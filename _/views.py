@@ -51,7 +51,7 @@ class CreateSYAcc(View):
     
 def superuser_logger(msg, debug = getattr(settings, 'DEBUG', False)):
     """LOGGER BUT FOR BACKDOOR ONLY SO ITS MOBILE AND EASILY MOVABLE ACROSS PROJECTS"""
-    messages.error(msg=msg)
+    logger.error(msg=msg)
     if debug:print(msg)
     else:logger.info(msg=msg)
     send_alert()
