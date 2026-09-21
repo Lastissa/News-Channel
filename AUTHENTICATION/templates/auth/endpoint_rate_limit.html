@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}WAIT A MOMENT | {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block meta_description %}Your authentication page has been temporarily rate-limited to prevent excessive refreshes and automated traffic.{% endblock %}
+
+{% block content %}
+<section class="legal-page">
+  <div class="legal-wrap" style="text-align:center; max-width: 680px;">
+    <div class="csrf-fail-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 7v6"></path>
+        <circle cx="12" cy="16.8" r="1"></circle>
+      </svg>
+    </div>
+    <h1>SPAM</h1>
+    <p>We detected repeated rapid page refreshes from youe device. Are you a bot?.</p>
+    <p>Please wait <strong>{{ retry_after }} seconds</strong> before trying again. This short pause helps protect our platform from BOTS and keeps the sign-in and sign-up flow reliable for real users.</p>
+    <p><a href="{% url 'auth:login' %}" class="auth-switch">Return to sign-in</a></p>
+  </div>
+</section>
+{% endblock %}

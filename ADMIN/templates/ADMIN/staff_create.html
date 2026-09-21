@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add staff · {{ project_name }}{% endblock %}
+
+{% block content %}
+<section class="profile-shell staff-create-shell">
+
+  <div class="profile-header-bar">
+    <h1>Add staff</h1>
+    <div class="profile-header-actions">
+      <a href="{% url 'home:profile' %}" class="profile-add-news-link">Back</a>
+    </div>
+  </div>
+
+  <div class="staff-create-layout">
+    <form class="profile-card staff-create-form" method="post" action="{% url 'control:staff_create' %}"
+          data-staff-create-form data-endpoint="{% url 'control:staff_create' %}" novalidate>
+      {% csrf_token %}
+
+      <div class="panel-header">
+        <h3>New staff account</h3>
+        <span class="panel-tag">Admin Only.</span>
+      </div>
+
+      {% if form_error %}
+      <p class="staff-create-error">{{ form_error }}</p>
+      {% endif %}
+
+      {% comment %} Role options come from SERVICE_INTERNAL.config.StaffConfig, which
+            reads STAFF.models.STAFF_ROLE. Protected roles (Founder) is never
+            offered here. {% endcomment %}
+      <div class="staff-field staff-field-wide">
+        <label for="staff-create-email">Email</label>
+        <input id="staff-create-email" type="email" name="email" maxlength="254"
+               value="{{ form_data.email|default:'' }}" placeholder="new.staff@example.com" autocomplete="off" required>
+        <small>Means of Authentication for the new staff.</small>
+      </div>
+
+      <div class="staff-field staff-field-wide">
+        <label for="staff-create-password">Password</label>
+        <input id="staff-create-password" type="text" name="password" value="NewStaff"
+               autocomplete="off" required>
+        <small>Initial password. The staff member can choose to change it after first login.</small>
+      </div>
+
+      <div class="staff-field staff-field-wide">
+        <label for="staff-create-full-name">Full name / UserName</label>
+        <input id="staff-create-full-name" type="text" name="full_name" maxlength="100"
+               value="{{ form_data.full_name|default:'' }}" placeholder="Name attached to their stories" required>
+        <small>Shown on every story they publish.</small>
+      </div>
+
+      <div class="staff-field">
+        <label for="staff-create-gender">Gender</label>
+        <select id="staff-create-gender" name="gender" required>
+          <option value="" {% if not form_data.gender %}selected{% endif %}>Select gender</option>
+          {% for value, label in gender_choices %}
+            <option value="{{ value }}" {% if form_data.gender == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="staff-field">
+        <label for="staff-create-role">Role</label>
+        <select id="staff-create-role" name="role" required>
+          <option value="" {% if not form_data.role %}selected{% endif %}>Select role</option>
+          {% for value, label in role_choices %}
+            <option value="{{ value }}" {% if form_data.role == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% comment %} AUTHORITY: a single whitelisted flag. Granting admin here tops outat is_admin=True; {% endcomment %}
+      <label class="staff-create-check staff-field-wide" for="staff-create-admin">
+        <input id="staff-create-admin" type="checkbox" name="is_admin" {% if form_data.is_admin %}checked{% endif %}>
+        <span>Grant admin access</span>
+        <small>Do Not Tick This If You Are Only Creating A Staff Account That Shouldn't Have Access Like You Do.</small>
+      </label>
+
+      <div class="staff-form-actions staff-field-wide">
+        <button type="submit" class="profile-action-btn primary" data-staff-create-btn>Create staff account</button>
+      </div>
+      <p class="staff-record-feedback staff-field-wide" data-staff-create-feedback role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'home/css/profile.css' %}">
+{% endblock %}

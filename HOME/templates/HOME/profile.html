@@ -1,0 +1,660 @@
+{% extends "base.html" %}
+{% load static %}
+{% load custom_tag %}
+
+{% block title %}Profile · {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block content %}
+<section class="profile-shell">
+  <div class="profile-header-bar">
+    <h1> <a href="/portfolio/{{request.user.id}}">Profile</a></h1>
+    <div class="profile-header-actions">
+      {% if is_admin_user %}
+        <a href="{% url 'control:staff_create' %}" class="profile-add-news-link">+ Staff</a>
+      {% endif %}
+      {% if show_staff_dashboard %}
+        <a href="{% url 'home:add_news' %}" class="profile-add-news-link" data-add-news-link> <b>+</b> NeWs</a>
+      {% endif %}
+      {% comment %} DELETE ACCOUNT: every account except the superuser. The
+          placard overlay is fetched by htmx only once this button is pressed,
+          so nothing about the flow ships with the page itself. {% endcomment %}
+      {% if not user.is_superuser %}
+        <button type="button" class="profile-add-news-link profile-delete-account-btn"
+                hx-get="{% url 'home:profile_delete_placard' %}?step=1"
+                hx-target="[data-delete-overlay]"
+                hx-swap="innerHTML">Delete Account</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="profile-layout">
+    <aside class="profile-summary" aria-label="Profile settings">
+      <div class="profile-identity-row">
+        <div class="profile-avatar-wrap">
+          <img src="{{ user.profile_img}}" alt="{{ user.email }} avatar" class="profile-avatar" onerror="this.onerror=null;this.src='/static/404.jpg';">
+        </div>
+
+        <div class="profile-identity-copy">
+          <h2>{% if profile and profile.full_name %}{{ profile.full_name }}{% else %}{{ request.user.email | before_at }}{% endif %}</h2>
+          <p class="profile-role">
+            {% if is_admin_user %}Admin{% elif is_staff_user %}Staff{% else %}Member account{% endif %}
+          </p>
+        </div>
+      </div>
+
+      <div class="profile-info-list">
+        <div><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>
+        <div><span>Last login</span><strong>{{ user.last_login|date:"M d, Y H:i"|default:"Not recorded" }}</strong></div>
+        <div><span>Active sessions</span><strong>{{ user_sessions|length }}</strong></div>
+      </div>
+
+      <div class="profile-setting-block">
+        <div class="setting-row">
+          <div class="setting-copy">
+            <span class="setting-label">Alert</span>
+            <small>{% if user.receive_email_login_alert %}Receiving login alert{% else %}Not receiving login alert{% endif %}</small>
+          </div>
+          <div class="newsletter-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-switch {% if user.receive_email_login_alert %}is-on{% endif %}"
+              aria-pressed="{{ user.receive_email_login_alert|yesno:'true,false' }}"
+              data-newsletter-toggle
+              data-enable-url="{% url 'home:profile_newsletter_toggle' %}"
+              data-enabled="{{ user.receive_email_login_alert|yesno:'true,false' }}"
+              data-on-text="Receiving login alert"
+              data-off-text="Not receiving login alert">
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {% if is_staff_user and profile %}
+      <div class="profile-setting-block">
+        <div class="setting-row">
+          <div class="setting-copy">
+            <span class="setting-label">Story views alert</span>
+            <small>{% if profile.get_blog_notification %}Receiving view alert for stories{% else %}Not receiving view alert{% endif %}</small>
+          </div>
+          <div class="newsletter-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-switch {% if profile.get_blog_notification %}is-on{% endif %}"
+              aria-pressed="{{ profile.get_blog_notification|yesno:'true,false' }}"
+              data-newsletter-toggle
+              data-enable-url="{% url 'home:profile_blog_notification_toggle' %}"
+              data-enabled="{{ profile.get_blog_notification|yesno:'true,false' }}"
+              data-on-text="Receiving view reminders"
+              data-off-text="Not receiving view reminders">
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="profile-setting-block">
+        <div class="setting-row">
+          <div class="setting-copy">
+            {% comment %} TODO: A follow btn attached to author profile to know the news to send to users that on this setting
+            Currently i plan to send all news with info that they once they have at least one suscribed author, they get only news alert from that one
+            {% endcomment %}
+            <span class="setting-label">News Alert</span>
+            <small>{% if user.send_newsletter %}Receiving news updates{% else %}Not receiving news updates{% endif %}</small>
+          </div>
+          <div class="newsletter-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-switch {% if user.send_newsletter %}is-on{% endif %}"
+              aria-pressed="{{ user.send_newsletter|yesno:'true,false' }}"
+              data-newsletter-toggle
+              data-enable-url="{% url 'home:profile_send_newsletter_toggle' %}"
+              data-enabled="{{ user.send_newsletter|yesno:'true,false' }}"
+              data-on-text="Receiving news updates"
+              data-off-text="Not receiving news updates">
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-actions profile-image-actions">
+        <div class="profile-image-link-form">
+          <label class="visually-hidden" for="profile-image-url">Profile image URL</label>
+          <input id="profile-image-url" type="url" name="image_url" placeholder="Paste image URL for Preview before update" autocomplete="off">
+          <div class="profile-image-actions-row">
+            <button type="button" class="profile-action-btn preview-image-btn" data-preview-profile-image >Preview</button>
+            <button type="button" class="profile-action-btn primary save-image-btn" data-save-profile-image>Update  pic (link)</button>
+          </div>
+        </div>
+        <button type="button" class="profile-action-btn">Upload avatar (file)</button>
+      </div>
+
+      <!--  LOG OUT ALL SESSIONS: available to every signed in user. Ends every
+            session the account holds, including the one that clicked, so the
+            page then redirects to the login page. -->
+      <div class="profile-setting-block profile-logout-all-block">
+        <button type="button" class="profile-action-btn logout-all-btn"
+                data-logout-all-sessions
+                data-endpoint="{% url 'home:profile_logout_all' %}">
+          Log out all sessions
+        </button>
+        <p class="staff-record-feedback" data-logout-all-feedback role="status" aria-live="polite"></p>
+      </div>
+    </aside>
+
+    <main class="profile-main">
+      {% if is_admin_user %}
+        <section class="profile-card profile-panel" id="staff-directory">
+          <div class="panel-header">
+            <h3>All staff</h3>
+            <span class="panel-tag">{{ staff_directory_page_obj.paginator.count }} total</span>
+          </div>
+          <div id="profile-staff-list" class="profile-bookmark-shell" data-staff-page="{{ staff_directory_page_obj.number }}" data-staff-endpoint="{% url 'control:staff_directory' %}">
+            {% if staff_directory %}
+            <ul class="profile-list staff-directory-list">
+              {% for member in staff_directory %}
+              <li>
+                <div>
+                  <strong>{{ member.heading }}</strong>
+                  <small>{{ member.detail }}</small>
+                </div>
+                <a href="{{ member.url }}">Open</a>
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-copy">This is Almost impossible to reach as you are a staff yourself and you are supposed to show but only reachable if no staff account was found though. Contact Developer +2348113577875</p>
+            {% endif %}
+          </div>
+
+          {% if staff_directory_page_obj.paginator.num_pages > 1 %}
+          <nav class="story-pagination profile-staff-pagination" aria-label="Staff pagination">
+            {% if staff_directory_page_obj.has_previous %}
+              <button type="button" class="story-page-btn page-nav" data-staff-page-btn data-page="{{ staff_directory_page_obj.previous_page_number }}">Prev</button>
+            {% endif %}
+
+            {% for page_num in staff_directory_page_range %}
+              {% if page_num == staff_directory_page_obj.paginator.ELLIPSIS %}
+                <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+              {% else %}
+                <button type="button" class="story-page-btn {% if page_num == staff_directory_page_obj.number %}is-active{% endif %}"
+                        data-staff-page-btn data-page="{{ page_num }}"
+                        aria-label="Go to page {{ page_num }}"
+                        {% if page_num == staff_directory_page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
+              {% endif %}
+            {% endfor %}
+
+            {% if staff_directory_page_obj.has_next %}
+              <button type="button" class="story-page-btn page-nav" data-staff-page-btn data-page="{{ staff_directory_page_obj.next_page_number }}">Next</button>
+            {% endif %}
+          </nav>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      {% if show_staff_dashboard %}
+        <section class="profile-card profile-panel staff-panel" id="staff-access">
+          <div class="panel-header">
+            <h3>Staff Profile</h3>
+            <span class="panel-tag">{{ profile.get_role_display|default:"Staff" }}</span>
+          </div>
+          <p class="staff-panel-intro">Customize apperance .</p>
+
+          <form class="staff-profile-form" method="post" action="{% url 'home:profile_staff_update' %}" data-staff-profile-form data-endpoint="{% url 'home:profile_staff_update' %}" novalidate>
+            {% csrf_token %}
+
+            <div class="staff-field">
+              <label for="staff-full-name">Full name</label>
+              <input id="staff-full-name" type="text" name="full_name" maxlength="100" value="{{ profile.full_name|default:'' }}" required>
+              <small>Name Attached To Stories.</small>
+            </div>
+
+            <div class="staff-field">
+              <label for="staff-gender">Gender</label>
+              <select id="staff-gender" name="gender" {% if not is_admin_user %}disabled{% endif %}>
+                <option value="" {% if not profile or not profile.gender %}selected{% endif %}>Select gender</option>
+                {% for value, label in gender_choices %}
+                  <option value="{{ value }}" {% if profile and profile.gender == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small>{% if is_admin_user %}Pronoun identification.{% else %}Admin only.{% endif %}</small>
+            </div>
+
+            <!--  OWN ROLE: an admin may change their own role here, on their
+                  own profile. Options come from StaffConfig, so editing
+                  STAFF_ROLE updates this dropdown everywhere at once. It posts
+                  to its own endpoint; the form's Save changes never touches
+                  role. -->
+            {% if is_admin_user %}
+            <div class="staff-field" data-own-role-block>
+              <label for="staff-role">Role</label>
+              <select id="staff-role" data-own-role-input>
+                {% if profile and profile.role in protected_roles %}
+                  <option value="{{ profile.role }}" selected disabled>{{ profile.get_role_display }} (locked)</option>
+                {% endif %}
+                {% for value, label in role_choices %}
+                  <option value="{{ value }}" {% if profile and profile.role == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small>Every change update your 'last-promotion' date.</small>
+              <button type="button" class="profile-action-btn" data-own-role-save data-endpoint="{% url 'control:own_role' %}">Update role</button>
+              <p class="staff-record-feedback" data-own-role-feedback role="status" aria-live="polite"></p>
+            </div>
+            {% endif %}
+
+            <div class="staff-field">
+              <label for="staff-twitter">X (Twitter) URL</label>
+              <input id="staff-twitter" type="url" name="twitter_handle" value="{{ profile.twitter_handle|default:'' }}" placeholder="https://x.com/handle">
+            </div>
+
+            <div class="staff-field">
+              <label for="staff-facebook">Facebook URL</label>
+              <input id="staff-facebook" type="url" name="facebook_handle" value="{{ profile.facebook_handle|default:'' }}" placeholder="https://facebook.com/page">
+            </div>
+
+            <div class="staff-field">
+              <label for="staff-whatsapp">WhatsApp URL</label>
+              <input id="staff-whatsapp" type="url" name="whatsapp_handle" value="{{ profile.whatsapp_handle|default:'' }}" placeholder="https://wa.me/234...">
+            </div>
+
+            <div class="staff-field">
+              <label for="staff-speciality">Speciality</label>
+              <input id="staff-speciality" type="text" name="speciality" value="{{ speciality_csv }}" placeholder="e.g. Politics, Education" {% if not is_admin_user %}disabled{% endif %}>
+              <small>Comma separated tags shown on your stories.{% if not is_admin_user %} Admin only.{% endif %}</small>
+            </div>
+
+            <div class="staff-field staff-field-wide">
+              <label for="staff-bio">Bio</label>
+              <textarea id="staff-bio" name="bio" rows="4" placeholder="Tell readers about yourself...">{{ profile.bio|default:'' }}</textarea>
+            </div>
+
+            <div class="staff-form-actions staff-field-wide">
+              <button type="submit" class="profile-action-btn primary" data-staff-save-btn>Save changes</button>
+            </div>
+          </form>
+        </section>
+      {% endif %}
+
+      {% if show_staff_dashboard %}
+        <section class="profile-card profile-panel" id="published-stories">
+          <div class="panel-header">
+            <h3>Published stories</h3>
+            <span class="panel-tag">{{ stories_page_obj.paginator.count }} total</span>
+          </div>
+          <div id="profile-published-list" class="profile-bookmark-shell" data-published-page="{{ stories_page_obj.number }}" data-published-endpoint="{% url 'home:profile_published' %}">
+            {% if published_stories %}
+            <ul class="profile-list">
+              {% for blog in published_stories %}
+              <li data-published-story-item>
+                <div>
+                  <strong>{{ blog.heading }}</strong>
+                  <small>{{ blog.views }} view{{ blog.views|pluralize }} &bull; {{ blog.date_created|date:"M d, Y" }}</small>
+                </div>
+                <div class="published-story-actions">
+                  <a href="{% url 'blog:story_detail' blog.id %}">Open</a>
+                  <form method="post" action="{% url 'home:profile_published_delete' blog.id %}" data-published-story-delete-form data-endpoint="{% url 'home:profile_published_delete' blog.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="published-story-delete-btn" aria-label="Delete {{ blog.heading }}" title="Delete story">
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
+                      </svg>
+                      <span class="visually-hidden">Del Story</span>
+                    </button>
+                  </form>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-copy">No stories published yet.</p>
+            {% endif %}
+          </div>
+
+          {% if stories_page_obj.paginator.num_pages > 1 %}
+          <nav class="story-pagination profile-published-pagination" aria-label="Published stories pagination">
+            {% if stories_page_obj.has_previous %}
+              <button type="button" class="story-page-btn page-nav" data-published-page-btn data-page="{{ stories_page_obj.previous_page_number }}">Prev</button>
+            {% endif %}
+
+            {% for page_num in stories_page_range %}
+              {% if page_num == stories_page_obj.paginator.ELLIPSIS %}
+                <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+              {% else %}
+                <button type="button" class="story-page-btn {% if page_num == stories_page_obj.number %}is-active{% endif %}"
+                        data-published-page-btn data-page="{{ page_num }}"
+                        aria-label="Go to page {{ page_num }}"
+                        {% if page_num == stories_page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
+              {% endif %}
+            {% endfor %}
+
+            {% if stories_page_obj.has_next %}
+              <button type="button" class="story-page-btn page-nav" data-published-page-btn data-page="{{ stories_page_obj.next_page_number }}">Next</button>
+            {% endif %}
+          </nav>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      <section class="profile-card profile-panel" id="recent-bookmarks">
+        <div class="panel-header">
+          <h3>Recent bookmarks</h3>
+          <span class="panel-tag">Latest</span>
+        </div>
+        <div id="profile-bookmarks-list" class="profile-bookmark-shell" data-bookmark-page="{{ bookmark_page_obj.number }}" data-bookmark-endpoint="{% url 'home:profile_bookmarks' %}">
+          {% if recent_bookmarks %}
+          <ul class="profile-list">
+            {% for bookmark in recent_bookmarks %}
+              <li>
+                <div>
+                  <strong>{{ bookmark.blog.heading }}</strong>
+                  <small>{{ bookmark.created_at|date:"M d, Y" }}</small>
+                </div>
+                <div class="profile-bookmark-actions">
+                  <a href="{% url 'blog:story_detail' bookmark.blog_id %}">Open</a>
+                  <button type="button" class="profile-bookmark-toggle" data-bookmark-btn data-endpoint="{% url 'home:bookmark' bookmark.blog_id %}" data-saved="true" aria-pressed="true" aria-label="Remove {{ bookmark.blog.heading }} from bookmarks" title="Rem BookMark">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4-6.5 4V4.5a1 1 0 0 1 1-1Z" fill="currentColor" />
+                    </svg>
+                    <span class="visually-hidden">Remove bookmark</span>
+                  </button>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="empty-copy">No bookmarks saved yet. All news you bookmarked appear here.</p>
+          {% endif %}
+        </div>
+
+        {% if bookmark_page_obj.paginator.num_pages > 1 %}
+        <nav class="story-pagination profile-bookmark-pagination" aria-label="Bookmark pagination">
+          {% if bookmark_page_obj.has_previous %}
+            <button type="button" class="story-page-btn page-nav" data-bookmark-page-btn data-page="{{ bookmark_page_obj.previous_page_number }}">Prev</button>
+          {% endif %}
+
+          {% for page_num in bookmark_page_range %}
+            {% if page_num == bookmark_page_obj.paginator.ELLIPSIS %}
+              <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+            {% else %}
+              <button type="button" class="story-page-btn {% if page_num == bookmark_page_obj.number %}is-active{% endif %}"
+                      data-bookmark-page-btn data-page="{{ page_num }}"
+                      aria-label="Go to page {{ page_num }}"
+                      {% if page_num == bookmark_page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
+            {% endif %}
+          {% endfor %}
+
+          {% if bookmark_page_obj.has_next %}
+            <button type="button" class="story-page-btn page-nav" data-bookmark-page-btn data-page="{{ bookmark_page_obj.next_page_number }}">Next</button>
+          {% endif %}
+        </nav>
+        {% endif %}
+      </section>
+
+      <section class="profile-card profile-panel" id="reading-history">
+        <div class="panel-header">
+          <h3>Reading history</h3>
+        </div>
+        <div id="profile-history-list" class="profile-bookmark-shell" data-history-page="{{ history_page_obj.number }}" data-history-endpoint="{% url 'home:profile_history' %}">
+          {% if reading_history %}
+          <ul class="profile-list">
+            {% for blog in reading_history %}
+            <li>
+              <div>
+                <strong>{{ blog.heading }}</strong>
+                <small>{{ blog.date_created|date:"M d, Y" }}</small>
+              </div>
+              <a href="{% url 'blog:story_detail' blog.id %}">Open</a>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="empty-copy">No reading history yet. All news you view shows here</p>
+          {% endif %}
+        </div>
+
+        {% if history_page_obj.paginator.num_pages > 1 %}
+        <nav class="story-pagination profile-history-pagination" aria-label="Reading history pagination">
+          {% if history_page_obj.has_previous %}
+            <button type="button" class="story-page-btn page-nav" data-history-page-btn data-page="{{ history_page_obj.previous_page_number }}">Prev</button>
+          {% endif %}
+
+          {% for page_num in history_page_range %}
+            {% if page_num == history_page_obj.paginator.ELLIPSIS %}
+              <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+            {% else %}
+              <button type="button" class="story-page-btn {% if page_num == history_page_obj.number %}is-active{% endif %}"
+                      data-history-page-btn data-page="{{ page_num }}"
+                      aria-label="Go to page {{ page_num }}"
+                      {% if page_num == history_page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
+            {% endif %}
+          {% endfor %}
+
+          {% if history_page_obj.has_next %}
+            <button type="button" class="story-page-btn page-nav" data-history-page-btn data-page="{{ history_page_obj.next_page_number }}">Next</button>
+          {% endif %}
+        </nav>
+        {% endif %}
+      </section>
+
+      <section class="profile-card profile-panel" id="recent-comments">
+        <div class="panel-header">
+          <h3>Recent comments</h3>
+        </div>
+        <div id="profile-comments-list" class="profile-bookmark-shell" data-comments-page="{{ comments_page_obj.number }}" data-comments-endpoint="{% url 'home:profile_comments' %}">
+          {% if recent_comments %}
+          <ul class="profile-list">
+            {% for comment in recent_comments %}
+            <li>
+              <div>
+                <strong>{{ comment.blog.heading }}</strong>
+                <small>{{ comment.content|truncatechars:85 }}</small>
+              </div>
+              <a href="{% url 'blog:story_detail' comment.blog_id %}">View</a>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="empty-copy">No comments yet. All comment made on every news appear here</p>
+          {% endif %}
+        </div>
+
+        {% if comments_page_obj.paginator.num_pages > 1 %}
+        <nav class="story-pagination profile-comments-pagination" aria-label="Comments pagination">
+          {% if comments_page_obj.has_previous %}
+            <button type="button" class="story-page-btn page-nav" data-comments-page-btn data-page="{{ comments_page_obj.previous_page_number }}">Prev</button>
+          {% endif %}
+
+          {% for page_num in comments_page_range %}
+            {% if page_num == comments_page_obj.paginator.ELLIPSIS %}
+              <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+            {% else %}
+              <button type="button" class="story-page-btn {% if page_num == comments_page_obj.number %}is-active{% endif %}"
+                      data-comments-page-btn data-page="{{ page_num }}"
+                      aria-label="Go to page {{ page_num }}"
+                      {% if page_num == comments_page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
+            {% endif %}
+          {% endfor %}
+
+          {% if comments_page_obj.has_next %}
+            <button type="button" class="story-page-btn page-nav" data-comments-page-btn data-page="{{ comments_page_obj.next_page_number }}">Next</button>
+          {% endif %}
+        </nav>
+        {% endif %}
+      </section>
+    </main>
+  </div>
+
+  {#   THE DELETE ACCOUNT PLACARD OVERLAY LANDS HERE, EMPTY UNTIL THE BUTTON IS PRESSED   #}
+  <div data-delete-overlay></div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+{{ block.super }} {% comment %} TO CLONE THE PARENT CONTNT FOR EXTRA HEAD FIRST ISTEAD OF OVERIDING {% endcomment %}
+<link rel="stylesheet" href="{% static 'home/css/profile.css' %}">
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ block.super }}
+  <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+  <script>
+    (function () {
+      /*  DELETE ACCOUNT PLEASE WAIT: while the placard is being fetched the
+          user gets a blurred, self closing window instead of an empty page.
+          CHANGE DELETE_PLACARD_WAIT_SECONDS to move the force close time. It
+          is also the watchdog: a placard request that hangs (lost network
+          mid flight) is aborted after this many seconds so no button ever
+          freezes. */
+      var DELETE_PLACARD_WAIT_SECONDS = 8;
+
+      var overlayHost = document.querySelector("[data-delete-overlay]");
+      if (!overlayHost) return;
+
+      var waitTimer = null;
+      var countdownTimer = null;
+      var watchdogTimer = null;
+      var pendingXhr = null;
+      var busyButton = null;
+
+      function stopTimers() {
+        window.clearTimeout(waitTimer);
+        window.clearInterval(countdownTimer);
+        window.clearTimeout(watchdogTimer);
+        waitTimer = null;
+        countdownTimer = null;
+        watchdogTimer = null;
+      }
+
+      function closeOverlay() {
+        if (pendingXhr) { try { pendingXhr.abort(); } catch (err) { /* request already gone */ } }
+        pendingXhr = null;
+        stopTimers();
+        overlayHost.innerHTML = "";
+      }
+
+      /*  True for the header Delete account button and anything inside the
+          placard: every request that swaps into the overlay. */
+      function isOverlayRequest(elt) {
+        return !!(elt && elt.classList &&
+          (elt.classList.contains("profile-delete-account-btn") || overlayHost.contains(elt)));
+      }
+
+      function isHeaderDeleteButton(elt) {
+        return !!(elt && elt.classList && elt.classList.contains("profile-delete-account-btn"));
+      }
+
+      function setButtonBusy(elt, busy) {
+        if (busy) {
+          busyButton = elt;
+          elt.dataset.originalText = elt.textContent;
+          elt.disabled = true;
+          elt.textContent = elt.dataset.busyLabel || "Checking...";
+        } else if (busyButton) {
+          busyButton.disabled = false;
+          if (busyButton.dataset.originalText) busyButton.textContent = busyButton.dataset.originalText;
+          busyButton = null;
+        }
+      }
+
+      function showStepError(message) {
+        var node = overlayHost.querySelector("[data-delete-step-error]");
+        if (!node) return;
+        node.textContent = message;
+        node.hidden = false;
+      }
+
+      function showPleaseWait() {
+        overlayHost.innerHTML =
+          '<div class="delete-account-layer" data-delete-wait>' +
+          '  <div class="delete-account-backdrop" data-delete-wait-close></div>' +
+          '  <div class="delete-account-placard delete-account-placard-wait" role="status" aria-live="polite">' +
+          '    <span class="delete-account-spinner" aria-hidden="true"></span>' +
+          '    <h3>Please wait</h3>' +
+          '    <p>Preparing the account deletion check...</p>' +
+          '    <small>Closes by itself in <strong data-delete-wait-count>' + DELETE_PLACARD_WAIT_SECONDS + '</strong> seconds.</small>' +
+          '  </div>' +
+          '</div>';
+
+        var closeNode = overlayHost.querySelector("[data-delete-wait-close]");
+        if (closeNode) closeNode.addEventListener("click", closeOverlay);
+
+        var secondsLeft = DELETE_PLACARD_WAIT_SECONDS;
+        countdownTimer = window.setInterval(function () {
+          secondsLeft -= 1;
+          var counter = overlayHost.querySelector("[data-delete-wait-count]");
+          if (counter) counter.textContent = String(Math.max(secondsLeft, 0));
+          if (secondsLeft <= 0) window.clearInterval(countdownTimer);
+        }, 1000);
+
+        waitTimer = window.setTimeout(closeOverlay, DELETE_PLACARD_WAIT_SECONDS * 1000);
+      }
+
+      /*  A confirm or finalize request that hangs (lost network mid flight)
+          is aborted on the watchdog. htmx restores the button on abort and
+          the afterRequest handler below shows the retry message, so the
+          button never freezes dead. */
+      function fireWatchdog() {
+        watchdogTimer = null;
+        if (pendingXhr) { try { pendingXhr.abort(); } catch (err) { /* already settled */ } }
+        pendingXhr = null;
+        setButtonBusy(busyButton, false);
+        showStepError("This is taking too long. Check your connection and try again.");
+      }
+
+      document.body.addEventListener("htmx:beforeRequest", function (event) {
+        var elt = event.detail && event.detail.elt;
+        if (!isOverlayRequest(elt)) return;
+        pendingXhr = event.detail.xhr || null;
+        if (isHeaderDeleteButton(elt)) {
+          showPleaseWait();
+        } else {
+          setButtonBusy(elt, true);
+          watchdogTimer = window.setTimeout(fireWatchdog, DELETE_PLACARD_WAIT_SECONDS * 1000);
+        }
+      });
+
+      /*  htmx refuses to swap non 2xx responses by default. The placard
+          answers mistakes with rendered fragments (400 wrong email, 429 rate
+          limit), so let exactly those through for overlay requests; 401 and
+          403 stay unswapped JSON and are handled by afterRequest instead. */
+      document.body.addEventListener("htmx:beforeSwap", function (event) {
+        var elt = event.detail && event.detail.elt;
+        if (!isOverlayRequest(elt)) return;
+        var status = event.detail.xhr ? event.detail.xhr.status : 0;
+        if (status === 400 || status === 429) {
+          event.detail.shouldSwap = true;
+          event.detail.isError = false;
+        }
+      });
+
+      document.body.addEventListener("htmx:afterRequest", function (event) {
+        var elt = event.detail && event.detail.elt;
+        if (!isOverlayRequest(elt)) return;
+        var status = event.detail.xhr ? event.detail.xhr.status : 0;
+        pendingXhr = null;
+        /*  On success the swap has already replaced the wait window with the
+            real placard, so only the timers need clearing; on failure nothing
+            was swapped, so force close instead of leaving a stuck window. */
+        stopTimers();
+        if (isHeaderDeleteButton(elt)) {
+          if (!event.detail.successful) closeOverlay();
+          return;
+        }
+        setButtonBusy(busyButton, false);
+        /*  status 0 = network failure or watchdog abort: no fragment arrived,
+            so say it and keep the current step so the user can just retry.
+            Rendered error fragments (400/429) already carry their message. */
+        if (!event.detail.successful && status === 0) {
+          showStepError("Network issue. Check your connection and try again.");
+        }
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && overlayHost.querySelector("[data-delete-wait]")) closeOverlay();
+      });
+    })();
+  </script>
+{% endblock %}

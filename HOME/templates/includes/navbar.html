@@ -1,0 +1,70 @@
+{% load static %}
+<header class="site-header" id="site-header">
+  <div class="header-bar">
+    <a href="{% url 'home:home' %}" class="brand">
+      <img src="{% static "logo.jpg" %}" alt="{{ project_name }} logo" class="brand-mark" width="36" height="36" loading="eager">
+      <span class="brand-word">{{ project_name }}</span>
+    </a>
+  
+
+    <nav class="primary-nav" id="primary-nav-mobile" aria-label="Primary">
+      <ul>
+        <li><a href="{% url 'home:home' %}">Home</a></li>
+        <li><a href="#" class="soon" >Editorial team</a></li>
+        <li class="has-dropdown">
+          <button type="button" class="dropdown-toggle" aria-expanded="false" aria-haspopup="true">News category
+            <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <ul class="dropdown-menu">
+            <li class="category-filter">
+              <label class="visually-hidden" for="category-filter">Filter news categories</label>
+              <input id="category-filter" type="search" placeholder="Filter categories" autocomplete="off" data-category-filter>
+            </li>
+            {% for value, label in nav_categories %}
+            <li data-category-option><a href="{% url 'home:home' %}?category={{ value }}">{{ label|title }}</a></li>
+            {% endfor %}
+          </ul>
+        </li>
+        <li><a href="#" aria-disabled="true" class="soon">Services<span class="soon-tag">Soon</span></a></li>
+        {% if request.user.is_authenticated %}
+        <li class="has-dropdown">
+          <button type="button" class="dropdown-toggle" aria-expanded="false" aria-haspopup="true">Profile
+            <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="{% url 'home:profile' %}">Profile home</a></li>
+            <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
+            <li><a href="{% url 'home:profile' %}#reading-history">Stories history</a></li>
+            <li><a href="{% url 'home:profile' %}#recent-comments">Comment history</a></li>
+          </ul>
+        </li>
+        <li class="nav-logout-item">
+          <form method="post" action="{% url 'auth:logout' %}" class="nav-logout-form" data-logout-form>
+            {% csrf_token %}
+            <button type="submit" class="nav-logout-btn" data-logout-btn>Logout</button>
+          </form>
+        </li>
+        {% else %}
+        <li><a href="{% url 'auth:register' %}?to={{ request.get_full_path|urlencode }}">Sign up</a></li>
+        <li><a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}">Log in</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+
+    <div class="header-actions">
+      <form class="search-form" action="{% url 'home:home' %}" method="get" role="search">
+        <input type="search" name="q" id="search-input" placeholder="Search Headlines" aria-label="Search Headlines" value="{{ query|default:'' }}">
+      </form>
+      <button type="button" class="icon-btn" id="search-toggle" aria-label="Toggle search" aria-expanded="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M14 14l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="theme-toggle" aria-label="Toggle dark mode">
+        <svg viewBox="0 0 20 20" class="icon-sun" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"/><g stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 1.5v2.4M10 16.1v2.4M18.5 10h-2.4M3.9 10H1.5M15.9 4.1l-1.7 1.7M5.8 14.2l-1.7 1.7M15.9 15.9l-1.7-1.7M5.8 5.8L4.1 4.1"/></g></svg>
+        <svg viewBox="0 0 20 20" class="icon-moon" aria-hidden="true"><path d="M17 11.2A7.2 7.2 0 018.8 3a7.2 7.2 0 108.2 8.2z" fill="currentColor"/></svg>
+      </button>
+      <button type="button" class="icon-btn nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="primary-nav-mobile">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5h15M2.5 10h15M2.5 14.5h15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+</header>

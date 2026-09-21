@@ -1,0 +1,10 @@
+asgiref==3.12.1
+Django==6.1.1
+django-redis==7.0.0
+djangorestframework==3.18.1
+dotenv==0.9.9
+python-dotenv==1.2.3
+redis==8.1.0
+sqlparse==0.6.0
+tzdata==2026.3
+whitenoise==6.12.0

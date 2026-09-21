@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% static 'home_no_bg.svg' as placeholder %}
+{% if not is_filtered %}
+<section class="hero" id="hero-carousel" aria-label="Featured stories" data-autoplay="6000">
+  {% if featured_posts %}
+  <div class="hero-track">
+    {% for post in featured_posts %}
+        <article class="hero-slide {% if forloop.first %}is-active{% endif %}"style="--slide-image: url('{{ post.image_1|default:placeholder}}');" data-index="{{ forloop.counter0 }}">
+      <div class="hero-scrim"></div>
+      <div class="hero-content">
+        <p class="hero-label"><span class="dot"></span>Featured story</p>
+        <h1 class="hero-headline"><a href="{% url 'blog:story_detail' post.id %}">{{ post.heading }}</a></h1>
+        {% comment %} i comment it out bcos its good for only by email@domain.com  not staff full name {% endcomment %}
+          <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }}</p>
+        <div class="hero-actions">
+          <a class="glass-btn" href="{% url 'blog:story_detail' post.id %}" target="_self">Read story</a>
+          <a class="glass-btn glass-btn-outline" href="{% url 'blog:story_detail' post.id %}" target="_self"
+             data-share-btn data-share-url="{{request.get_host}}{% url 'blog:story_detail' post.id %}">Share story</a>
+        </div>
+      </div>
+      <button type="button"
+              class="bookmark-chip hero-bookmark"
+              data-bookmark-btn
+              data-blog-id="{{ post.id }}"
+              data-endpoint="{% url 'home:bookmark' post.id %}"
+              data-saved="{% if post.id in saved_ids %}true{% else %}false{% endif %}"
+              aria-pressed="{% if post.id in saved_ids %}true{% else %}false{% endif %}"
+              aria-label="Save story">
+        <svg viewBox="0 0 20 20" class="bookmark-icon" aria-hidden="true">
+          <path d="M5 3.5h10a1 1 0 011 1V18l-6-3.6L4 18V4.5a1 1 0 011-1z" fill="{% if post.id in saved_ids %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </article>
+    {% endfor %}
+  </div>
+
+  {% if featured_posts|length > 1 %}
+  <div class="hero-controls">
+    <button type="button" class="hero-arrow hero-prev" aria-label="Previous story">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4L7 10l5.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="hero-dots" role="tablist" aria-label="Choose featured story">
+      {% for post in featured_posts %}
+      <button type="button" class="hero-dot {% if forloop.first %}is-active{% endif %}" data-index="{{ forloop.counter0 }}" role="tab" aria-label="Story {{ forloop.counter }}"></button>
+      {% endfor %}
+    </div>
+    <button type="button" class="hero-arrow hero-next" aria-label="Next story">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4L13 10l-5.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="hero-empty">
+    <p class="hero-label"><span class="dot"></span>Featured story</p>
+    <h1 class="hero-headline hero-headline-empty">No stories yet</h1>
+    <p class="hero-empty-copy">New headlines land is seen here as soon as it is published.</p>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="story-grid-section">
+  <div class="section-heading">
+    <h2 id="headline">
+      {% if is_filtered %}
+        {% if query %}Results for "{{ query }}"{% elif active_category %}{{ active_category|title }}{% endif %}
+      {% else %}
+        Headlines
+      {% endif %}
+    </h2>
+    {% if is_filtered %}<a class="clear-filter" href="{% url 'home:home' %}">Clear</a>{% endif %}
+  </div>
+
+  <div class="story-grid" id="story-grid" data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.number }}{% endif %}" data-query="{{ query }}" data-category="{{ active_category }}">
+    {% include "HOME/partials/story_cards.html" %}
+  </div>
+
+  {% if page_obj.paginator.count == 0 %}
+  <p class="empty-state">
+    {% if is_filtered %}No Headline or Category Matches This Search. Try a different keyword.
+    {% else %}No headlines published yet. Check back shortly.{% endif %}
+  </p>
+  {% endif %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="story-pagination" aria-label="Story pagination">
+    {% if page_obj.has_previous %}
+      <a class="story-page-btn page-nav" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if active_category %}&category={{ active_category }}{% endif %}#headline" aria-label="Go to previous page">Prev</a>
+    {% endif %}
+
+    {% for page_num in page_range %}
+      {% if page_num == page_obj.paginator.ELLIPSIS %}
+        <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+      {% else %}
+        <a class="story-page-btn {% if page_num == page_obj.number %}is-active{% endif %}"
+           href="?page={{ page_num }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if active_category %}&category={{ active_category }}{% endif %}#headline"
+           aria-label="Go to page {{ page_num }}"
+           {% if page_num == page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+      <a class="story-page-btn page-nav" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if active_category %}&category={{ active_category }}{% endif %}#headline" aria-label="Go to next page">Next</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

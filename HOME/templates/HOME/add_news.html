@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add news | {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block meta_description %}Staff editor for publishing news stories on {{ project_name }}.{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <style>
+    .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
+    .editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .editor-toolbar h1 { margin: 0; font-size: 1.5rem; color: var(--ink); }
+    .editor-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .editor-loading-note { color: var(--slate); font-size: 0.82rem; }
+    .editor-preview-toggle, .editor-publish-btn {
+      border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--nav-bg);
+      color: var(--nav-fg); font: inherit; font-weight: 700; font-size: 0.85rem; padding: 9px 14px; cursor: pointer;
+    }
+    .editor-publish-btn { background: var(--amber-alt); }
+    .editor-workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+    .editor-pane {
+      border: 1px solid var(--line); border-radius: var(--radius-l); background: var(--surface);
+      height: calc(100vh - 150px); min-height: 420px; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .editor-shell.preview-off .editor-preview-pane { display: none; }
+    .editor-shell.preview-off .editor-workspace { grid-template-columns: 1fr; }
+    .editor-shell.is-loading .editor-workspace { filter: blur(7px); pointer-events: none; user-select: none; }
+    @media (max-width: 899.98px) {
+      .editor-workspace { grid-template-columns: 1fr; }
+      .editor-pane { height: auto; min-height: 0; }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<section class="editor-shell is-loading"
+         id="editor-shell"
+         data-heavy-css="{% static 'home/css/add-news.css' %}"
+         data-heavy-js="{% static 'home/js/add-news-editor.js' %}">
+  <div class="editor-toolbar">
+    <h1>+ news</h1>
+    <div class="editor-actions">
+      <span class="editor-loading-note" data-editor-loading-note>Preparing editor...</span>
+      <button type="button" class="editor-preview-toggle" data-editor-preview-toggle hidden>Hide preview</button>
+      <button type="submit" form="add-news-form" class="editor-publish-btn" data-editor-publish disabled>Publish</button>
+    </div>
+  </div>
+
+  <div class="editor-workspace">
+    <div class="editor-pane editor-form-pane">
+      <div class="editor-pane-header">Editor</div>
+      <div class="editor-form-scroll">
+        <form id="add-news-form" class="editor-form" method="post" action="{% url 'home:add_news' %}" data-editor-form data-endpoint="{% url 'home:add_news' %}" novalidate>
+          {% csrf_token %}
+          <div class="editor-field">
+            <label for="editor-heading">Heading</label>
+            <input id="editor-heading" type="text" name="heading" maxlength="100" data-editor-heading placeholder="Headline" autocomplete="off">
+          </div>
+
+          <div class="editor-field">
+            <label for="editor-image">Image URL</label>
+            <input id="editor-image" type="url" name="image_1" data-editor-image placeholder="https://example.com/image.jpg" autocomplete="off">
+            <div class="editor-image-actions">
+              <button type="button" class="editor-upload-btn" data-editor-upload-btn>Upload file</button>
+            </div>
+          </div>
+
+          <div class="editor-field">
+            <label for="editor-image-info">Image description <small>(optional)</small></label>
+            <input id="editor-image-info" type="text" name="image_info" maxlength="100" data-editor-image-info placeholder="The image is self explanatory." autocomplete="off">
+          </div>
+
+          <div class="editor-field">
+            <label for="editor-category">Category</label>
+            <select id="editor-category" name="category" data-editor-category>
+              <option value="" selected>Select category</option>
+              {% for value, label in nav_categories %}
+                <option value="{{ value }}">{{ label|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="editor-field">
+            <label for="editor-content">Content</label>
+            <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content..."></textarea>
+            <small class="editor-convention-hint">Blank line starts a new paragraph.</small>
+            <small class="editor-convention-hint"><b>#</b> = bigger subheading.</small>
+            <small class="editor-convention-hint"><b>##</b> = less bigger subheading.</small>
+            <small class="editor-convention-hint"><b>###</b> = less bigger subheading.</small>
+            <small class="editor-convention-hint">#### = less bigger subheading.</small>
+            <small class="editor-convention-hint">* = bullets.</small>
+            <small class="editor-convention-hint">'.' after number is numbered points.</small>
+            <small class="editor-convention-hint">**text** = Bold.</small>
+            <small class="editor-convention-hint">__text__ = Italic.</small>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="editor-pane editor-preview-pane">
+      <div class="editor-pane-header">Preview</div>
+      <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  /* LIGHT PHASE: runs at parse time, before the heavy editor. It tells the
+     user the page is still fetching its parts, then pulls them in. The heavy
+     files are ordinary static assets so repeat visits come from cache. */
+  (function () {
+    "use strict";
+    var shell = document.getElementById("editor-shell");
+
+    var lightHost = null;
+    function lightToast(message, tone) {
+      if (!lightHost) {
+        lightHost = document.createElement("div");
+        lightHost.style.cssText = "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;";
+        document.body.appendChild(lightHost);
+      }
+      while (lightHost.children.length >= 2) {
+        lightHost.firstElementChild.remove();
+      }
+      var node = document.createElement("div");
+      node.textContent = message;
+      node.style.cssText = "font-family:inherit;font-size:0.86rem;padding:10px 16px;border-radius:8px;color:#fff;text-align:center;max-width:min(92vw,480px);" +
+        "background:" + (tone === "error" ? "#B3402A" : "#0E1B2C") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);";
+      node.addEventListener("click", function () { node.remove(); });
+      lightHost.appendChild(node);
+      window.setTimeout(function () { node.remove(); }, 4200);
+    }
+    window.editorToast = lightToast;
+
+    lightToast("Best ExPerience On Desktop");
+
+    var css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = shell.dataset.heavyCss;
+    document.head.appendChild(css);
+
+    var js = document.createElement("script");
+    js.src = shell.dataset.heavyJs;
+    js.defer = true;
+    js.onerror = function () {
+      lightToast("Editor components failed to load. Check your connection and reload the page.", "error");
+    };
+    document.head.appendChild(js);
+  })();
+</script>
+{% endblock %}
+
+{% block footer %}{% endblock %}
+{% block floating_social %}{% endblock %}

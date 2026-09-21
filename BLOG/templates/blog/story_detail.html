@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% load custom_tag %}
+
+{% block title %}{{ blog.heading }} | {{ project_name }}{% endblock %}
+{% block meta_description %}{{ blog.heading }}. Read the latest update, author details, and related story context from {{ project_name }}.{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <meta property="og:title" content="{{ blog.heading }}">
+  <meta property="og:description" content=" {{ excerp }}... - By {{ blog.author.staffprofile.full_name|default:"REPORTER" }}, a member of {{project_name}} team">
+  {% if blog.image_1 %}
+    <meta property="og:image" content="{{ blog.image_1 }}">
+    {% else %}
+    <meta property="og:image" content="{{ 404.jpg }}">
+  {% endif %}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ blog.heading }}">
+  <meta name="twitter:description" content="{{ blog.heading }} — {{ project_name }}">
+{% endblock %}
+
+{% block content %}
+{% load static %}
+<section class="story-article-shell">
+  <article class="story-article no-inner-shell" aria-labelledby="story-heading">
+    <header class="story-header">
+      <div class="story-kicker-row">
+        <button type="button"
+                class="bookmark-chip story-bookmark-chip"
+                data-bookmark-btn
+                data-blog-id="{{ blog.id }}"
+                data-endpoint="{% url 'home:bookmark' blog.id %}"
+                data-saved="{% if is_bookmarked %}true{% else %}false{% endif %}"
+                aria-pressed="{% if is_bookmarked %}true{% else %}false{% endif %}"
+                aria-label="Save story">
+          <svg viewBox="0 0 20 20" class="bookmark-icon" aria-hidden="true">
+            <path d="M5 3.5h10a1 1 0 011 1V18l-6-3.6L4 18V4.5a1 1 0 011-1z" fill="{% if is_bookmarked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg>
+          <span class="bookmark-count" data-bookmark-count>{{ bookmark_count }}</span>
+        </button>
+        <a class="story-kicker" href="{% url 'home:home' %}?category={{ blog.category }}">{{ blog.get_category_display|title }}</a>
+        <span class="story-separator">•</span>
+        <time datetime="{{ blog.date_created|date:'c' }}">{{ blog.date_created|date:"j M Y" }}</time>
+      </div>
+
+      <h1 id="story-heading">{{ blog.heading }}</h1>
+
+      <div class="story-meta-row">
+        <div class="author-pill">
+          <a href="{{ author_portfolio_url|default:'#' }}" class="author-avatar" aria-label="Author profile">
+              <img src="{{ blog.author.profile_img }}" alt="{{ blog.author_name }} profile picture" loading="lazy" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+          </a>
+          <div>
+            <p class="meta-label">By</p>
+            <a href="{{ author_portfolio_url|default:'#' }}" class="meta-author">{{ blog.author_name }}</a>
+          </div>
+        </div>
+
+        <div class="story-metrics" aria-label="Story metrics">
+          <span><strong>Views</strong> {{ blog.views }}</span>
+          <span><strong>Word count</strong> {{ blog.word_count }}</span>
+          <span><strong>Likes</strong> {{ blog.likes }}</span>
+        </div>
+      </div>
+    </header>
+
+      <figure class="story-hero-figure">
+        <img src="{{ blog.image_1 }}" alt="{{ blog.heading }}" loading="eager" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+        {% if blog.image_info %}
+          <figcaption>{{ blog.image_info }}</figcaption>
+        {% else %}
+          <figcaption>404 meaning caption not found </figcaption>
+        {% endif %}
+      </figure>
+
+    <div class="story-body">
+      {{ blog_content_html|safe }}
+    </div>
+
+    <div class="article-actions">
+      <form method="post" action="{% url 'blog:blog_like' blog.id %}" class="action-form" data-story-like-form data-endpoint="{% url 'blog:blog_like' blog.id %}">
+        {% csrf_token %}
+        <button type="submit" class="story-like-btn" data-story-like-btn>
+          Like article
+          <span class="like-badge" data-story-like-count>{{ blog.likes }}</span>
+        </button>
+      </form>
+
+      {% if follow_endpoint %}
+        <div class="follow-control">
+          <form method="post" action="{{ follow_endpoint }}" class="action-form"
+                data-follow-author-form data-endpoint="{{ follow_endpoint }}">
+            {% csrf_token %}
+            <button type="submit" class="follow-btn" data-follow-author-btn
+                    data-following="{% if is_following_author %}true{% else %}false{% endif %}"
+                    aria-pressed="{% if is_following_author %}true{% else %}false{% endif %}"
+                    aria-label="{% if is_following_author %}Unfollow {{ blog.author_name }}{% else %}Follow {{ blog.author_name }}{% endif %}"
+                    title="{% if is_following_author %}Unfollow {{ blog.author_name }}{% else %}Follow {{ blog.author_name }}{% endif %}">
+              <svg class="follow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M15.5 19.5v-1.4c0-2.1-1.7-3.8-3.8-3.8H7.8C5.7 14.3 4 16 4 18.1v1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <circle cx="9.8" cy="7.6" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <path class="follow-icon-plus" d="M18 7v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path class="follow-icon-check" d="m15.2 10.1 2 2 3.3-3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span data-follow-label>{% if is_following_author %}Following{% else %}Follow author{% endif %}</span>
+            </button>
+          </form>
+          {% comment %} <span class="follow-count" aria-live="polite"><strong data-follow-count>{{ author_follower_count }}</strong> following</span> {% endcomment %}
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="author-card">
+      <a href="{{ author_portfolio_url|default:'#' }}" class="author-card-main" aria-label="View {{ blog.author_name }} profile">
+        <div class="author-card-inner">
+          <div class="author-card-image-wrap">
+              <img src="{{ blog.author.profile_img }}" alt="{{ blog.author_name }}" class="author-card-image" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+          </div>
+          <div class="author-card-copy">
+            <p class="author-card-label">Author profile</p>
+            {% if author_tags %}
+              <div class="author-card-tags">
+                {% for tag in author_tags %}<span class="author-card-tag">{{ tag }}</span>{% endfor %}
+              </div>
+            {% endif %}
+            <h3>{{ blog.author_name |default:"Missing Name. Report Bug" }}</h3>
+            {% if author_profile and author_profile.tribute_bio %}
+              <p>{{ author_profile.tribute_bio }}</p>
+            {% else %}
+              <p><b>DOES NOT HAVE A PROFILE</b></p>
+            {% endif %}
+          </div>
+        </div>
+      </a>
+      <div class="author-socials">
+        {% if author_profile and author_profile.twitter_handle %}
+          <a href="{{ author_profile.twitter_handle }}" target="_blank" rel="noopener noreferrer">X</a>
+        {% endif %}
+        {% if author_profile and author_profile.facebook_handle %}
+          <a href="{{ author_profile.facebook_handle }}" target="_blank" rel="noopener noreferrer">Facebook</a>
+        {% endif %}
+        {% if author_profile and author_profile.whatsapp_handle %}
+          <a href="{{ author_profile.whatsapp_handle }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        {% endif %}
+        {% if not author_profile or not author_profile.twitter_handle and not author_profile.facebook_handle and not author_profile.whatsapp_handle %}
+          <a href="#" target="_blank" rel="noopener noreferrer">Twitter</a>
+          <a href="#" target="_blank" rel="noopener noreferrer">Facebook</a>
+          <a href="#" target="_blank" rel="noopener noreferrer">Instagram</a>
+        {% endif %}
+      </div>
+    </aside>
+
+    {% if author_recent_stories %}
+      <section class="author-more-stories" aria-labelledby="author-more-title">
+        <h2 id="author-more-title">More recent stories from {{ blog.author_name }}</h2>
+        <div class="story-grid">
+          {% for story in author_recent_stories %}
+            <article class="story-card">
+              <a class="story-card-media" href="{% url 'blog:story_detail' story.id %}" tabindex="-1">
+                <img src="{{ story.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+              </a>
+              <div class="story-card-body">
+                <div class="story-card-meta">
+                  <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
+                  <span class="meta-divider" aria-hidden="true"></span>
+                  <span class="meta-time">{{ story.date_created|timesince }} ago</span>
+                </div>
+                <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.id %}">{{ story.heading }}</a></h3>
+                <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    <section class="comment-panel" aria-labelledby="comments-title">
+      <div class="comment-panel-header">
+        <h2 id="comments-title">Comments</h2>
+        <span data-comment-count>{{ comments|length }} comment{{ comments|length|pluralize }}</span>
+      </div>
+
+      <form method="post" action="{% url 'blog:comment_create' blog.id %}" class="comment-form" data-comment-form novalidate>
+        {% csrf_token %}
+        <label for="comment-input" class="sr-only">Write a comment</label>
+        <textarea id="comment-input" name="comment" rows="4" placeholder="Share Your Though On This Post..."></textarea>
+        <button type="submit" class="comment-submit-btn">Post comment</button>
+      </form>
+
+      <div class="comment-list" data-comment-list>
+        {% for comment in comments %}
+          {% with author_profile_data=comment.author.staffprofile %}
+          <article class="comment-item" data-comment-item data-comment-id="{{ comment.id }}">
+            <div class="comment-header">
+              <div class="comment-author-block">
+                {% if comment.author.profile_img %}
+                  <img src="{{ comment.author.profile_img }}" alt="{{ comment.author.email }} profile picture" class="comment-avatar" loading="lazy" onerror="this.onerror=null; this.src='{% static '404.jpg' %}'">
+                {% elif author_profile_data and author_profile_data.full_name %}
+                  <span class="comment-avatar">{{ author_profile_data.full_name|slice:':1'|upper }}</span>
+                {% else %}
+                  <span class="comment-avatar">{{ comment.author.email|slice:':1'|upper }}</span>
+                {% endif %}
+                <strong>
+                  {% comment %} {{comment.author_id}} {% endcomment %}
+                  {% if request.user.is_authenticated and comment.author_id == request.user.id %} Me
+                  {% elif author_profile_data and author_profile_data.full_name %}{{ author_profile_data.full_name }}
+                  {% else %}{{ comment.author.email|before_at }}{% endif %}</strong>
+              </div>
+              <div class="comment-toolbar">
+                <form method="post" action="{% url 'blog:comment_like' comment.id %}" class="comment-like-form" data-comment-like-form data-endpoint="{% url 'blog:comment_like' comment.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="comment-like-btn" data-comment-like-btn>
+                    <span aria-hidden="true">❤</span>
+                    Like
+                    <span class="comment-like-count" data-comment-like-count>{{ comment.likes }}</span>
+                  </button>
+                </form>
+                {% if request.user.is_authenticated and comment.author_id == request.user.id %}
+                  <form method="post" action="{% url 'blog:comment_delete' comment.id %}" class="comment-delete-form" data-comment-delete-form data-endpoint="{% url 'blog:comment_delete' comment.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="comment-delete-btn" data-comment-delete-btn>Delete</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+            <p>{{ comment.content }}</p>
+            <small data-comment-like-summary>{{ comment.likes }} like{{ comment.likes|pluralize }}</small>
+          </article>
+          {% endwith %}
+        {% empty %}
+          <p class="empty-comments" data-empty-comment-state>No comments yet. Be the first to share your thoughts.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </article>
+</section>
+{% endblock %}
+

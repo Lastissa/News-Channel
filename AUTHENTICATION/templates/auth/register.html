@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Create account | {{ project_name }}{% endblock %}
+{% block meta_description %}Create your {{ project_name }} account to save stories, receive updates, and personalize your reading experience.{% endblock %}
+
+{% block content %}
+<div class="auth-shell auth-shell-register">
+  <div class="auth-visual" aria-hidden="true">
+    <div class="auth-visual-inner">
+      <img src="{% static 'logo.jpg' %}" alt="{{ project_name }} logo" class="auth-logo">
+    </div>
+  </div>
+
+  <div class="auth-panel">
+    <div class="auth-header">
+      <h1>Create account</h1>
+    </div>
+
+    <form method="post" class="auth-form" novalidate data-auth-form data-server-error="{{ error|escapejs }}">
+      {% csrf_token %}
+      <input type="hidden" name="to" value="{{ return_to }}">
+      <div class="field-group">
+        <label for="register-email">Email address</label>
+        <input id="register-email" type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+      </div>
+      <div class="field-group">
+        <label for="register-password">Password</label>
+        <div class="password-field">
+          <input id="register-password" type="password" name="password" placeholder="At least 6 characters" required autocomplete="new-password">
+          <button type="button" class="password-toggle" data-target="register-password" aria-label="Show password" aria-pressed="false">
+            <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"/><path d="M9.09 5.47A10.96 10.96 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-4.42 5.04"/><path d="M6.61 6.61A17.77 17.77 0 0 0 2 12s3.5 7 10 7a11.47 11.47 0 0 0 4.83-1.1"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="register-password-confirm">Confirm password</label>
+        <div class="password-field">
+          <input id="register-password-confirm" type="password" name="password_confirm" placeholder="Repeat your password" required autocomplete="new-password">
+          <button type="button" class="password-toggle" data-target="register-password-confirm" aria-label="Show password" aria-pressed="false">
+            <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"/><path d="M9.09 5.47A10.96 10.96 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-4.42 5.04"/><path d="M6.61 6.61A17.77 17.77 0 0 0 2 12s3.5 7 10 7a11.47 11.47 0 0 0 4.83-1.1"/></svg>
+          </button>
+        </div>
+      </div>
+      <button type="submit" class="auth-submit">Create account</button>
+    </form>
+
+    <p class="auth-switch">
+      Already have an account?
+      <a href="{% url 'auth:login' %}?to={{ return_to|urlencode }}">Sign in</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ block.super }}
+  <script>
+    (function () {
+      var form = document.querySelector('[data-auth-form]');
+      if (!form) return;
+
+      function showAuthToast(message) {
+        var host = document.getElementById('auth-toast');
+        if (!host) {
+          host = document.createElement('div');
+          host.id = 'auth-toast';
+          host.setAttribute('role', 'status');
+          host.setAttribute('aria-live', 'polite');
+          document.body.appendChild(host);
+        }
+        host.textContent = message;
+        host.classList.add('is-visible');
+        window.clearTimeout(host._timer);
+        host._timer = window.setTimeout(function () {
+          host.classList.remove('is-visible');
+        }, 2600);
+      }
+
+      var serverError = form.dataset.serverError;
+      if (serverError) {
+        showAuthToast(serverError);
+      }
+
+      document.querySelectorAll('.password-toggle').forEach(function (toggle) {
+        var target = document.getElementById(toggle.dataset.target);
+        if (!target) return;
+
+        toggle.addEventListener('click', function () {
+          var isHidden = target.type === 'password';
+          target.type = isHidden ? 'text' : 'password';
+          toggle.classList.toggle('is-visible', isHidden);
+          toggle.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+          toggle.setAttribute('aria-pressed', String(isHidden));
+        });
+      });
+
+      var submitBtn = form.querySelector('.auth-submit');
+      function setSubmitBusy(busy) {
+        if (!submitBtn) return;
+        submitBtn.disabled = busy;
+        submitBtn.dataset.pending = busy ? 'true' : 'false';
+        submitBtn.classList.toggle('is-pending', busy);
+        if (busy) {
+          submitBtn.dataset.originalText = submitBtn.textContent;
+          submitBtn.textContent = 'Creating account...';
+        } else if (submitBtn.dataset.originalText) {
+          submitBtn.textContent = submitBtn.dataset.originalText;
+        }
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (submitBtn.dataset.pending === 'true') return;
+
+        var email = form.querySelector('input[type="email"]');
+        var password = form.querySelector('input[name="password"]');
+        var confirmField = form.querySelector('input[name="password_confirm"]');
+
+        if (!email.value.trim() || !password.value.trim() || (confirmField && !confirmField.value.trim())) {
+          showAuthToast('Please complete all required fields.');
+          if (!email.value.trim()) email.focus();
+          else if (!password.value.trim()) password.focus();
+          else if (confirmField && !confirmField.value.trim()) confirmField.focus();
+          return;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
+          showAuthToast('Please enter a valid email address.');
+          email.focus();
+          return;
+        }
+
+        if (password.value.length < 6) {
+          showAuthToast('Password must be at least 6 characters long.');
+          password.focus();
+          return;
+        }
+
+        if (confirmField && password.value !== confirmField.value) {
+          showAuthToast('Passwords do not match.');
+          confirmField.focus();
+          return;
+        }
+
+        setSubmitBusy(true);
+        fetch(form.action, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          body: new FormData(form),
+        })
+          .then(function (response) {
+            return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+          })
+          .then(function (result) {
+            var payload = {};
+            try { payload = JSON.parse(result.text || '{}') || {}; } catch (e) { /* non JSON body */ }
+            showAuthToast(payload.detail || (result.ok ? 'Account created.' : 'Could not create the account.'));
+            if (!result.ok) {
+              setSubmitBusy(false);
+              return;
+            }
+            window.setTimeout(function () { window.location.assign(payload.redirect_to || '/'); }, 600);
+          })
+          .catch(function () {
+            setSubmitBusy(false);
+            showAuthToast('Connection issue. Please try again.');
+          });
+      });
+
+      //   NEVER leave the button frozen: unfreeze right before the page goes
+      //   (navigation or back/forward cache) and when a cached page is shown.
+      window.addEventListener('pagehide', function () { setSubmitBusy(false); });
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted) setSubmitBusy(false);
+      });
+    })();
+  </script>
+{% endblock %}

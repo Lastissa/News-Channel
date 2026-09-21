@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}NOT FOUND | {{ project_name }}{% endblock %}
+{% block meta_description %}This post does not exist on {{ project_name }} Or have been deleted by the Author{% endblock %}
+
+{% block content %}
+<section class="story-article-shell">
+  <article class="story-article no-inner-shell" aria-labelledby="story-heading">
+    <header class="story-header">
+      <div class="story-kicker-row">
+        <button type="button"
+                class="bookmark-chip story-bookmark-chip"
+                data-bookmark-btn
+                data-blog-id="{{ blog_id }}"
+                data-endpoint="{% url 'blog:bookmark_not_found' %}"
+                data-saved="false"
+                aria-pressed="false"
+                aria-label="Save story">
+          <svg viewBox="0 0 20 20" class="bookmark-icon" aria-hidden="true">
+            <path d="M5 3.5h10a1 1 0 011 1V18l-6-3.6L4 18V4.5a1 1 0 011-1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg>
+          <span class="bookmark-count" data-bookmark-count>0</span>
+        </button>
+        <span class="story-kicker">404</span>
+        <span class="story-separator">&bull;</span>
+        <time datetime="{% now 'c' %}">{% now "j M Y" %}</time>
+      </div>
+
+      <h1 id="story-heading">NOT FOUND</h1>
+
+      <div class="story-meta-row">
+        <div class="story-metrics" aria-label="Story metrics">
+          <span><strong>Views</strong> 0</span>
+          <span><strong>Word count</strong> {{ decoy_content|wordcount }}</span>
+          <span><strong>Likes</strong> 0</span>
+        </div>
+      </div>
+    </header>
+
+    <figure class="story-hero-figure">
+      <img src="{% static '404.jpg' %}" alt="NOT FOUND" loading="eager" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+      <figcaption>404, page not found, this page does not exist</figcaption>
+    </figure>
+
+    <div class="story-body">
+      <p><b>{{ decoy_content }}</b></p>
+    </div>
+
+    {% comment %} <div class="article-actions">
+      <form method="post" action="{% url 'blog:blog_like' blog_id %}" class="action-form" data-story-like-form data-endpoint="{% url 'blog:blog_like' blog_id %}">
+        {% csrf_token %}
+        <button type="submit" class="story-like-btn" data-story-like-btn>
+          Like article
+          <span class="like-badge" data-story-like-count>0</span>
+        </button>
+      </form>
+    </div> {% endcomment %}
+
+    {% comment %} <aside class="author-card">
+      <div class="author-card-inner">
+        <div class="author-card-image-wrap">
+          <img src="{% static '404.jpg' %}" alt="Anonymous profile picture" class="author-card-image" onerror="this.onerror=null; this.src='{% static '404.jpg' %}'">
+        </div>
+        <div class="author-card-copy">
+          <p class="author-card-label">Author profile</p>
+          <h3>Anonymous</h3>
+          <p>404, not found</p>
+        </div>
+      </div>
+    </aside> {% endcomment %}
+  </article>
+</section>
+{% endblock %}

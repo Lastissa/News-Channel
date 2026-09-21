@@ -1,0 +1,180 @@
+/* Add news editor: heavy chrome pulled in by the light loader script.
+   The base layout skeleton lives inline in the template; this file adds the
+   full polish and is cacheable across visits. */
+
+.editor-pane-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--nav-bg);
+  color: white;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.editor-form-scroll,
+.editor-preview-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.editor-form-scroll {
+  padding: 16px;
+}
+
+.editor-preview-scroll {
+  background: var(--nav-bg);
+  padding: 18px;
+}
+
+.editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.editor-field label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.editor-field input,
+.editor-field select,
+.editor-field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--input-fill);
+  color: var(--ink);
+  padding: 11px 13px;
+  font: inherit;
+  font-size: 0.94rem;
+}
+
+.editor-field textarea {
+  resize: vertical;
+  min-height: 320px;
+  line-height: 1.6;
+  font-family: var(--font-body);
+}
+
+.editor-field input:focus,
+.editor-field select:focus,
+.editor-field textarea:focus {
+  outline: 1.5px solid var(--amber-deep);
+  outline-offset: 1px;
+}
+
+.editor-field input.is-error {
+  border-color: var(--danger);
+}
+
+.editor-image-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.editor-upload-btn {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.editor-upload-btn:hover {
+  border-color: var(--amber-deep);
+  color: var(--amber-deep);
+}
+
+.editor-image-actions small {
+  color: var(--slate);
+  font-size: 0.75rem;
+}
+
+.editor-convention-hint {
+  color: var(--ink);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.editor-loading-note {
+  animation: editor-note-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes editor-note-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.editor-shell.is-ready .editor-loading-note {
+  display: none;
+}
+
+.editor-preview-toggle[hidden] {
+  display: none;
+}
+
+.editor-preview-toggle.is-off {
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+.editor-publish-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.editor-publish-btn.is-pending {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* The preview renders the real story article markup (story-article etc. from
+   base.css) so it matches the published page; the wrapper just frames it. */
+.editor-preview-frame {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 18px 16px;
+}
+
+.editor-preview-empty {
+  color: var(--slate);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 40px 10px;
+}
+
+@media (max-width: 899.98px) {
+  .editor-form-scroll,
+  .editor-preview-scroll {
+    overflow: visible;
+  }
+
+  .editor-field textarea {
+    min-height: 220px;
+  }
+}

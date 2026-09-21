@@ -1,0 +1,1070 @@
+.portfolio-shell {
+  --pf-track: rgba(14, 27, 44, 0.08);
+  --pf-mute: rgba(14, 27, 44, 0.28);
+  --pf-unfollow: #fa8773;
+  --pf-c1: #0b6e8a;
+  --pf-c2: #22d3ee;
+  --pf-c3: #0e1b2c;
+  --pf-c4: #5b6b7c;
+  --pf-c5: #9fe9f6;
+  --pf-other: #c3cdd8;
+
+  width: min(1180px, calc(100% - 24px));
+  margin: 16px auto 0;
+  padding-bottom: 48px;
+}
+
+html[data-theme="dark"] .portfolio-shell {
+  --pf-track: rgba(243, 239, 230, 0.1);
+  --pf-mute: rgba(243, 239, 230, 0.32);
+  --pf-c1: #22d3ee;
+  --pf-c2: #2b8cab;
+  --pf-c3: #f3efe6;
+  --pf-c4: #93a2b3;
+  --pf-c5: #b7eef8;
+  --pf-other: #4a5a6e;
+}
+
+.portfolio-card[id],
+.portfolio-contact[id] {
+  scroll-margin-top: calc(var(--header-h) + 14px);
+}
+
+/* ---------- Placard ---------- */
+.portfolio-placard {
+  display: grid;
+  grid-template-columns: minmax(0, 30%) minmax(0, 1fr);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* The left strip: picture and follow, centred on the navy of the nav bar,
+   cut off from the rest by a thick brand line. */
+.portfolio-placard-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 8px;
+  background: var(--nav-bg-dynamic);
+  border-right: 6px solid var(--amber);
+}
+
+.portfolio-placard-media {
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: rgba(246, 243, 237, 0.08);
+  border: 2px solid var(--nav-fg-light);
+}
+
+.portfolio-placard-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portfolio-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--nav-fg);/*FOR STAFF WITHOUT IMAGE SO THEIR INTIAL COLOUR IS SET*/
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 10vw, 4.6rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.portfolio-placard-media img[hidden],
+.portfolio-initial[hidden] {
+  display: none;
+}
+
+.portfolio-follow-form {
+  width: 100%;
+  max-width: 220px;
+}
+
+
+.portfolio-placard-aside .follow-btn {
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 4px;
+  border-radius: 0;
+  background: transparent;
+  color: lightgreen;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  text-align: center;
+}
+
+
+.portfolio-placard-aside .follow-btn[data-following="true"] {
+  color: var(--nav-fg);
+}
+
+.portfolio-placard-aside .follow-btn[data-following="true"]:hover,
+.portfolio-placard-aside .follow-btn[data-following="true"]:focus-visible {
+  color: var(--pf-unfollow);
+}
+
+/* Identity column */
+.portfolio-placard-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 12px 16px;
+}
+
+.portfolio-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--slate);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.portfolio-role {
+  background: var(--nav-bg);
+  color: white;
+}
+
+html[data-theme="dark"] .portfolio-role {background: red;}
+
+.portfolio-placard-copy h1 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: clamp(1.4rem, 5.6vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.portfolio-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.portfolio-email {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.portfolio-email a {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.portfolio-contact-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portfolio-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--nav-bg);
+  background: var(--nav-bg);
+  color: var(--nav-fg);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.portfolio-icon-link svg {
+  width: 19px;
+  height: 19px;
+}
+
+.portfolio-icon-link:hover,
+.portfolio-icon-link:focus-visible {
+  border-color: transparent;
+}
+
+/* Quick facts: label above value, as many columns as fit. */
+.portfolio-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.portfolio-facts > div {
+  min-width: 0;
+}
+
+.portfolio-facts dt {
+  color: var(--slate);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portfolio-facts dd {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* Headline counts */
+.portfolio-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 0;
+  color: var(--slate);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.portfolio-summary > span {
+  min-width: 0;
+}
+
+.portfolio-summary strong {
+  display: block;
+  color: var(--ink);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.follow-note {
+  display: block;
+  margin: -2px 0 0;
+  padding-left: 10px;
+  border-left: 3px solid darkgreen;
+  color: var(--slate);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.portfolio-specialities {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-specialities ul {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portfolio-specialities-label {
+  color: var(--slate);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portfolio-speciality {
+  padding: 4px 14px;
+  background: var(--paper-dim);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+/* ---------- Key numbers ---------- */
+.portfolio-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 16px 0 0;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+.portfolio-stats-strip > div {
+  min-width: 0;
+  padding: 12px 12px 14px;
+  background: var(--surface);
+}
+
+.portfolio-stats-strip dt {
+  color: var(--slate);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.portfolio-stats-strip dd {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: clamp(1.4rem, 5vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.portfolio-stats-strip small {
+  display: block;
+  margin-top: 4px;
+  color: var(--slate);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.portfolio-stat--milestone {
+  box-shadow: inset 0 4px 0 red;
+  padding-top: 16px !important;
+}
+
+.stat-story-title a {
+  display: block;
+  overflow: hidden;
+  color: var(--brand-deep);
+  font-weight: 600;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+/* Author rank mini chart: one bar per ranked author, ours in brand colour. */
+.rank-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 26px;
+  margin-top: 8px;
+}
+
+.rank-bar {
+  flex: 1 1 0;
+  max-width: 16px;
+  min-height: 3px;
+  background: var(--pf-mute);
+}
+
+.rank-bar.is-me {
+  background: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand-deep);
+}
+
+/* ---------- Section tabs ---------- */
+.portfolio-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-bottom: 10px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.portfolio-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.portfolio-tabs a {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.portfolio-tabs a:hover,
+.portfolio-tabs a:focus-visible {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+/* ---------- Card grid ---------- */
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.portfolio-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  container-type: inline-size;
+}
+
+.portfolio-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.portfolio-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.portfolio-card h2::before {
+  content: "";
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  background: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand-deep);
+}
+
+.portfolio-card-head p {
+  margin: 4px 0 0;
+  color: var(--slate);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.portfolio-section-tag {
+  flex-shrink: 0;
+  padding: 3px 12px;
+  font-size: 0.6rem;
+}
+
+.portfolio-prose {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.portfolio-card--endorsement .portfolio-prose {
+  padding-left: 12px;
+  border-left: 4px solid var(--brand);
+}
+
+.portfolio-empty,
+.portfolio-caption {
+  margin: 0;
+  color: var(--slate);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.portfolio-caption {
+  margin-top: 12px;
+}
+
+.tag-mini {
+  padding: 2px 10px;
+  font-size: 0.62rem;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+/* ---------- Recent story reach ---------- */
+.reach-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reach-list li {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.reach-list li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.reach-list li:last-child {
+  padding-bottom: 0;
+}
+
+.reach-copy {
+  min-width: 0;
+}
+
+.portfolio-story-link {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.portfolio-story-link:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--brand-deep);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.reach-copy small {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--slate);
+}
+
+.reach-metrics {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reach-nums {
+  color: var(--slate);
+  font-size: 0.78rem;
+}
+
+.reach-nums strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.reach-likes::before {
+  content: "\00b7";
+  margin: 0 6px;
+}
+
+/* All bars share one look: a track, a brand fill, a dark teal underside. */
+.reach-track,
+.coverage-track,
+.response-track {
+  display: block;
+  height: 12px;
+  overflow: hidden;
+  background: var(--pf-track);
+}
+
+.reach-fill,
+.coverage-fill,
+.response-fill {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  box-shadow: inset 0 -3px 0 var(--brand-deep);
+}
+
+@container (min-width: 540px) {
+  .reach-list li {
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 40%);
+    align-items: center;
+    gap: 18px;
+  }
+}
+
+/* ---------- Coverage ranking ---------- */
+.coverage-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coverage-list li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "pos label count"
+    "pos track count";
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.coverage-pos {
+  grid-area: pos;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  background: var(--nav-bg);
+  color: var(--nav-fg);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.coverage-list li:first-child .coverage-pos {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.coverage-label {
+  grid-area: label;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coverage-track {
+  grid-area: track;
+}
+
+.coverage-count {
+  grid-area: count;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.coverage-count strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.coverage-count small,
+.legend-value small,
+.response-nums small {
+  color: var(--slate);
+  font-size: 0.7rem;
+}
+
+/* ---------- Publishing rhythm ---------- */
+.rhythm-cols {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rhythm-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* --p is the bar height as a whole percent of the plot, headroom kept for
+   the value that sits on top of the bar. */
+.rhythm-plot {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 190px;
+  border-bottom: 2px solid var(--ink);
+  background-image: repeating-linear-gradient(to top, var(--pf-track) 0, var(--pf-track) 1px, transparent 1px, transparent 25%);
+}
+
+.rhythm-bar {
+  position: absolute;
+  right: 14%;
+  bottom: 0;
+  left: 14%;
+  height: calc((100% - 26px) * var(--p) / 100);
+  background: var(--brand);
+  box-shadow: inset 0 -4px 0 var(--brand-deep);
+}
+
+.rhythm-value {
+  position: absolute;
+  right: 0;
+  bottom: calc((100% - 26px) * var(--p, 0) / 100 + 4px);
+  left: 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.rhythm-col.is-empty .rhythm-bar {
+  height: 3px;
+  background: var(--pf-mute);
+  box-shadow: none;
+}
+
+.rhythm-col.is-empty .rhythm-value {
+  bottom: 7px;
+  color: var(--slate);
+  font-weight: 600;
+}
+
+.rhythm-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.rhythm-label small {
+  color: var(--slate);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.rhythm-col.is-current .rhythm-label {
+  color: var(--ink);
+  box-shadow: 0 2px 0 var(--brand);
+}
+
+/* ---------- Readership donut ---------- */
+.readership {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+}
+
+.donut {
+  width: min(190px, 62cqi);
+}
+
+.donut svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: rotate(0deg);
+}
+
+.donut-track {
+  stroke: var(--pf-track);
+}
+
+.donut-total {
+  fill: var(--ink);
+  font-family: var(--font-body);
+  font-size: 5.2px;
+  font-weight: 800;
+}
+
+.donut-caption {
+  fill: var(--slate);
+  font-family: var(--font-body);
+  font-size: 2.6px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.donut-slice.tone-c1, .swatch.tone-c1 { stroke: var(--pf-c1); background: var(--pf-c1); }
+.donut-slice.tone-c2, .swatch.tone-c2 { stroke: var(--pf-c2); background: var(--pf-c2); }
+.donut-slice.tone-c3, .swatch.tone-c3 { stroke: var(--pf-c3); background: var(--pf-c3); }
+.donut-slice.tone-c4, .swatch.tone-c4 { stroke: var(--pf-c4); background: var(--pf-c4); }
+.donut-slice.tone-c5, .swatch.tone-c5 { stroke: var(--pf-c5); background: var(--pf-c5); }
+.donut-slice.tone-other, .swatch.tone-other { stroke: var(--pf-other); background: var(--pf-other); }
+.donut-slice { background: none !important; }
+
+.donut-legend {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.donut-legend li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+}
+
+.swatch.tone-c3 {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.legend-label {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.legend-value strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+@container (min-width: 470px) {
+  .readership {
+    grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
+    align-items: center;
+    gap: 24px;
+  }
+
+  .donut {
+    width: 100%;
+  }
+}
+
+/* ---------- Reader response ---------- */
+.response-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.response-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "copy nums"
+    "track track";
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.response-copy {
+  grid-area: copy;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.response-label {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.response-copy small {
+  color: var(--slate);
+  font-size: 0.74rem;
+}
+
+.response-track {
+  grid-area: track;
+  height: 16px;
+}
+
+.response-nums {
+  grid-area: nums;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.response-nums strong {
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+@container (min-width: 620px) {
+  .response-list li {
+    grid-template-columns: minmax(180px, 26%) minmax(0, 1fr) minmax(96px, auto);
+    grid-template-areas: "copy track nums";
+    gap: 18px;
+  }
+}
+
+/* ---------- Wider screens: 12 column structure ---------- */
+@media (min-width: 720px) {
+  .portfolio-shell {
+    margin-top: 24px;
+    padding-bottom: 56px;
+  }
+
+  .portfolio-placard-aside {
+    gap: 16px;
+    padding: 24px 18px;
+  }
+
+  .portfolio-placard-copy {
+    gap: 14px;
+    padding: 24px 28px 26px;
+  }
+
+  .portfolio-kicker {
+    font-size: 0.76rem;
+  }
+
+  .portfolio-email {
+    font-size: 0.98rem;
+  }
+
+  .portfolio-icon-link {
+    width: 40px;
+    height: 40px;
+  }
+
+  .portfolio-facts {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px 20px;
+  }
+
+  .portfolio-facts dd {
+    font-size: 0.92rem;
+  }
+
+  .portfolio-summary {
+    grid-template-columns: repeat(4, auto);
+    justify-content: start;
+    gap: 12px 0;
+    font-size: 0.84rem;
+  }
+
+  .portfolio-summary > span {
+    padding: 0 26px 0 0;
+    margin-right: 26px;
+    border-right: 1px solid var(--line);
+  }
+
+  .portfolio-summary > span:last-child {
+    padding-right: 0;
+    margin-right: 0;
+    border-right: 0;
+  }
+
+  .portfolio-summary strong {
+    font-size: 1.7rem;
+  }
+
+  .portfolio-placard-aside .follow-btn {
+    flex-direction: row;
+    min-height: 46px;
+    font-size: 0.9rem;
+    gap: 8px;
+  }
+
+  .portfolio-stats-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 20px;
+  }
+
+  .portfolio-stats-strip > div {
+    padding: 16px 18px 18px;
+  }
+
+  .portfolio-stat--milestone {
+    padding-top: 20px !important;
+  }
+
+  .portfolio-tabs {
+    margin-top: 20px;
+  }
+
+  .portfolio-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .portfolio-card {
+    padding: 22px 22px 24px;
+  }
+
+  .span-5 { grid-column: span 5; }
+  .span-6 { grid-column: span 6; }
+  .span-7 { grid-column: span 7; }
+  .span-12 { grid-column: span 12; }
+}
+
+/* The follow button needs the label beside the icon only when the strip is
+   wide enough, so it stays stacked on narrow desktop windows too. */
+@media (min-width: 720px) and (max-width: 979px) {
+  .portfolio-placard-aside .follow-btn {
+    flex-direction: column;
+    font-size: 0.8rem;
+  }
+}
+
+/* Contact hover colours for the email icon (the social ones live in base.css). */
+.fab-email:hover,
+.portfolio-icon-link.fab-email:hover {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+/* ---------- Small clean-ups ---------- */
+.portfolio-tabs a:focus-visible,
+.portfolio-icon-link:focus-visible {
+  outline: 2px solid var(--brand-deep);
+  outline-offset: 2px;
+}
+
+/* Navy chips vanish on the dark theme surface, so they take a brand wash there. */
+html[data-theme="dark"] .portfolio-section-tag,
+html[data-theme="dark"] .portfolio-card .tag-mini {
+  background: red;
+  color: yellow;
+}
+
+html[data-theme="dark"] .coverage-pos {
+  background: var(--pf-track);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
+  background: greenyellow;
+  color: black;
+}

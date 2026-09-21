@@ -1,0 +1,19 @@
+{% comment %}
+TO ADD ANOTHER ICON LATER:
+1. Add the link/handle to SERVICE_INTERNAL/config.py's About class and to
+   custom_context_processors() so it's available as a template variable.
+2. Duplicate one <a class="fab-btn" ...> block below, swap the href and the
+   <svg> icon.
+3. No CSS changes needed -- .fab-stack lays out children automatically.
+{% endcomment %}
+<div class="fab-stack" aria-label="Contact us on social media">
+  <a class="fab-btn fab-whatsapp" href="{{ whatsapp }}" target="_self" rel="noopener noreferrer" aria-label="Chat with us on WhatsApp">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 00-7.8 13.5L3 21l4.7-1.2A9 9 0 1012 3zm0 1.8a7.2 7.2 0 016.2 10.9l-.2.4.6 2.3-2.3-.6-.4.2A7.2 7.2 0 1112 4.8zm-3.4 3.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.1 0 1.2.9 2.4 1 2.6.1.1 1.7 2.8 4.3 3.8 2.1.9 2.5.7 3 .6.5 0 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.6-.3l-1.9-.9c-.3-.1-.5-.1-.7.1l-.7.9c-.1.2-.3.2-.5.1-.8-.3-1.7-.9-2.5-1.7-.7-.7-1.2-1.5-1.4-1.7-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.4.1-.6l-.9-2c-.1-.3-.3-.3-.5-.3z"/></svg>
+  </a>
+  <a class="fab-btn fab-twitter" href="{{ tweeter }}" target="_self" rel="noopener noreferrer" aria-label="Follow us on Twitter">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 3H22l-7.2 8.2L23 21h-6.4l-5-6.5L5.8 21H2.7l7.7-8.8L2 3h6.5l4.6 6 5.8-6zm-1.1 16.2h1.8L7.3 4.7H5.4l12.4 14.5z"/></svg>
+  </a>
+  <a class="fab-btn fab-facebook" href="{{ facebook }}" target="_self" rel="noopener noreferrer" aria-label="Follow us on Facebook">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.6h2.6l.4-3h-3v-1.9c0-.9.2-1.5 1.5-1.5h1.6V4.3C15.9 4.2 15 4.1 14 4.1c-2.2 0-3.7 1.3-3.7 3.8v2.1H7.7v3H10.3V21h3.2z"/></svg>
+  </a>
+</div>

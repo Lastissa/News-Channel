@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+{% load custom_tag %}
+
+{% block title %} {{blog.heading}} {% endblock %}
+
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block meta_description %}This story was published by an Unverified author · {{ project_name }} without a verified {{ project_name }} profile. READ WITH CAUTION.{% endblock %}
+
+{% block extra_head %}
+{% if not author_profile %}
+<meta property="og:title" content="Unverified author · {{ blog.author.email|before_at }}">
+<meta property="og:description" content="This story was published by an Unverified author · {{ blog.author.email |before_at }} without a verified {{ project_name }} profile. READ WITH CAUTION.">
+<meta property="og:image" content="{{blog.image_1}}">
+{% endif %}
+{% endblock %}
+
+{% block content %}
+  <div style="max-width:640px;margin:0 auto;padding:64px 20px;text-align:center;">
+    <h1>Unverified Author</h1>
+
+    <p>
+      Every author on {{ project_name}} has a verified
+      staff profile. The account behind this story does not.
+    </p>
+
+    <p>
+      THIS IS TO INFORM YOU THAT THIS NEWS IS NOT BACKED BY {{project_name}} AND THE CONTENT MIGHT BE INACCRUATE
+    </p>
+
+  </div>
+
+{% endblock %}

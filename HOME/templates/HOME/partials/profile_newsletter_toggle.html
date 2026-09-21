@@ -1,0 +1,12 @@
+<button
+  type="button"
+  class="toggle-switch {% if enabled %}is-on{% endif %}"
+  aria-pressed="{{ enabled|yesno:'true,false' }}"
+  data-toggle-url="{% url 'home:profile_newsletter_toggle' %}"
+  hx-post="{% url 'home:profile_newsletter_toggle' %}"
+  hx-trigger="click"
+  hx-swap="outerHTML"
+  hx-target="closest .toggle-switch"
+  data-enabled="{{ enabled|yesno:'true,false' }}">
+  <span class="toggle-thumb"></span>
+</button>

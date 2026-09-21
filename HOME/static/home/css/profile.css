@@ -1,0 +1,1034 @@
+.profile-shell {
+  max-width: 100%;
+}
+
+.profile-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  background: var(--nav-bg);
+  border-radius: 0;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+}
+
+.profile-header-bar h1 {
+  color: var(--nav-fg);
+  font-size: clamp(1.5rem, 2vw, 2.1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.profile-add-news-link {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 16px;
+  border-radius: none;
+  background: var(--amber-alt);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+
+.profile-add-news-link:hover {
+  background: var(--amber-alt-deep);
+}
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.profile-summary,
+.profile-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Anchor targets from the nav profile dropdown: keep the sticky header
+   from covering the panel heading when the page loads scrolled to one. */
+.profile-panel {
+  scroll-margin-top: calc(var(--header-h) + 20px);
+}
+
+/* ---------- Staff access: self-service profile editor ---------- */
+.staff-panel-intro {
+  margin: 0;
+  color: red;
+  font-size: 0.9rem;
+
+}
+
+.staff-profile-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+  margin-top: 16px;
+}
+
+.staff-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.staff-field-wide {
+  grid-column: 1 / -1;
+}
+
+.staff-field label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.staff-field input,
+.staff-field select,
+.staff-field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--input-fill);
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.staff-field textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.staff-field input:focus,
+.staff-field select:focus,
+.staff-field textarea:focus {
+  outline: 1.5px solid var(--amber-alt-deep);
+  outline-offset: 1px;
+}
+
+.staff-field input:disabled,
+.staff-field select:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  background: var(--paper-dim);
+}
+
+.staff-field small {
+  color: var(--slate);
+  font-size: 0.74rem;
+}
+
+.staff-role-value {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--paper-dim);
+  padding: 10px 12px;
+}
+
+.staff-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.staff-form-actions .profile-action-btn {
+  width: auto;
+  min-width: 160px;
+}
+
+.staff-form-actions .profile-action-btn.is-pending {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+@media (max-width: 719px) {
+  .staff-profile-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*  NEVER clamp this aside to the viewport: the staff record controls and the
+    logout-all block sit below one screen of content, and a sticky box with
+    overflow hidden can never reveal its bottom. */
+.profile-summary {
+  align-self: start;
+  height: auto;
+  padding: 18px 18px 20px;
+}
+
+.profile-identity-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-avatar-wrap {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  background: var(--paper-dim);
+  flex-shrink: 0;
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-identity-copy {
+  min-width: 0;
+}
+
+.profile-identity-copy h2 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  line-height: 1.2;
+  overflow-x: scroll;
+}
+
+.profile-role {
+  margin: 6px 0 0;
+  color: var(--slate);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-info-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.profile-info-list div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  min-width: 0;
+}
+
+.profile-info-list span {
+  color: var(--slate);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.profile-info-list strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.profile-image-link-form {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.profile-image-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 8px;
+}
+
+.profile-image-actions-row .profile-action-btn {
+  width: 100%;
+  min-width: 0;
+}
+
+.profile-setting-block {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setting-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.setting-copy small {
+  color: var(--slate);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border: 1px solid var(--line);
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.16s ease, opacity 0.16s ease;
+  will-change: transform, background-color;
+}
+
+.toggle-switch:active {
+  transform: scale(0.97);
+}
+
+.toggle-switch.is-pending {
+  opacity: 0.75;
+  transform: scale(0.98);
+}
+
+.toggle-switch.is-on {
+  background: var(--amber-alt);
+  border-color: var(--line);
+}
+
+.toggle-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  transform: translateX(0);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.toggle-switch.is-on .toggle-thumb {
+  transform: translateX(22px);
+}
+
+.profile-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.profile-action-btn {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 9px;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+.profile-action-btn.primary {
+  background: var(--amber-alt);
+  border-color: var(--amber-alt-deep);
+  color: #ffffff;
+}
+
+.profile-main {
+  display: grid;
+  gap: 20px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.profile-card {
+  padding: 18px 18px 10px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.panel-tag {
+  color: var(--amber-alt-deep);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-panel p {
+  margin-bottom: 16px;
+  color: var(--slate);
+}
+
+.profile-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: grid;
+  gap: 12px;
+}
+
+.profile-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.profile-list div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-list strong {
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.profile-list small {
+  color: var(--slate);
+}
+
+.profile-list a {
+  color: var(--amber-alt-deep);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.profile-bookmark-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.profile-bookmark-toggle {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--amber-alt-deep);
+  cursor: pointer;
+}
+
+.profile-bookmark-toggle:hover,
+.profile-bookmark-toggle:focus-visible {
+  border-color: var(--amber-alt-deep);
+  background: rgba(186, 121, 14, 0.1);
+}
+
+.profile-bookmark-toggle:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.profile-bookmark-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.published-story-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.published-story-actions form {
+  margin: 0;
+}
+
+.published-story-delete-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: #b42318;
+  cursor: pointer;
+}
+
+.published-story-delete-btn:hover,
+.published-story-delete-btn:focus-visible {
+  border-color: #b42318;
+  background: rgba(180, 35, 24, 0.08);
+}
+
+.published-story-delete-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.published-story-delete-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.empty-copy {
+  color: var(--slate);
+}
+
+@media (max-width: 899.98px) {
+  .profile-header-bar {
+    justify-content: center;
+  }
+
+  .profile-main {
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
+@media (min-width: 900px) {
+  .profile-layout {
+    grid-template-columns: minmax(290px, 330px) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+@media (min-width: 900px) {
+  .profile-header-bar {
+    justify-content: flex-start;
+    padding: 18px 28px;
+  }
+
+  .profile-layout {
+    grid-template-columns: minmax(290px, 330px) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .profile-summary {
+    padding: 22px 20px;
+  }
+
+  .profile-identity-row {
+    align-items: flex-start;
+  }
+
+  .profile-info-list {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .profile-header-bar {
+    padding: 16px 18px;
+  }
+
+  .profile-identity-row {
+    flex-direction: row;
+  }
+
+  .profile-image-actions-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 900px) {
+  .profile-layout {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+/*  ADMIN AUTHORITY: STAFF DIRECTORY PLACARD
+    Names here are plain reference text, not headings, so the placard drops the
+    bold treatment and rides on the default body font. */
+.staff-directory-list strong {
+  font-family: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+/*  ADMIN AUTHORITY: STAFF RECORD PAGE  */
+.staff-record-identity {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.staff-record-name {
+  font-family: inherit;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.staff-record-email {
+  color: var(--slate);
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+.staff-record-note {
+  color: var(--slate);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.staff-record-block {
+  display: grid;
+  gap: 10px;
+}
+
+.staff-record-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.staff-record-block-head small {
+  color: var(--slate);
+}
+
+.staff-record-textarea,
+.staff-record-select,
+.staff-record-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.staff-record-textarea:disabled,
+.staff-record-select:disabled,
+.staff-record-input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.staff-record-feedback {
+  min-height: 1.1em;
+  font-size: 0.85rem;
+  color: var(--slate);
+}
+
+.staff-record-feedback.is-error {
+  color: #c0392b;
+}
+
+.staff-record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.staff-record-grid .staff-record-wide {
+  grid-column: 1 / -1;
+}
+
+.staff-record-grid dt {
+  color: var(--slate);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.staff-record-grid dd {
+  margin: 0;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.staff-record-socials,
+.staff-record-tags {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.staff-record-tags li {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.staff-record-socials a {
+  color: var(--amber-alt-deep);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .staff-record-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*  ADMIN AUTHORITY: PROFILE HEADER ACTIONS + LOG OUT ALL + ADD STAFF  */
+.profile-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-logout-all-block {
+  margin-top: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.logout-all-btn {
+  color: var(--paper);
+  border-color: var(--careful-btn-bg);
+  background-color: var(--careful-btn-bg);
+  border-radius: 0%;
+
+}
+
+.logout-all-btn:hover,
+.logout-all-btn:focus-visible {
+  border-color: var(--amber-alt);
+  background: var(--ink);
+}
+
+.logout-all-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.staff-create-layout {
+  /* max-width: 760px; */
+  /* margin: 0 auto; */
+  /* padding: 0 20px 40px; */
+}
+
+.staff-create-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+}
+
+.staff-create-form .panel-header {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+}
+
+.staff-create-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #c0392b;
+  font-weight: 700;
+}
+
+.staff-create-check {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  cursor: pointer;
+}
+
+.staff-create-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--amber-alt);
+}
+
+.staff-create-check span {
+  font-weight: 700;
+}
+
+.staff-create-check small {
+  grid-column: 1 / -1;
+  color: var(--slate);
+  font-size: 0.74rem;
+}
+
+.staff-create-form .staff-record-feedback {
+  min-height: 1.1em;
+}
+
+@media (max-width: 719px) {
+  .staff-create-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Delete account: header button + htmx placard overlay ---------- */
+.profile-delete-account-btn {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid rgba(179, 64, 42, 0.45);
+  cursor: pointer;
+}
+
+.profile-delete-account-btn:hover,
+.profile-delete-account-btn:focus-visible {
+  background: rgba(149, 25, 1, 0.163);
+}
+
+.delete-account-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.delete-account-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 27, 44, 0.62);
+}
+
+.delete-account-placard {
+  position: relative;
+  width: min(92vw, 520px);
+  max-height: min(86vh, 720px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--danger);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  padding: 22px 22px 18px;
+}
+
+.delete-account-placard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.delete-account-placard-head h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.delete-account-step-tag {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--slate);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.delete-account-lede {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.delete-account-sub {
+  margin: 0 0 16px;
+  color: var(--slate);
+  font-size: 0.88rem;
+}
+
+.delete-account-loss-list {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  display: grid;
+  gap: 8px;
+}
+
+.delete-account-error {
+  margin: 0 0 12px;
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+
+.delete-account-final-form {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-account-final-form label {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--ink);
+}
+
+.delete-account-final-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-dim, transparent);
+  color: var(--ink);
+  padding: 11px 12px;
+  font: inherit;
+}
+
+.delete-account-final-form input:focus {
+  outline: none;
+  border-color: var(--danger);
+}
+
+.delete-account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.profile-action-btn.danger {
+  color: #fff;
+  border-color: var(--careful-btn-bg);
+  background: var(--careful-btn-bg);
+  border-radius: 0;
+}
+
+.profile-action-btn.danger:hover,
+.profile-action-btn.danger:focus-visible {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
+/* ---------- Delete account: please wait + continue button side switch ---------- */
+.delete-account-backdrop {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.delete-account-placard-wait {
+  border-top-color: var(--amber-alt);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.delete-account-placard-wait h3 {
+  margin: 2px 0 0;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.delete-account-placard-wait p {
+  margin: 0;
+  color: var(--slate);
+  font-size: 0.88rem;
+}
+
+.delete-account-placard-wait small {
+  color: var(--slate);
+  font-size: 0.78rem;
+}
+
+.delete-account-placard-wait strong {
+  color: var(--ink);
+}
+
+.delete-account-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid var(--line);
+  border-top-color: var(--amber-alt);
+  animation: delete-account-spin 0.8s linear infinite;
+}
+
+@keyframes delete-account-spin {
+  to { transform: rotate(360deg); }
+}
+
+/*  The continue button switches sides on every confirm, right then left
+    then right, and slides in from the side it is heading to. */
+.delete-account-actions.delete-account-actions-left {
+  justify-content: flex-start;
+}
+
+.delete-account-actions.delete-account-actions-right {
+  justify-content: flex-end;
+}
+
+.delete-account-actions-left .profile-action-btn.danger {
+  animation: delete-account-slide-left 0.28s ease;
+}
+
+.delete-account-actions-right .profile-action-btn.danger {
+  animation: delete-account-slide-right 0.28s ease;
+}
+
+@keyframes delete-account-slide-left {
+  from { transform: translateX(-18px); opacity: 0.35; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes delete-account-slide-right {
+  from { transform: translateX(18px); opacity: 0.35; }
+  to { transform: none; opacity: 1; }
+}

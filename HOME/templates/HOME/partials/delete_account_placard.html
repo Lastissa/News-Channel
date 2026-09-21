@@ -1,0 +1,103 @@
+{% comment %}
+  DELETE ACCOUNT PLACARD (htmx overlay fragment).
+
+  Fetched lazily by htmx the first time the Delete account button on the
+  profile page is pressed; nothing here ships with the profile page itself.
+  Steps 1 to 3 are the three "are you sure" confirms, step 4 lists what the
+  deletion destroys and carries the type-your-email-to-finalize form. Each
+  confirm button pulls the next step from the same endpoint; cancel clears
+  the overlay. The final form is a plain POST so the server can delete,
+  log out and redirect with a django message.
+{% endcomment %}
+<div class="delete-account-layer" data-delete-placard>
+  <div class="delete-account-backdrop" data-delete-placard-close></div>
+
+  <div class="delete-account-placard" role="dialog" aria-modal="true" aria-labelledby="delete-placard-title">
+    <div class="delete-account-placard-head">
+      <h3 id="delete-placard-title">Delete account</h3>
+      <span class="delete-account-step-tag">Step {{ step }} of {{ total_steps }}</span>
+    </div>
+
+    {% if step == 4 %}
+    <p class="delete-account-lede">Final check. This are what will happen the moment your account is deleted:</p>
+
+    <ul class="delete-account-loss-list">
+      <li>The account itself, its login and every active session end immediately.</li>
+      {% if is_staff_user %}
+        <li>Your staff profile goes with it: bio, socials, speciality and everyone following you.</li>
+      {% endif %}
+      <li>{{ stories_count }} published {{ stories_count|pluralize:"story,stories" }} deleted permanently.</li>
+      <li>{{ comments_count }} comment{{ comments_count|pluralize }} removed from every story.</li>
+      <li>{{ bookmarks_count }} saved bookmark{{ bookmarks_count|pluralize }} and your reading history gone.</li>
+      <li>Newsletter and login alerts stop. The email can sign up fresh later, but nothing deleted here can be recovered.</li>
+    </ul>
+
+    {% if error %}<p class="delete-account-error">{{ error }}</p>{% endif %}
+    <p class="delete-account-error" data-delete-step-error hidden></p>
+
+    <form hx-post="{{ delete_endpoint }}" hx-target="[data-delete-overlay]" hx-swap="innerHTML"
+          class="delete-account-final-form">
+      {% csrf_token %}
+      <label for="delete-account-email">Type your email address to finalize. <br> DO NOT TYPE ITIF YOU DO NOT UNDERSTAND THE RISK YET. <br>YOU CAN SPEAK WITH US ON ANY CHANNEL FOR SAFE DEACTIVATION ISTEAD</label>
+      <input id="delete-account-email" type="email" name="email" autocomplete="off"
+             placeholder="{{ account_email }}" required>
+      <div class="delete-account-actions">
+        <button type="button" class="profile-action-btn" data-delete-placard-close>Cancel</button>
+        <button type="submit" class="profile-action-btn danger" data-busy-label="Deleting...">Delete my account</button>
+      </div>
+    </form>
+
+    {% else %}
+    <p class="delete-account-lede">Are you sure?</p>
+    <p class="delete-account-sub" data-delete-confirm-copy>
+      {% if steps_remaining == 1 %}
+      <b>DO NOT PROCEED IF YOU ARE NOT CERTAIN. BAD THINGS WILL HAPPEN.</b>
+        This is the last confirmation. One more "Yes" and the final step opens.
+        {% elif steps_remaining == 2 %}
+        THIS ACT IS DANGEROUS.<br><br>
+        <b>CANCEL IF YOU ARE NOT CERTAIN AS LOSING AN ACCOUNT IS IRREVERSIBLE.<b>
+      {% else %}
+      READ CAREFULLY.<br>
+        You will be asked {{ steps_remaining }} more time{{ steps_remaining|pluralize }} before anything happens.
+      {% endif %}
+    </p>
+
+    {% comment %} {#   FILLED BY THE PAGE SCRIPT WHEN A CONFIRM REQUEST DIES (LOST NETWORK,
+         TIMEOUT) SO THE USER IS NEVER LEFT WONDERING AND CAN JUST RETRY.   #} {% endcomment %}
+    <p class="delete-account-error" data-delete-step-error hidden></p>
+
+    {% comment %}  THE CONTINUE BUTTON SWITCHES SIDES ON EVERY CONFIRM, RIGHT
+        THEN LEFT THEN RIGHT, SO THE STEP CHANGE IS FELT, NOT JUST READ. {% endcomment %}
+    <div class="delete-account-actions {% if step|divisibleby:2 %}delete-account-actions-left{% else %}delete-account-actions-right{% endif %}">
+      <button type="button" class="profile-action-btn" data-delete-placard-close>Cancel</button>
+      <button type="button" class="profile-action-btn danger"
+              hx-get="{{ placard_endpoint }}?step={{ step|add:'1' }}"
+              hx-target="[data-delete-overlay]"
+              hx-swap="innerHTML">Yes, continue</button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  (function () {
+    var layer = document.currentScript.previousElementSibling;
+    if (!layer || !layer.hasAttribute("data-delete-placard")) return;
+
+    function closePlacard() {
+      var host = document.querySelector("[data-delete-overlay]");
+      if (host) host.innerHTML = "";
+    }
+
+    layer.querySelectorAll("[data-delete-placard-close]").forEach(function (node) {
+      node.addEventListener("click", closePlacard);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") closePlacard();
+    });
+
+    var emailInput = document.getElementById("delete-account-email");
+    if (emailInput) emailInput.focus();
+  })();
+</script>

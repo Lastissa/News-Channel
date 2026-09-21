@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Page not found | {{ project_name }}{% endblock %}
+{% block meta_description %}The page you are looking for does not exist on {{ project_name }}.{% endblock %}
+
+{% block content %}
+<section class="notfound-shell">
+  <h1>404</h1>
+  <p>Page not found. The page you are looking for does not exist.</p>
+  <a class="notfound-home-link" href="{% url 'home:home' %}">Back to headlines</a>
+</section>
+{% endblock %}

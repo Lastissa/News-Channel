@@ -1,0 +1,52 @@
+{% comment %}
+  PORTFOLIO EXTRAS FRAGMENT: career highlights, coverage by category and
+  selected work. Fetched after first paint; the page script drops each part
+  into its matching slot. All content is real account data, nothing inflated.
+{% endcomment %}
+<div data-extras-part="career">
+  <ul class="portfolio-highlights">
+    {% for highlight in highlights %}
+      <li>{{ highlight }}</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div data-extras-part="coverage">
+  {% if coverage %}
+    <ul class="coverage-list">
+      {% for row in coverage %}
+        <li>
+          <span class="coverage-label">{{ row.label }}</span>
+          <span class="coverage-track" role="img" aria-label="{{ row.label }}: {{ row.total }} stories, {{ row.share }} percent of output">
+            <span class="coverage-fill" style="width: {{ row.share }}%"></span>
+          </span>
+          <span class="coverage-count">{{ row.total }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="coverage-caption">Share of published stories per category.</p>
+  {% else %}
+    <p class="portfolio-empty">No coverage recorded yet.</p>
+  {% endif %}
+</div>
+
+<div data-extras-part="work">
+  {% if stories %}
+    <ul class="portfolio-stories-list">
+      {% for story in stories %}
+        <li>
+          <div class="portfolio-story-copy">
+            <a href="{% url 'blog:story_detail' story.id %}" class="portfolio-story-link">{{ story.heading }}</a>
+            <small>
+              <span class="tag tag-mini">{{ story.get_category_display|title }}</span>
+              {{ story.views }} view{{ story.views|pluralize }} &bull; {{ story.date_created|date:"M d, Y" }}
+            </small>
+          </div>
+          <a href="{% url 'blog:story_detail' story.id %}" class="portfolio-story-open">Read</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="portfolio-empty">No stories published yet.</p>
+  {% endif %}
+</div>

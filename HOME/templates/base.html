@@ -1,0 +1,67 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme_preference|default:'light' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% csrf_token %}
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('abureports-theme');
+                var theme = stored === 'dark' || stored === 'light'
+                    ? stored
+                    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+                try {
+                    document.cookie = 'abureports-theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
+                } catch (e) {}
+            } catch (e) {
+                try {
+                    var fallback = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', fallback);
+                } catch (err) {}
+            }
+        })();
+    </script>
+    <title>{% block title %}{{ project_name }} · {{ project_cachphrase }}{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}{{ project_cachphrase }}{% endblock %}">
+    {% block meta_robots %}<meta name="robots" content="index, follow">{% endblock %}
+    <meta property="og:site_name" content="{{ project_name }}">
+    <link rel="icon" type="image/png" href="{% static "logo.jpg" %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+
+    <link rel="stylesheet" href="{% static 'home/css/base.css' %}">
+    {% block extra_head %}
+    {% comment %} TITLE AND DESCRIPTION ALREADY TAKEN CARE OF BY NoRMAL TITLE AND DESCRPTION META TAG AS THEY ARE ALWAYS PRESENT {% endcomment %}
+    {% comment %} <meta property="og:title" content="{{project_name}}">
+    <meta property="og:description" content="{{project_cachphrase}}"> {% endcomment %}
+    <meta property="og:image" content="{% if page_og_image %}{{ page_og_image }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'logo.jpg' %}{% endif %}">
+    {% comment %} <meta property="og:url" content="https://yourdomain.com/page-url/"> {% endcomment %}
+    {% endblock %}
+</head>
+
+
+<body>
+{% include "includes/navbar.html" %}
+{% if messages %}
+  <div id="django-message-host" style="display:none;">
+    {% for message in messages %}
+      <div class="django-message {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
+<main id="main-content">
+{% block content %}{% endblock %}
+</main>
+{% block footer %}{% include "includes/footer.html" %}{% endblock %}
+{% block floating_social %}{% include "includes/floating_social.html" %}{% endblock %}
+
+<script src="{% static 'home/js/app.js' %}" defer></script>
+<script src="{% static 'home/js/carousel.js' %}" defer></script>
+<script src="{% static 'home/js/interactions.js' %}" defer></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

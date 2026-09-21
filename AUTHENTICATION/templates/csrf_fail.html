@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Session expired · {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block content %}
+<section class="legal-page">
+  <div class="legal-wrap csrf-fail">
+    <div class="csrf-fail-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 1 21h22L12 2zm0 4.5 7.5 13h-15L12 6.5zM11 10v5h2v-5h-2zm0 6.5V19h2v-2.5h-2z"/></svg>
+    </div>
+    <p class="legal-eyebrow">Security check</p>
+    <h1>That action couldn't be completed</h1>
+    <p class="legal-intro">Your request was blocked by a security check, usually because the page was open a while before you submitted it, or you went back to a cached copy of the page.</p>
+    <p class="legal-intro">Or You Double Force tap a button already in the process of gettin you what you need, <b>common cases - (1) during login / signup</b></p>
+
+    <h2>What you can do</h2>
+    <ol class="csrf-fail-steps">
+      <li>Go back and reload the page, then try the action again.</li>
+      <li>If you were signed in, check whether you're still logged in and sign in again if not.</li>
+      <li>Clear Cache In Your Browser Settings.</li>
+      <li>Delete browsing data for this site.</li>
+      <li>Make sure cookies are enabled for this site in your browser.</li>
+      <li>Still stuck? Let us know using the contact details in the footer, so we can look into it.</li>
+    </ol>
+
+    <div class="csrf-fail-actions">
+      <a href="javascript:history.back()" class="csrf-fail-btn csrf-fail-btn-ghost">Go back</a>
+      <a href="{% url 'home:home' %}" class="csrf-fail-btn">Return home</a>
+    </div>
+  </div>
+</section>
+{% endblock content %}

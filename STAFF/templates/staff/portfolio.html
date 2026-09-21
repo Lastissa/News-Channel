@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% load static l10n %}
+
+{% block title %}{{ display_name }} · {{ role_label }} · Portfolio · {{ project_name }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="canonical" href="{{ request.build_absolute_uri }}">
+  <meta name="author" content="{{ display_name }} ({{ author.email }})">
+  <meta property="og:type" content="profile">
+  <meta property="og:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
+  <meta property="og:description" content="{{ meta_description }}">
+  <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  <meta property="profile:username" content="{{ display_name }}">
+  {% if page_og_image %}
+    <meta property="og:image" content="{{ page_og_image }}">
+  {% endif %}
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
+  <meta name="twitter:description" content="{{ meta_description }}">
+  <script type="application/ld+json">{{ person_schema_json }}</script>
+  <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}">
+{% endblock %}
+
+{% comment %}
+  The floating buttons on this page belong to the author, not the project:
+  the email plus every social the author filled in. A social left empty on
+  the profile is never drawn.
+{% endcomment %}
+{% block floating_social %}
+<div class="fab-stack" aria-label="Contact {{ display_name }}">
+  <a class="fab-btn fab-email" href="mailto:{{ author.email }}" aria-label="Email {{ display_name }}" title="Email">
+    {% include "staff/partials/social_icon.html" with key="email" %}
+  </a>
+  {% for social in socials %}
+    <a class="fab-btn fab-{{ social.key }}" href="{{ social.url }}" target="_blank" rel="noopener noreferrer"
+       aria-label="{{ social.aria }}" title="{{ social.label }}">
+      {% include "staff/partials/social_icon.html" with key=social.key %}
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="portfolio-shell">
+
+  {# ---------- PLACARD: picture and follow on the left, identity on the right ---------- #}
+  <header class="portfolio-placard">
+    <div class="portfolio-placard-aside">
+      <div class="portfolio-placard-media">
+        {% if author.profile_img %}
+          <img src="{{ author.profile_img }}" alt="{{ display_name }} profile picture"
+               onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
+          <span class="portfolio-initial" hidden aria-hidden="true">{{ display_name|slice:":1"|upper }}</span>
+        {% else %}
+          <span class="portfolio-initial" aria-hidden="true">{{ display_name|slice:":1"|upper }}</span>
+        {% endif %}
+      </div>
+
+      <form method="post" action="{{ follow_endpoint }}" class="portfolio-follow-form"
+            data-follow-author-form data-endpoint="{{ follow_endpoint }}">
+        {% csrf_token %}
+        <button type="submit" class="follow-btn" data-follow-author-btn
+                data-following="{% if is_following %}true{% else %}false{% endif %}"
+                aria-pressed="{% if is_following %}true{% else %}false{% endif %}"
+                aria-label="{% if is_following %}Unfollow {{ display_name }}{% else %}Follow {{ display_name }}{% endif %}"
+                title="{% if is_following %}Unfollow {{ display_name }}{% else %}Follow {{ display_name }}{% endif %}">
+          <svg class="follow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M15.5 19.5v-1.4c0-2.1-1.7-3.8-3.8-3.8H7.8C5.7 14.3 4 16 4 18.1v1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="9.8" cy="7.6" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <path class="follow-icon-plus" d="M18 7v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path class="follow-icon-check" d="m15.2 10.1 2 2 3.3-3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span data-follow-label>{% if is_following %}Following{% else %}Follow author{% endif %}</span>
+        </button>
+      </form>
+    </div>
+
+    <div class="portfolio-placard-copy">
+      <p class="portfolio-kicker">
+        <span class="tag portfolio-role">{{ role_label }}</span>
+        <span class="portfolio-kicker-project">{{ project_name }}</span>
+      </p>
+      <h1>{{ display_name }}</h1>
+
+      <div class="portfolio-contact" id="portfolio-contact">
+        <p class="portfolio-email"><a href="mailto:{{ author.email }}">{{ author.email }}</a></p>
+        {% comment %} I COMMENT IT OUT BCOS THE FLOATING ALREADY CARRIESS STAFF SOCIALS {% endcomment %}
+        {% comment %} {% if socials %}
+          <ul class="portfolio-contact-icons" aria-label="Contact {{ display_name }}">
+            {% for social in socials %}
+              <li>
+                <a class="portfolio-icon-link fab-{{ social.key }}" href="{{ social.url }}" target="_blank"
+                   rel="noopener noreferrer" aria-label="{{ social.aria }}" title="{{ social.label }}">
+                  {% include "staff/partials/social_icon.html" with key=social.key %}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %} {% endcomment %}
+      </div>
+
+      <dl class="portfolio-facts" aria-label="About {{ display_name }}">
+        {% if sex_label %}
+          <div><dt>Sex</dt><dd>{{ sex_label }}</dd></div>
+        {% endif %}
+        <div><dt>On the team since</dt><dd>{{ author.date_joined|date:"F Y" }}</dd></div>
+        {% if staff_profile.last_promotion %}
+          <div><dt>Last promoted</dt><dd>{{ staff_profile.last_promotion|date:"F Y" }}</dd></div>
+        {% endif %}
+        {% if top_category %}
+          <div><dt>Most covered</dt><dd>{{ top_category }}</dd></div>
+        {% endif %}
+        {% if stats.latest_story %}
+          <div><dt>Last published</dt><dd>{{ stats.latest_story|date:"M d, Y" }}</dd></div>
+        {% endif %}
+      </dl>
+
+      <p class="portfolio-summary">
+        <span><strong>{{ stats.story_count }}</strong> published stor{{ stats.story_count|pluralize:"y,ies" }}</span>
+        <span><strong>{{ stats.total_views|floatformat:"0g" }}</strong> story view{{ stats.total_views|pluralize }}</span>
+        <span><strong data-follow-count>{{ follower_count }}</strong> <span data-follow-count-noun>follower{{ follower_count|pluralize }}</span></span>
+        <span><strong>{{ following_count|default:"0" }}</strong> following</span>
+      </p>
+      <small class="follow-note">Follow to receive email whenever this author makes a post.</small>
+
+      {% if speciality %}
+        <div class="portfolio-specialities">
+          <span class="portfolio-specialities-label">Editorial focus</span>
+          <ul>{% for item in speciality %}<li class="portfolio-speciality">{{ item }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+    </div>
+  </header>
+
+  {# ---------- KEY NUMBERS: six totals plus two milestones ---------- #}
+  <dl class="portfolio-stats-strip" aria-label="Editorial statistics">
+    <div>
+      <dt>Total story views</dt>
+      <dd>{{ stats.total_views|floatformat:"0g" }}</dd>
+      <small>All published work</small>
+    </div>
+    <div>
+      <dt>Total likes</dt>
+      <dd>{{ stats.total_likes|floatformat:"0g" }}</dd>
+      <small>Reader reactions</small>
+    </div>
+    <div>
+      <dt>Published stories</dt>
+      <dd>{{ stats.story_count }}</dd>
+      <small>Editorial output</small>
+    </div>
+    <div>
+      <dt>Followers</dt>
+      <dd data-follow-count>{{ follower_count }}</dd>
+      <small>Newsletter audience</small>
+    </div>
+    <div>
+      <dt>Average views</dt>
+      <dd>{{ stats.average_views|floatformat:"0g" }}</dd>
+      <small>Per published story</small>
+    </div>
+    <div>
+      <dt>Average likes</dt>
+      <dd>{{ stats.average_likes|floatformat:"0g" }}</dd>
+      <small>Per published story</small>
+    </div>
+    <div class="portfolio-stat--milestone">
+      <dt>Author rank</dt>
+      {% if ranking.rank %}
+        <dd>#{{ ranking.rank }}</dd>
+        <small>of {{ ranking.total_authors }} author{{ ranking.total_authors|pluralize }} by stories posted</small>
+        <span class="rank-bars" aria-hidden="true">
+          {% for bar in ranking.bars %}<span class="rank-bar{% if bar.is_me %} is-me{% endif %}" style="height: {{ bar.height }}%"></span>{% endfor %}
+        </span>
+      {% else %}
+        <dd>Unranked</dd>
+        <small>No stories published yet</small>
+      {% endif %}
+    </div>
+    <div class="portfolio-stat--milestone">
+      <dt>Most viewed story</dt>
+      {% if top_story %}
+        <dd>{{ top_story.views|floatformat:"0g" }}</dd>
+        <small class="stat-story-title"><a href="{% url 'blog:story_detail' top_story.id %}" title="{{ top_story.heading }}">{{ top_story.heading }}</a></small>
+      {% else %}
+        <dd>None yet</dd>
+        <small>No stories published yet</small>
+      {% endif %}
+    </div>
+  </dl>
+
+  <nav class="portfolio-tabs" aria-label="Portfolio sections">
+    {% if bio %}<a href="#portfolio-bio">Profile</a>{% endif %}
+    {% if tribute %}<a href="#portfolio-tribute">Endorsement</a>{% endif %}
+    {% if stories %}
+      <a href="#portfolio-work">Story reach</a>
+      <a href="#portfolio-coverage">Coverage</a>
+      <a href="#portfolio-rhythm">Rhythm</a>
+      <a href="#portfolio-readership">Readership</a>
+      <a href="#portfolio-response">Reader response</a>
+    {% endif %}
+    <a href="#portfolio-contact">Contact</a>
+  </nav>
+
+  <div class="portfolio-grid">
+
+    {% if bio %}
+      <section class="portfolio-card {% if tribute %}span-6{% else %}span-12{% endif %}" id="portfolio-bio">
+        <header class="portfolio-card-head">
+          <div><h2>Profile</h2></div>
+          <span class="tag portfolio-section-tag">About</span>
+        </header>
+        <p class="portfolio-prose">{{ bio|linebreaksbr }}</p>
+      </section>
+    {% endif %}
+
+    {% if tribute %}
+      <section class="portfolio-card portfolio-card--endorsement {% if bio %}span-6{% else %}span-12{% endif %}" id="portfolio-tribute">
+        <header class="portfolio-card-head">
+          <div><h2>Endorsement from the editorial team</h2></div>
+          <span class="tag portfolio-section-tag">Editors</span>
+        </header>
+        <p class="portfolio-prose">{{ tribute|linebreaksbr }}</p>
+      </section>
+    {% endif %}
+
+    {% if stories %}
+      {# ---- recent story reach ---- #}
+      <section class="portfolio-card span-7" id="portfolio-work">
+        <header class="portfolio-card-head">
+          <div>
+            <h2>Recent story reach</h2>
+            <p>Views across the latest {{ stories|length }} published stor{{ stories|length|pluralize:"y,ies" }}.</p>
+          </div>
+          <span class="tag portfolio-section-tag">Latest work</span>
+        </header>
+        <ul class="reach-list">
+          {% for story in stories %}
+            <li>
+              <div class="reach-copy">
+                <a href="{% url 'blog:story_detail' story.id %}" class="portfolio-story-link">{{ story.heading }}</a>
+                <small><span class="tag tag-mini">{{ story.get_category_display|title }}</span><time datetime="{{ story.date_created|date:'Y-m-d' }}">{{ story.date_created|date:"M d, Y" }}</time></small>
+              </div>
+              <div class="reach-metrics">
+                <span class="reach-track" role="img" aria-label="{{ story.heading }} has {{ story.views }} views, {{ story.reach_share }} percent of the highest viewed recent story">
+                  <span class="reach-fill" style="width: {{ story.reach_share }}%"></span>
+                </span>
+                <span class="reach-nums"><strong>{{ story.views|floatformat:"0g" }}</strong> view{{ story.views|pluralize }}<span class="reach-likes">{{ story.likes }} like{{ story.likes|pluralize }}</span></span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      {# ---- coverage ranking ---- #}
+      <section class="portfolio-card span-5" id="portfolio-coverage">
+        <header class="portfolio-card-head">
+          <div>
+            <h2>Coverage</h2>
+            <p>Published stories by category, ranked.</p>
+          </div>
+          <span class="tag portfolio-section-tag">By topic</span>
+        </header>
+        <ol class="coverage-list">
+          {% for row in coverage %}
+            <li>
+              <span class="coverage-pos" aria-hidden="true">{{ row.position }}</span>
+              <span class="coverage-label">{{ row.label }}</span>
+              <span class="coverage-track" role="img" aria-label="{{ row.label }}: {{ row.total }} stor{{ row.total|pluralize:'y,ies' }}, {{ row.share }} percent of published work">
+                <span class="coverage-fill" style="width: {{ row.width }}%"></span>
+              </span>
+              <span class="coverage-count"><strong>{{ row.total }}</strong><small>{{ row.share }}%</small></span>
+            </li>
+          {% endfor %}
+        </ol>
+      </section>
+
+      {# ---- publishing rhythm ---- #}
+      <section class="portfolio-card span-7" id="portfolio-rhythm">
+        <header class="portfolio-card-head">
+          <div>
+            <h2>Publishing rhythm</h2>
+            <p>Stories published per month over the last {{ rhythm_months }} months.</p>
+          </div>
+          <span class="tag portfolio-section-tag">Output</span>
+        </header>
+        <ol class="rhythm-cols">
+          {% for column in rhythm.columns %}
+            <li class="rhythm-col{% if column.total == 0 %} is-empty{% endif %}{% if column.is_current %} is-current{% endif %}" style="--p: {{ column.height }}">
+              <span class="rhythm-plot">
+                <span class="rhythm-value">{{ column.total }}</span>
+                <span class="rhythm-bar"></span>
+              </span>
+              <span class="rhythm-label">{{ column.label }}{% if column.year %}<small>{{ column.year }}</small>{% endif %}</span>
+              <span class="sr-only">{{ column.label }}: {{ column.total }} stor{{ column.total|pluralize:"y,ies" }}</span>
+            </li>
+          {% endfor %}
+        </ol>
+        <p class="portfolio-caption">
+          {% if rhythm.window_total %}
+            {{ rhythm.window_total }} stor{{ rhythm.window_total|pluralize:"y,ies" }} in this window. The tallest month is the full height of the chart.
+          {% else %}
+            No stories in this window. Older work is counted in the totals above.
+          {% endif %}
+        </p>
+      </section>
+
+      {# ---- readership by category ---- #}
+      <section class="portfolio-card span-5" id="portfolio-readership">
+        <header class="portfolio-card-head">
+          <div>
+            <h2>Readership</h2>
+            <p>Where the views come from, by category.</p>
+          </div>
+          <span class="tag portfolio-section-tag">Audience</span>
+        </header>
+        {% if readership %}
+          <div class="readership">
+            <div class="donut">
+              {% localize off %}
+              <svg viewBox="0 0 42 42" role="img" aria-label="Share of {{ stats.total_views }} views by category">
+                <circle class="donut-track" cx="21" cy="21" r="15.9155" fill="none" stroke-width="6"/>
+                {% for slice in readership %}
+                  <circle class="donut-slice tone-{{ slice.tone }}" cx="21" cy="21" r="15.9155" fill="none" stroke-width="6"
+                          stroke-dasharray="{{ slice.dash }} {{ slice.gap }}" stroke-dashoffset="{{ slice.offset }}"/>
+                {% endfor %}
+                <text class="donut-total" x="21" y="21.6" text-anchor="middle">{{ stats.total_views|floatformat:"0g" }}</text>
+                <text class="donut-caption" x="21" y="26.4" text-anchor="middle">views</text>
+              </svg>
+              {% endlocalize %}
+            </div>
+            <ul class="donut-legend">
+              {% for slice in readership %}
+                <li>
+                  <span class="swatch tone-{{ slice.tone }}" aria-hidden="true"></span>
+                  <span class="legend-label">{{ slice.label }}</span>
+                  <span class="legend-value"><strong>{{ slice.views|floatformat:"0g" }}</strong><small>{{ slice.pct_label }}</small></span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% else %}
+          <p class="portfolio-empty">No views recorded yet.</p>
+        {% endif %}
+      </section>
+
+      {# ---- reader response ---- #}
+      <section class="portfolio-card span-12" id="portfolio-response">
+        <header class="portfolio-card-head">
+          <div>
+            <h2>Reader response</h2>
+            <p>What readers do after opening the work. Every bar is measured against total views.</p>
+          </div>
+          <span class="tag portfolio-section-tag">Engagement</span>
+        </header>
+        <ul class="response-list">
+          {% for row in reader_response %}
+            <li>
+              <div class="response-copy">
+                <span class="response-label">{{ row.label }}</span>
+                <small>{{ row.note }}</small>
+              </div>
+              <span class="response-track" role="img" aria-label="{{ row.label }}: {{ row.value }}{% if row.ratio %}, {{ row.ratio }}{% endif %}">
+                <span class="response-fill" style="width: {{ row.width }}%"></span>
+              </span>
+              <span class="response-nums"><strong>{{ row.value|floatformat:"0g" }}</strong>{% if row.ratio %}<small>{{ row.ratio }}</small>{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% else %}
+      <section class="portfolio-card span-12">
+        <header class="portfolio-card-head">
+          <div><h2>Published work</h2></div>
+          <span class="tag portfolio-section-tag">Latest work</span>
+        </header>
+        <p class="portfolio-empty">No stories published yet. Reach, coverage and readership charts appear here after the first story goes live.</p>
+      </section>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
