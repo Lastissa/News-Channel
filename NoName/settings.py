@@ -125,7 +125,7 @@ MAILERS = {
     },
 }
 
-STATIC_ROOT = "staticfiles/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 
 SY_SECRET = os.getenv('sy_secret')
