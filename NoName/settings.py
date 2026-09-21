@@ -13,12 +13,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CSRF_FAILURE_VIEW = "AUTHENTICATION.views.csrf_failure"
 CSRF_TRUSTED_ORIGINS = ['https://esta-sensate-unquickly.ngrok-free.dev',]
 
-SECRET_KEY = os.getenv('DJANGO_SECRET') or "abcdef"
+SECRET_KEY = os.getenv('DJANGO_SECRET')
 
-DEBUG = os.getenv("DEBUG") or False
+DEBUG = os.getenv("DEBUG", 'False').upper() in ['TRUE']
 # DEBUG = False
 
-ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1,testserver").split(',')
+ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -131,11 +131,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 SY_SECRET = os.getenv('sy_secret')
 
 MAINTENANCE_MODE = os.getenv('MAINTENANCE_MODE', "FALSE")
-
-
-# Optional: Use Redis for sessions as well
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-SESSION_CACHE_ALIAS = "default"
 
 REDIS_URL=os.getenv('redis_url')
 if REDIS_URL and os.getenv('use_redis'):

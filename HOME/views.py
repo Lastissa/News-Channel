@@ -15,12 +15,13 @@ from django.utils import timezone
 from django.utils.text import Truncator
 from django.views import View
 
-from AUTHENTICATION.models import Auth
+from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, CATEGORY, Comment
 from HOME.models import Bookmark
 from SERVICE_INTERNAL.abstract import (
     _optimization,
     _response,
+    get_cache,
     info_logger,
     is_rate_limited,
     notify_admins_account_deleted,
@@ -154,41 +155,24 @@ def _resolve_page_number(raw_value, *, default=1):
 
 
 def _user_sessions_for_profile(user, request):
-    sessions = []
-    for session in Session.objects.filter(session_key__isnull=False).iterator():
-        decoded = session.get_decoded() or {}
-        if str(decoded.get("_auth_user_id")) != str(user.pk):
-            continue
+    if not user.is_authenticated:
+        return []
 
-        meta = decoded.get("session_meta") or {}
-        login_time = meta.get("logged_in_at")
-        if login_time:
-            try:
-                login_time = timezone.datetime.fromisoformat(login_time)
-            except ValueError:
-                login_time = None
+    current_key = request.session.session_key
 
-        expiry = getattr(session, "expire_date", None)
-        if expiry is None and hasattr(session, "get_expiry_date"):
-            try:
-                expiry = session.get_expiry_date()
-            except (AttributeError, TypeError, ValueError):
-                expiry = None
-
-        sessions.append(
-            {
-                "session_key": session.session_key,
-                "ip": meta.get("ip") or "Unknown IP",
-                "device": meta.get("user_agent") or "Unknown device",
-                "logged_in_at": login_time,
-                "expires_at": expiry,
-                "is_current": session.session_key == request.session.session_key,
+    rows = UserSession.objects.filter(user=user).order_by("-logged_in_at")
+    return [{
+            "session_key": row.session_key,
+            "ip": row.ip or "Unknown IP",
+            "device": row.user_agent or "Unknown device",
+            "logged_in_at": row.logged_in_at,
+            "expires_at": row.expires_at,
+            "is_current": row.session_key == current_key,
             }
-        )
-
-    sessions.sort(key=lambda item: (item["is_current"], item["logged_in_at"] or timezone.now()), reverse=True)
-    return sessions
-
+            for row in rows
+    ]
+    
+    
 
 class HomeView(View):
     """Landing page: hero carousel of featured stories and paginated story grid."""
@@ -274,11 +258,11 @@ class BookmarkView(View):
 
         existing = Bookmark.objects.filter(user=request.user, blog=blog).first()
         if existing:
-            remaining_time, is_limited = is_rate_limited(request, 10, 2, False)
+            remaining_time, is_limited = is_rate_limited(request, 2, 2, True)
             if is_limited:
                 unit = "second" if remaining_time == 1 else "seconds"
                 return _response(
-                    {"detail": f"Too many bookmark removals. Try again in {remaining_time} {unit}."},
+                    {"detail": f"Too frequent bookmark removals. Try again in {remaining_time} {unit}."},
                     status=429,
                 )
             existing.delete()
@@ -347,6 +331,7 @@ class AddNewsView(View):
                 {"detail": "You already have a story with this exact heading in this category. Edit the heading or choose a different category."},
                 status=400,
             )
+            "TODO: Send Email Alert to all followers + people that have not followers informing them of the latest news, the footer should contain a btn that the viewer can opt out of that email by simply turning off their"
         return _response(
             {"detail": "Story published.", "story_url": f"/story/{blog.pk}/", "id": blog.pk},
             status=201,
@@ -873,6 +858,7 @@ class ProfileView(View):
             "gender_choices": GENDER_CHOICES,
             "role_choices": StaffConfig.role_choices() if is_admin else [],
             "protected_roles": sorted(StaffConfig.PROTECTED_ROLES) if is_admin else [],
+            'staff_profile': get_cache('session-count') or 0,
             "staff_directory": staff_directory,
             "staff_directory_page_obj": staff_directory_page_obj,
             "staff_directory_page_range": staff_directory_page_range,

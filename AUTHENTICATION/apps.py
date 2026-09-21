@@ -3,3 +3,5 @@ from django.apps import AppConfig
 
 class AuthenticationConfig(AppConfig):
     name = 'AUTHENTICATION'
+    def ready(self):
+        from . import signals  # noqa: F401

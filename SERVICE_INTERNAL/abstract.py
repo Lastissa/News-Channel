@@ -13,7 +13,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
+debug_base = True
 def get_client_ip(request)-> str:
     """Return the client IP using X-Forwarded-For when available."""
     if request is None:
@@ -64,7 +64,7 @@ def is_rate_limited(request, timeout_window=60, max_requests=10, reset_timeout =
     return remaining_time, is_limited
 
 
-def _response(dict: dict, status=200, debug= True, log = False, logger=logger, logger_type="info", msg = "NOT PASSED") -> JsonResponse | Response:
+def _response(dict: dict, status=200, debug= debug_base, log = False, logger=logger, logger_type="info", msg = "NOT PASSED") -> JsonResponse | Response:
     """
     ----------------------------------------------------------------------
     ##   RESPONSE + LOGGING
@@ -85,25 +85,25 @@ def _response(dict: dict, status=200, debug= True, log = False, logger=logger, l
     # RETURNING RESPONSE
     return JsonResponse(dict, status=status)
     
-    
-def info_logger(logger = logger, debug = False, msg = "NOT PASSED"):
+
+def info_logger(logger = logger, debug = debug_base, msg = "NOT PASSED"):
     "Info / Debug Logger"
     if debug: print(msg)
     else: return logger.info(msg=msg)
     
-def warning_logger(logger = logger, debug = True, msg = "NOT PASSED"):
+def warning_logger(logger = logger, debug = debug_base, msg = "NOT PASSED"):
     "Warning / Debug Logger"
     if debug: print(msg)
     else: return logger.warning(msg=msg)
 
-def error_logger(logger = logger, debug = True, msg = "NOT PASSED"):
+def error_logger(logger = logger, debug = debug_base, msg = "NOT PASSED"):
     "Error / Debug Logger"
     if debug: print(msg)
     else: return logger.error(msg=msg)
 
 
 
-def _optimization(debug = False):
+def _optimization(debug = debug_base):
     """Analyze database queries"""
     return 0
     if debug:

@@ -335,7 +335,7 @@
 }
 
 .profile-action-btn {
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   background: transparent;
   color: var(--ink);
   border-radius: 9px;
@@ -346,7 +346,7 @@
 }
 
 .profile-action-btn.primary {
-  background: var(--amber-alt);
+  background: linear-gradient(var(--nav-bg), green);
   border-color: var(--amber-alt-deep);
   color: #ffffff;
 }
@@ -730,8 +730,8 @@
 }
 
 .logout-all-btn {
-  color: var(--paper);
-  border-color: var(--careful-btn-bg);
+  color: white;
+  border-color: var(--amber-alt-deep);
   background-color: var(--careful-btn-bg);
   border-radius: 0%;
 
@@ -945,7 +945,7 @@
 .profile-action-btn.danger {
   color: #fff;
   border-color: var(--careful-btn-bg);
-  background: var(--careful-btn-bg);
+  background: yellow;
   border-radius: 0;
 }
 

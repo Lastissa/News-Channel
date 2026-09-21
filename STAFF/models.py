@@ -21,12 +21,12 @@ class StaffProfile(models.Model):
     whatsapp_handle = models.URLField(blank=True, null=True)
     facebook_handle = models.URLField(blank=True, null=True)
     # subsequent handle can be added in the future
-    speciality = models.JSONField(default=list, blank=True, null=True)    #   IF THE STAFF HAVE A SPECIAL NICHE ABOUT POST THEY LOVE MAKING
+    speciality = models.JSONField(default=list, blank=True, null=True, help_text="CSV. IF THE STAFF HAVE A SPECIAL NICHE ABOUT POST THEY LOVE MAKING")
     bio = models.TextField(blank=True, default="")
     role = models.CharField(max_length=20, choices=STAFF_ROLE, blank=True, default="JOURNALIST")
-    tribute_bio = models.TextField(blank=True, null=True)    #   DIFFERENT FROM BIO AS THIS ONE, THE ADMIN WRITE IT FOR THE STAFF
-    last_promotion = models.DateField(blank=True, null=True)  #   DIFFERENT FROM THEN THEY CREATED ACCOUNT, THIS CAN BE USED TO SHOW THEY HAVE BEEN PROMOTED WITHING A TIME SPA
-    get_blog_notification = models.BooleanField(default=True) #   WETHER TO BEEP THE STAFF WHEN THEIR BLOG GET VIEWWED
+    tribute_bio = models.TextField(blank=True, null=True, help_text="DIFFERENT FROM BIO AS THIS ONE, THE ADMINS WRITE IT FOR THE STAFF")
+    last_promotion = models.DateField(blank=True, null=True, help_text="DIFFERENT FROM THEN THEY CREATED ACCOUNT, THIS CAN BE USED TO SHOW THEY HAVE BEEN PROMOTED WITHING A TIME SPA")
+    get_blog_notification = models.BooleanField(default=True, help_text="WETHER TO BEEP THE STAFF WHEN THEIR BLOG GET VIEWWED") #   
 
     class Meta:
         verbose_name = "Staff profile"

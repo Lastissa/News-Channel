@@ -301,7 +301,7 @@
                       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                         <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
                       </svg>
-                      <span class="visually-hidden">Del Story</span>
+                      {% comment %} <span class="visually-hidden">Del Story</span> {% endcomment %}
                     </button>
                   </form>
                 </div>
@@ -356,9 +356,9 @@
                   <a href="{% url 'blog:story_detail' bookmark.blog_id %}">Open</a>
                   <button type="button" class="profile-bookmark-toggle" data-bookmark-btn data-endpoint="{% url 'home:bookmark' bookmark.blog_id %}" data-saved="true" aria-pressed="true" aria-label="Remove {{ bookmark.blog.heading }} from bookmarks" title="Rem BookMark">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4-6.5 4V4.5a1 1 0 0 1 1-1Z" fill="currentColor" />
+                      <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4-6.5 4V4.5a1 1 0 0 1 1-1Z" fill="var(--nav-bg)" />
                     </svg>
-                    <span class="visually-hidden">Remove bookmark</span>
+                    {% comment %} <span class="visually-hidden">Rm bookmark</span> {% endcomment %}
                   </button>
                 </div>
               </li>

@@ -19,8 +19,9 @@ from django.views import View
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog
 from HOME.views import _resolve_page_number
-from SERVICE_INTERNAL.abstract import is_rate_limited
+from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
+from SERVICE_INTERNAL.email_single import _base_email
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
 from STAFF.models import GENDER_CHOICES, StaffProfile
@@ -442,9 +443,7 @@ class OwnRoleUpdateView(View):
 
         profile = StaffProfile.objects.filter(auth=request.user).first()
         if profile is None:
-            return JsonResponse(
-                {"detail": "Save your staff profile first, then set your role."}, status=409
-            )
+            return JsonResponse({"detail": "Staff Profile Missing On This Account."}, status=409)
 
         role = (request.POST.get("role") or "").strip()
         allowed = {value for value, _ in StaffConfig.role_choices()}
@@ -478,7 +477,7 @@ class OwnRoleUpdateView(View):
 
 
 class StaffCreateView(View):
-    """Full page form for adding a staff account. Admin and superuser only.
+    """Full page form for adding a staff account. Admin and superuser only Access Only.
 
     The Auth row and its StaffProfile row are created together: an account
     without a profile is exactly the broken state the staff directory flags.
@@ -493,7 +492,7 @@ class StaffCreateView(View):
         return self._render(request)
 
     def post(self, request):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 30, 3)
         if limited:
             return self._fail(request, f"Permission Denied, Wait {remaining_seconds} seconds")
         if not admin_only(request.user):
@@ -527,16 +526,12 @@ class StaffCreateView(View):
         if error is not None:
             return self._fail(request, error)
 
-        #   Flags are whitelisted: only is_staff (always) and is_admin (from
-        #   the checkbox) are ever set. Superuser is granted only through the
-        #   owner's private endpoint, never from this form.
         with transaction.atomic():
             account = Auth.objects.create_staff(email=email, password=password, is_admin=grant_admin)
             StaffProfile.objects.create(auth=account, gender=gender, full_name=full_name, role=role)
-
-        logger.info(
-            "STAFF CREATED: %s (admin=%s) by %s", account.email, grant_admin, request.user.email
-        )
+            "TODO:WRITE UP THE HTML_MESSAGE WELCOMING CREATED STAFF AND ATTACHING THEIT DEFAULT PASSWORD UNFORMING THEM AN ACCOUNT HAVE BEEN CREATED FOR THEM"
+            _base_email(request.user.email, account.email)
+        info_logger(msg=f"STAFF CREATED: {account.email} (grant_admin={grant_admin}) by {request.user.email} with password set as : {password}")
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(

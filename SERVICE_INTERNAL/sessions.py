@@ -9,17 +9,16 @@ from django.contrib.sessions.models import Session
 
 
 def drop_sessions_for(account):
-    """Delete every active session belonging to an account. Returns how many
-    sessions were dropped.
-
-    The walk decodes every row in the session table, which is fine at the
-    current scale; if the site grows this needs an index backed approach
-    instead of a full table scan.
+    """Delete every active session belonging to an account.
+    Returns how many sessions were dropped.
     """
-    dropped = 0
-    for session in Session.objects.filter(session_key__isnull=False).iterator():
-        decoded = session.get_decoded() or {}
-        if str(decoded.get("_auth_user_id")) == str(account.pk):
-            session.delete()
-            dropped += 1
-    return dropped
+    from AUTHENTICATION.models import UserSession
+    from django.contrib.sessions.models import Session
+
+    session_keys = list(UserSession.objects.filter(user=account).values_list("session_key", flat=True))
+    if not session_keys:
+        return 0
+
+    Session.objects.filter(session_key__in=session_keys).delete()
+    UserSession.objects.filter(session_key__in=session_keys).delete()
+    return len(session_keys)

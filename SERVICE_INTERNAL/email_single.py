@@ -6,6 +6,11 @@
 from SERVICE_INTERNAL.abstract import info_logger
 
 
+def _base_email(sender, receiver, message = None, html_message = None):
+    "TODO: Create a html like with reusable component (head - Project identity), body: house content, footer-contact support details with no marketing advert"
+    info_logger(msg=f"{sender} Sent A mail To {receiver}.")
+
+
 def _try_send_login_email(user: object):
     """
     Receives the user queryset and look for the login alert

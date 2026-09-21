@@ -8,7 +8,7 @@
 {% block extra_head %}
   {{ block.super }}
   <style>
-    .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
+    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }    .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
     .editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
     .editor-toolbar h1 { margin: 0; font-size: 1.5rem; color: var(--ink); }
     .editor-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -84,6 +84,7 @@
           <div class="editor-field">
             <label for="editor-content">Content</label>
             <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content..."></textarea>
+            <b class="prompt"> COPY AND PASTE THE FOLLOWING GUIDE FOR YOUR AGENT OR ADHERE TO IT IF YOU WANT TO BETTER FORMATTED STRUCTURE</B>
             <small class="editor-convention-hint">Blank line starts a new paragraph.</small>
             <small class="editor-convention-hint"><b>#</b> = bigger subheading.</small>
             <small class="editor-convention-hint"><b>##</b> = less bigger subheading.</small>

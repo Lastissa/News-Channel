@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.utils import timezone
 
 from SERVICE_INTERNAL.abstract import info_logger
 
@@ -92,3 +93,34 @@ class PasswordResetKey(models.Model):
     def __str__(self):
         return f"PasswordResetKey: {self.user.email} ({self.created_at})"
     
+    
+
+class UserSession(models.Model):
+    """
+    One row per active login session for a user.
+
+    Written on user_logged_in, deleted on user_logged_out.
+    Currently Queried by the profile page to list/count a user's active sessions.
+    """
+
+    user = models.ForeignKey(Auth,on_delete=models.CASCADE,related_name="user_sessions",db_index=True,)
+    session_key = models.CharField(max_length=40,unique=True,db_index=True,help_text="The Django session key (cookie value).",)
+    ip = models.GenericIPAddressField(null=True,blank=True)
+    user_agent = models.CharField(max_length=255,blank=True,help_text="Browser user agent at login time.",)
+    logged_in_at = models.DateTimeField(auto_now_add=True,db_index=True,)
+    last_seen = models.DateTimeField(auto_now=True,)
+    expires_at = models.DateTimeField(null=True,blank=True,db_index=True,help_text="When this session expires. Mirrors the Django session expiry.",
+    )
+
+    class Meta:
+        ordering = ["-logged_in_at"]
+
+
+    def __str__(self):
+        return f"{self.user_id} · {self.session_key[:8]}… · {self.logged_in_at:%Y-%m-%d %H:%M}"
+
+    @property
+    def is_expired(self):
+        if self.expires_at is None:
+            return False
+        return self.expires_at < timezone.now()

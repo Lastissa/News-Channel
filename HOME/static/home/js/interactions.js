@@ -179,7 +179,7 @@
           field first was sending an empty "email" to the view every time. */
       var body = new FormData(newsletterForm);
 
-      statusEl.textContent = "We Will Send You Latest Collection. Login To Filter Categories.";
+      statusEl.textContent = "We Will Send You Latest Collection. Login To Filter Categories of news";
       statusEl.className = "newsletter-status is-ok";
       submitBtn.disabled = true;
       emailInput.value = "";
@@ -1370,7 +1370,7 @@
         submitBtn.disabled = true;
         submitBtn.classList.add("is-pending");
       }
-      say(createFeedback, "Creating...", false);
+      say(createFeedback, "Creating Account, Please Wait.", false);
 
       fetch(createForm.dataset.endpoint || createForm.action, {
         method: "POST",

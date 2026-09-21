@@ -10,7 +10,7 @@
   --paper: white;/*#fffcf7;*/
   --paper-dim: #fff9ec;
   --surface: #FFFFFF;
-  --input-fill: #ffffff;
+  --input-fill: rgb(249, 249, 250);
   --amber: #e8a324;
   --amber-alt:rgb(15, 113, 15);
   --amber-alt-deep:rgb(24, 100, 24);
@@ -19,7 +19,7 @@
   --line: rgba(14, 27, 44, 0.12);
   --success: #2F7A4D;
   --danger: #B3402A;
-  --careful-btn-bg:rgba(221, 22, 22, 0.957);  /*Btns That Signify Careful Operation */
+  --careful-btn-bg: rgb(141, 13, 13);  /*Btns That Signify Careful Operation */
   --paginator-color: #0E1B2C;
   --paginator-bg: rgba(15, 23, 42, 0.06);
   --paginator-border: rgba(148, 163, 184, 0.45);
@@ -48,13 +48,13 @@ html[data-theme="dark"] {
   --paper: #0B1420;
   --paper-dim: #101C2C;
   --surface: #121F30;
-  --input-fill: #111D2B;
+  --input-fill: #182c44;
   --slate: #93A2B3;
   --amber-alt:rgb(15, 113, 15);
   --amber-alt-deep:rgb(33, 182, 33);
   --amber-deep: #EDB35A;
   --line: rgba(243, 239, 230, 0.14);
-  --careful-btn-bg:rgba(174, 13, 13, 0.815);  /*Btns That Signify Careful Operation */
+  --careful-btn-bg:rgba(221, 33, 33, 0.815);  /*Btns That Signify Careful Operation */
   --paginator-color: #F3EFE6;
   --paginator-bg: rgba(255, 255, 255, 0.04);
   --paginator-border: rgba(243, 239, 230, 0.2);
@@ -267,14 +267,15 @@ html[data-theme="dark"] .icon-moon { display: block; }
   }
   .nav-logout-btn {
     font-family: var(--font-body);
-    background-color: var(--amber-deep);
+    background-color: var(--danger);
     text-align: center;
-    letter-spacing: 2px;
+    text-transform: uppercase;
+    letter-spacing: 5px;
     max-width: 30ch;
     border: none;
     font-weight: bold;
     font-size: 1.2rem;
-    color: var(--ink);
+    color: var(--paper);
   }
 
   .site-header.nav-open .primary-nav { display: block; transform: translateX(0); }
@@ -1047,10 +1048,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
     background: var(--paper);
   }
 
-  .nav-logout-btn,
-  .nav-logout-btn:hover {
-    color: #000;
-  }
+ 
 
   .category-filter {
     padding: 8px 0;

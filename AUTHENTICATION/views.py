@@ -58,7 +58,7 @@ class LoginView(View):
             messages.info(request, message=f"Hello {request.user.email}, welcome back.".upper())
             return redirect(_return_to(request))
         #i noticed that if the password is visible, the login btn will not click; dont know if its a feature of a bug but currenlty, i am taking it as a feature
-        "TODO: SHow the information below to users for them to know the login btn is not broken but image is not showing in the ui, need fixing"
+        # "SHow the information below to users for them to know the login btn is not broken but image is not showing in the ui, need fixing"
         messages.info(request, "Hide password to enable login.")
         return render(request, "auth/login.html", _auth_context(request))
     
@@ -85,20 +85,12 @@ class LoginView(View):
             return render(request, "auth/login.html", _auth_context(request, error="Invalid email or password."), status=401)
 
 
-        # user = authenticate(request, email=email.upper(), password=password)
         if user is not None and user.is_active:
-            _try_send_login_email(user)
-            request.session["session_meta"] = {
-                "logged_in_at": timezone.now().isoformat(),
-                "ip": request.META.get("REMOTE_ADDR", "Unknown IP"),
-                "user_agent": request.META.get("HTTP_USER_AGENT", "Unknown device"),
-            }
             login(request, user)
             return_to = _return_to(request)
             if is_ajax:
                 return _response({"detail": "Login successful.", "redirect_to": return_to}, status=200)
             return redirect(return_to)
-        # print(f"xxxxxxxxxxxxxxxxxx --------------- {user.is_active}")
         if user is not None and not user.is_active:
             if is_ajax:
                 return _response({"detail": "Account Have Been Suspended."}, status=403)
@@ -110,7 +102,6 @@ class LoginView(View):
 
 class LogoutView(View):
     def post(self, request):
-        info_logger(logger, msg=f"ACCOUNT LOGOUT: {request.user.email} logged out successfully")
         logout(request)
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return _response({"detail": "success"}, status=200)
