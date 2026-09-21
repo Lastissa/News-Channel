@@ -1,6 +1,7 @@
 import time
 
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.shortcuts import render
 
 
@@ -46,7 +47,7 @@ class AuthEndpointThrottleMiddleware:
 
 
 
-from django.db import connection
+from django.db import OperationalError, connection
 
 class QueryCountMiddleware:
     """ONLY FOR PRINTING THE Q COUNTS"""
@@ -64,3 +65,4 @@ class QueryCountMiddleware:
                 print(i['sql'])
                 print(" ")
         return response
+

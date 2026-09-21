@@ -13,7 +13,6 @@ class About:
     whatsapp = "https://wa.link/ebvff1/"
     tweeter = "https://x.com/ABUSUAD01/"
     contact_email = "hello@abureports.ng"
-    domain = getattr(settings, "DOMAIN_NAME") or "http://localhost:8000"
 
     #   CONTACTS - personal / one to one /consultancy
     email = "marketing@gmail.com"
@@ -69,7 +68,6 @@ def custom_context_processors(request):
         'whatsapp': About.whatsapp,
         'tweeter': About.tweeter,
         'contact_email': About.contact_email,
-        'domain': About.domain,
         'nav_categories': CATEGORY,
         'partnership_email': About.email,
         'whatsapp_dm': About.whatsapp_dm,

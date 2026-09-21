@@ -39,7 +39,7 @@
 
 .hero-slide-body {
   padding: 28px 26px 26px;
-  color: var(--paper);
+  color: red;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;

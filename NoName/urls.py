@@ -6,6 +6,7 @@ from django.views.generic import RedirectView
 from HOME.views import RobotsTxtView, SitemapXmlView
 
 handler404 = "HOME.views.handler404"
+handler500 = "HOME.views.handler500"
 
 urlpatterns = [
     path('robots.txt', RobotsTxtView.as_view()),

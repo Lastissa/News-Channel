@@ -41,6 +41,23 @@ def handler404(request, exception=None):
     regular header and footer."""
     return render(request, "HOME/404.html", status=404)
 
+def handler500(request, exception=None):
+    html = f"""<html>
+                <head>
+                    <title>Service Down</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    </head>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                    <h1>SERVICE MODE</h1>
+                    <p>System is currently in service.</p>
+                    <p>Please try again later.</p>
+                    <p>We are very sorry for the inconvenience.</p>
+                    <p>This downtime is temporary as we are actively working on fixing some glitches with our database in order to best serve you more.</p>
+                    <p>{About.project_name} team cares.</p>
+                </body>
+            </html>
+            """
+    return HttpResponse(html, content_type="text/html", status=500)
 
 class RobotsTxtView(View):
     """Plain robots.txt for crawlers. Every private area (admin, control,

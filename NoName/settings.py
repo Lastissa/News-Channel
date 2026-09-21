@@ -15,7 +15,7 @@ CSRF_TRUSTED_ORIGINS = ['https://esta-sensate-unquickly.ngrok-free.dev',]
 
 SECRET_KEY = os.getenv('DJANGO_SECRET') or "abcdef"
 
-DEBUG = os.getenv("DEBUG") == "True" or False
+DEBUG = os.getenv("DEBUG") or False
 # DEBUG = False
 
 ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1,testserver").split(',')
@@ -127,7 +127,6 @@ MAILERS = {
 
 STATIC_ROOT = "staticfiles/"
 
-DOMAIN_NAME = os.getenv("DOMAIN_NAME") or "http://localhost:8000"
 
 SY_SECRET = os.getenv('sy_secret')
 
