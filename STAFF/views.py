@@ -292,6 +292,7 @@ class PortfolioView(View):
         context = {
             "author": author,
             "staff_profile": profile,
+            'staff_image': author.profile_img or None,
             "display_name": display_name,
             "sex_label": sex_label,
             "bio": bio,

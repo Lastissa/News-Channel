@@ -13,9 +13,10 @@
   <meta property="og:description" content="{{ meta_description }}">
   <meta property="og:url" content="{{ request.build_absolute_uri }}">
   <meta property="profile:username" content="{{ display_name }}">
-  {% if page_og_image %}
-    <meta property="og:image" content="{{ page_og_image }}">
-  {% endif %}
+  {% if staff_image %}
+    <meta property="og:image" content="{{ staff_image }}">
+  {% else %}
+  {% endif %}<meta property="og:image" content="">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
   <meta name="twitter:description" content="{{ meta_description }}">

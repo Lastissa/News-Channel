@@ -290,7 +290,7 @@ html[data-theme="dark"] .icon-moon { display: block; }
   .primary-nav .chev { color: var(--ink); }
   .primary-nav .dropdown-menu {
     position: static; box-shadow: none; opacity: 1; visibility: visible; transform: none; display: none;
-    margin-top: 4px; background: var(--paper-very-transparent); border: none; padding: 0;
+    margin-top: 4px; background: var(--paper); border: none; padding: 0;
   }
   .has-dropdown.is-open .dropdown-menu { display: block; }
   .dropdown-menu li a { color: var(--ink); }
@@ -457,11 +457,11 @@ a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 .newsletter-status.is-error { color: #e79c8a; }
 
 .footer-main {
-  max-width: 1180px; margin: 0 auto; padding: 0 20px 14px;
+  max-width: 1180px; margin: 0 auto; padding: 0;
 }
-.footer-signin { padding: 0 0 18px; }
+.footer-signin { padding: 0 0 18px; margin: 0;}
 .footer-signin-inner {
-  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; border-radius: 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
   border: 1px solid rgba(246,243,237,0.18); background: rgba(12,18,24,0.35); backdrop-filter: blur(4px); padding: 18px 20px;
 }
 .footer-signin-label { margin: 0 0 8px; color: var(--amber); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
@@ -705,13 +705,14 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   padding: 12px 16px 14px; font-size: 0.86rem; color: var(--ink-soft); font-style: italic; text-align: right; background: var(--paper-dim);
 }
 .story-body {
+  overflow-wrap: anywhere;
   max-width: 100%; font-size: 1.04rem; line-height: 1.82; color: var(--ink-soft);
 }
 .story-body > p,
 .story-body > ul,
 .story-body > ol,
 .story-body > h3 {
-  max-width: 100%; margin-bottom: 1.4em;
+  max-width: 100%; margin-bottom: 1.2em;
 }
 .story-body h3 {
   font-size: clamp(1.2rem, 2vw, 1.7rem); line-height: 1.25; margin-top: 1.4em; margin-bottom: 0.75em; color: var(--ink);

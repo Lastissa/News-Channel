@@ -154,10 +154,16 @@ class StoryDetailView(View):
         author_follower_count = (
             AuthorFollow.objects.filter(author=blog.author).count() if author_has_portfolio else 0
         )
-
+        #   FOR OG DESCRIPTION TO BE CLEAN AND CLEAR carrying the first paragrah 
+        og_descr =blog.content.split("\n\n")[0] or  "No Excerp Provided which is impossible"
+        print(og_descr)
+        og_descr.replace("#", '')
+        og_descr.replace("**", '')
+        og_descr.replace("__", '')
+        if len(og_descr) > 250: og_descr = og_descr[:250]
         context = {
             "blog": blog,
-            'excerp': blog.content[:60].lstrip("#") or "",
+            'excerp': og_descr,
             "blog_content_html": blog_content,
             "comments": comments,
             "author_profile": author_profile,

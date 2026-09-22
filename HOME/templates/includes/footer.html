@@ -40,7 +40,7 @@
       <div class="footer-signin-inner">
         <div>
           <p class="footer-signin-label">Why sign in?</p>
-          <h3>Bookmark stories. Track Comments. Manage History.</h3>
+          <h3>Bookmark, Track & Manage Stories.</h3>
         </div>
         <div class="footer-auth-actions">
           <a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}" class="footer-auth-link primary">Sign in</a>
@@ -77,11 +77,11 @@
         <img src="{% static 'profile.png' %}" alt="Lastissa" class="footer-credit-avatar">
         <img src="{% static 'lastissa-logo.png' %}" alt="Lastissa logo" class="footer-credit-avatar">
         <span class="footer-credit-text">
-          <span class="footer-credit-label">Software Built By</span>
-          <span class="footer-credit-name">Lastissa <i class="footer-credit-hint">(Click me)</i></span>
+          <span class="footer-credit-label">Built By</span>
+          <span class="footer-credit-name">SY Team <i class="footer-credit-hint">(Get More Info)</i></span>
         </span>
       </a>
-      <span class="footer-credit-note">A community project to help student gain access to information faster</span>
+      {% comment %} <span class="footer-credit-note">A community project to help student gain access to information faster</span> {% endcomment %}
     </div>
   </div>
 

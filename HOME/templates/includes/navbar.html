@@ -17,7 +17,7 @@
           </button>
           <ul class="dropdown-menu">
             <li class="category-filter">
-              <label class="visually-hidden" for="category-filter">Filter news categories</label>
+              {% comment %} <label class="visually-hidden" for="category-filter">Filter news categories</label> {% endcomment %}
               <input id="category-filter" type="search" placeholder="Filter categories" autocomplete="off" data-category-filter>
             </li>
             {% for value, label in nav_categories %}

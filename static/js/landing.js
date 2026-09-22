@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var config = window.ABUREPORTS || {};
+  var config = window.ABUREPORT || {};
 
   /* ---------- Hero carousel ---------- */
 

@@ -4,19 +4,19 @@ PROJECT CUSTOM CONFIGURATION FILE
 from django.conf import settings
 
 class About:
-    project_name = "AbuReports"
+    project_name = "AbuReport"
     project_cachphrase = "Reliable Source, Trusted hands."
     version = "1.0.0"
     
     #   SOCIALS     -   public / group / hanNDLES
     facebook = ""
-    whatsapp = "https://wa.link/ebvff1/"
+    whatsapp = "https://whatsapp.com/channel/0029Vb6h9AHVvTUfxoSvS2p"
     tweeter = "https://x.com/ABUSUAD01/"
-    contact_email = "hello@abureports.ng"
+    contact_email = "hello@abureport.ng"
 
     #   CONTACTS - personal / one to one /consultancy
     email = "marketing@gmail.com"
-    whatsapp_dm = "https://wa.me.09112"
+    whatsapp_dm = "https://wa.me.09031394284"
     mobile = "+234xxxxxxxxxxxx"
     
     
@@ -57,8 +57,8 @@ def custom_context_processors(request):
     from BLOG.models import CATEGORY
 
     theme = "light"
-    if request and request.COOKIES.get("abureports-theme") in {"dark", "light"}:
-        theme = request.COOKIES.get("abureports-theme")
+    if request and request.COOKIES.get("abureport-theme") in {"dark", "light"}:
+        theme = request.COOKIES.get("abureport-theme")
 
     return {
         "project_name": About.project_name,

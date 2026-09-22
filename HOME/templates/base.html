@@ -8,13 +8,13 @@
     <script>
         (function () {
             try {
-                var stored = localStorage.getItem('abureports-theme');
+                var stored = localStorage.getItem('abureport-theme');
                 var theme = stored === 'dark' || stored === 'light'
                     ? stored
                     : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
                 document.documentElement.setAttribute('data-theme', theme);
                 try {
-                    document.cookie = 'abureports-theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
+                    document.cookie = 'abureport-theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
                 } catch (e) {}
             } catch (e) {
                 try {
@@ -45,23 +45,23 @@
 
 
 <body>
-{% include "includes/navbar.html" %}
-{% if messages %}
-  <div id="django-message-host" style="display:none;">
-    {% for message in messages %}
-      <div class="django-message {{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-  </div>
-{% endif %}
-<main id="main-content">
-{% block content %}{% endblock %}
-</main>
-{% block footer %}{% include "includes/footer.html" %}{% endblock %}
-{% block floating_social %}{% include "includes/floating_social.html" %}{% endblock %}
+    {% include "includes/navbar.html" %}
+    {% if messages %}
+    <div id="django-message-host" style="display:none;">
+        {% for message in messages %}
+        <div class="django-message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <main id="main-content">
+    {% block content %}{% endblock %}
+    </main>
+    {% block footer %}{% include "includes/footer.html" %}{% endblock %}
+    {% block floating_social %}{% include "includes/floating_social.html" %}{% endblock %}
 
-<script src="{% static 'home/js/app.js' %}" defer></script>
-<script src="{% static 'home/js/carousel.js' %}" defer></script>
-<script src="{% static 'home/js/interactions.js' %}" defer></script>
-{% block extra_scripts %}{% endblock %}
+    <script src="{% static 'home/js/app.js' %}" defer></script>
+    <script src="{% static 'home/js/carousel.js' %}" defer></script>
+    <script src="{% static 'home/js/interactions.js' %}" defer></script>
+    {% block extra_scripts %}{% endblock %}
 </body>
 </html>

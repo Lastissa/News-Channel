@@ -12,6 +12,7 @@ This project serves as a community services, i realized if i cant give money bac
 in collaboration with an accomplice of mine who have the required attentions and me that have the skills to build this, we decided to bring this project to live with one sole purpose "**MAKE INFORATION AFFORDABLE**".
 
 ## SEPRATION OF CONCERN
+`PORTFOLIO STOP WORKING IF USER ACCOUNT IS DISABLED`
 All apps defined inside this project are mobile meaning they can be moved without affecting the monolithical apporach this project utilize
 ```micro-service
 AUTHENTICATION/

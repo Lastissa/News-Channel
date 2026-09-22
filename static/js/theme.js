@@ -5,7 +5,7 @@
   var toggle = document.getElementById("theme-toggle");
   var navToggle = document.getElementById("nav-toggle");
   var nav = document.getElementById("site-nav");
-  var STORAGE_KEY = "abureports-theme";
+  var STORAGE_KEY = "abureport-theme";
 
   function applyTheme(theme) {
     root.setAttribute("data-theme", theme);

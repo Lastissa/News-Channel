@@ -1,9 +1,11 @@
+// THEME SETTINGS AND OTHERS
+
 (function () {
   "use strict";
 
   var root = document.documentElement;
   var header = document.getElementById("site-header");
-  var THEME_KEY = "abureports-theme";
+  var THEME_KEY = "abureport-theme";
 
   /* Theme toggle */
   function applyTheme(theme) {
@@ -18,8 +20,8 @@
   try { savedTheme = localStorage.getItem(THEME_KEY); } catch (e) { /* ignore */ }
   if (savedTheme) {
     applyTheme(savedTheme);
-  } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    applyTheme("dark");
+  } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+    applyTheme("light");
   }
 
   var themeToggle = document.getElementById("theme-toggle");

@@ -7,7 +7,7 @@
 {% block extra_head %}
   {{ block.super }}
   <meta property="og:title" content="{{ blog.heading }}">
-  <meta property="og:description" content=" {{ excerp }}... - By {{ blog.author.staffprofile.full_name|default:"REPORTER" }}, a member of {{project_name}} team">
+  <meta property="og:description" content="{{ excerp }}">
   {% if blog.image_1 %}
     <meta property="og:image" content="{{ blog.image_1 }}">
     {% else %}
