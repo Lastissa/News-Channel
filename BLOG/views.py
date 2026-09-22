@@ -156,10 +156,8 @@ class StoryDetailView(View):
         )
         #   FOR OG DESCRIPTION TO BE CLEAN AND CLEAR carrying the first paragrah 
         og_descr =blog.content.split("\n\n")[0] or  "No Excerp Provided which is impossible"
-        print(og_descr)
-        og_descr.replace("#", '')
-        og_descr.replace("**", '')
-        og_descr.replace("__", '')
+        og_descr = og_descr.lstrip('#')
+        for chars in ['**', '__']:og_descr = og_descr.replace(chars, '')
         if len(og_descr) > 250: og_descr = og_descr[:250]
         context = {
             "blog": blog,

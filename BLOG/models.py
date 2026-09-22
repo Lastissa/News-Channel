@@ -7,13 +7,13 @@ from django.db.models.functions import Lower
 CATEGORY = [
     ('UNIVERSITY', 'UNIVERSITY'),
     ('POLYTECHNIC', 'POLYTECHNIC'),
+    ('ORGANIZATION', 'ORGANIZATION'),
     ('JAMB', 'JAMB'),
     ('WAEC', 'WAEC'),
     ('POSTUTME', 'POSTUTME'),
     ('SCHOLARSHIP', 'SCHOLARSHIP'),
     ('TECHNOLOGY', 'TECHNOLOGY'),
     ('SECURITY', 'SECURITY'),
-    ('NIGERIA-POLITICS', 'NIGERIA-POLITICS'),
     ('GENERAL', 'GENERAL'),
 ]
 class Blog(models.Model):
