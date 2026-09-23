@@ -74,7 +74,7 @@ class RobotsTxtView(View):
                 "Disallow: /_admin/",
                 "Disallow: /control/",
                 "Disallow: /sy/",
-                # "Disallow: /auth/", # ALLOW FOLLOW AUTH SO OUR LOGIN CAN BE VIEWED PUBLICLY SINCE I AM CERTAIN ITS SECURE AND THIS IS JUST A NEWS PLATFORM
+                "Disallow: /auth/",
                 "Disallow: /profile/",
                 "Disallow: /load-more/",
                 "",

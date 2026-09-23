@@ -163,3 +163,5 @@ CLOUDINARY_API_SECRET = os.getenv('cloudinary_api_secret')
 
 #IMAGE UPLOADS (avatars + news images, see SERVICE_INTERNAL/images.py)
 IMAGE_UPLOAD_MAX_MB = int(os.getenv('image_upload_max_mb', 4))
+
+RESEND_API_KEY = os.getenv('resend_api_key')
