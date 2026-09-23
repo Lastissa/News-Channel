@@ -98,6 +98,36 @@ def parse_story_content(content):
     return '\n'.join(blocks)
 
 
+TICKER_MARKER_RE = re.compile(r"^(#{1,6}\s*|\*\s+|\d+\.\s+)")
+
+
+def build_ticker_text(content):
+    """Plain-text feed for the reading marquee at the top of the story page.
+    Strips this project's markdown-style markers (#, *, __, **) and joins every
+    paragraph/block with ' * ' so the whole story can be read in one continuous
+    pass while it scrolls."""
+    if not content:
+        return ""
+
+    blocks = [block for block in re.split(r"\n\s*\n", content.strip()) if block.strip()]
+    cleaned_blocks = []
+    for block in blocks:
+        lines = []
+        for line in block.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            line = TICKER_MARKER_RE.sub("", line)
+            line = line.replace("**", "").replace("__", "")
+            if line:
+                lines.append(line)
+        text = " ".join(lines).strip()
+        if text:
+            cleaned_blocks.append(text)
+
+    return " * ".join(cleaned_blocks)
+
+
 class StoryDetailView(View):
     def get(self, request, blog_id):
         blog = cache_or_run(f"blog-{blog_id}", lambda: Blog.objects.filter(pk=blog_id).select_related("author__staffprofile").first(), timeout=100)
@@ -106,6 +136,7 @@ class StoryDetailView(View):
                 request,"blog/story_404.html",{"blog_id": blog_id, "decoy_content": STORY_404_CONTENT},status=404,)
             
         blog_content = parse_story_content(blog.content)
+        ticker_text = build_ticker_text(blog.content)
 
         comments = blog.comments.select_related("author__staffprofile").order_by("id")
         
@@ -155,7 +186,7 @@ class StoryDetailView(View):
             AuthorFollow.objects.filter(author=blog.author).count() if author_has_portfolio else 0
         )
         #   FOR OG DESCRIPTION TO BE CLEAN AND CLEAR carrying the first paragrah 
-        og_descr =blog.content.split("\n\n")[0] or  "No Excerp Provided which is impossible"
+        og_descr = re.split(r'\n\s*\n', blog.content.strip(), maxsplit=1)[0]
         og_descr = og_descr.lstrip('#')
         for chars in ['**', '__']:og_descr = og_descr.replace(chars, '')
         if len(og_descr) > 250: og_descr = og_descr[:250]
@@ -163,6 +194,7 @@ class StoryDetailView(View):
             "blog": blog,
             'excerp': og_descr,
             "blog_content_html": blog_content,
+            "ticker_text": ticker_text,
             "comments": comments,
             "author_profile": author_profile,
             "author_tags": author_tags,

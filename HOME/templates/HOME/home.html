@@ -17,8 +17,16 @@
           <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }}</p>
         <div class="hero-actions">
           <a class="glass-btn" href="{% url 'blog:story_detail' post.id %}" target="_self">Read story</a>
-          <a class="glass-btn glass-btn-outline" href="{% url 'blog:story_detail' post.id %}" target="_self"
-             data-share-btn data-share-url="{{request.get_host}}{% url 'blog:story_detail' post.id %}">Share story</a>
+          <button type="button" class="glass-btn glass-btn-outline glass-btn-icon"
+                  data-share-btn data-share-url="{{ site_domain }}{% url 'blog:story_detail' post.id %}"
+                  aria-label="Copy link to this story" title="Copy link to this story">
+            <svg viewBox="0 0 24 24" class="share-icon" aria-hidden="true">
+              <circle cx="18" cy="5" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+              <circle cx="6" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+              <circle cx="18" cy="19" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M8.2 10.6l7.4-4.1M8.2 13.4l7.4 4.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            </svg>
+          </button>
         </div>
       </div>
       <button type="button"

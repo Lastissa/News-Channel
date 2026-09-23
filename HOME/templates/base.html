@@ -28,6 +28,10 @@
     <meta name="description" content="{% block meta_description %}{{ project_cachphrase }}{% endblock %}">
     {% block meta_robots %}<meta name="robots" content="index, follow">{% endblock %}
     <meta property="og:site_name" content="{{ project_name }}">
+    <link rel="canonical" href="{{ site_domain }}{{ request.path }}">
+    <meta property="og:url" content="{{ site_domain }}{{ request.path }}">
+    <meta property="og:locale" content="en_NG">
+    {% if twitter_username %}<meta name="twitter:site" content="@{{ twitter_username }}">{% endif %}
     <link rel="icon" type="image/png" href="{% static "logo.jpg" %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,9 +42,20 @@
     {% comment %} TITLE AND DESCRIPTION ALREADY TAKEN CARE OF BY NoRMAL TITLE AND DESCRPTION META TAG AS THEY ARE ALWAYS PRESENT {% endcomment %}
     {% comment %} <meta property="og:title" content="{{project_name}}">
     <meta property="og:description" content="{{project_cachphrase}}"> {% endcomment %}
-    <meta property="og:image" content="{% if page_og_image %}{{ page_og_image }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'logo.jpg' %}{% endif %}">
-    {% comment %} <meta property="og:url" content="https://yourdomain.com/page-url/"> {% endcomment %}
+    <meta property="og:image" content="{% if page_og_image %}{{ page_og_image }}{% else %}{{ site_domain }}{% static 'logo.jpg' %}{% endif %}">
     {% endblock %}
+    {% if social_links %}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "NewsMediaOrganization",
+      "name": "{{ project_name|escapejs }}",
+      "url": "{{ site_domain }}/",
+      "logo": "{{ site_domain }}{% static 'logo.jpg' %}",
+      "sameAs": [{% for link in social_links %}"{{ link|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]
+    }
+    </script>
+    {% endif %}
 </head>
 
 

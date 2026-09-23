@@ -6,12 +6,11 @@
 
 {% block extra_head %}
   {{ block.super }}
-  <link rel="canonical" href="{{ request.build_absolute_uri }}">
+  {% comment %} canonical + og:url already come from base.html via site_domain + request.path {% endcomment %}
   <meta name="author" content="{{ display_name }} ({{ author.email }})">
   <meta property="og:type" content="profile">
   <meta property="og:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
   <meta property="og:description" content="{{ meta_description }}">
-  <meta property="og:url" content="{{ request.build_absolute_uri }}">
   <meta property="profile:username" content="{{ display_name }}">
   {% if staff_image %}
     <meta property="og:image" content="{{ staff_image }}">

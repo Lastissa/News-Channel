@@ -908,6 +908,22 @@
     if (label) label.textContent = following ? "Following" : "Follow author";
   }
 
+  /* The story page now shows a follow button both at the top (by the byline)
+     and at the bottom, both for the same author -- keep every copy on the
+     page in sync instead of only the one that was actually submitted. */
+  function syncFollowButtons(following) {
+    document.querySelectorAll("[data-follow-author-btn]").forEach(function (node) {
+      setFollowVisual(node, following);
+    });
+  }
+
+  function setFollowPending(pending) {
+    document.querySelectorAll("[data-follow-author-btn]").forEach(function (node) {
+      node.dataset.pending = pending ? "true" : "false";
+      node.classList.toggle("is-pending", pending);
+    });
+  }
+
   document.addEventListener("submit", function (event) {
     var form = event.target.closest("[data-follow-author-form]");
     if (!form) return;
@@ -918,9 +934,8 @@
 
     var wasFollowing = button.dataset.following === "true";
     var next = !wasFollowing;
-    button.dataset.pending = "true";
-    button.classList.add("is-pending");
-    setFollowVisual(button, next);
+    setFollowPending(true);
+    syncFollowButtons(next);
 
     fetch(form.dataset.endpoint || form.action, {
       method: "POST",
@@ -931,11 +946,10 @@
         return response.text().then(function (text) { return { ok: response.ok, status: response.status, text: text }; });
       })
       .then(function (result) {
-        button.dataset.pending = "false";
-        button.classList.remove("is-pending");
+        setFollowPending(false);
 
         if (!result.ok) {
-          setFollowVisual(button, wasFollowing);
+          syncFollowButtons(wasFollowing);
           var message = extractDetail(result.text, "Could not update the follow.");
           if (result.status === 401) message = extractDetail(result.text, "You have to log in to follow this author.");
           toast(message, "error");
@@ -945,7 +959,7 @@
         var payload = {};
         try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) {}
         var following = typeof payload.following === "boolean" ? payload.following : next;
-        setFollowVisual(button, following);
+        syncFollowButtons(following);
         if (typeof payload.follower_count === "number") {
           document.querySelectorAll("[data-follow-count]").forEach(function (node) {
             node.textContent = String(payload.follower_count);
@@ -957,9 +971,8 @@
         toast(payload.detail || (following ? "Followed." : "Unfollowed."));
       })
       .catch(function () {
-        button.dataset.pending = "false";
-        button.classList.remove("is-pending");
-        setFollowVisual(button, wasFollowing);
+        setFollowPending(false);
+        syncFollowButtons(wasFollowing);
         toast("Connection issue. The follow was not updated.", "error");
       });
   });

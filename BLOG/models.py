@@ -26,6 +26,7 @@ class Blog(models.Model):
     views = models.PositiveIntegerField(default=0, db_index=True)
     likes = models.PositiveIntegerField(default=0)
     non_anonymous_viewer = models.ManyToManyField("AUTHENTICATION.Auth", related_name="non_anonymous_viewer", blank=True)   #   TRACKIG THE PEOPLE WHO VEIWED SO I CAN CREATE THEIR HISTORY
+    last_updated = models.DateTimeField(auto_now=True, blank=True, null=True, help_text="CHANGES ANYTIME UPDATES IS MADE")
     date_created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -63,3 +64,4 @@ class Comment(models.Model):
     author = models.ForeignKey('AUTHENTICATION.Auth', on_delete=models.CASCADE, related_name='comments')
     content = models.TextField(blank=False, null=False)
     likes = models.PositiveIntegerField(default=0)
+    date_created = models.DateTimeField(auto_now_add=True)    #   NEEDED FOR THE COMMENT TIMESTAMP ("x days ago") SHOWN IN THE UI

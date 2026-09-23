@@ -332,6 +332,8 @@ class PortfolioView(View):
     def _person_schema(request, author, display_name, description, role_label, socials, speciality):
         """JSON-LD Person so search engines capture the username, the email
         and every reach out link on the page."""
+        from SERVICE_INTERNAL.config import About
+
         schema = {
             "@context": "https://schema.org",
             "@type": "Person",
@@ -340,7 +342,9 @@ class PortfolioView(View):
             "description": description[:300],
             "jobTitle": role_label,
             "worksFor": {"@type": "Organization", "name": PortfolioView._project_name()},
-            "url": request.build_absolute_uri(),
+            #   REAL DOMAIN, NOT request.build_absolute_uri(): that reflects whatever
+            #   host/IP/tunnel served the request, which hurts SEO ranking signals.
+            "url": f"{About.domain}{request.path}",
         }
         if author.profile_img:
             schema["image"] = author.profile_img

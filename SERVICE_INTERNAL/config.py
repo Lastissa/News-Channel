@@ -7,9 +7,21 @@ class About:
     project_name = "AbuReport"
     project_cachphrase = "Reliable Source, Trusted hands."
     version = "1.0.0"
+
+    #   CANONICAL DOMAIN FOR SEO / SOCIAL PREVIEWS / STRUCTURED DATA / EMAIL LINKS.
+    #   Pulled from the first entry in ALLOWED_HOSTS  instead of
+    #   the literal request host, so a canonical tag, share preview, sitemap entry
+    #   or JSON-LD url always points at the real .com.ng domain and never at
+    #   whatever host/IP/tunnel actually served the request.
+    domain = (
+        f"{'http' if settings.DEBUG else 'https'}://{settings.ALLOWED_HOSTS[0]}"
+        if settings.ALLOWED_HOSTS else ""
+    )
     
     #   SOCIALS     -   public / group / hanNDLES
     facebook = ""
+    instagram = ""
+    linkedin = ""
     whatsapp = "https://whatsapp.com/channel/0029Vb6h9AHVvTUfxoSvS2p"
     tweeter = "https://x.com/ABUSUAD01/"
     contact_email = "hello@abureport.ng"
@@ -60,13 +72,26 @@ def custom_context_processors(request):
     if request and request.COOKIES.get("abureport-theme") in {"dark", "light"}:
         theme = request.COOKIES.get("abureport-theme")
 
+    #   SEO: every social link that actually has a value, used for the sitewide
+    #   JSON-LD "sameAs" list so an empty handle never renders as a blank entry.
+    social_links = [
+        url for url in (About.facebook, About.tweeter, About.whatsapp, About.instagram, About.linkedin)
+        if url
+    ]
+    twitter_username = About.tweeter.rstrip("/").split("/")[-1] if About.tweeter else ""
+
     return {
         "project_name": About.project_name,
         "version": About.version,
         'project_cachphrase': About.project_cachphrase,
+        'site_domain': About.domain,
         'facebook': About.facebook,
+        'instagram': About.instagram,
+        'linkedin': About.linkedin,
         'whatsapp': About.whatsapp,
         'tweeter': About.tweeter,
+        'twitter_username': twitter_username,
+        'social_links': social_links,
         'contact_email': About.contact_email,
         'nav_categories': CATEGORY,
         'partnership_email': About.email,

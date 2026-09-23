@@ -1,0 +1,80 @@
+/* ---------- top-of-page reading ticker ---------- */
+.story-ticker {
+  background: var(--brand);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 10px 0;
+  margin-bottom: 18px;
+}
+
+.story-ticker-track {
+  display: inline-flex;
+  width: max-content;
+  animation: story-ticker-scroll 26s linear infinite;
+  will-change: transform;
+}
+
+.story-ticker-segment {
+  display: inline-block;
+  padding-right: 56px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+@keyframes story-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-ticker-track { animation: none; }
+  .story-ticker { overflow-x: auto; }
+}
+
+/* ---------- views / likes as icons ---------- */
+.metric-item { display: inline-flex; align-items: center; gap: 5px; }
+.metric-icon { width: 15px; height: 15px; flex-shrink: 0; }
+
+/* ---------- copy link row, underneath views/word count/likes ---------- */
+.story-metrics-group {display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.story-copy-link-row { align-self: stretch;width: 100%;margin-top: 0; background-color: transparent;}
+.copy-link-btn, .copy-link-btn span {
+  width: 100%;
+  font-weight: 900;
+  display: inline-block; align-items: end; gap: 6px; border: none; background: transparent;
+  color: var(--brand-deep); padding: 6px 12px; font: inherit; font-size: 0.8rem;
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.copy-link-icon { width: 14px; height: 14px; flex-shrink: 0; }
+
+@media (max-width: 768px) {
+    .story-metrics-group {
+        width: 100%;
+        align-items: center;
+    }
+
+    .story-metrics {
+        justify-content: center;
+    }
+
+    .story-copy-link-row {
+        width: 100%;
+    }
+
+    .copy-link-btn {
+        width: 100%;
+    }
+}
+
+/* ---------- comment timestamp ---------- */
+.comment-date { color: var(--slate); font-size: 0.76rem; font-weight: 400; }
+
+/* ---------- follow button duplicated next to the byline ---------- */
+.meta-author-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.follow-btn-inline {
+  min-height: auto; padding: 5px 12px; font-size: 0.72rem; border-radius: 999px;
+}
+.follow-btn-inline .follow-icon { width: 14px; height: 14px; }

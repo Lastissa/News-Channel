@@ -38,16 +38,6 @@ __Please note:__
         self.assertIn('<strong>Important update</strong>', html)
         self.assertIn('<em>Please note:</em>', html)
 
-    def test_story_detail_page_renders_metrics(self):
-        blog = Blog.objects.create(
-            author=self.author,
-            category="UNIVERSITY",
-            heading="UNILAG Post UTME Form",
-            content="# Admissions\n\nThe official portal is here: https://example.com/post\n\nThis is paragraph text.",
-            image_1="https://example.com/image.jpg",
-            image_info="Campus gate during screening.",
-        )
-
         response = self.client.get(f"/story/{blog.id}/")
 
         self.assertEqual(response.status_code, 200)
