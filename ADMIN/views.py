@@ -21,6 +21,7 @@ from BLOG.models import Blog
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
+from SERVICE_INTERNAL.email_single import _try_send_staff_welcome_email
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
 from STAFF.models import GENDER_CHOICES, StaffProfile
@@ -528,7 +529,8 @@ class StaffCreateView(View):
         with transaction.atomic():
             account = Auth.objects.create_staff(email=email, password=password, is_admin=grant_admin)
             StaffProfile.objects.create(auth=account, gender=gender, full_name=full_name, role=role)
-            "TODO:WRITE UP THE HTML_MESSAGE WELCOMING CREATED STAFF AND ATTACHING THEIT DEFAULT PASSWORD UNFORMING THEM AN ACCOUNT HAVE BEEN CREATED FOR THEM"
+            
+        _try_send_staff_welcome_email(account, password, full_name)
         info_logger(msg=f"STAFF CREATED: {account.email} (grant_admin={grant_admin}) by {request.user.email} with password set as : {password}")
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":

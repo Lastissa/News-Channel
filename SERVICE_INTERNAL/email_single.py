@@ -238,3 +238,28 @@ def _try_send_newsletter_subscribe_email(email: str):
     )
     _dispatch_email(email, subject, html_message)
     info_logger(msg=f"EMAIL: newsletter subscribe confirmation sent to {email}")
+
+def _try_send_staff_welcome_email(user: object, password: str, full_name: str = ""):
+    """
+    Sent once, right after an admin creates a staff account (ADMIN.views.StaffCreateView),
+    carrying the login email + the plaintext password the admin just set so the
+    new hire can sign in. `password` is only ever known at this one moment --
+    it is hashed immediately on save and never stored or logged in the clear
+    again after this call.
+    """
+    greeting = f"Hi {full_name}," if full_name else "Hi,"
+    subject = f"Your {About.project_name} staff account is ready"
+    main_content = (
+        f"<p>{greeting}</p>"
+        f"<p>An account has been created for you on {About.project_name}. Here are your login details:</p>"
+        f"<p>Email: <strong>{user.email}</strong><br>Password: <strong>{password}</strong></p>"
+        f'<p><a href="{About.domain}/login/">Log in here</a> and change your password once you\'re in.</p>'
+    )
+    html_message = _build_email_html(
+        title="Welcome to the Team",
+        main_content=main_content,
+        end_note=f"Welcome aboard,<br>{About.project_name} Team",
+        unsubscribe_query=f"type=staff_welcome&email={quote(user.email)}",
+    )
+    _dispatch_email(user.email, subject, html_message)
+    info_logger(msg=f"EMAIL: staff welcome credentials sent to {user.email}")

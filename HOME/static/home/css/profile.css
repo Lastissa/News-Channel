@@ -244,20 +244,79 @@
   width: 100%;
 }
 
+/*  MOBILE FIRST: Preview takes the free width and the two update buttons are
+    icon only squares beside it, so the whole row stays on one line. From
+    900px the words come back and the file button drops onto its own line. */
 .profile-image-actions-row {
   display: grid;
-  grid-template-columns: 1fr 1.6fr;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
   gap: 8px;
 }
 
 .profile-image-actions-row .profile-action-btn {
   width: 100%;
   min-width: 0;
+  min-height: 42px;
 }
 
-.upload-avatar-btn.is-pending {
-  opacity: 0.6;
-  pointer-events: none;
+.profile-image-actions-row .avatar-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0;
+}
+
+.profile-image-actions-row .upload-avatar-btn {
+  border-color: var(--line);
+}
+
+.avatar-btn-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*  Hidden the screen reader safe way, never display:none, so the button
+    still has its name when only the icon shows. */
+.avatar-btn-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+  .profile-image-actions-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-image-actions-row .upload-avatar-btn {
+    grid-column: 1 / -1;
+  }
+
+  .profile-image-actions-row .avatar-icon-btn {
+    padding: 10px 14px;
+  }
+
+  .avatar-btn-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: hidden;
+    clip: auto;
+    clip-path: none;
+    text-overflow: ellipsis;
+  }
 }
 
 .profile-setting-block {
@@ -572,10 +631,6 @@
 
   .profile-identity-row {
     flex-direction: row;
-  }
-
-  .profile-image-actions-row {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1036,4 +1091,221 @@
 @keyframes delete-account-slide-right {
   from { transform: translateX(18px); opacity: 0.35; }
   to { transform: none; opacity: 1; }
+}
+
+/* ---------- Avatar adjust window: select, resize, preview, then confirm ---------- */
+html.avatar-crop-open {
+  overflow: hidden;
+}
+
+.avatar-crop-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.avatar-crop-layer[hidden] {
+  display: none;
+}
+
+.avatar-crop-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 27, 44, 0.62);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.avatar-crop-dialog {
+  position: relative;
+  width: min(100%, 700px);
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--amber-alt);
+  border-radius: 8px;
+  box-shadow: var(--shadow-raised);
+  padding: 18px 18px 16px;
+}
+
+.avatar-crop-head h3 {
+  margin: 0 0 14px;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.avatar-crop-body {
+  display: grid;
+  gap: 16px;
+}
+
+.avatar-crop-stage {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  background: var(--paper-dim);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.avatar-crop-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.avatar-crop-stage:focus-visible {
+  outline: 2px solid var(--brand-deep);
+  outline-offset: 2px;
+}
+
+.avatar-crop-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*  Short phones: preview on the left, resize control and hint on the right,
+    so the whole window fits without scrolling. */
+.avatar-crop-side {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.avatar-crop-preview-block {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.avatar-crop-preview {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--paper-dim);
+}
+
+.avatar-crop-preview-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.avatar-crop-controls {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.avatar-crop-zoom {
+  display: grid;
+  gap: 6px;
+}
+
+.avatar-crop-zoom label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.avatar-crop-zoom input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--amber-alt);
+}
+
+.avatar-crop-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--slate);
+}
+
+.avatar-crop-feedback {
+  margin: 12px 0 0;
+}
+
+.avatar-crop-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.avatar-crop-actions .profile-action-btn {
+  width: auto;
+  flex: 1 1 0;
+  min-height: 42px;
+}
+
+.avatar-crop-actions .avatar-crop-cancel {
+  border-color: var(--line);
+}
+
+.avatar-crop-actions .profile-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.avatar-crop-layer.is-pending .avatar-crop-stage {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+@media (min-width: 640px) {
+  .avatar-crop-dialog {
+    padding: 22px 22px 18px;
+  }
+
+  .avatar-crop-body {
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .avatar-crop-stage {
+    margin: 0;
+  }
+
+  .avatar-crop-side {
+    grid-template-columns: 1fr;
+    align-content: start;
+    justify-items: start;
+    gap: 20px;
+  }
+
+  .avatar-crop-preview {
+    width: 120px;
+    height: 120px;
+  }
+
+  .avatar-crop-controls {
+    width: 100%;
+  }
+
+  .avatar-crop-actions {
+    justify-content: flex-end;
+  }
+
+  .avatar-crop-actions .profile-action-btn {
+    flex: 0 0 auto;
+    min-width: 160px;
+  }
 }

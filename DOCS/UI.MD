@@ -61,3 +61,10 @@ Template `STAFF/templates/staff/portfolio.html`, styles `STAFF/static/staff/css/
 - Key numbers strip: eight tiles, the six totals plus author rank (among active authors by stories posted) and most viewed story.
 - Charts, all real data and pure HTML/SVG: recent story reach, coverage ranking, publishing rhythm (last 6 months), readership donut (views by category), reader response (views against readers, likes, comments, saves).
 - Cards sit on a 12 column grid from 720px and use container queries, so they adapt to their own width.
+
+### PROFILE PICTURE UPLOAD (`/profile/`)
+Template `HOME/templates/HOME/profile.html`, styles `HOME/static/home/css/profile.css`, script in the "profile avatar" section of `HOME/static/home/js/interactions.js`.
+- The two update buttons (link and file) are icon only below 900px so the whole row stays on one line, and show icon plus text from 900px up. The words stay in the page for screen readers.
+- Picking a file never uploads it. It opens the Adjust photo window: drag to reposition, slider, mouse wheel or pinch to resize, live circular preview. Nothing is sent until Confirm upload is pressed. Cancel or Escape throws the choice away.
+- What is sent is the framed square, cut in the browser to a 512 x 512 JPEG, so the file is small and is exactly what the preview showed.
+- Each account owns one avatar asset in Cloudinary (`abureport/avatars/user_<id>`). A new upload overwrites it and never adds another image (see `SERVICE_INTERNAL/images.py`).

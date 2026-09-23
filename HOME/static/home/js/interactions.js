@@ -383,105 +383,351 @@
       });
   });
 
-  /* ---------- profile avatar: real file upload (optimized server side) ---------- */
-  var MAX_AVATAR_BYTES = 8 * 1024 * 1024;
-  var avatarPreviewObjectUrl = null;
+  /* ---------- profile avatar: select, resize, preview, confirm, then upload ----------
+     Picking a file only opens the adjust window. The photo is repositioned and
+     zoomed there, cropped to a square on a canvas, and nothing leaves the
+     browser until "Confirm upload" is pressed. The upload goes to the same
+     endpoint as before, and the server stores it over the user's existing
+     avatar instead of adding a new image. */
+  (function initAvatarCropper() {
+    var MAX_AVATAR_BYTES = 8 * 1024 * 1024;   /* largest file we will even open */
+    var OUTPUT_PX = 512;                      /* same size as the preset in SERVICE_INTERNAL/images.py */
+    var MAX_ZOOM = 4;
+    var JPEG_QUALITY = 0.9;
+    var ENDPOINT = "/profile/settings/image/";
 
-  document.addEventListener("click", function (event) {
-    var openBtn = event.target.closest("[data-upload-profile-image]");
-    if (!openBtn) return;
-
+    var layer = document.querySelector("[data-avatar-crop]");
     var fileInput = document.getElementById("profile-avatar-file");
-    if (fileInput) fileInput.click();
-  });
+    var openBtn = document.querySelector("[data-upload-profile-image]");
+    if (!layer || !fileInput || !openBtn) return;
 
-  document.addEventListener("change", function (event) {
-    var fileInput = event.target.closest("[data-profile-avatar-file]");
-    if (!fileInput) return;
+    var stage = layer.querySelector("[data-avatar-crop-stage]");
+    var stageCanvas = layer.querySelector("[data-avatar-crop-canvas]");
+    var previewCanvas = layer.querySelector("[data-avatar-crop-preview]");
+    var zoomInput = layer.querySelector("[data-avatar-crop-zoom]");
+    var feedback = layer.querySelector("[data-avatar-crop-feedback]");
+    var confirmBtn = layer.querySelector("[data-avatar-crop-confirm]");
+    var cancelBtn = layer.querySelector("[data-avatar-crop-cancel]");
 
-    var file = fileInput.files && fileInput.files[0];
-    if (!file) return;
+    /* The whole crop is three numbers: `zoom` (1 = the largest square that
+       fits the photo) and `cx`, `cy` (the point of the photo, in its own
+       pixels, sitting at the middle of the frame). The visible square is
+       always inside the photo, so there is never an empty edge. */
+    var img = null;
+    var objectUrl = null;
+    var zoom = 1;
+    var cx = 0;
+    var cy = 0;
+    var pointers = {};
+    var pinchStartDistance = 0;
+    var pinchStartZoom = 1;
+    var pending = false;
+    var isOpen = false;
+    var frameQueued = false;
 
-    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
-      toast("Unsupported image type. Use JPEG, PNG, WEBP or GIF.", "error");
-      fileInput.value = "";
-      return;
-    }
-    if (file.size > MAX_AVATAR_BYTES) {
-      toast("Image is too large. Max allowed size is 8MB.", "error");
-      fileInput.value = "";
-      return;
-    }
-
-    var uploadBtn = document.querySelector("[data-upload-profile-image]");
-    var avatar = document.querySelector(".profile-avatar");
-
-    /* Local-only preview while the upload is in flight, avoids a blank
-       avatar for the second or two the request takes. */
-    if (avatarPreviewObjectUrl) URL.revokeObjectURL(avatarPreviewObjectUrl);
-    avatarPreviewObjectUrl = URL.createObjectURL(file);
-    if (avatar) avatar.src = avatarPreviewObjectUrl;
-
-    if (uploadBtn) {
-      uploadBtn.dataset.pending = "true";
-      uploadBtn.disabled = true;
-      uploadBtn.classList.add("is-pending");
-      uploadBtn.textContent = "Uploading...";
+    function clamp(value, low, high) {
+      return Math.min(high, Math.max(low, value));
     }
 
-    var formData = new FormData();
-    formData.append("image_file", file);
+    function sourceSide() {
+      return Math.min(img.naturalWidth, img.naturalHeight) / zoom;
+    }
 
-    fetch("/profile/settings/image/", {
-      method: "POST",
-      headers: {
-        "X-CSRFToken": getCookie("csrftoken"),
-        "X-Requested-With": "XMLHttpRequest"
-      },
-      credentials: "same-origin",
-      body: formData,
-    })
-      .then(function (response) {
-        return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+    function keepInsidePhoto() {
+      zoom = clamp(zoom, 1, MAX_ZOOM);
+      var half = sourceSide() / 2;
+      cx = clamp(cx, half, img.naturalWidth - half);
+      cy = clamp(cy, half, img.naturalHeight - half);
+    }
+
+    /* One painter for the stage, the preview and the file that gets uploaded,
+       so what the person sees is exactly what is sent. */
+    function paint(target, size) {
+      if (target.width !== size) {
+        target.width = size;
+        target.height = size;
+      }
+      var ctx = target.getContext("2d");
+      var side = sourceSide();
+      ctx.fillStyle = "#ffffff";   /* only ever shows through a transparent PNG */
+      ctx.fillRect(0, 0, size, size);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, cx - side / 2, cy - side / 2, side, side, 0, 0, size, size);
+    }
+
+    function draw() {
+      frameQueued = false;
+      if (!img) return;
+      var density = Math.min(window.devicePixelRatio || 1, 2);
+      paint(stageCanvas, Math.max(160, Math.round(stage.clientWidth * density)));
+      paint(previewCanvas, 192);
+    }
+
+    function queueDraw() {
+      if (frameQueued) return;
+      frameQueued = true;
+      requestAnimationFrame(draw);
+    }
+
+    function panBy(dx, dy) {
+      var sourcePerPixel = sourceSide() / stage.clientWidth;
+      cx -= dx * sourcePerPixel;
+      cy -= dy * sourcePerPixel;
+      keepInsidePhoto();
+      queueDraw();
+    }
+
+    function setZoom(next) {
+      zoom = next;
+      keepInsidePhoto();
+      zoomInput.value = String(zoom);
+      queueDraw();
+    }
+
+    function setFeedback(message) {
+      feedback.textContent = message || "";
+      feedback.hidden = !message;
+    }
+
+    function setPending(on) {
+      pending = on;
+      confirmBtn.disabled = on;
+      cancelBtn.disabled = on;
+      zoomInput.disabled = on;
+      confirmBtn.textContent = on ? "Uploading..." : "Confirm upload";
+      layer.classList.toggle("is-pending", on);
+    }
+
+    function releasePhoto() {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = null;
+      img = null;
+    }
+
+    function openCropper(file) {
+      releasePhoto();
+      objectUrl = URL.createObjectURL(file);
+
+      var candidate = new Image();
+      candidate.onload = function () {
+        img = candidate;
+        zoom = 1;
+        cx = img.naturalWidth / 2;
+        cy = img.naturalHeight / 2;
+        zoomInput.min = "1";
+        zoomInput.max = String(MAX_ZOOM);
+        zoomInput.value = "1";
+        setFeedback("");
+        setPending(false);
+        layer.hidden = false;
+        isOpen = true;
+        document.documentElement.classList.add("avatar-crop-open");
+        draw();
+        stage.focus({ preventScroll: true });
+      };
+      candidate.onerror = function () {
+        releasePhoto();
+        toast("That file could not be opened as an image.", "error");
+      };
+      candidate.src = objectUrl;
+    }
+
+    function closeCropper() {
+      if (pending) return;
+      isOpen = false;
+      layer.hidden = true;
+      document.documentElement.classList.remove("avatar-crop-open");
+      pointers = {};
+      stage.classList.remove("is-dragging");
+      releasePhoto();
+      openBtn.focus();
+    }
+
+    function sendAvatar(blob) {
+      var formData = new FormData();
+      formData.append("image_file", blob, "avatar.jpg");
+
+      fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken"),
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin",
+        body: formData,
       })
-      .then(function (result) {
-        if (uploadBtn) {
-          uploadBtn.dataset.pending = "false";
-          uploadBtn.disabled = false;
-          uploadBtn.classList.remove("is-pending");
-          uploadBtn.textContent = "Upload avatar (file)";
-        }
-        fileInput.value = "";
+        .then(function (response) {
+          return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+        })
+        .then(function (result) {
+          var payload = {};
+          try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* non JSON body, fall back below */ }
 
-        var payload = {};
-        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* non JSON body, fall back below */ }
-        var detail = payload.detail || (result.ok ? "Profile image updated." : "Could not upload profile image.");
+          setPending(false);
+          if (!result.ok) {
+            /* Stay open so the person can retry. The toast host sits under
+               this window, so the message is shown inside it. */
+            setFeedback(payload.detail || "Could not upload profile image.");
+            return;
+          }
 
-        if (!result.ok) {
-          toast(detail, "error");
+          var avatar = document.querySelector(".profile-avatar");
+          if (avatar && payload.image_url) {
+            avatar.src = payload.image_url;
+            avatar.onerror = function () {
+              this.src = "/static/404.jpg";
+            };
+          }
+          closeCropper();
+          toast(payload.detail || "Profile image updated.");
+        })
+        .catch(function () {
+          setPending(false);
+          setFeedback("Network Error. Profile image was not uploaded.");
+        });
+    }
+
+    function confirmUpload() {
+      if (pending || !img) return;
+      setFeedback("");
+      setPending(true);   /* locks the window before the async steps below */
+
+      var output = document.createElement("canvas");
+      paint(output, OUTPUT_PX);
+      output.toBlob(function (blob) {
+        if (!blob) {
+          setPending(false);
+          setFeedback("Could not prepare this image. Try a different photo.");
           return;
         }
+        sendAvatar(blob);
+      }, "image/jpeg", JPEG_QUALITY);
+    }
 
-        toast(detail);
-        if (avatarPreviewObjectUrl) { URL.revokeObjectURL(avatarPreviewObjectUrl); avatarPreviewObjectUrl = null; }
-        if (avatar && payload.image_url) {
-          avatar.src = payload.image_url;
-          avatar.onerror = function () {
-            this.src = "/static/404.jpg";
-          };
-        }
-      })
-      .catch(function () {
-        if (uploadBtn) {
-          uploadBtn.dataset.pending = "false";
-          uploadBtn.disabled = false;
-          uploadBtn.classList.remove("is-pending");
-          uploadBtn.textContent = "Upload avatar (file)";
-        }
-        fileInput.value = "";
-        toast("Network Error. Profile image was not uploaded.", "error");
-      });
-  });
+    /* ----- opening: the icon button only asks for a file ----- */
+    openBtn.addEventListener("click", function () {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", function () {
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";   /* lets the same file be picked again after a cancel */
+      if (!file) return;
+
+      if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+        toast("Unsupported image type. Use JPEG, PNG, WEBP or GIF.", "error");
+        return;
+      }
+      if (file.size > MAX_AVATAR_BYTES) {
+        toast("Image is too large. Max allowed size is 8MB.", "error");
+        return;
+      }
+      openCropper(file);
+    });
+
+    /* ----- adjusting: drag, pinch, wheel, slider, keyboard ----- */
+    function pointerDistance() {
+      var ids = Object.keys(pointers);
+      var a = pointers[ids[0]];
+      var b = pointers[ids[1]];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    stage.addEventListener("pointerdown", function (event) {
+      if (!img || pending) return;
+      stage.setPointerCapture(event.pointerId);
+      pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+      if (Object.keys(pointers).length === 2) {
+        pinchStartDistance = pointerDistance();
+        pinchStartZoom = zoom;
+      }
+      stage.classList.add("is-dragging");
+    });
+
+    stage.addEventListener("pointermove", function (event) {
+      var point = pointers[event.pointerId];
+      if (!point || !img) return;
+
+      if (Object.keys(pointers).length >= 2) {
+        point.x = event.clientX;
+        point.y = event.clientY;
+        if (pinchStartDistance > 0) setZoom(pinchStartZoom * pointerDistance() / pinchStartDistance);
+        return;
+      }
+
+      var dx = event.clientX - point.x;
+      var dy = event.clientY - point.y;
+      point.x = event.clientX;
+      point.y = event.clientY;
+      panBy(dx, dy);
+    });
+
+    function endPointer(event) {
+      delete pointers[event.pointerId];
+      if (!Object.keys(pointers).length) stage.classList.remove("is-dragging");
+    }
+    stage.addEventListener("pointerup", endPointer);
+    stage.addEventListener("pointercancel", endPointer);
+
+    stage.addEventListener("wheel", function (event) {
+      if (!img || pending) return;
+      event.preventDefault();
+      setZoom(zoom * Math.exp(-event.deltaY * 0.0015));
+    }, { passive: false });
+
+    zoomInput.addEventListener("input", function () {
+      if (!img) return;
+      setZoom(parseFloat(zoomInput.value) || 1);
+    });
+
+    stage.addEventListener("keydown", function (event) {
+      if (!img || pending) return;
+      var step = stage.clientWidth * 0.04;
+      var handled = true;
+      if (event.key === "ArrowLeft") panBy(-step, 0);
+      else if (event.key === "ArrowRight") panBy(step, 0);
+      else if (event.key === "ArrowUp") panBy(0, -step);
+      else if (event.key === "ArrowDown") panBy(0, step);
+      else if (event.key === "+" || event.key === "=") setZoom(zoom + 0.1);
+      else if (event.key === "-") setZoom(zoom - 0.1);
+      else handled = false;
+      if (handled) event.preventDefault();
+    });
+
+    /* ----- confirming / leaving ----- */
+    confirmBtn.addEventListener("click", confirmUpload);
+    cancelBtn.addEventListener("click", closeCropper);
+
+    document.addEventListener("keydown", function (event) {
+      if (!isOpen) return;
+      if (event.key === "Escape") {
+        closeCropper();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      /* keep keyboard focus inside the window while it is open */
+      var stops = Array.prototype.filter.call(
+        layer.querySelectorAll("button, input, [tabindex=\"0\"]"),
+        function (node) { return !node.disabled; }
+      );
+      if (!stops.length) return;
+      var first = stops[0];
+      var last = stops[stops.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    window.addEventListener("resize", function () {
+      if (isOpen) queueDraw();
+    });
+  })();
 
   /* ---------- profile pagination: bookmarks + reading history share one flow ---------- */
   var PROFILE_LISTS = {

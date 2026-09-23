@@ -124,13 +124,28 @@
         <div class="profile-image-link-form">
           <label class="visually-hidden" for="profile-image-url">Profile image URL</label>
           <input id="profile-image-url" type="url" name="image_url" placeholder="Paste image URL for Preview before update" autocomplete="off">
+          {% comment %} MOBILE: the two update buttons are icon only so the whole row fits on one line, the words come back
+              from 900px up. The label span stays in the page for screen readers, aria-label carries the same words. {% endcomment %}
           <div class="profile-image-actions-row">
             <button type="button" class="profile-action-btn preview-image-btn" data-preview-profile-image >Preview</button>
-            <button type="button" class="profile-action-btn primary save-image-btn" data-save-profile-image>Update  pic (link)</button>
+            <button type="button" class="profile-action-btn primary save-image-btn avatar-icon-btn" data-save-profile-image aria-label="Update pic (link)" title="Update pic (link)">
+              <svg class="avatar-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <span class="avatar-btn-label">Update pic (link)</span>
+            </button>
+            <button type="button" class="profile-action-btn upload-avatar-btn avatar-icon-btn" data-upload-profile-image aria-label="Upload avatar (file)" title="Upload avatar (file)">
+              <svg class="avatar-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="M17 8l-5-5-5 5" />
+                <path d="M12 3v12" />
+              </svg>
+              <span class="avatar-btn-label">Upload avatar (file)</span>
+            </button>
           </div>
         </div>
         <input id="profile-avatar-file" type="file" name="image_file" data-profile-avatar-file accept="image/jpeg,image/png" hidden>
-        <button type="button" class="profile-action-btn upload-avatar-btn" data-upload-profile-image>Upload avatar (file)</button>
       </div>
 
       <!--  LOG OUT ALL SESSIONS: available to every signed in user. Ends every
@@ -490,6 +505,46 @@
 
   {#   THE DELETE ACCOUNT PLACARD OVERLAY LANDS HERE, EMPTY UNTIL THE BUTTON IS PRESSED   #}
   <div data-delete-overlay></div>
+
+  {#   AVATAR ADJUST WINDOW. Opens after a file is picked. The photo is repositioned and zoomed here, the preview is
+       live, and NOTHING is sent to the server until "Confirm upload" is pressed. Driven by interactions.js.   #}
+  <div class="avatar-crop-layer" data-avatar-crop hidden>
+    <div class="avatar-crop-backdrop"></div>
+    <div class="avatar-crop-dialog" role="dialog" aria-modal="true" aria-labelledby="avatar-crop-title">
+      <div class="avatar-crop-head">
+        <h3 id="avatar-crop-title">Adjust photo</h3>
+      </div>
+
+      <div class="avatar-crop-body">
+        <div class="avatar-crop-stage" data-avatar-crop-stage tabindex="0"
+             aria-label="Photo area. Drag to reposition the photo. Arrow keys move it, plus and minus resize it.">
+          <canvas data-avatar-crop-canvas width="320" height="320"></canvas>
+        </div>
+
+        <div class="avatar-crop-side">
+          <div class="avatar-crop-preview-block">
+            <canvas class="avatar-crop-preview" data-avatar-crop-preview width="192" height="192" aria-hidden="true"></canvas>
+            <span class="avatar-crop-preview-label">Preview</span>
+          </div>
+
+          <div class="avatar-crop-controls">
+            <div class="avatar-crop-zoom">
+              <label for="avatar-crop-zoom">Resize</label>
+              <input id="avatar-crop-zoom" type="range" min="1" max="4" step="0.01" value="1" data-avatar-crop-zoom>
+            </div>
+            <p class="avatar-crop-hint">Drag the photo to reposition it. Pinch, scroll or use the slider to resize it.</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="staff-record-feedback is-error avatar-crop-feedback" data-avatar-crop-feedback role="alert" hidden></p>
+
+      <div class="avatar-crop-actions">
+        <button type="button" class="profile-action-btn avatar-crop-cancel" data-avatar-crop-cancel>Cancel</button>
+        <button type="button" class="profile-action-btn primary" data-avatar-crop-confirm>Confirm upload</button>
+      </div>
+    </div>
+  </div>
 </section>
 {% endblock %}
 

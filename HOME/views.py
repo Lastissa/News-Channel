@@ -27,7 +27,6 @@ from SERVICE_INTERNAL.abstract import (
     notify_admins_account_deleted,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig
-from SERVICE_INTERNAL.email_batch import _try_send_new_story_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
@@ -351,9 +350,7 @@ class AddNewsView(View):
                 {"detail": "You already have a story with this exact heading in this category. Edit the heading or choose a different category."},
                 status=400,
             )
-
-        _try_send_new_story_batch_email(blog)
-
+            "TODO: Send Email Alert to all followers + people that have not followers informing them of the latest news, the footer should contain a btn that the viewer can opt out of that email by simply turning off their"
         return _response(
             {"detail": "Story published.", "story_url": f"/story/{blog.pk}/", "id": blog.pk},
             status=201,
@@ -375,16 +372,13 @@ class NewsletterSubscribeView(View):
             unit = "second" if remaining_time == 1 else "seconds"
             return _response({"detail": f"Too many requests. Try again in {remaining_time} {unit}."}, status=429)
 
-        if request.user.is_authenticated:
-            email = request.user.email
-        else:
-            email = request.POST.get("email", '').strip()
+        email = request.POST.get("email", '').strip()
 
         if not email or "@" not in email:
             return _response({"detail": "Invalid email address."}, status=400)
 
         user_model = get_user_model()
-        existing = request.user if request.user.is_authenticated else user_model.objects.filter(email__iexact=email).first()
+        existing = user_model.objects.filter(email__iexact=email).first()
         if existing is not None:
             if not existing.send_newsletter:
                 existing.send_newsletter = True
@@ -447,9 +441,6 @@ class ProfileSendNewsletterToggleView(View):
         new_state = not bool(getattr(request.user, "send_newsletter", False))
         request.user.send_newsletter = new_state
         request.user.save(update_fields=["send_newsletter"])
-
-        if new_state:
-            _try_send_newsletter_subscribe_email(request.user.email)
 
         return JsonResponse(
             {
@@ -531,14 +522,25 @@ class ProfileImageUpdateView(View):
     automatic optimization, i.e. the person never picks a quality here,
     that choice only exists for staff on the Add news page."""
 
+    @staticmethod
+    def _too_frequent(request):
+        """A 429 JsonResponse when this client is updating too often, else None."""
+        remaining_time, is_limited = is_rate_limited(request, 30, 2,False)
+        if is_limited: return JsonResponse({'detail': f'too frequent update. Retry in {str(remaining_time) + "seconds" if remaining_time>1 else str(remaining_time)+" second"}'}, status = 429)
+        return None
+
     def post(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in to update your profile image.", "valid": False}, status=401)
 
         image_file = request.FILES.get("image_file")
         if image_file:
+            #   RATE LIMIT BEFORE CLOUDINARY: the upload overwrites this user's one avatar asset in place, so a
+            #   request that is going to be refused must never get as far as touching it.
+            too_frequent = self._too_frequent(request)
+            if too_frequent: return too_frequent
             try:
-                image_url = upload_profile_image(image_file)
+                image_url = upload_profile_image(image_file, request.user.pk)
             except ImageUploadError as exc:
                 return JsonResponse({"detail": str(exc), "valid": False}, status=400)
         else:
@@ -552,9 +554,10 @@ class ProfileImageUpdateView(View):
             except ValidationError:
                 return JsonResponse({"detail": "The URL must be a valid http or https link.", "valid": False}, status=400)
 
-        #   RATE LIMIT THE ENDPOINT JUST BEFORE DATABASE UPLOAD
-        remaining_time, is_limited = is_rate_limited(request, 30, 2,False)
-        if is_limited: return JsonResponse({'detail': f'too frequent update. Retry in {str(remaining_time) + "seconds" if remaining_time>1 else str(remaining_time)+" second"}'}, status = 429)
+            #   RATE LIMIT THE ENDPOINT JUST BEFORE DATABASE UPLOAD
+            too_frequent = self._too_frequent(request)
+            if too_frequent: return too_frequent
+
         request.user.profile_img = image_url
         request.user.save(update_fields=["profile_img"])
         return JsonResponse({"detail": "Profile image updated.", "valid": True, "image_url": image_url}, status=200)

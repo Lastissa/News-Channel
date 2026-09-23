@@ -8,7 +8,9 @@ never talks to the cloudinary SDK directly. Reads from setting
 
 Two upload paths, two different trade offs:
     -   `upload_profile_image`   ->  personal avatar. Always squeezed down
-        with the same fixed preset, the user never gets a choice.
+        with the same fixed preset, the user never gets a choice. Every user
+        owns exactly ONE avatar asset (`abureport/avatars/user_<id>`), a new
+        upload overwrites it in place instead of adding another image.
     -   `upload_news_image`      ->  staff only, called from the Add news
         page. `quality` is whatever the LOW / MEDIUM / HIGH <select> sent
         and drives which Cloudinary preset from `ImageQuality` is used.
@@ -81,6 +83,15 @@ class ImageQuality:
 #   personal uploads stay small and fast no matter who is uploading.
 _PROFILE_IMAGE_PRESET = {"quality": "auto:eco", "width": 512, "height": 512, "crop": "fill", "gravity": "face"}
 
+_AVATAR_FOLDER = "abureport/avatars"
+
+
+def _avatar_public_id(user_id) -> str:
+    """The one fixed Cloudinary public id a user's avatar always lives at.
+    Built from the account id only, never from anything the browser sent, so
+    nobody can aim an upload at somebody else's asset."""
+    return f"{_AVATAR_FOLDER}/user_{user_id}"
+
 
 def _validate_image_file(file) -> None:
     """Raises ImageUploadError if `file` is not an acceptable image
@@ -99,21 +110,30 @@ def _validate_image_file(file) -> None:
         raise ImageUploadError("Unsupported image type. Please upload a JPEG, PNG file.")
 
 
-def _run_upload(file, folder: str, preset: dict, tag: str) -> str:
+def _run_upload(file, folder: str, preset: dict, tag: str, public_id: str | None = None) -> str:
     """Shared Cloudinary call used by both upload functions below. Returns
     the `secure_url` string. Any Cloudinary side failure is logged and
     re-raised as ImageUploadError, so callers never need to know the SDK
-    exists or catch cloudinary's own exception type."""
+    exists or catch cloudinary's own exception type.
+
+    Without `public_id` every call stores a brand new asset in `folder` (news
+    images). With `public_id` the asset lives at that exact id and is
+    overwritten in place (avatars), `folder` is then ignored because the id
+    already carries the full path. `invalidate` clears the CDN copy so the
+    replaced picture shows up straight away."""
+    if public_id:
+        placement = {"public_id": public_id, "unique_filename": False, "overwrite": True, "invalidate": True}
+    else:
+        placement = {"folder": folder, "unique_filename": True, "overwrite": False}
+
     try:
         result = cloudinary.uploader.upload(
             file,
-            folder=folder,
             resource_type="image",
             fetch_format="auto",
-            unique_filename=True,
-            overwrite=False,
             transformation=[preset],
             tags=[tag],
+            **placement,
         )
     except CloudinaryError as exc:
         error_logger(msg=f"CLOUDINARY UPLOAD FAILED ({tag}): {exc}")
@@ -128,12 +148,19 @@ def _run_upload(file, folder: str, preset: dict, tag: str) -> str:
     return secure_url
 
 
-def upload_profile_image(file) -> str:
+def upload_profile_image(file, user_id) -> str:
     """Personal / avatar image upload. Always the same optimized preset,
     on purpose there is no quality choice here, unlike the staff news
-    upload below."""
+    upload below. The picture replaces the user's previous uploaded avatar
+    (same public id, overwritten), so re-uploading never piles up images."""
     _validate_image_file(file)
-    return _run_upload(file, folder="abureport/avatars", preset=_PROFILE_IMAGE_PRESET, tag="avatar")
+    return _run_upload(
+        file,
+        folder=_AVATAR_FOLDER,
+        preset=_PROFILE_IMAGE_PRESET,
+        tag="avatar",
+        public_id=_avatar_public_id(user_id),
+    )
 
 
 def upload_news_image(file, quality=ImageQuality.MEDIUM) -> str:
