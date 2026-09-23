@@ -27,6 +27,7 @@ from SERVICE_INTERNAL.abstract import (
     notify_admins_account_deleted,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig
+from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
 from STAFF.models import GENDER_CHOICES, FollowRelationship, StaffProfile
@@ -287,6 +288,8 @@ class AddNewsView(View):
     def post(self, request):
         heading = (request.POST.get("heading") or "").strip()
         image_url = (request.POST.get("image_1") or "").strip()
+        image_file = request.FILES.get("image_file")
+        image_quality = (request.POST.get("image_quality") or ImageQuality.MEDIUM).strip().lower()
         image_info = (request.POST.get("image_info") or "").strip()
         category = (request.POST.get("category") or "").strip().upper()
         content = (request.POST.get("content") or "").strip()
@@ -300,7 +303,15 @@ class AddNewsView(View):
         if not content:
             return _response({"detail": "The story content cannot be empty."}, status=400)
 
-        if image_url:
+        #   AN UPLOADED FILE ALWAYS WINS OVER A PASTED URL. Nothing is sent
+        #   to cloudinary until this line, i.e. not while the staff member
+        #   is still typing/previewing, only once they publish.
+        if image_file:
+            try:
+                image_url = upload_news_image(image_file, quality=image_quality)
+            except ImageUploadError as exc:
+                return _response({"detail": str(exc)}, status=400)
+        elif image_url:
             validator = URLValidator(schemes=["http", "https"])
             try:
                 validator(image_url)
@@ -495,21 +506,32 @@ class ProfileLogoutAllSessionsView(View):
 
 
 class ProfileImageUpdateView(View):
-    """Validate and save a new profile image URL."""
+    """Validate and save a new profile image, either a pasted URL (unchanged
+    flow) or an uploaded file. An uploaded file always goes through
+    SERVICE_INTERNAL.images.upload_profile_image, which applies a fixed,
+    automatic optimization, i.e. the person never picks a quality here,
+    that choice only exists for staff on the Add news page."""
 
     def post(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in to update your profile image.", "valid": False}, status=401)
 
-        image_url = (request.POST.get("image_url") or "").strip()
-        if not image_url:
-            return JsonResponse({"detail": "Please add a valid image URL.", "valid": False}, status=400)
+        image_file = request.FILES.get("image_file")
+        if image_file:
+            try:
+                image_url = upload_profile_image(image_file)
+            except ImageUploadError as exc:
+                return JsonResponse({"detail": str(exc), "valid": False}, status=400)
+        else:
+            image_url = (request.POST.get("image_url") or "").strip()
+            if not image_url:
+                return JsonResponse({"detail": "Please add a valid image URL.", "valid": False}, status=400)
 
-        validator = URLValidator(schemes=["http", "https"])
-        try:
-            validator(image_url)
-        except ValidationError:
-            return JsonResponse({"detail": "The URL must be a valid http or https link.", "valid": False}, status=400)
+            validator = URLValidator(schemes=["http", "https"])
+            try:
+                validator(image_url)
+            except ValidationError:
+                return JsonResponse({"detail": "The URL must be a valid http or https link.", "valid": False}, status=400)
 
         #   RATE LIMIT THE ENDPOINT JUST BEFORE DATABASE UPLOAD
         remaining_time, is_limited = is_rate_limited(request, 30, 2,False)

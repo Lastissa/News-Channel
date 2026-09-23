@@ -160,3 +160,6 @@ CSRF_TRUSTED_ORIGINS
 CLOUDINARY_CLOUD_NAME = os.getenv('cloud_name')
 CLOUDINARY_API_KEY = os.getenv('cloudinary_api_key')
 CLOUDINARY_API_SECRET = os.getenv('cloudinary_api_secret')
+
+#IMAGE UPLOADS (avatars + news images, see SERVICE_INTERNAL/images.py)
+IMAGE_UPLOAD_MAX_MB = int(os.getenv('image_upload_max_mb', 4))

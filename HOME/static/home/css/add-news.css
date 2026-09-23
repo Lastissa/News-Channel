@@ -114,6 +114,32 @@
   font-size: 0.75rem;
 }
 
+.editor-image-filename {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.editor-image-clear-btn {
+  border-style: solid;
+  color: var(--danger);
+}
+
+.editor-image-clear-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.editor-field input:disabled {
+  background: var(--paper-dim, var(--input-fill));
+  color: var(--slate);
+  cursor: not-allowed;
+}
+
 .editor-convention-hint {
   color: var(--ink);
   font-size: 0.75rem;
@@ -178,3 +204,11 @@
     min-height: 220px;
   }
 }
+
+
+.second-tab{
+      background-color:red;
+      padding:0;
+      width:100%;
+      margin:0;
+    }

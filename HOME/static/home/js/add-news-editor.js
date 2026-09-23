@@ -13,6 +13,10 @@
   var form = shell.querySelector("[data-editor-form]");
   var headingInput = shell.querySelector("[data-editor-heading]");
   var imageInput = shell.querySelector("[data-editor-image]");
+  var imageFileInput = shell.querySelector("[data-editor-image-file]");
+  var imageFilenameEl = shell.querySelector("[data-editor-image-filename]");
+  var imageClearBtn = shell.querySelector("[data-editor-image-clear]");
+  var imageQualityField = shell.querySelector("[data-editor-image-quality-field]");
   var imageInfoInput = shell.querySelector("[data-editor-image-info]");
   var categorySelect = shell.querySelector("[data-editor-category]");
   var contentInput = shell.querySelector("[data-editor-content]");
@@ -23,7 +27,13 @@
   var note = shell.querySelector("[data-editor-loading-note]");
 
   var PREVIEW_KEY = "abu-editor-preview";
+  var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   var pendingPublish = false;
+
+  /* Local-only preview of a chosen file. No upload happens here, that
+     only happens inside the publish handler further down, via the real
+     `image_file` FormData entry the browser already attached to the form. */
+  var selectedImageObjectUrl = null;
 
   function toast(message, tone) {
     if (window.editorToast) {
@@ -142,7 +152,7 @@
 
   function renderPreview() {
     var heading = headingInput.value.trim();
-    var imageUrl = imageInput.value.trim();
+    var imageUrl = selectedImageObjectUrl || imageInput.value.trim();
     var imageInfo = imageInfoInput.value.trim() || "The image is self explanatory.";
     var categoryLabel = currentCategoryLabel();
     var bodyHtml = parseStoryContent(contentInput.value);
@@ -243,6 +253,7 @@
         }
         var payload = {};
         try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* ignore */ }
+        if (selectedImageObjectUrl) { URL.revokeObjectURL(selectedImageObjectUrl); selectedImageObjectUrl = null; }
         toast(payload.detail || "Story published.");
         if (payload.story_url) {
           window.setTimeout(function () { window.location.href = payload.story_url; }, 700);
@@ -259,9 +270,55 @@
     return match ? decodeURIComponent(match.pop()) : "";
   }
 
-  if (uploadBtn) {
+  function clearSelectedImageFile() {
+    if (imageFileInput) imageFileInput.value = "";
+    if (selectedImageObjectUrl) {
+      URL.revokeObjectURL(selectedImageObjectUrl);
+      selectedImageObjectUrl = null;
+    }
+    imageInput.disabled = false;
+    if (imageFilenameEl) { imageFilenameEl.hidden = true; imageFilenameEl.textContent = ""; }
+    if (imageClearBtn) imageClearBtn.hidden = true;
+    if (imageQualityField) imageQualityField.hidden = true;
+  }
+
+  if (uploadBtn && imageFileInput) {
     uploadBtn.addEventListener("click", function () {
-      toast("File upload is not available yet. Paste an image URL for now.");
+      imageFileInput.click();
+    });
+
+    imageFileInput.addEventListener("change", function () {
+      var file = imageFileInput.files && imageFileInput.files[0];
+      if (!file) return;
+
+      if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+        toast("Unsupported image type. Use JPEG, PNG, WEBP or GIF.", "error");
+        clearSelectedImageFile();
+        return;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        toast("Image is too large. Max allowed size is 8MB.", "error");
+        clearSelectedImageFile();
+        return;
+      }
+
+      if (selectedImageObjectUrl) URL.revokeObjectURL(selectedImageObjectUrl);
+      selectedImageObjectUrl = URL.createObjectURL(file);
+
+      /* the file replaces the pasted URL, so it is disabled (and left out
+         of the form submit) while a file is selected */
+      imageInput.disabled = true;
+      if (imageFilenameEl) { imageFilenameEl.textContent = file.name; imageFilenameEl.hidden = false; }
+      if (imageClearBtn) imageClearBtn.hidden = false;
+      if (imageQualityField) imageQualityField.hidden = false;
+      schedulePreview();
+    });
+  }
+
+  if (imageClearBtn) {
+    imageClearBtn.addEventListener("click", function () {
+      clearSelectedImageFile();
+      schedulePreview();
     });
   }
 

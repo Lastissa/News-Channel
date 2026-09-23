@@ -383,6 +383,106 @@
       });
   });
 
+  /* ---------- profile avatar: real file upload (optimized server side) ---------- */
+  var MAX_AVATAR_BYTES = 8 * 1024 * 1024;
+  var avatarPreviewObjectUrl = null;
+
+  document.addEventListener("click", function (event) {
+    var openBtn = event.target.closest("[data-upload-profile-image]");
+    if (!openBtn) return;
+
+    var fileInput = document.getElementById("profile-avatar-file");
+    if (fileInput) fileInput.click();
+  });
+
+  document.addEventListener("change", function (event) {
+    var fileInput = event.target.closest("[data-profile-avatar-file]");
+    if (!fileInput) return;
+
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      toast("Unsupported image type. Use JPEG, PNG, WEBP or GIF.", "error");
+      fileInput.value = "";
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast("Image is too large. Max allowed size is 8MB.", "error");
+      fileInput.value = "";
+      return;
+    }
+
+    var uploadBtn = document.querySelector("[data-upload-profile-image]");
+    var avatar = document.querySelector(".profile-avatar");
+
+    /* Local-only preview while the upload is in flight, avoids a blank
+       avatar for the second or two the request takes. */
+    if (avatarPreviewObjectUrl) URL.revokeObjectURL(avatarPreviewObjectUrl);
+    avatarPreviewObjectUrl = URL.createObjectURL(file);
+    if (avatar) avatar.src = avatarPreviewObjectUrl;
+
+    if (uploadBtn) {
+      uploadBtn.dataset.pending = "true";
+      uploadBtn.disabled = true;
+      uploadBtn.classList.add("is-pending");
+      uploadBtn.textContent = "Uploading...";
+    }
+
+    var formData = new FormData();
+    formData.append("image_file", file);
+
+    fetch("/profile/settings/image/", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin",
+      body: formData,
+    })
+      .then(function (response) {
+        return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+      })
+      .then(function (result) {
+        if (uploadBtn) {
+          uploadBtn.dataset.pending = "false";
+          uploadBtn.disabled = false;
+          uploadBtn.classList.remove("is-pending");
+          uploadBtn.textContent = "Upload avatar (file)";
+        }
+        fileInput.value = "";
+
+        var payload = {};
+        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* non JSON body, fall back below */ }
+        var detail = payload.detail || (result.ok ? "Profile image updated." : "Could not upload profile image.");
+
+        if (!result.ok) {
+          toast(detail, "error");
+          return;
+        }
+
+        toast(detail);
+        if (avatarPreviewObjectUrl) { URL.revokeObjectURL(avatarPreviewObjectUrl); avatarPreviewObjectUrl = null; }
+        if (avatar && payload.image_url) {
+          avatar.src = payload.image_url;
+          avatar.onerror = function () {
+            this.src = "/static/404.jpg";
+          };
+        }
+      })
+      .catch(function () {
+        if (uploadBtn) {
+          uploadBtn.dataset.pending = "false";
+          uploadBtn.disabled = false;
+          uploadBtn.classList.remove("is-pending");
+          uploadBtn.textContent = "Upload avatar (file)";
+        }
+        fileInput.value = "";
+        toast("Network Error. Profile image was not uploaded.", "error");
+      });
+  });
+
   /* ---------- profile pagination: bookmarks + reading history share one flow ---------- */
   var PROFILE_LISTS = {
     bookmark: {

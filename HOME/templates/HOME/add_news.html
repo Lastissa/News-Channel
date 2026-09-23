@@ -10,7 +10,11 @@
   <meta name="viewport" content="initial-scale=1">
   {% comment %} <meta name="viewport" content="initial-scale=0.5, width=1200"> {% endcomment %}
   <style>
-    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }    .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
+    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }
+    .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
+      @media (max-width: 899.98px) {
+        .editor-shell {padding: 0;}
+      }
     .editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
     .editor-toolbar h1 { margin: 0; font-size: 1.5rem; color: var(--ink); }
     .editor-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -54,7 +58,7 @@
       <div class="editor-pane-header">Preview</div>
       <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
     </div>
-    <div class="editor-pane editor-form-pane">
+    <div class="editor-pane second-tab editor-form-pane">
       <div class="editor-pane-header">Editor</div>
       <div class="editor-form-scroll">
         <form id="add-news-form" class="editor-form" method="post" action="{% url 'home:add_news' %}" data-editor-form data-endpoint="{% url 'home:add_news' %}" novalidate>
@@ -67,9 +71,22 @@
           <div class="editor-field">
             <label for="editor-image">Image URL</label>
             <input id="editor-image" type="url" name="image_1" data-editor-image placeholder="https://example.com/image.jpg" autocomplete="off">
+            <input id="editor-image-file" type="file" name="image_file" data-editor-image-file accept="image/jpeg,image/png" hidden>
             <div class="editor-image-actions">
               <button type="button" class="editor-upload-btn" data-editor-upload-btn>Upload file</button>
+              <span class="editor-image-filename" data-editor-image-filename hidden></span>
+              <button type="button" class="editor-upload-btn editor-image-clear-btn" data-editor-image-clear hidden>Remove File</button>
             </div>
+              <small class="editor-convention-hint">The preview below is only on your device until you publish post then it will be uplaoded to the server.</small>
+          </div>
+
+          <div class="editor-field" data-editor-image-quality-field hidden>
+            <label for="editor-image-quality">Image quality <small>(applies to uploaded file only)</small></label>
+            <select id="editor-image-quality" name="image_quality" data-editor-image-quality>
+              <option value="low">Low - smallest file, fastest story loading time</option>
+              <option value="medium" selected>Medium - balanced</option>
+              <option value="high">High - best detail, largest file - heavy story loading time</option>
+            </select>
           </div>
 
           <div class="editor-field">
@@ -168,7 +185,7 @@
     js.src = shell.dataset.heavyJs;
     js.defer = true;
     js.onerror = function () {
-      lightToast("Editor components failed to load. Check your connection and reload the page.", "error");
+      lightToast("components failed to load. Check your connection & reload the page.", "error");
     };
     document.head.appendChild(js);
   })();
