@@ -7,6 +7,8 @@
 
 {% block extra_head %}
   {{ block.super }}
+  <meta name="viewport" content="initial-scale=1">
+  {% comment %} <meta name="viewport" content="initial-scale=0.5, width=1200"> {% endcomment %}
   <style>
     .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }    .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
     .editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -46,8 +48,12 @@
       <button type="submit" form="add-news-form" class="editor-publish-btn" data-editor-publish disabled>Publish</button>
     </div>
   </div>
-
+  
   <div class="editor-workspace">
+    <div class="editor-pane editor-preview-pane">
+      <div class="editor-pane-header">Preview</div>
+      <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
+    </div>
     <div class="editor-pane editor-form-pane">
       <div class="editor-pane-header">Editor</div>
       <div class="editor-form-scroll">
@@ -82,27 +88,44 @@
           </div>
 
           <div class="editor-field">
-            <label for="editor-content">Content</label>
-            <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content..."></textarea>
-            <b class="prompt"> COPY AND PASTE THE FOLLOWING GUIDE FOR YOUR AGENT OR ADHERE TO IT IF YOU WANT TO BETTER FORMATTED STRUCTURE</B>
-            <small class="editor-convention-hint">Blank line starts a new paragraph.</small>
-            <small class="editor-convention-hint"><b>#</b> = bigger subheading.</small>
-            <small class="editor-convention-hint"><b>##</b> = less bigger subheading.</small>
-            <small class="editor-convention-hint"><b>###</b> = less bigger subheading.</small>
-            <small class="editor-convention-hint">#### = less bigger subheading.</small>
-            <small class="editor-convention-hint">* = bullets.</small>
-            <small class="editor-convention-hint">'.' after number is numbered points.</small>
-            <small class="editor-convention-hint">**text** = Bold.</small>
-            <small class="editor-convention-hint">__text__ = Italic.</small>
-          </div>
+          <label for="editor-content">Content</label>
+          <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content..."></textarea>
+
+          <b class="prompt">FORMATTING GUIDE — OPTIONAL</b>
+
+          <small class="editor-convention-hint">
+            You may write the entire content as plain text without using any formatting syntax.
+          </small>
+
+          <small class="editor-convention-hint">
+            The first paragraph should preferably - NOT A MUST - remain plain text, without headings, bullets, numbering, bold, or italic formatting.
+          </small>
+
+          <small class="editor-convention-hint">
+            Leave a blank line between paragraphs.
+          </small>
+
+          <small class="editor-convention-hint"><b>#</b> = subheading.</small>
+          <small class="editor-convention-hint"><b>##</b> = smaller subheading.</small>
+          <small class="editor-convention-hint"><b>###</b> = smaller subheading.</small>
+          <small class="editor-convention-hint"><b>####</b> = smaller subheading.</small>
+          <small class="editor-convention-hint"><b>*</b> = bullet point.</small>
+          <small class="editor-convention-hint"><b>1.</b>, <b>2.</b>, etc. = numbered points.</small>
+          <small class="editor-convention-hint"><b>**text**</b> = bold.</small>
+          <small class="editor-convention-hint"><b>__text__</b> = italic.</small>
+
+          <small class="editor-convention-hint">
+            Use these formatting rules only when they improve the structure or readability of the content.
+          </small>
+        </div>
         </form>
       </div>
     </div>
 
-    <div class="editor-pane editor-preview-pane">
+    {% comment %} <div class="editor-pane editor-preview-pane">
       <div class="editor-pane-header">Preview</div>
       <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
-    </div>
+    </div> {% endcomment %}
   </div>
 </section>
 

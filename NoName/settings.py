@@ -126,6 +126,7 @@ MAILERS = {
 }
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 SY_SECRET = os.getenv('sy_secret')
@@ -154,3 +155,8 @@ else:
     }
     
     
+CSRF_TRUSTED_ORIGINS
+
+CLOUDINARY_CLOUD_NAME = os.getenv('cloud_name')
+CLOUDINARY_API_KEY = os.getenv('cloudinary_api_key')
+CLOUDINARY_API_SECRET = os.getenv('cloudinary_api_secret')
