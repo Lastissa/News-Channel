@@ -74,7 +74,7 @@ class RobotsTxtView(View):
                 "Disallow: /_admin/",
                 "Disallow: /control/",
                 "Disallow: /sy/",
-                "Disallow: /auth/",
+                # "Disallow: /auth/", # ALLOW FOLLOW AUTH SO OUR LOGIN CAN BE VIEWED PUBLICLY SINCE I AM CERTAIN ITS SECURE AND THIS IS JUST A NEWS PLATFORM
                 "Disallow: /profile/",
                 "Disallow: /load-more/",
                 "",
@@ -126,7 +126,11 @@ class SitemapXmlView(View):
 
         return render(request, "HOME/sitemap.xml", {"urls": urls}, content_type="application/xml")
 
-
+class BingIndexNowView(View):
+    """BING SAY TO INDEX RIGHT AWAY, THIS HELPS"""
+    def get(self, request):
+        return render(request, '28499029458943a79b9877afdefa8212.txt')
+    
 def _bookmarked_ids(user):
     if not user.is_authenticated:
         return set()
