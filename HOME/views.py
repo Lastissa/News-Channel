@@ -126,7 +126,10 @@ class SitemapXmlView(View):
             )
 
         return render(request, "HOME/sitemap.xml", {"urls": urls}, content_type="application/xml")
-
+class FavicoView(View):
+    def get(self, request):
+        return redirect(to='/static/logo.jpg', preserve_request=True, permanent=True)
+    
 class BingIndexNowView(View):
     """BING SAY TO INDEX RIGHT AWAY, THIS HELPS"""
     def get(self, request):

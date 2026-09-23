@@ -11,8 +11,6 @@ settings.ALLOWED_HOSTS = ['testserver']
 settings.MAINTENANCE_MODE = 'FALSE'
 
 u = Auth.objects.create_user(email='debug@example.com', password='secret')
-print('user_created', u.pk, u.email)
-print('is_authenticated_property', u.is_authenticated)
 
 c = Client()
 print('before_force_login_session', c.session.session_key)

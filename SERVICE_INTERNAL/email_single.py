@@ -2,12 +2,6 @@
 ------------------------------------------------------------
 #   SEND SINGLE EMAIL ONLY SECTION
 ------------------------------------------------------------
-NO EXTERNAL MAIL PROVIDER WIRED YET (see project memory: provider is still
-undecided). Every "send" below only builds the full email (subject + html)
-and hands it to info_logger as a decoy so the flow stays testable. Once a
-provider is chosen, only `_dispatch_email` needs to change to actually place
-the call -- nothing else in this file talks to a provider directly.
-
 Layout rule: `_build_email_html` is the ONLY place that builds HEAD, BODY or
 FOOTER markup. No other function in this file (or elsewhere) should hand-roll
 part of the template -- every "prefilled" sender below just supplies content
@@ -15,10 +9,14 @@ to that one method.
 """
 
 from urllib.parse import quote
+import resend
 
 from SERVICE_INTERNAL.abstract import info_logger, error_logger
 from SERVICE_INTERNAL.config import About
 
+from django.conf import settings
+
+resend.api_key = getattr(settings, 'RESEND_API_KEY', 'abcdef')
 
 def _build_email_html(title, main_content, end_note="", header_extra="", unsubscribe_query="", preference_note=""):
     """
@@ -47,75 +45,72 @@ def _build_email_html(title, main_content, end_note="", header_extra="", unsubsc
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{About.project_name}</title>
-<style>
-    body {{ margin:0; padding:0; background-color:#f4f4f5; font-family: Arial, Helvetica, sans-serif; color:#222222; }}
-    .email-wrapper {{ width:100%; background-color:#f4f4f5; padding:24px 0; }}
-    .email-container {{ max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:8px; overflow:hidden; }}
-    .email-heading {{ background-color:#111827; padding:24px 32px; text-align:center; }}
-    .email-heading h1 {{ margin:0; color:#ffffff; font-size:20px; letter-spacing:0.5px; }}
-    .email-heading p {{ margin:4px 0 0; color:#9ca3af; font-size:12px; }}
-    .email-body {{ padding:32px; }}
-    .email-title {{ margin:0 0 16px; font-size:18px; color:#111827; }}
-    .email-main {{ font-size:15px; line-height:1.6; color:#374151; }}
-    .email-end-note {{ margin-top:24px; font-size:14px; color:#374151; }}
-    .email-footer {{ padding:20px 32px; background-color:#f9fafb; text-align:center; font-size:12px; color:#6b7280; }}
-    .email-footer p {{ margin:4px 0; }}
-    .email-footer a {{ color:#6b7280; text-decoration:underline; }}
-    @media only screen and (max-width:600px) {{
-        .email-container {{ width:100% !important; border-radius:0 !important; }}
-        .email-heading, .email-body, .email-footer {{ padding-left:20px !important; padding-right:20px !important; }}
-        .email-title {{ font-size:16px !important; }}
-        .email-main {{ font-size:14px !important; }}
-    }}
-</style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{About.project_name}</title>
+    <style>
+        body {{ margin:0; padding:0; background-color:#f4f4f5; font-family: Arial, Helvetica, sans-serif; color:#222222; }}
+        .email-wrapper {{ width:100%; background-color:#f4f4f5; padding:24px 0; }}
+        .email-container {{ max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:8px; overflow:hidden; }}
+        .email-heading {{ background-color:#111827; padding:24px 32px; text-align:center; }}
+        .email-heading h1 {{ margin:0; color:#ffffff; font-size:20px; letter-spacing:0.5px; }}
+        .email-heading p {{ margin:4px 0 0; color:#9ca3af; font-size:12px; }}
+        .email-body {{ padding:32px; }}
+        .email-title {{ margin:0 0 16px; font-size:18px; color:#111827; }}
+        .email-main {{ font-size:15px; line-height:1.6; color:#374151; }}
+        .email-end-note {{ margin-top:24px; font-size:14px; color:#374151; }}
+        .email-footer {{ padding:20px 32px; background-color:#f9fafb; text-align:center; font-size:12px; color:#6b7280; }}
+        .email-footer p {{ margin:4px 0; }}
+        .email-footer a {{ color:#6b7280; text-decoration:underline; }}
+        @media only screen and (max-width:600px) {{
+            .email-container {{ width:100% !important; border-radius:0 !important; }}
+            .email-heading, .email-body, .email-footer {{ padding-left:20px !important; padding-right:20px !important; }}
+            .email-title {{ font-size:16px !important; }}
+            .email-main {{ font-size:14px !important; }}
+        }}
+    </style>
 </head>
 <body>
-<div class="email-wrapper">
-    <table role="presentation" class="email-container" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td class="email-heading">
-            <h1>{About.project_name}</h1>
-            <p>{header_extra or About.project_cachphrase}</p>
-        </td></tr>
-        <tr><td class="email-body">
-            <h2 class="email-title">{title}</h2>
-            <div class="email-main">{main_content}</div>
-            {f'<p class="email-end-note">{end_note}</p>' if end_note else ''}
-        </td></tr>
-        <tr><td class="email-footer">
-            <p>No longer want this kind of email? <a href="{unsubscribe_url}">Unsubscribe</a></p>
-            {f'<p>{preference_note}</p>' if preference_note else ''}
-            <p>Questions? Reach us at <a href="mailto:support@abureport.com.ng">support@abureport.com.ng</a></p>
-        </td></tr>
-    </table>
-</div>
+    <div class="email-wrapper">
+        <table role="presentation" class="email-container" width="100%" cellpadding="0" cellspacing="0">
+            <tr><td class="email-heading">
+                <h1>{About.project_name}</h1>
+                <p>{header_extra or About.project_cachphrase}</p>
+            </td></tr>
+            <tr><td class="email-body">
+                <h2 class="email-title">{title}</h2>
+                <div class="email-main">{main_content}</div>
+                {f'<p class="email-end-note">{end_note}</p>' if end_note else ''}
+            </td></tr>
+            <tr><td class="email-footer">
+                <p>No longer want this kind of email? <a href="{unsubscribe_url}">Unsubscribe</a></p>
+                {f'<p>{preference_note}</p>' if preference_note else ''}
+                <p>Questions? Reach us at <a href="mailto:support@abureport.com.ng">support@abureport.com.ng</a></p>
+            </td></tr>
+        </table>
+    </div>
 </body>
 </html>"""
 
 
 def _dispatch_email(receiver, subject, html_message):
     """
-    SINGLE exit point for handing a fully-built email off to be sent.
-    NO PROVIDER WIRED YET: this only logs the decoy send (subject + the full
-    prepared html) so the flow is testable end to end. Swap the body of the
-    try block for a real provider call once one is picked -- nothing else in
-    this file needs to change.
-
     Never raises: any failure here is caught and logged, so an undecided or
     broken mail step can never break the request that triggered it.
     """
     try:
-        info_logger(msg=f"EMAIL (DECOY SEND): to={receiver} | subject={subject}\n{html_message}")
+        if getattr(settings, 'DEBUG'):from_email = "noreply@resend.dev" 
+        else:from_email = "noreply@abureport.com.ng" 
+        params = {
+            "from": f"{About.project_name} <{from_email}>",
+            "to": [receiver],
+            "subject": subject,
+            "html": html_message,
+        }
+        resend.Emails.send(params)
+        info_logger(msg=f"EMAIL: dispatched to {receiver} subject={subject}")
     except Exception as exc:
         error_logger(msg=f"EMAIL SEND FAILED: to={receiver} subject={subject} error={exc}")
-
-
-def _base_email(sender, receiver, message=None, html_message=None):
-    "TODO: Create a html like with reusable component (head - Project identity), body: house content, footer-contact support details with no marketing advert"
-    info_logger(msg=f"{sender} Sent A mail To {receiver}.")
-
 
 """
 ------------------------------------------------------------
@@ -141,15 +136,15 @@ def _try_send_login_email(user: object):
         f"<p>We noticed a new login to your {About.project_name} account ({user.email}). "
         "If this was you, no action is needed.</p>"
         "<p>If you don't recognise this activity, reset your password as soon as possible.</p>"
+        
     )
     html_message = _build_email_html(
         title="Login Alert",
         main_content=main_content,
-        end_note=f"Stay safe,<br>{About.project_name} Team",
+        end_note=f"You receive this mail becAUSE you have 'receive alert' toggeled on in your profile. Stay safe,<br>{About.project_name} Team",
         unsubscribe_query=f"type=login_alert&email={quote(user.email)}",
     )
     _dispatch_email(user.email, subject, html_message)
-    info_logger(msg=f"EMAIL: successfully sent login alert to {user.email} as they have reminder enabled in their account")
 
 
 def _try_send_password_reset_email(user: object, reset_link: str):

@@ -315,10 +315,7 @@ html[data-theme="dark"] .icon-moon { display: block; }
 /* ---------- Hero carousel ---------- */
 .hero { position: relative; overflow: hidden; background: var(--nav-bg); border-bottom-left-radius: 25px;}
 .hero-track { position: relative; height: 75vh; min-height: 400px; max-height: 640px; background: var(--nav-bg); }
-@media (max-width:899px) {
-
-    .hero-track { position: relative; height: 56vh;min-height: 0;max-height: none; background: var(--nav-bg);}
-}
+@media (max-width:899px) {.hero-track { position: relative; height: 53vh;min-height: 0;max-height: none; background: var(--nav-bg);}}
 .hero-slide {
   position: absolute; inset: 0; background-image: var(--slide-image); background-size: cover; background-position: center;
   background-color: var(--nav-bg);
@@ -711,7 +708,8 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .story-body {
   overflow-wrap: anywhere;
-  max-width: 100%; font-size: 1.04rem; line-height: 1.82; color: var(--ink);
+  max-width: 100%; font-size: 1.04rem; line-height: 1.82; color: var(--ink
+  );
 }
 .story-body > p,
 .story-body > ul,

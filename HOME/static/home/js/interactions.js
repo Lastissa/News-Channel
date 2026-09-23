@@ -179,7 +179,7 @@
           field first was sending an empty "email" to the view every time. */
       var body = new FormData(newsletterForm);
 
-      statusEl.textContent = "We Will Send You Latest Collection. Login To Filter Categories of news";
+      statusEl.textContent = "Suscribed.";
       statusEl.className = "newsletter-status is-ok";
       submitBtn.disabled = true;
       emailInput.value = "";
