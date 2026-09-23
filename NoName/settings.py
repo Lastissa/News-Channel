@@ -165,3 +165,8 @@ CLOUDINARY_API_SECRET = os.getenv('cloudinary_api_secret')
 IMAGE_UPLOAD_MAX_MB = int(os.getenv('image_upload_max_mb', 4))
 
 RESEND_API_KEY = os.getenv('resend_api_key')
+
+#   STORY VIEW ALERTS: staff with StaffProfile.get_blog_notification on get
+#   an email every N views their own story crosses (see BLOG.views.StoryDetailView
+#   and SERVICE_INTERNAL.email_single._try_send_story_views_alert_email).
+STORY_VIEWS_ALERT_INTERVAL = int(os.getenv('story_views_alert_interval', 5))

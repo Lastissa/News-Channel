@@ -192,6 +192,32 @@ def _try_send_password_reset_success_email(user: object):
     info_logger(msg=f"EMAIL: password reset success notice sent to {user.email}")
 
 
+def _try_send_story_views_alert_email(user: object, blog: object):
+    """
+    Notifies a staff author that one of their stories just crossed another
+    STORY_VIEWS_ALERT_INTERVAL views. The caller (BLOG.views.StoryDetailView)
+    is responsible for checking the StaffProfile 'get_blog_notification'
+    preference and the interval before calling this -- this function only
+    builds and sends.
+    """
+    subject = f"Your story just crossed {blog.views} views"
+    main_content = (
+        "<p>Hi,</p>"
+        f"<p>Your story <strong>{blog.heading}</strong> on {About.project_name} just reached "
+        f"<strong>{blog.views}</strong> views.</p>"
+        f'<p><a href="{About.domain}/story/{blog.pk}/">View the story</a></p>'
+    )
+    html_message = _build_email_html(
+        title="Story Views Alert",
+        main_content=main_content,
+        end_note=f"Keep up the great work,<br>{About.project_name} Team",
+        unsubscribe_query=f"type=story_views_alert&email={quote(user.email)}",
+        preference_note="You can turn these alerts off from your profile settings at any time.",
+    )
+    _dispatch_email(user.email, subject, html_message)
+    info_logger(msg=f"EMAIL: story views alert sent to {user.email} for blog={blog.pk} views={blog.views}")
+
+
 def _try_send_newsletter_subscribe_email(email: str):
     """
     Confirms a newsletter subscription for an anonymous visitor who used the

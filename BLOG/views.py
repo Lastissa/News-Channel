@@ -1,6 +1,7 @@
 import html
 import re
 
+from django.conf import settings
 from django.db.models import F, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -9,6 +10,7 @@ from django.views import View
 
 from AUTHENTICATION.models import Auth
 from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, info_logger, is_rate_limited, set_cache
+from SERVICE_INTERNAL.email_single import _try_send_story_views_alert_email
 from STAFF.models import AuthorFollow, StaffProfile
 from .models import Blog, Comment
 
@@ -158,6 +160,10 @@ class StoryDetailView(View):
         Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
         blog.refresh_from_db(fields=["views"])
 
+        alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
+        if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
+            _try_send_story_views_alert_email(blog.author, blog)
+
         if request.user.is_authenticated:
             # THROUGH LET ME ACCESS THE BG MODEL THAT DJANGO CREATE FOR M2M
             already = Blog.non_anonymous_viewer.through.objects.filter(
@@ -189,7 +195,7 @@ class StoryDetailView(View):
         og_descr = re.split(r'\n\s*\n', blog.content.strip(), maxsplit=1)[0]
         og_descr = og_descr.lstrip('#')
         for chars in ['**', '__']:og_descr = og_descr.replace(chars, '')
-        if len(og_descr) > 250: og_descr = og_descr[:250]
+        if len(og_descr) > 400: og_descr = og_descr[:400]
         context = {
             "blog": blog,
             'excerp': og_descr,

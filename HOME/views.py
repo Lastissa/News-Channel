@@ -27,6 +27,7 @@ from SERVICE_INTERNAL.abstract import (
     notify_admins_account_deleted,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig
+from SERVICE_INTERNAL.email_batch import _try_send_new_story_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
@@ -350,7 +351,9 @@ class AddNewsView(View):
                 {"detail": "You already have a story with this exact heading in this category. Edit the heading or choose a different category."},
                 status=400,
             )
-            "TODO: Send Email Alert to all followers + people that have not followers informing them of the latest news, the footer should contain a btn that the viewer can opt out of that email by simply turning off their"
+
+        _try_send_new_story_batch_email(blog)
+
         return _response(
             {"detail": "Story published.", "story_url": f"/story/{blog.pk}/", "id": blog.pk},
             status=201,
@@ -372,13 +375,16 @@ class NewsletterSubscribeView(View):
             unit = "second" if remaining_time == 1 else "seconds"
             return _response({"detail": f"Too many requests. Try again in {remaining_time} {unit}."}, status=429)
 
-        email = request.POST.get("email", '').strip()
+        if request.user.is_authenticated:
+            email = request.user.email
+        else:
+            email = request.POST.get("email", '').strip()
 
         if not email or "@" not in email:
             return _response({"detail": "Invalid email address."}, status=400)
 
         user_model = get_user_model()
-        existing = user_model.objects.filter(email__iexact=email).first()
+        existing = request.user if request.user.is_authenticated else user_model.objects.filter(email__iexact=email).first()
         if existing is not None:
             if not existing.send_newsletter:
                 existing.send_newsletter = True
@@ -441,6 +447,9 @@ class ProfileSendNewsletterToggleView(View):
         new_state = not bool(getattr(request.user, "send_newsletter", False))
         request.user.send_newsletter = new_state
         request.user.save(update_fields=["send_newsletter"])
+
+        if new_state:
+            _try_send_newsletter_subscribe_email(request.user.email)
 
         return JsonResponse(
             {
