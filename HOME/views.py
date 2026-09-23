@@ -27,6 +27,7 @@ from SERVICE_INTERNAL.abstract import (
     notify_admins_account_deleted,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig
+from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
@@ -379,11 +380,13 @@ class NewsletterSubscribeView(View):
             if not existing.send_newsletter:
                 existing.send_newsletter = True
                 existing.save(update_fields=["send_newsletter"])
+                _try_send_newsletter_subscribe_email(email)
                 return _response({"detail": "Nesletter now active for this user."}, status=200)
             return _response({"detail": "You've already susbribed before."}, status=400)
 
         user_model.objects.create_user(email=email, password=self.STARTER_PASSWORD, send_newsletter=True)
         info_logger( msg = f"NEWSLETTER SIGNUP: {email} subscribed, account created")
+        _try_send_newsletter_subscribe_email(email)
         return _response({"detail": "Welcome Odogwu."}, status=201)
 
 

@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from SERVICE_INTERNAL.abstract import _response, is_rate_limited
 from SERVICE_INTERNAL.config import About
-from SERVICE_INTERNAL.email_single import _try_send_login_email, _try_send_password_reset_email
+from SERVICE_INTERNAL.email_single import _try_send_login_email, _try_send_password_reset_email, _try_send_password_reset_success_email
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +306,7 @@ class PasswordResetView(View):
         #   are wiped, so this exact link can never reset anything again.
         reset_row.delete()
         info_logger(logger, msg=f"PASSWORD RESET: {user.email} updated their password through a reset link")
+        _try_send_password_reset_success_email(user)
 
         messages.success(request, "Password updated. You can now sign in with your new password.")
         return redirect("auth:login")

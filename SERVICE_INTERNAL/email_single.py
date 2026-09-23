@@ -1,62 +1,219 @@
 """
 ------------------------------------------------------------
-#   SEND SINGLE EMAIL ONLY SECTION  
+#   SEND SINGLE EMAIL ONLY SECTION
 ------------------------------------------------------------
+NO EXTERNAL MAIL PROVIDER WIRED YET (see project memory: provider is still
+undecided). Every "send" below only builds the full email (subject + html)
+and hands it to info_logger as a decoy so the flow stays testable. Once a
+provider is chosen, only `_dispatch_email` needs to change to actually place
+the call -- nothing else in this file talks to a provider directly.
+
+Layout rule: `_build_email_html` is the ONLY place that builds HEAD, BODY or
+FOOTER markup. No other function in this file (or elsewhere) should hand-roll
+part of the template -- every "prefilled" sender below just supplies content
+to that one method.
 """
 
-from SERVICE_INTERNAL.abstract import info_logger
-import resend
-from django.conf import settings
+from urllib.parse import quote
 
-resend.api_key = getattr(settings, 'RESEND_API_KEY')
+from SERVICE_INTERNAL.abstract import info_logger, error_logger
+from SERVICE_INTERNAL.config import About
 
-def _sendSingleMail(receiver, subject, html_message = None, message = None, sender='noreply', wait = False):
+
+def _build_email_html(title, main_content, end_note="", header_extra="", unsubscribe_query="", preference_note=""):
     """
-    TODO:SET IT TO ASYNC MODE BEFORE PROD
+    THE single source of truth for every outgoing email's markup: HEADING,
+    BODY and FOOTER all come from this one method, so no email in the
+    project ever drifts from this layout.
+
+    title              : formal-letter style heading for the body, e.g. "Login Alert"
+    main_content       : the actual message. Small HTML (<p>, <br>, <a>) is fine.
+    end_note           : closing line of the body, e.g. "Stay safe, AbuReport Team"
+    header_extra       : optional line under the project name in the heading
+                         (defaults to the project catchphrase)
+    unsubscribe_query  : query string appended to the unsubscribe link so the
+                         receiving view knows what to switch off, e.g.
+                         "type=login_alert&email=jane%40mail.com"
+    preference_note    : optional extra footer line (e.g. a link to manage
+                         preferences generally, not just unsubscribe)
+
+    Mobile vs desktop: the layout is a single fluid table capped at 600px, so
+    desktop clients get the boxed card while the @media block below drops the
+    side padding and shrinks type once the viewport goes under 600px -- same
+    html, no separate render path.
     """
-    domain='support@resend.dev'
-    if wait:
-        """WAIT FOR RESPONSE AND DO NOT FIRE AND FORGET"""
-    
-params = {
-    # "from": "Testing <newme@abureport.com.ng>",
-    "from": "Testing <newme@resend.dev>",
-    "to": ["lastissa11@gmail.com"],
-    "subject": "hello world",
-    "html": "<strong>it works!</strong>",
-}
+    unsubscribe_url = f"{About.domain}/unsubscribe/?{unsubscribe_query}" if unsubscribe_query else f"{About.domain}/unsubscribe/"
 
-# email = resend.Emails.send(params)
-# print(email)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{About.project_name}</title>
+<style>
+    body {{ margin:0; padding:0; background-color:#f4f4f5; font-family: Arial, Helvetica, sans-serif; color:#222222; }}
+    .email-wrapper {{ width:100%; background-color:#f4f4f5; padding:24px 0; }}
+    .email-container {{ max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:8px; overflow:hidden; }}
+    .email-heading {{ background-color:#111827; padding:24px 32px; text-align:center; }}
+    .email-heading h1 {{ margin:0; color:#ffffff; font-size:20px; letter-spacing:0.5px; }}
+    .email-heading p {{ margin:4px 0 0; color:#9ca3af; font-size:12px; }}
+    .email-body {{ padding:32px; }}
+    .email-title {{ margin:0 0 16px; font-size:18px; color:#111827; }}
+    .email-main {{ font-size:15px; line-height:1.6; color:#374151; }}
+    .email-end-note {{ margin-top:24px; font-size:14px; color:#374151; }}
+    .email-footer {{ padding:20px 32px; background-color:#f9fafb; text-align:center; font-size:12px; color:#6b7280; }}
+    .email-footer p {{ margin:4px 0; }}
+    .email-footer a {{ color:#6b7280; text-decoration:underline; }}
+    @media only screen and (max-width:600px) {{
+        .email-container {{ width:100% !important; border-radius:0 !important; }}
+        .email-heading, .email-body, .email-footer {{ padding-left:20px !important; padding-right:20px !important; }}
+        .email-title {{ font-size:16px !important; }}
+        .email-main {{ font-size:14px !important; }}
+    }}
+</style>
+</head>
+<body>
+<div class="email-wrapper">
+    <table role="presentation" class="email-container" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td class="email-heading">
+            <h1>{About.project_name}</h1>
+            <p>{header_extra or About.project_cachphrase}</p>
+        </td></tr>
+        <tr><td class="email-body">
+            <h2 class="email-title">{title}</h2>
+            <div class="email-main">{main_content}</div>
+            {f'<p class="email-end-note">{end_note}</p>' if end_note else ''}
+        </td></tr>
+        <tr><td class="email-footer">
+            <p>No longer want this kind of email? <a href="{unsubscribe_url}">Unsubscribe</a></p>
+            {f'<p>{preference_note}</p>' if preference_note else ''}
+            <p>Questions? Reach us at <a href="mailto:support@abureport.com.ng">support@abureport.com.ng</a></p>
+        </td></tr>
+    </table>
+</div>
+</body>
+</html>"""
 
-def _base_email(sender, receiver, message = None, html_message = None):
+
+def _dispatch_email(receiver, subject, html_message):
+    """
+    SINGLE exit point for handing a fully-built email off to be sent.
+    NO PROVIDER WIRED YET: this only logs the decoy send (subject + the full
+    prepared html) so the flow is testable end to end. Swap the body of the
+    try block for a real provider call once one is picked -- nothing else in
+    this file needs to change.
+
+    Never raises: any failure here is caught and logged, so an undecided or
+    broken mail step can never break the request that triggered it.
+    """
+    try:
+        info_logger(msg=f"EMAIL (DECOY SEND): to={receiver} | subject={subject}\n{html_message}")
+    except Exception as exc:
+        error_logger(msg=f"EMAIL SEND FAILED: to={receiver} subject={subject} error={exc}")
+
+
+def _base_email(sender, receiver, message=None, html_message=None):
     "TODO: Create a html like with reusable component (head - Project identity), body: house content, footer-contact support details with no marketing advert"
     info_logger(msg=f"{sender} Sent A mail To {receiver}.")
 
 
+"""
+------------------------------------------------------------
+#   PREFILLED SENDERS -- each just supplies content to _build_email_html
+#   and hands the result to _dispatch_email. No template markup here.
+------------------------------------------------------------
+"""
+
+
 def _try_send_login_email(user: object):
     """
-    Receives the user queryset and look for the login alert
-    if found, send email, else just comot eye
-    #   LOGGER ALREADY SET UP
+    Receives the user queryset and looks for the login alert preference.
+    If enabled, prepares and "sends" the login success email; else logs why
+    nothing was sent.
     """
-    
-    if user.receive_email_login_alert:
-        #send mail
-        email = resend.Emails.send(params)
-        print(email)
-        info_logger(msg=f"EMAIL: successfully sent login alert to {user.email} as they have reminder enanbled in their account")
-    else:
+    if not getattr(user, "receive_email_login_alert", False):
         info_logger(msg=f"LOGIN ALERT: {user.email} logged in but no login alert was sent as they have it disabled")
+        return
+
+    subject = f"New login to your {About.project_name} account"
+    main_content = (
+        "<p>Hi,</p>"
+        f"<p>We noticed a new login to your {About.project_name} account ({user.email}). "
+        "If this was you, no action is needed.</p>"
+        "<p>If you don't recognise this activity, reset your password as soon as possible.</p>"
+    )
+    html_message = _build_email_html(
+        title="Login Alert",
+        main_content=main_content,
+        end_note=f"Stay safe,<br>{About.project_name} Team",
+        unsubscribe_query=f"type=login_alert&email={quote(user.email)}",
+    )
+    _dispatch_email(user.email, subject, html_message)
+    info_logger(msg=f"EMAIL: successfully sent login alert to {user.email} as they have reminder enabled in their account")
 
 
 def _try_send_password_reset_email(user: object, reset_link: str):
     """
-    Receives the user and the freshly generated reset link and "sends" it.
-    NO EXTERNAL MAIL PLATFORM IS WIRED YET, so the mail is printed to the
-    terminal, same as the login alert above. The printed line carries the
-    full link so the flow stays testable during development.
+    Receives the user and the freshly generated reset link and prepares the
+    password-reset-request email.
     """
-    info_logger(msg=f"EMAIL (DUMMY, PRINTED TO TERMINAL): password reset requested for {user.email}")
+    subject = f"Reset your {About.project_name} password"
+    main_content = (
+        "<p>Hi,</p>"
+        f"<p>We received a request to reset the password on your account ({user.email}).</p>"
+        f'<p><a href="{reset_link}">Click here to reset your password</a></p>'
+        "<p>If you didn't request this, you can safely ignore this email -- your password won't change.</p>"
+    )
+    html_message = _build_email_html(
+        title="Password Reset Requested",
+        main_content=main_content,
+        end_note=f"{About.project_name} Team",
+        unsubscribe_query=f"type=password_reset&email={quote(user.email)}",
+    )
+    _dispatch_email(user.email, subject, html_message)
+    info_logger(msg=f"EMAIL: password reset requested for {user.email}")
     info_logger(msg=f"RESET LINK for {user.email}: {reset_link}")
-    
+
+
+def _try_send_password_reset_success_email(user: object):
+    """
+    Confirms a password was just changed through the reset flow. Sent right
+    after the new password is saved, so the account owner has a record even
+    if they didn't make the change themselves.
+    """
+    subject = f"Your {About.project_name} password was changed"
+    main_content = (
+        "<p>Hi,</p>"
+        f"<p>This confirms the password on your account ({user.email}) was just changed.</p>"
+        "<p>If you made this change, no action is needed. If you didn't, contact us immediately.</p>"
+    )
+    html_message = _build_email_html(
+        title="Password Changed",
+        main_content=main_content,
+        end_note=f"{About.project_name} Team",
+        unsubscribe_query=f"type=password_reset&email={quote(user.email)}",
+    )
+    _dispatch_email(user.email, subject, html_message)
+    info_logger(msg=f"EMAIL: password reset success notice sent to {user.email}")
+
+
+def _try_send_newsletter_subscribe_email(email: str):
+    """
+    Confirms a newsletter subscription for an anonymous visitor who used the
+    footer signup on the base page. `email` is a plain string here since no
+    user object is guaranteed to exist yet at the call site.
+    """
+    subject = f"You're subscribed to {About.project_name}"
+    main_content = (
+        "<p>Hi,</p>"
+        f"<p>You're now subscribed to news updates from {About.project_name}.</p>"
+        "<p>We'll only email you when there's something worth reading.</p>"
+    )
+    html_message = _build_email_html(
+        title="Subscription Confirmed",
+        main_content=main_content,
+        end_note=f"Welcome aboard,<br>{About.project_name} Team",
+        unsubscribe_query=f"type=newsletter&email={quote(email)}",
+    )
+    _dispatch_email(email, subject, html_message)
+    info_logger(msg=f"EMAIL: newsletter subscribe confirmation sent to {email}")
