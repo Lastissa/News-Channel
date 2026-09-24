@@ -117,3 +117,8 @@
   {% endif %}
 </section>
 {% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<meta name="yandex-verification" content="1093315bd8192b90" />
+{% endblock extra_head %}

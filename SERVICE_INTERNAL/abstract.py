@@ -13,7 +13,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-debug_base = True
+from django.conf import settings
+debug_base = getattr(settings, "DEBUG", False)
 def get_client_ip(request)-> str:
     """Return the client IP using X-Forwarded-For when available."""
     if request is None:

@@ -140,7 +140,7 @@ class BingIndexNowView(View):
 class YandexIndexNow(View):
     """YANDEX SAY MALE I PUT AM FOR INDEXING ON THEIR OWN SIDE"""
     def get(self, request):
-        return render(request, "yandex_1093315bd8192b90.html ")
+        return render(request, "yandex_1093315bd8192b90.html")
 
 
 def _bookmarked_ids(user):
