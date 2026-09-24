@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Sign in | {{ project_name }}{% endblock %}
-{% block meta_description %}Sign in to {{ project_name }} Login to bookmark stories, track updates, and manage your reading list.{% endblock %}
+{% block meta_description %}Sign in to {{ project_name }}. Login to bookmark stories, track updates, and manage your reading list.{% endblock %}
 
 {% block content %}
 <div class="auth-shell auth-shell-login">
@@ -13,8 +13,8 @@
 
   <div class="auth-panel">
     <div class="auth-header">
-      <p class="auth-kicker">Welcome back</p>
-      <h1>Sign in</h1>
+      {% comment %} <p class="auth-kicker">Welcome back</p> {% endcomment %}
+      <h1>Sign in to AbuReport</h1>
     </div>
 
     <form method="post" class="auth-form" novalidate data-auth-form data-server-error="{{ error|escapejs }}">

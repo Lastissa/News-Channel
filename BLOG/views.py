@@ -2,6 +2,7 @@ import html
 import re
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import F, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -9,7 +10,7 @@ from django.urls import reverse
 from django.views import View
 
 from AUTHENTICATION.models import Auth
-from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, info_logger, is_rate_limited, set_cache
+from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, error_logger, get_cache, info_logger, is_rate_limited, set_cache
 from SERVICE_INTERNAL.email_single import _try_send_story_views_alert_email
 from STAFF.models import AuthorFollow, StaffProfile
 from .models import Blog, Comment
@@ -130,6 +131,102 @@ def build_ticker_text(content):
     return " * ".join(cleaned_blocks)
 
 
+VIEW_COUNT_TTL = 600  # 10 minutes
+
+
+def _increment_view_counter(blog_pk):
+    """Buffer view counts in cache instead of hitting the DB on every request."""
+    key = f"views:blog:{blog_pk}"
+    current = cache.get(key) or 0
+    cache.set(key, current + 1, timeout=VIEW_COUNT_TTL)
+    # Track active keys so FlushViewCountsView can iterate without raw SCAN
+    index = cache.get("views:blog:index") or set()
+    index.add(key)
+    cache.set("views:blog:index", index, timeout=VIEW_COUNT_TTL + 100)
+
+
+def _check_and_send_views_alert(blog_pk):
+    """After a flush, check whether the cumulative view count has crossed an
+    alert-interval threshold and send the author's notification email if so.
+    Failures are non-fatal — the flush must not be disrupted by email issues.
+
+    Respects ``StaffProfile.get_blog_notification`` — only sends if the author
+    has opted in to blog-view alerts.
+    """
+    try:
+        blog = Blog.objects.filter(pk=blog_pk).select_related("author__staffprofile").first()
+        if not blog:
+            return
+        views = blog.views or 0
+        alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 100)
+        if alert_interval <= 0 or views <= 0 or views % alert_interval != 0:
+            return
+        # Respect the per-author notification preference
+        try:
+            wants_alert = blog.author.staffprofile.get_blog_notification
+        except StaffProfile.DoesNotExist:
+            wants_alert = False
+        if wants_alert:
+            _try_send_story_views_alert_email(user=blog.author, blog=blog)
+    except Exception as e:
+        error_logger(msg=f"VIEWS-ALERT-FAIL blog {blog_pk}: {e}")
+
+
+class FlushViewCountsView(View):
+    """Drain Redis view-count buffers into the DB.
+
+    Authorisation: staff session OR ``X-Flush-Secret`` header matching
+    ``settings.FLUSH_SECRET``.  Returns 403 for all other callers.
+    Returns JSON ``{"flushed": <n>}`` on success.
+    """
+
+    def post(self, request):
+        flush_secret = getattr(settings, "FLUSH_SECRET", "")
+        caller_secret = request.headers.get("X-Flush-Secret", "")
+        is_authorised = (
+            (request.user.is_authenticated and request.user.is_staff)
+            or (flush_secret and caller_secret == flush_secret)
+        )
+        if not is_authorised:
+            return JsonResponse({"detail": "Forbidden."}, status=403)
+
+        index: set = cache.get("views:blog:index") or set()
+        flushed = 0
+        failed_keys = set()
+
+        for key in index:
+            # Extract PK from key pattern "views:blog:<pk>"
+            try:
+                blog_pk = int(key.split(":")[-1])
+            except (ValueError, IndexError):
+                info_logger(msg=f"FLUSH-SKIP: unrecognised key format '{key}'")
+                continue
+
+            delta = cache.get(key) or 0
+            if delta == 0:
+                continue
+
+            try:
+                Blog.objects.filter(pk=blog_pk).update(views=F("views") + delta)
+                cache.delete(key)
+                flushed += 1
+                _check_and_send_views_alert(blog_pk)
+            except Exception as e:
+                # Extend the TTL so counts keep accumulating until next flush
+                cache.set(key, delta, timeout=600)
+                failed_keys.add(key)
+                error_logger(msg=f"FLUSH-FAIL blog {blog_pk}: {e}")
+
+        # Clean up the index, keeping only keys that failed so they are
+        # retried on the next flush call.
+        if failed_keys:
+            cache.set("views:blog:index", failed_keys, timeout=700)
+        else:
+            cache.delete("views:blog:index")
+
+        return JsonResponse({"flushed": flushed}, status=200)
+
+
 class StoryDetailView(View):
     def get(self, request, blog_id):
         blog = cache_or_run(f"blog-{blog_id}", lambda: Blog.objects.filter(pk=blog_id).select_related("author__staffprofile").first(), timeout=100)
@@ -157,12 +254,7 @@ class StoryDetailView(View):
         author_recent_stories = Blog.objects.filter(author=blog.author).exclude(pk=blog.pk).order_by("-date_created")[:3]
 
 
-        Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
-        blog.refresh_from_db(fields=["views"])
-
-        alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
-        if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
-            _try_send_story_views_alert_email(blog.author, blog)
+        _increment_view_counter(blog.pk)
 
         if request.user.is_authenticated:
             # THROUGH LET ME ACCESS THE BG MODEL THAT DJANGO CREATE FOR M2M

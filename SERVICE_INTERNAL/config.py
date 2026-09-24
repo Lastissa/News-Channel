@@ -5,7 +5,7 @@ from django.conf import settings
 
 class About:
     project_name = "AbuReport"
-    project_cachphrase = "Reliable Source, Trusted hands."
+    project_cachphrase = "Reliable Source, Trusted News."
     version = "1.0.0"
 
     #   CANONICAL DOMAIN FOR SEO / SOCIAL PREVIEWS / STRUCTURED DATA / EMAIL LINKS.

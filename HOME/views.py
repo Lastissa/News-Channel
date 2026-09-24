@@ -98,12 +98,15 @@ class SitemapXmlView(View):
             {"loc": f"{domain}{reverse('home:promote')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
         ]
 
-        stories = Blog.objects.only("id", "date_created").order_by("-date_created")[:2000]
+        stories = Blog.objects.only("id", "date_created", "last_updated").order_by("-date_created")[:2000]
         for story in stories:
+            last_mod = story.last_updated or story.date_created
+            if story.date_created and (not last_mod or story.date_created > last_mod):
+                last_mod = story.date_created
             urls.append(
                 {
                     "loc": f"{domain}{reverse('blog:story_detail', args=[story.id])}",
-                    "lastmod": story.date_created.date().isoformat(),
+                    "lastmod": last_mod.date().isoformat() if last_mod else "",
                     "changefreq": "weekly",
                     "priority": "0.8",
                 }
@@ -134,7 +137,12 @@ class BingIndexNowView(View):
     """BING SAY TO INDEX RIGHT AWAY, THIS HELPS"""
     def get(self, request):
         return render(request, '28499029458943a79b9877afdefa8212.txt')
-    
+class YandexIndexNow(View):
+    """YANDEX SAY MALE I PUT AM FOR INDEXING ON THEIR OWN SIDE"""
+    def get(self, request):
+        return render(request, "yandex_1093315bd8192b90.html ")
+
+
 def _bookmarked_ids(user):
     if not user.is_authenticated:
         return set()
@@ -350,7 +358,6 @@ class AddNewsView(View):
                 {"detail": "You already have a story with this exact heading in this category. Edit the heading or choose a different category."},
                 status=400,
             )
-            "TODO: Send Email Alert to all followers + people that have not followers informing them of the latest news, the footer should contain a btn that the viewer can opt out of that email by simply turning off their"
         return _response(
             {"detail": "Story published.", "story_url": f"/story/{blog.pk}/", "id": blog.pk},
             status=201,
