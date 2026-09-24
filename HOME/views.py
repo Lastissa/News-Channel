@@ -1055,3 +1055,8 @@ class ProfileDeleteAccountView(View):
             "error": error,
         }
         return context
+
+class UnsubscribeView(View):
+    "TODO: Handle unsuscribe logic for when user want to stop receving email click"
+    def get(self, request):
+        return render(request, 'HOME/unsubscribe.html')

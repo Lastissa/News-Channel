@@ -16,10 +16,16 @@ from SERVICE_INTERNAL.config import About
 
 from django.conf import settings
 
+from concurrent.futures import ThreadPoolExecutor
+#FOR THE ASYNC LIKE IN PROD SINCE USING NORMAL THREADING IS HEAVY AND I CANNOT AFFORD A 8MB
+_EMAIL_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="email-send")
+
+
 resend.api_key = getattr(settings, 'RESEND_API_KEY', 'abcdef')
 
 def _build_email_html(title, main_content, end_note="", header_extra="", unsubscribe_query="", preference_note=""):
     """
+    NB: SETTING unsubscribe_query AS NONE MEAN THERE WILL NO BE UNSUSCRIBE URL IN THE EMAIL
     THE single source of truth for every outgoing email's markup: HEADING,
     BODY and FOOTER all come from this one method, so no email in the
     project ever drifts from this layout.
@@ -83,7 +89,7 @@ def _build_email_html(title, main_content, end_note="", header_extra="", unsubsc
                 {f'<p class="email-end-note">{end_note}</p>' if end_note else ''}
             </td></tr>
             <tr><td class="email-footer">
-                <p>No longer want this kind of email? <a href="{unsubscribe_url}">Unsubscribe</a></p>
+                {f'<p>No longer want this kind of email? <a href="{unsubscribe_url}">Unsubscribe</a></p>' if unsubscribe_query else ''}
                 {f'<p>{preference_note}</p>' if preference_note else ''}
                 <p>Questions? Reach us at <a href="mailto:support@abureport.com.ng">support@abureport.com.ng</a></p>
             </td></tr>
@@ -93,24 +99,31 @@ def _build_email_html(title, main_content, end_note="", header_extra="", unsubsc
 </html>"""
 
 
-def _dispatch_email(receiver, subject, html_message):
+def _dispatch_email(receiver, subject, html_message, no_async=None):
     """
     Never raises: any failure here is caught and logged, so an undecided or
     broken mail step can never break the request that triggered it.
+    TODO: divide email into two version, one for async and one for normal. THE ASYN SHOULD FIRE ALWAYS UNLESS A PARAM SAYING no_async=True is passed in the function 
     """
-    try:
-        if getattr(settings, 'DEBUG'):from_email = "noreply@resend.dev" 
-        else:from_email = "noreply@abureport.com.ng" 
-        params = {
-            "from": f"{About.project_name} <{from_email}>",
-            "to": [receiver],
-            "subject": subject,
-            "html": html_message,
-        }
-        resend.Emails.send(params)
-        info_logger(msg=f"EMAIL: dispatched to {receiver} subject={subject}")
-    except Exception as exc:
-        error_logger(msg=f"EMAIL SEND FAILED: to={receiver} subject={subject} error={exc}")
+    def _send():
+        try:
+            if getattr(settings, 'DEBUG'):from_email = "noreply@resend.dev" 
+            else:from_email = "noreply@abureport.com.ng" 
+            
+            
+            params = {
+                "from": f"{About.project_name} <{from_email}>",
+                # 'to':"lastissa11@gmail.com", # change this is in for @resend.dev email domain as resedn no go colllect normal emailm except this
+                "to": [receiver],
+                "subject": subject,
+                "html": html_message,
+            }
+            resend.Emails.send(params)
+            info_logger(msg=f"EMAIL: dispatched to {receiver} subject={subject}")
+        except Exception as exc:
+            error_logger(msg=f"EMAIL SEND FAILED: to={receiver} subject={subject} error={exc}")
+    if no_async:_send()
+    else:_EMAIL_EXECUTOR.submit(_send)
 
 """
 ------------------------------------------------------------
@@ -166,8 +179,6 @@ def _try_send_password_reset_email(user: object, reset_link: str):
         unsubscribe_query=f"type=password_reset&email={quote(user.email)}",
     )
     _dispatch_email(user.email, subject, html_message)
-    info_logger(msg=f"EMAIL: password reset requested for {user.email}")
-    info_logger(msg=f"RESET LINK for {user.email}: {reset_link}")
 
 
 def _try_send_password_reset_success_email(user: object):
@@ -228,13 +239,13 @@ def _try_send_newsletter_subscribe_email(email: str):
     main_content = (
         "<p>Hi,</p>"
         f"<p>You're now subscribed to news updates from {About.project_name}.</p>"
-        "<p>We'll only email you when there's something worth reading.</p>"
+        "<p>We'll only email you when there's something worth reading. Please Follow Authors so we can further tailor the kind of stories you get</p>"
     )
     html_message = _build_email_html(
         title="Subscription Confirmed",
         main_content=main_content,
-        end_note=f"Welcome aboard,<br>{About.project_name} Team",
-        unsubscribe_query=f"type=newsletter&email={quote(email)}",
+        end_note=f"Welcome aboard,You received this mail because you just signed up for our newsletter. If it was a mistake, click the unsuscribe button below so we wont send you any new story email. We do nt like spamming people. <br>{About.project_name} Team",
+        unsubscribe_query=None,
     )
     _dispatch_email(email, subject, html_message)
     info_logger(msg=f"EMAIL: newsletter subscribe confirmation sent to {email}")
@@ -253,13 +264,13 @@ def _try_send_staff_welcome_email(user: object, password: str, full_name: str = 
         f"<p>{greeting}</p>"
         f"<p>An account has been created for you on {About.project_name}. Here are your login details:</p>"
         f"<p>Email: <strong>{user.email}</strong><br>Password: <strong>{password}</strong></p>"
-        f'<p><a href="{About.domain}/login/">Log in here</a> and change your password once you\'re in.</p>'
+        f'<p><a href="{About.domain}/login/">Log in here</a> and change your password once you\'re in to ehnace security</p>'
     )
     html_message = _build_email_html(
         title="Welcome to the Team",
         main_content=main_content,
         end_note=f"Welcome aboard,<br>{About.project_name} Team",
-        unsubscribe_query=f"type=staff_welcome&email={quote(user.email)}",
+        unsubscribe_query=None,
     )
     _dispatch_email(user.email, subject, html_message)
     info_logger(msg=f"EMAIL: staff welcome credentials sent to {user.email}")
