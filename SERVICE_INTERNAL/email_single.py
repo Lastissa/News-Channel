@@ -113,8 +113,8 @@ def _dispatch_email(receiver, subject, html_message, no_async=None):
             
             params = {
                 "from": f"{About.project_name} <{from_email}>",
-                # 'to':"lastissa11@gmail.com", # change this is in for @resend.dev email domain as resedn no go colllect normal emailm except this
-                "to": [receiver],
+                'to':"lastissa11@gmail.com", # change this is in for @resend.dev email domain as resedn no go colllect normal emailm except this
+                # "to": [receiver],
                 "subject": subject,
                 "html": html_message,
             }
