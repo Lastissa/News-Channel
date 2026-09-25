@@ -19,12 +19,12 @@ class About:
     )
     
     #   SOCIALS     -   public / group / hanNDLES
-    facebook = ""
+    facebook = "https://web.facebook.com/profile.php?id=61584712490692"
     instagram = ""
     linkedin = ""
-    whatsapp = "https://whatsapp.com/channel/0029Vb6h9AHVvTUfxoSvS2p"
+    whatsapp = "https://www.whatsapp.com/channel/0029Vb6h94AHVvTUfxoSvS2p"
     tweeter = "https://x.com/ABUSUAD01/"
-    contact_email = "hello@abureport.ng"
+    contact_email = "@shaefalaap.resend.app"
 
     #   CONTACTS - personal / one to one /consultancy
     email = "marketing@gmail.com"
