@@ -165,11 +165,11 @@ def build_ticker_text(content):
 
 
 class StoryDetailView(View):
-    def get(self, request, blog_id):
-        blog = cache_or_run(f"blog-{blog_id}", lambda: Blog.objects.filter(pk=blog_id).select_related("author__staffprofile").first(), timeout=100)
+    def get(self, request, blog_slug):
+        blog = cache_or_run(f"blog-{blog_slug}", lambda: Blog.objects.filter(slug=blog_slug).select_related("author__staffprofile").first(), timeout=100)
         if blog is None:
             return render(
-                request,"blog/story_404.html",{"blog_id": blog_id, "decoy_content": STORY_404_CONTENT},status=404,)
+                request,"blog/story_404.html",{"blog_id": blog_slug, "decoy_content": STORY_404_CONTENT},status=404,)
             
         blog_content = parse_story_content(blog.content)
         ticker_text = build_ticker_text(blog.content)
@@ -215,7 +215,9 @@ class StoryDetailView(View):
             blog.author.is_staff or blog.author.is_admin or blog.author.is_superuser
         )
         author_portfolio_url = (
-            reverse("staff:portfolio", args=[blog.author_id]) if author_has_portfolio else ""
+            reverse("staff:portfolio", args=[author_profile.slug])
+            if author_has_portfolio and author_profile and author_profile.slug
+            else ""
         )
         is_following_author = bool(
             author_has_portfolio
@@ -326,7 +328,7 @@ class CommentCreateView(View):
         comment = Comment.objects.create(blog=blog, author=user, content=content)
         if _is_ajax(request):
             return JsonResponse({"detail": "Comment posted.", "comment_id": comment.id, "comment_count": blog.comments.count(), "content": comment.content}, status=201)
-        return redirect("blog:story_detail", blog_id=blog.pk)
+        return redirect("blog:story_detail", blog_slug=blog.slug)
 
 
 class CommentDeleteView(View):
@@ -342,10 +344,11 @@ class CommentDeleteView(View):
             return JsonResponse({"detail": "You can only delete your own comment."}, status=403)
 
         blog_id = comment.blog_id
+        blog_slug = comment.blog.slug
         comment.delete()
         if _is_ajax(request):
             return JsonResponse({"detail": "Comment deleted.", "comment_count": Comment.objects.filter(blog_id=blog_id).count()}, status=200)
-        return redirect("blog:story_detail", blog_id=blog_id)
+        return redirect("blog:story_detail", blog_slug=blog_slug)
 
 
 class CommentLikeView(View):

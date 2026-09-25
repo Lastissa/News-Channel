@@ -2,7 +2,7 @@
 
 {% for post in page_obj.object_list %}
 <article class="story-card">
-  <a class="story-card-media" href="{% url 'blog:story_detail' post.id %}" tabindex="-1">
+  <a class="story-card-media" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1">
     <img src="{{ post.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="abureport news placeholder image" loading="lazy">
   </a>
   <div class="story-card-body">
@@ -11,7 +11,7 @@
       <span class="meta-divider" aria-hidden="true"></span>
       <span class="meta-time">{{ post.date_created|timesince }} ago</span>
     </div>
-    <h3 class="story-card-title"><a href="{% url 'blog:story_detail' post.id %}">{{ post.heading }}</a></h3>
+    <h3 class="story-card-title"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h3>
     <p class="story-card-excerpt">{{ post.content|truncatewords:22 }}</p>
     <div class="story-card-footer">
       <span class="story-card-byline">{{ post.author.staffprofile.full_name|slice:":20"|default:"UNKNOWN" }}</span>

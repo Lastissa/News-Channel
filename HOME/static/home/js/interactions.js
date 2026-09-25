@@ -819,6 +819,9 @@
         }
         detailText = parts.join(" \u2022 ");
       }
+      /* item.url is always sent by the server as a slug-based /story/<slug>/
+         link; item.blog_id only remains as a raw numeric fallback so an
+         older cached payload without "url" doesn't render a dead link. */
       var actions = '<a href="' + (item.url || '/story/' + item.blog_id + '/') + '">' + linkLabel + '</a>';
       if (config === PROFILE_LISTS.bookmark) {
         actions += '<button type="button" class="profile-bookmark-toggle" data-bookmark-btn data-endpoint="/bookmark/' + item.blog_id + '/" data-saved="true" aria-pressed="true" aria-label="Remove bookmark" title="Remove bookmark">' +

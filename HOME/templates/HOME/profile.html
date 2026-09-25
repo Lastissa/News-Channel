@@ -8,7 +8,13 @@
 {% block content %}
 <section class="profile-shell">
   <div class="profile-header-bar">
-    <h1> <a href="/portfolio/{{request.user.id}}">Profile</a></h1>
+    <h1>
+      {% if profile and profile.slug %}
+        <a href="{% url 'staff:portfolio' profile.slug %}">Profile</a>
+      {% else %}
+        Profile
+      {% endif %}
+    </h1>
     <div class="profile-header-actions">
       {% if is_admin_user %}
         <a href="{% url 'control:staff_create' %}" class="profile-add-news-link">+ Staff</a>
@@ -310,7 +316,7 @@
                   <small>{{ blog.views }} view{{ blog.views|pluralize }} &bull; {{ blog.date_created|date:"M d, Y" }}</small>
                 </div>
                 <div class="published-story-actions">
-                  <a href="{% url 'blog:story_detail' blog.id %}">Open</a>
+                  <a href="{% url 'blog:story_detail' blog.slug %}">Open</a>
                   <form method="post" action="{% url 'home:profile_published_delete' blog.id %}" data-published-story-delete-form data-endpoint="{% url 'home:profile_published_delete' blog.id %}">
                     {% csrf_token %}
                     <button type="submit" class="published-story-delete-btn" aria-label="Delete {{ blog.heading }}" title="Delete story">
@@ -369,7 +375,7 @@
                   <small>{{ bookmark.created_at|date:"M d, Y" }}</small>
                 </div>
                 <div class="profile-bookmark-actions">
-                  <a href="{% url 'blog:story_detail' bookmark.blog_id %}">Open</a>
+                  <a href="{% url 'blog:story_detail' bookmark.blog.slug %}">Open</a>
                   <button type="button" class="profile-bookmark-toggle" data-bookmark-btn data-endpoint="{% url 'home:bookmark' bookmark.blog_id %}" data-saved="true" aria-pressed="true" aria-label="Remove {{ bookmark.blog.heading }} from bookmarks" title="Rem BookMark">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                       <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4-6.5 4V4.5a1 1 0 0 1 1-1Z" fill="var(--nav-bg)" />
@@ -422,7 +428,7 @@
                 <strong>{{ blog.heading }}</strong>
                 <small>{{ blog.date_created|date:"M d, Y" }}</small>
               </div>
-              <a href="{% url 'blog:story_detail' blog.id %}">Open</a>
+              <a href="{% url 'blog:story_detail' blog.slug %}">Open</a>
             </li>
             {% endfor %}
           </ul>
@@ -468,7 +474,7 @@
                 <strong>{{ comment.blog.heading }}</strong>
                 <small>{{ comment.content|truncatechars:85 }}</small>
               </div>
-              <a href="{% url 'blog:story_detail' comment.blog_id %}">View</a>
+              <a href="{% url 'blog:story_detail' comment.blog.slug %}">View</a>
             </li>
             {% endfor %}
           </ul>

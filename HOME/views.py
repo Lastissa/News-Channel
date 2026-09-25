@@ -93,35 +93,39 @@ class SitemapXmlView(View):
     def get(self, request):
         domain = About.domain.rstrip("/")
         urls = [
-            {"loc": f"{domain}/", "lastmod": "2026-09-25", "changefreq": "hourly", "priority": "1.0"},
+            {"loc": f"{domain}/", "lastmod": "", "changefreq": "hourly", "priority": "1.0"},
             {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": "", "changefreq": "yearly", "priority": "0.3"},
             {"loc": f"{domain}{reverse('home:promote')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
         ]
 
-        stories = Blog.objects.only("id", "date_created", "last_updated").order_by("-date_created")[:2000]
+        stories = Blog.objects.exclude(slug__isnull=True).exclude(slug="").only(
+            "id", "slug", "date_created", "last_updated"
+        ).order_by("-date_created")[:2000]
         for story in stories:
             last_mod = story.last_updated or story.date_created
             if story.date_created and (not last_mod or story.date_created > last_mod):
                 last_mod = story.date_created
             urls.append(
                 {
-                    "loc": f"{domain}{reverse('blog:story_detail', args=[story.id])}",
+                    "loc": f"{domain}{reverse('blog:story_detail', args=[story.slug])}",
                     "lastmod": last_mod.date().isoformat() if last_mod else "",
                     "changefreq": "weekly",
                     "priority": "0.8",
                 }
             )
 
-        authors = (
-            Auth.objects.filter(is_active=True)
-            .filter(Q(is_staff=True) | Q(is_admin=True) | Q(is_superuser=True))
-            .only("id")
-            .order_by("id")
+        profiles = (
+            StaffProfile.objects.filter(auth__is_active=True)
+            .filter(Q(auth__is_staff=True) | Q(auth__is_admin=True) | Q(auth__is_superuser=True))
+            .exclude(slug__isnull=True)
+            .exclude(slug="")
+            .only("id", "slug")
+            .order_by("slug")
         )
-        for author in authors:
+        for profile in profiles:
             urls.append(
                 {
-                    "loc": f"{domain}{reverse('staff:portfolio', args=[author.id])}",
+                    "loc": f"{domain}{reverse('staff:portfolio', args=[profile.slug])}",
                     "lastmod": "",
                     "changefreq": "weekly",
                     "priority": "0.6",
@@ -359,7 +363,7 @@ class AddNewsView(View):
                 status=400,
             )
         return _response(
-            {"detail": "Story published.", "story_url": f"/story/{blog.pk}/", "id": blog.pk},
+            {"detail": "Story published.", "story_url": reverse("blog:story_detail", args=[blog.slug]), "id": blog.pk},
             status=201,
         )
 
@@ -590,7 +594,7 @@ class ProfileBookmarksView(View):
                 "blog_id": bookmark.blog_id,
                 "heading": bookmark.blog.heading,
                 "created_at": bookmark.created_at.isoformat(),
-                "url": f"/blog/{bookmark.blog_id}/",
+                "url": reverse("blog:story_detail", args=[bookmark.blog.slug]),
             }
             for bookmark in page.object_list
         ]
@@ -630,7 +634,7 @@ class ProfileHistoryView(View):
                 "blog_id": blog.id,
                 "heading": blog.heading,
                 "date_created": blog.date_created.isoformat(),
-                "url": f"/blog/{blog.id}/",
+                "url": reverse("blog:story_detail", args=[blog.slug]),
             }
             for blog in page.object_list
         ]
@@ -670,7 +674,7 @@ class ProfileCommentsView(View):
                 "blog_id": comment.blog_id,
                 "heading": comment.blog.heading,
                 "excerpt": Truncator(comment.content).chars(85),
-                "url": f"/blog/{comment.blog_id}/",
+                "url": reverse("blog:story_detail", args=[comment.blog.slug]),
             }
             for comment in page.object_list
         ]
@@ -785,7 +789,7 @@ class ProfilePublishedView(View):
                 "heading": blog.heading,
                 "views": blog.views,
                 "date_created": blog.date_created.isoformat(),
-                "url": f"/story/{blog.id}/",
+                "url": reverse("blog:story_detail", args=[blog.slug]),
             }
             for blog in page.object_list
         ]

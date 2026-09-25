@@ -12,13 +12,13 @@
       <div class="hero-scrim"></div>
       <div class="hero-content">
         <p class="hero-label"><span class="dot"></span>Featured story</p>
-        <h1 class="hero-headline"><a href="{% url 'blog:story_detail' post.id %}">{{ post.heading }}</a></h1>
+        <h1 class="hero-headline"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h1>
         {% comment %} i comment it out bcos its good for only by email@domain.com  not staff full name {% endcomment %}
           <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }}</p>
         <div class="hero-actions">
-          <a class="glass-btn" href="{% url 'blog:story_detail' post.id %}" target="_self">Read story</a>
+          <a class="glass-btn" href="{% url 'blog:story_detail' post.slug %}" target="_self">Read story</a>
           <button type="button" class="glass-btn glass-btn-outline glass-btn-icon"
-                  data-share-btn data-share-url="{{ site_domain }}{% url 'blog:story_detail' post.id %}"
+                  data-share-btn data-share-url="{{ site_domain }}{% url 'blog:story_detail' post.slug %}"
                    data-copy-extra="
 {{post.heading}}
 

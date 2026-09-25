@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.text import slugify
 
 GENDER_CHOICES = [
     ('M', 'Male'),
@@ -17,6 +18,10 @@ class StaffProfile(models.Model):
     auth = models.OneToOneField("AUTHENTICATION.Auth", on_delete=models.CASCADE, related_name="staffprofile")
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     full_name = models.CharField(max_length=100, blank=True)
+    #   SEO/GEO URL SLUG. GENERATED ONCE FROM `full_name` THE FIRST TIME THIS
+    #   PROFILE IS SAVED (SEE save() BELOW). REPLACES THE OLD /portfolio/<id>/
+    #   NUMERIC PATH WITH A DESCRIPTIVE /portfolio/<full-name>/ PATH.
+    slug = models.SlugField(max_length=150, blank=True, null=True, unique=True)
     twitter_handle = models.URLField(blank=True, null=True)
     whatsapp_handle = models.URLField(blank=True, null=True)
     facebook_handle = models.URLField(blank=True, null=True)
@@ -31,6 +36,27 @@ class StaffProfile(models.Model):
     class Meta:
         verbose_name = "Staff profile"
         verbose_name_plural = "Staff profiles"
+
+    def save(self, *args, **kwargs):
+        """Generate `slug` once, the first time this profile is saved.
+
+        Slug is `slugify(full_name)` (e.g. "portfolio/jane-doe/"). If that
+        base is already taken by another staff member, a short numeric
+        suffix ("jane-doe-2") is appended so every profile still gets a
+        working, unique URL. Once set it is never regenerated on later
+        saves, so an already shared/indexed portfolio link never breaks.
+        """
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        if is_new and not self.slug:
+            base = slugify(self.full_name) or f"staff-{self.pk}"
+            candidate = base
+            suffix = 2
+            while StaffProfile.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
+                candidate = f"{base}-{suffix}"
+                suffix += 1
+            StaffProfile.objects.filter(pk=self.pk).update(slug=candidate)
+            self.slug = candidate
 
     def __str__(self):
         return f"{self.auth.email} + {self.full_name}"

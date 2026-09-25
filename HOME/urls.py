@@ -26,6 +26,6 @@ urlpatterns = [
     path("bookmark/<int:blog_id>/", views.BookmarkView.as_view(), name="bookmark"),
     path("newsletter/", views.NewsletterSubscribeView.as_view(), name="newsletter"),
     path("privacy-policy/", views.PrivacyPolicyView.as_view(), name="privacy_policy"),
-    path("promote/", views.PromoteView.as_view(), name="promote"),
+    path("promote-your-bussiness/", views.PromoteView.as_view(), name="promote"),
 ]
 

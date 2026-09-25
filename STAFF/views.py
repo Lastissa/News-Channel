@@ -49,6 +49,21 @@ def _portfolio_author_or_404(author_id):
     return author
 
 
+def _portfolio_profile_or_404(author_slug):
+    """Slug based lookup for the public portfolio URL. Only an active staff
+    level account with a profile slug has a portfolio; anything else 404s
+    exactly like a missing page."""
+    profile = (
+        StaffProfile.objects.filter(slug=author_slug, auth__is_active=True)
+        .filter(Q(auth__is_staff=True) | Q(auth__is_admin=True) | Q(auth__is_superuser=True))
+        .select_related("auth")
+        .first()
+    )
+    if profile is None:
+        raise Http404("This author does not have a portfolio.")
+    return profile
+
+
 def _display_name(profile, author):
     """The portfolio username: the staff full name when set, otherwise the
     email local part, mirroring blog.author_name."""
@@ -243,9 +258,9 @@ def _reader_response(author, total_views, total_likes):
 class PortfolioView(View):
     """The staff portfolio page a staff member can submit for jobs."""
 
-    def get(self, request, author_id):
-        author = _portfolio_author_or_404(author_id)
-        profile = StaffProfile.objects.filter(auth=author).first()
+    def get(self, request, author_slug):
+        profile = _portfolio_profile_or_404(author_slug)
+        author = profile.auth
 
         display_name = _display_name(profile, author)
         bio = (profile.bio or "").strip() if profile else ""
@@ -272,7 +287,7 @@ class PortfolioView(View):
 
         stories = list(
             Blog.objects.filter(author=author)
-            .only("id", "heading", "category", "views", "likes", "date_created")
+            .only("id", "slug", "heading", "category", "views", "likes", "date_created")
             .order_by("-date_created")[:PORTFOLIO_STORY_LIMIT]
         )
         highest_recent_views = max((story.views for story in stories), default=0)
@@ -284,7 +299,7 @@ class PortfolioView(View):
         rhythm = {"columns": [], "window_total": 0, "peak": 0}
         reader_response = []
         if story_count:
-            top_story = Blog.objects.filter(author=author).only("id", "heading", "views").order_by("-views", "-date_created").first()
+            top_story = Blog.objects.filter(author=author).only("id", "slug", "heading", "views").order_by("-views", "-date_created").first()
             coverage, readership = _coverage_and_readership(author, story_count, stats["total_views"])
             rhythm = _publishing_rhythm(author)
             reader_response = _reader_response(author, stats["total_views"], stats["total_likes"])

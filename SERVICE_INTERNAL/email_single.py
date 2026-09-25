@@ -216,7 +216,7 @@ def _try_send_story_views_alert_email(user: object, blog: object):
         "<p>Hi,</p>"
         f"<p>Your story <strong>{blog.heading}</strong> on {About.project_name} just reached "
         f"<strong>{blog.views}</strong> views.</p>"
-        f'<p><a href="{About.domain}/story/{blog.pk}/">View the story</a></p>'
+        f'<p><a href="{About.domain}/story/{blog.slug}/">View the story</a></p>'
     )
     html_message = _build_email_html(
         title="Story Views Alert",

@@ -203,7 +203,7 @@
                 <strong>{{ blog.heading }}</strong>
                 <small>{{ blog.views }} view{{ blog.views|pluralize }} &bull; {{ blog.date_created|date:"M d, Y" }}</small>
               </div>
-              <a href="{% url 'blog:story_detail' blog.id %}">Open</a>
+              <a href="{% url 'blog:story_detail' blog.slug %}">Open</a>
             </li>
             {% endfor %}
           </ul>

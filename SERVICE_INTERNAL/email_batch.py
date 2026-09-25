@@ -96,7 +96,7 @@ def _try_send_new_story_batch_email(blog: object):
         return
 
     subject = f"New story from {blog.author_name} on {About.project_name}"
-    story_url = f"{About.domain}/story/{blog.pk}/"
+    story_url = f"{About.domain}/story/{blog.slug}/"
 
     def build_html_for(email):
         main_content = (

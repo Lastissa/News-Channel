@@ -183,7 +183,7 @@
       <dt>Most viewed story</dt>
       {% if top_story %}
         <dd>{{ top_story.views|floatformat:"0g" }}</dd>
-        <small class="stat-story-title"><a href="{% url 'blog:story_detail' top_story.id %}" title="{{ top_story.heading }}">{{ top_story.heading }}</a></small>
+        <small class="stat-story-title"><a href="{% url 'blog:story_detail' top_story.slug %}" title="{{ top_story.heading }}">{{ top_story.heading }}</a></small>
       {% else %}
         <dd>None yet</dd>
         <small>No stories published yet</small>
@@ -240,7 +240,7 @@
           {% for story in stories %}
             <li>
               <div class="reach-copy">
-                <a href="{% url 'blog:story_detail' story.id %}" class="portfolio-story-link">{{ story.heading }}</a>
+                <a href="{% url 'blog:story_detail' story.slug %}" class="portfolio-story-link">{{ story.heading }}</a>
                 <small><span class="tag tag-mini">{{ story.get_category_display|title }}</span><time datetime="{{ story.date_created|date:'Y-m-d' }}">{{ story.date_created|date:"M d, Y" }}</time></small>
               </div>
               <div class="reach-metrics">

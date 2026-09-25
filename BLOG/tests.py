@@ -46,7 +46,7 @@ __Please note:__
         self.assertIn('<strong>Important update</strong>', html)
         self.assertIn('<em>Please note:</em>', html)
 
-        response = self.client.get(f"/story/{blog.id}/")
+        response = self.client.get(f"/story/{blog.slug}/")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Views")
@@ -193,7 +193,7 @@ class Bug1ViewCountUnitExplorationTest(TestCase):
 
         # Capture all DB queries during the view call
         with CaptureQueriesContext(connection) as ctx:
-            StoryDetailView.as_view()(request, blog_id=blog.pk)
+            StoryDetailView.as_view()(request, blog_slug=blog.slug)
 
         # --- Assertion 1: Redis counter was set ---
         redis_key = f"views:blog:{blog.pk}"
@@ -271,7 +271,7 @@ class Bug1ViewCountPBTExplorationTest(HypothesisTestCase):
         request = _make_anonymous_request(blog.pk)
 
         with CaptureQueriesContext(connection) as ctx:
-            StoryDetailView.as_view()(request, blog_id=blog.pk)
+            StoryDetailView.as_view()(request, blog_slug=blog.slug)
 
         redis_key = f"views:blog:{blog.pk}"
         counter_value = cache.get(redis_key)
@@ -345,7 +345,7 @@ class Bug1PreservationContextTest(TestCase):
         author = _make_staff_with_profile(email="preserve_anon@example.com")
         blog = _make_blog(author, heading="Preservation anon test article")
 
-        response = self.client.get(f"/story/{blog.pk}/")
+        response = self.client.get(f"/story/{blog.slug}/")
 
         self.assertEqual(response.status_code, 200)
 
@@ -374,7 +374,7 @@ class Bug1PreservationContextTest(TestCase):
         blog = _make_blog(author, heading="Preservation auth test article")
 
         self.client.force_login(author)
-        response = self.client.get(f"/story/{blog.pk}/")
+        response = self.client.get(f"/story/{blog.slug}/")
 
         self.assertEqual(response.status_code, 200)
 
@@ -403,7 +403,7 @@ class Bug1PreservationContextTest(TestCase):
         blog = _make_blog(author, heading="Preservation viewer tracking article")
 
         self.client.force_login(author)
-        self.client.get(f"/story/{blog.pk}/")
+        self.client.get(f"/story/{blog.slug}/")
 
         is_tracked = Blog.non_anonymous_viewer.through.objects.filter(
             blog=blog, auth=author
@@ -459,7 +459,7 @@ class Bug1PreservationContextPBTTest(HypothesisTestCase):
         blog = _make_blog(author, heading=f"PBT preservation anon article {seed}")
 
         request = _make_anonymous_request(blog.pk)
-        response = StoryDetailView.as_view()(request, blog_id=blog.pk)
+        response = StoryDetailView.as_view()(request, blog_slug=blog.slug)
 
         self.assertEqual(
             response.status_code,
@@ -471,7 +471,7 @@ class Bug1PreservationContextPBTTest(HypothesisTestCase):
         # using TemplateResponse; use the test client path for context inspection.
         # Re-run via test client to inspect context keys.
         self.client.logout()
-        tc_response = self.client.get(f"/story/{blog.pk}/")
+        tc_response = self.client.get(f"/story/{blog.slug}/")
         self.assertEqual(tc_response.status_code, 200)
 
         mandatory_keys = ["blog", "blog_content_html", "ticker_text", "comments", "author_profile"]
@@ -512,7 +512,7 @@ class Bug1PreservationContextPBTTest(HypothesisTestCase):
         blog = _make_blog(author, heading=f"PBT preservation auth article {seed}")
 
         self.client.force_login(author)
-        response = self.client.get(f"/story/{blog.pk}/")
+        response = self.client.get(f"/story/{blog.slug}/")
 
         self.assertEqual(
             response.status_code,

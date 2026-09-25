@@ -132,7 +132,7 @@ def _published_rows(blog_list):
             "blog_id": blog.id,
             "heading": blog.heading,
             "detail": f"{blog.views} view{'' if blog.views == 1 else 's'} \u2022 {blog.date_created:%b %d, %Y}",
-            "url": reverse("blog:story_detail", args=[blog.id]),
+            "url": reverse("blog:story_detail", args=[blog.slug]),
         }
         for blog in blog_list
     ]

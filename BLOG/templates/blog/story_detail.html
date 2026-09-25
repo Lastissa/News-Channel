@@ -234,7 +234,7 @@
         <div class="story-grid">
           {% for story in author_recent_stories %}
             <article class="story-card">
-              <a class="story-card-media" href="{% url 'blog:story_detail' story.id %}" tabindex="-1">
+              <a class="story-card-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1">
                 <img src="{{ story.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
               </a>
               <div class="story-card-body">
@@ -243,7 +243,7 @@
                   <span class="meta-divider" aria-hidden="true"></span>
                   <span class="meta-time">{{ story.date_created|timesince }} ago</span>
                 </div>
-                <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.id %}">{{ story.heading }}</a></h3>
+                <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
                 <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
               </div>
             </article>
