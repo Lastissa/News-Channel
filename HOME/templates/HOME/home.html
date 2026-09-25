@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
+{% load format_copy_btn %}
 {% block content %}
 {% static 'home_no_bg.svg' as placeholder %}
 {% if not is_filtered %}
@@ -19,6 +19,13 @@
           <a class="glass-btn" href="{% url 'blog:story_detail' post.id %}" target="_self">Read story</a>
           <button type="button" class="glass-btn glass-btn-outline glass-btn-icon"
                   data-share-btn data-share-url="{{ site_domain }}{% url 'blog:story_detail' post.id %}"
+                   data-copy-extra="
+{{post.heading}}
+
+{{post.content | filter_copy_btn_text}}
+
+Aritucluated by {{post.author.staffprofile.full_name}}
+"
                   aria-label="Copy link to this story" title="Copy link to this story">
             <svg viewBox="0 0 24 24" class="share-icon" aria-hidden="true">
               <circle cx="18" cy="5" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>

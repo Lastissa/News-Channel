@@ -27,7 +27,7 @@ class About:
     contact_email = "@shaefalaap.resend.app"
 
     #   CONTACTS - personal / one to one /consultancy
-    email = "marketing@gmail.com"
+    email = "@shaefalaap.resend.app"
     whatsapp_dm = "https://wa.me.09031394284"
     mobile = "+234xxxxxxxxxxxx"
     

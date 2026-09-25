@@ -8,9 +8,10 @@
   --pf-c4: #5b6b7c;
   --pf-c5: #9fe9f6;
   --pf-other: #c3cdd8;
-
-  width: min(1180px, calc(100% - 24px));
-  margin: 16px auto 0;
+width: 100vw;
+  /* width: min(1180px, calc(100% - 24px)); moved to only desktop */
+  /* margin: 16px auto 0; */ /*before the default v1 margin moved to only desktop*/
+  margin: 0;
   padding-bottom: 48px;
 }
 
@@ -930,6 +931,8 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 /* ---------- Wider screens: 12 column structure ---------- */
 @media (min-width: 720px) {
   .portfolio-shell {
+    width: min(1180px, calc(100% - 24px)); 
+    margin: 16px auto 0;
     margin-top: 24px;
     padding-bottom: 56px;
   }

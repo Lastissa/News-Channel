@@ -93,7 +93,7 @@ class SitemapXmlView(View):
     def get(self, request):
         domain = About.domain.rstrip("/")
         urls = [
-            {"loc": f"{domain}/", "lastmod": "", "changefreq": "hourly", "priority": "1.0"},
+            {"loc": f"{domain}/", "lastmod": "2026-09-25", "changefreq": "hourly", "priority": "1.0"},
             {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": "", "changefreq": "yearly", "priority": "0.3"},
             {"loc": f"{domain}{reverse('home:promote')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
         ]

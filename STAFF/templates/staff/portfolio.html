@@ -10,7 +10,7 @@
   <meta name="author" content="{{ display_name }} ({{ author.email }})">
   <meta property="og:type" content="profile">
   <meta property="og:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
-  <meta property="og:description" content="{{ meta_description }}">
+  <meta property="og:description" content="{{ meta_description }}. {{ stats.story_count }} stories. {{stats.total_views}} Views.">
   <meta property="profile:username" content="{{ display_name }}">
   {% if staff_image %}
     <meta property="og:image" content="{{ staff_image }}">
@@ -312,7 +312,7 @@
         <header class="portfolio-card-head">
           <div>
             <h2>Readership</h2>
-            <p>Where the views come from, by category.</p>
+            <p>Views by category.</p>
           </div>
           <span class="tag portfolio-section-tag">Audience</span>
         </header>

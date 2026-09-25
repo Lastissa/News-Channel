@@ -149,9 +149,12 @@
     var btn = event.target.closest("[data-share-btn]");
     if (!btn) return;
     event.preventDefault();
-    var url = btn.dataset.shareUrl;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(function () {
+ var extra = btn.dataset.copyExtra || "";
+  var url = btn.dataset.shareUrl || "";
+  var text = extra ? url + "\n\n" + extra : url;
+  
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
         toast("Link copied.");
       }).catch(function () {
         toast("Could not copy link.", "error");
