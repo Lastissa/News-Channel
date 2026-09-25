@@ -1064,3 +1064,155 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 
 
+
+/* ---------- Newsletter popup (bottom sheet) ---------- */
+/* Anonymous-only, dismissible subscribe prompt. No full-screen backdrop on
+   purpose -- the rest of the page stays usable underneath, which is what
+   keeps this "not by force". Slides up from below the viewport and back
+   down again; JS only ever toggles the .is-visible class. */
+.newsletter-popup {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 260; /* above the fab-stack (200), below toast/auth layers (300+) */
+  display: flex;
+  justify-content: center;
+  padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+  visibility: hidden;
+  font-weight: bold;
+}
+.newsletter-popup-card {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 520px;
+  background: var(--surface);
+  border: 4px double red;
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
+  box-shadow: var(--shadow-raised);
+  padding: 18px 18px calc(16px + env(safe-area-inset-bottom, 0px));
+  position: relative;
+  transform: translateY(115%);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.newsletter-popup.is-visible {
+  visibility: visible;
+}
+.newsletter-popup.is-visible .newsletter-popup-card {
+  transform: translateY(0);
+}
+.newsletter-popup-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper-dim);
+  color: red;
+  cursor: pointer;
+}
+.newsletter-popup-close svg { width: 14px; height: 14px; }
+.newsletter-popup-close:hover { color: var(--ink); }
+.newsletter-popup-kicker {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber-deep);
+}
+.newsletter-popup-heading {
+  margin: 0 0 6px;
+  padding-right: 28px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: var(--ink);
+}
+.newsletter-popup-sub {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  color: var(--slate);
+}
+.newsletter-popup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.newsletter-popup-form input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--line);
+  background: var(--input-fill);
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-family: var(--font-body);
+}
+.newsletter-popup-form input:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 1px;
+}
+.newsletter-popup-form input.is-invalid {
+  border-color: var(--danger);
+}
+.newsletter-popup-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.newsletter-popup-cancel {
+  padding: 10px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--slate);
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.newsletter-popup-cancel:hover { color: var(--ink); }
+.newsletter-popup-submit {
+  padding: 10px 20px;
+  border-radius: var(--radius-m);
+  border: none;
+  background: var(--amber);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.newsletter-popup-submit:hover { background: #f4b743; }
+.newsletter-popup-submit:disabled { opacity: 0.6; cursor: default; }
+.newsletter-popup-status {
+  min-height: 1.1em;
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+}
+.newsletter-popup-status.is-ok { color: var(--success); }
+.newsletter-popup-status.is-error { color: var(--danger); }
+
+@media (min-width: 640px) {
+  .newsletter-popup {
+    left: auto;
+    right: 20px;
+    bottom: 20px;
+    padding: 0;
+    justify-content: flex-end;
+  }
+  .newsletter-popup-card {
+    max-width: 380px;
+    border-radius: var(--radius-l);
+    padding: 20px 20px 18px;
+  }
+  .newsletter-popup-form { flex-direction: row; flex-wrap: wrap; }
+  .newsletter-popup-form input { flex: 1 1 auto; min-width: 0; }
+  .newsletter-popup-actions { flex: 0 0 auto; }
+}

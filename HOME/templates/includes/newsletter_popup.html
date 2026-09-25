@@ -1,0 +1,56 @@
+{% load static %}
+{% comment %}
+NEWSLETTER POPUP (bottom sheet).
+
+Anonymous-only, non-blocking subscribe prompt. Included from pages that show
+news (HOME/home.html and blog/story_detail.html), NOT from base.html, so it
+never appears on auth/profile/admin pages.
+
+Optional include params:
+  scroll_target    CSS selector to track reading progress against
+                    (e.g. ".story-body"). Omit/blank to track the whole
+                    page's scroll instead.
+  scroll_threshold  Fraction (0-1) of scroll_target that must be scrolled
+                    past before the popup shows. Defaults to 0.2 (40%).
+
+It is entirely optional for the visitor: a visible close (×) button, a
+"Not now" cancel button, and a line of copy saying so -- no full-screen
+backdrop, the rest of the page stays usable, and dismissing it (or
+subscribing) suppresses it for a while via localStorage. See
+newsletter-popup.js logic in interactions.js.
+{% endcomment %}
+{% if not request.user.is_authenticated %}
+<div class="newsletter-popup"
+     id="newsletter-popup"
+     data-newsletter-popup
+     data-endpoint="{% url 'home:newsletter' %}"
+     data-scroll-target="{{ scroll_target|default:'' }}"
+     data-scroll-threshold="{{ scroll_threshold|default:'0.2' }}"
+     role="dialog"
+     aria-modal="false"
+     aria-labelledby="newsletter-popup-title"
+     aria-hidden="true">
+  <div class="newsletter-popup-card">
+    <button type="button" class="newsletter-popup-close" data-newsletter-popup-close aria-label="Close">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+
+    <div class="newsletter-popup-body">
+      <p class="newsletter-popup-kicker" id="newsletter-popup-title">Stay up to date.</p>
+      <h3 class="newsletter-popup-heading">Get {{ project_name }} Latest Stories Soon As They Are Posted.</h3>
+      <p class="newsletter-popup-sub">Completely optional. Close this anytime and we won't ask again today.</p>
+
+      <form id="newsletter-popup-form" class="newsletter-popup-form" data-newsletter-popup-form novalidate>
+        {% csrf_token %}
+        <label for="newsletter-popup-email" class="visually-hidden">Email address</label>
+        <input type="email" id="newsletter-popup-email" name="email" placeholder="you@example.com" autocomplete="email" required>
+        <div class="newsletter-popup-actions">
+          <button type="button" class="newsletter-popup-cancel" data-newsletter-popup-close>Not now</button>
+          <button type="submit" class="newsletter-popup-submit">Subscribe</button>
+        </div>
+      </form>
+      <p class="newsletter-popup-status" id="newsletter-popup-status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+</div>
+{% endif %}

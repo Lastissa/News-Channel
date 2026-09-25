@@ -319,3 +319,7 @@
   {{ block.super }}
   <script src="{% static 'blog/js/story-ticker.js' %}" defer></script>
 {% endblock %}
+
+{% block newsletter_popup %}
+{% include "includes/newsletter_popup.html" with scroll_target=".story-body" %}
+{% endblock %}

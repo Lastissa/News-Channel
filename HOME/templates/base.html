@@ -7,19 +7,24 @@
     {% csrf_token %}
     <script>
         (function () {
+            /* Default initial theme is LIGHT. We only ever switch to dark when
+               the visitor has explicitly chosen it before (stored in
+               localStorage from a click on the theme toggle). We deliberately
+               do NOT fall back to the OS/browser 'prefers-color-scheme: dark'
+               media query here -- that used to silently boot dark-mode
+               visitors into dark theme on their very first visit and then
+               persist it via the cookie below, which made "light" not
+               actually be the default. */
             try {
                 var stored = localStorage.getItem('abureport-theme');
-                var theme = stored === 'dark' || stored === 'light'
-                    ? stored
-                    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                var theme = (stored === 'dark' || stored === 'light') ? stored : 'light';
                 document.documentElement.setAttribute('data-theme', theme);
                 try {
                     document.cookie = 'abureport-theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
                 } catch (e) {}
             } catch (e) {
                 try {
-                    var fallback = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                    document.documentElement.setAttribute('data-theme', fallback);
+                    document.documentElement.setAttribute('data-theme', 'light');
                 } catch (err) {}
             }
         })();
@@ -73,6 +78,7 @@
     </main>
     {% block footer %}{% include "includes/footer.html" %}{% endblock %}
     {% block floating_social %}{% include "includes/floating_social.html" %}{% endblock %}
+    {% block newsletter_popup %}{% endblock %}
 
     <script src="{% static 'home/js/app.js' %}" defer></script>
     <script src="{% static 'home/js/carousel.js' %}" defer></script>

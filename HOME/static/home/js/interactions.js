@@ -1769,4 +1769,139 @@
         });
     });
   }
+  /* ---------- newsletter popup: bottom-sheet, scroll-triggered, dismissible ---------- */
+  (function () {
+    var popup = document.querySelector("[data-newsletter-popup]");
+    if (!popup) return; // not rendered for this page/user (see newsletter_popup.html)
+
+    var STORAGE_KEY = "abureport-newsletter-popup-state";
+    var DISMISS_MS = 3 * 24 * 60 * 60 * 1000; // re-offer 3 days after a manual dismiss
+    var FALLBACK_DELAY_MS = 8000; // used only when the page can't scroll at all
+
+    function readState() {
+      try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+    }
+    function writeState(value) {
+      try { localStorage.setItem(STORAGE_KEY, value); } catch (e) { /* storage unavailable, ignore */ }
+    }
+
+    var state = readState();
+    if (state === "subscribed") return; // already subscribed, never ask again
+    if (state && state !== "subscribed" && Number(state) > Date.now()) return; // still inside a dismiss cooldown
+
+    var endpoint = popup.dataset.endpoint;
+    var threshold = parseFloat(popup.dataset.scrollThreshold);
+    if (isNaN(threshold) || threshold <= 0 || threshold > 1) threshold = 0.4;
+    var targetSelector = popup.dataset.scrollTarget;
+    var targetEl = targetSelector ? document.querySelector(targetSelector) : null;
+
+    var form = popup.querySelector("[data-newsletter-popup-form]");
+    var emailInput = document.getElementById("newsletter-popup-email");
+    var statusEl = document.getElementById("newsletter-popup-status");
+    var submitBtn = form ? form.querySelector(".newsletter-popup-submit") : null;
+    var shown = false;
+
+    function showPopup() {
+      if (shown) return;
+      shown = true;
+      popup.classList.add("is-visible");
+      popup.setAttribute("aria-hidden", "false");
+      window.removeEventListener("scroll", onScroll);
+    }
+
+    function hidePopup(persistDismiss) {
+      popup.classList.remove("is-visible");
+      popup.setAttribute("aria-hidden", "true");
+      if (persistDismiss) writeState(String(Date.now() + DISMISS_MS));
+    }
+
+    function scrollProgress() {
+      if (targetEl) {
+        var rect = targetEl.getBoundingClientRect();
+        var elTop = rect.top + window.scrollY;
+        var elHeight = targetEl.offsetHeight || 1;
+        return (window.scrollY + window.innerHeight - elTop) / elHeight;
+      }
+      var doc = document.documentElement;
+      var maxScroll = doc.scrollHeight - window.innerHeight;
+      if (maxScroll <= 0) return -1; // page too short to scroll, caller falls back to a timer
+      return window.scrollY / maxScroll;
+    }
+
+    var scrollTicking = false;
+    function onScroll() {
+      if (scrollTicking) return;
+      scrollTicking = true;
+      window.requestAnimationFrame(function () {
+        scrollTicking = false;
+        var progress = scrollProgress();
+        if (progress >= threshold) showPopup();
+      });
+    }
+
+    if (scrollProgress() === -1) {
+      window.setTimeout(showPopup, FALLBACK_DELAY_MS);
+    } else {
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll(); // covers a visitor who is already past the threshold on load
+    }
+
+    popup.querySelectorAll("[data-newsletter-popup-close]").forEach(function (btn) {
+      btn.addEventListener("click", function () { hidePopup(true); });
+    });
+
+    if (emailInput) {
+      emailInput.addEventListener("input", function () {
+        emailInput.classList.remove("is-invalid");
+      });
+    }
+
+    if (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var email = emailInput.value.trim();
+        var validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+        if (!validEmail) {
+          emailInput.classList.add("is-invalid");
+          statusEl.textContent = "Enter a valid email address.";
+          statusEl.className = "newsletter-popup-status is-error";
+          return;
+        }
+
+        var body = new FormData(form);
+        submitBtn.disabled = true;
+        statusEl.textContent = "";
+        statusEl.className = "newsletter-popup-status";
+
+        fetch(endpoint, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+          body: body,
+        })
+          .then(function (response) {
+            return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+          })
+          .then(function (result) {
+            submitBtn.disabled = false;
+            if (result.ok) {
+              statusEl.textContent = extractDetail(result.text, "Subscribed. Check your inbox.");
+              statusEl.className = "newsletter-popup-status is-ok";
+              writeState("subscribed");
+              window.setTimeout(function () { hidePopup(false); }, 1800);
+            } else {
+              emailInput.classList.add("is-invalid");
+              statusEl.textContent = extractDetail(result.text, "Something went wrong.");
+              statusEl.className = "newsletter-popup-status is-error";
+            }
+          })
+          .catch(function () {
+            submitBtn.disabled = false;
+            statusEl.textContent = "Network Error. Please try again.";
+            statusEl.className = "newsletter-popup-status is-error";
+          });
+      });
+    }
+  })();
 })();

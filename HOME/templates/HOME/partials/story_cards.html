@@ -3,7 +3,7 @@
 {% for post in page_obj.object_list %}
 <article class="story-card">
   <a class="story-card-media" href="{% url 'blog:story_detail' post.id %}" tabindex="-1">
-    <img src="{{ post.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+    <img src="{{ post.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="abureport news placeholder image" loading="lazy">
   </a>
   <div class="story-card-body">
     <div class="story-card-meta">
