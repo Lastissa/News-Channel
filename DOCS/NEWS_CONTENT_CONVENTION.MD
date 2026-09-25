@@ -96,6 +96,25 @@ Rule:
 - Use **text** only.
 - Do not create alternate bold syntax for the same task.
 
+### 7) INLINE IMAGES
+
+Any line that starts with imgl or imgr should be treated as an inline, floated image.
+
+Example:
+
+imgl https://a.com/pic.jpg A cat sitting
+imgr https://a.com/pic.jpg A dog running
+
+Rule:
+- The first word on the line is the keyword: imgl or imgr.
+- The second word is the image URL.
+- Everything after the URL, on the same line, is the alt text.
+- imgl floats the image left. imgr floats the image right. In both cases the surrounding paragraph text wraps around the image; it is never rendered as its own full-width block.
+- If no alt text is given after the URL, the parser falls back to the filename taken from the URL. Example: imgl https://a.com/cat.jpg produces alt="cat.jpg".
+- The inline image is always rendered smaller than the page's top-level (hero) image.
+- This token is parsed before headings, bold, and italic, so an image URL or its alt text is never partially consumed by #, **, or __.
+- Do not introduce an alternate syntax for inline images.
+
 ---
 
 ## WRITING STYLE FOR AUTHORS
@@ -111,6 +130,7 @@ Recommended guidance for writers:
 - Start a new line with # for section titles.
 - Paste links normally as full URLs.
 - Use bold or italic only when needed, using the allowed markers.
+- Start a new line with imgl or imgr, followed by the image URL and optional alt text, to place a small inline image that floats left or right.
 
 ---
 
@@ -118,11 +138,12 @@ Recommended guidance for writers:
 
 To avoid conflict, the parser should process content in this order:
 
-1. Detect heading blocks first
-2. Detect unordered and ordered list blocks next
-3. Detect URL links in text
-4. Detect bold and italic inline markup
-5. Treat remaining text as normal paragraphs
+1. Detect inline image tokens (imgl/imgr) first, so their URL and alt text are never consumed by another marker
+2. Detect heading blocks next
+3. Detect unordered and ordered list blocks next
+4. Detect URL links in text
+5. Detect bold and italic inline markup
+6. Treat remaining text as normal paragraphs
 
 This order prevents a line from being misread as ordinary copy when it is actually a heading, list, or link.
 
@@ -138,6 +159,7 @@ This is the most important rule:
 - Italic: __ only
 - Bold: ** only
 - Link: http:// or https:// only
+- Inline image: imgl (left) or imgr (right) only
 
 Do not introduce alternate patterns for the same purpose. This keeps the editor simple and the parser reliable.
 
@@ -162,6 +184,8 @@ The application portal reopened for the new session. Students should review elig
 3. Upload all required documents
 
 The official portal is here: https://example.edu/admission
+
+imgl https://example.edu/images/campus-gate.jpg Students queue at the campus gate
 
 __Please note:__ deadlines are strict.
 

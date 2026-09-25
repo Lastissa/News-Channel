@@ -72,6 +72,23 @@
     return safe;
   }
 
+  /* INLINE FLOATED IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text".
+     Checked before headings/bold/italic so the URL + alt text are never
+     consumed by those markers -- mirrors IMG_TOKEN_RE in BLOG/views.py. */
+  var imgTokenRe = /^(imgl|imgr)\s+(\S+)(?:\s+(.*))?$/;
+
+  function imageFilenameFromUrl(url) {
+    var withoutQuery = url.split(/[?#]/)[0];
+    var parts = withoutQuery.split("/");
+    return parts[parts.length - 1] || url;
+  }
+
+  function renderInlineImage(direction, url, altText) {
+    var alt = (altText || "").trim() || imageFilenameFromUrl(url);
+    var sideClass = direction === "imgl" ? "story-inline-img-left" : "story-inline-img-right";
+    return '<img class="story-inline-img ' + sideClass + '" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">';
+  }
+
   function parseStoryContent(content) {
     if (!content) return "";
     var normalized = String(content).replace(/\r\n?/g, "\n").trim();
@@ -81,11 +98,18 @@
     var headingRe = /^(#+)\s*(.*)$/;
     var bulletRe = /^\*\s+/;
     var orderedRe = /^\d+\.\s+/;
-    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+)/;
+    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+)/;
 
     while (i < lines.length) {
       var line = lines[i].trim();
       if (!line) { i += 1; continue; }
+
+      var imgMatch = line.match(imgTokenRe);
+      if (imgMatch) {
+        blocks.push(renderInlineImage(imgMatch[1], imgMatch[2], imgMatch[3]));
+        i += 1;
+        continue;
+      }
 
       var headingMatch = line.match(headingRe);
       if (headingMatch) {

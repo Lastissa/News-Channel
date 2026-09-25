@@ -711,6 +711,20 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   max-width: 100%; font-size: 1.04rem; line-height: 1.82; color: var(--ink
   );
 }
+/*  Inline imgl/imgr token image: floated, text wraps around it, and kept
+    noticeably smaller than the top-level hero (.story-hero-figure, which
+    caps at 720px wide / 420px tall). */
+.story-inline-img {
+  max-width: min(45%, 280px); max-height: 260px; width: auto; height: auto;
+  object-fit: cover; display: block; border-radius: 12px; border: 1px solid var(--line);
+  box-shadow: var(--shadow-card); background: var(--paper-dim);
+  filter: saturate(0.9) contrast(0.98) brightness(0.97);
+}
+.story-inline-img-left { float: left; margin: 4px 18px 12px 0;}
+.story-inline-img-right { float: right; margin: 4px 0 12px 18px; }
+@media (max-width: 599.98px) {
+  .story-inline-img { max-width: min(55%, 200px); max-height: 190px; }
+}
 .story-body > p,
 .story-body > ul,
 .story-body > ol,

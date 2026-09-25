@@ -1,5 +1,6 @@
 import html
 import re
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.db.models import F, Prefetch
@@ -15,6 +16,11 @@ from STAFF.models import AuthorFollow, StaffProfile
 from .models import Blog, Comment
 
 URL_RE = re.compile(r"https?://[^\s<>'\"]+")
+
+#   INLINE FLOATED IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text".
+#   Must be checked before headings/bold/italic so the URL + alt text are
+#   never consumed by those markers (see DOCS/NEWS_CONTENT_CONVENTION.MD).
+IMG_TOKEN_RE = re.compile(r"^(imgl|imgr)\s+(\S+)(?:\s+(.*))?$")
 
 STORY_404_CONTENT = (
     "This page does not exist. We may not have enough stories published yet, "
@@ -32,6 +38,22 @@ def _linkify_text(value):
     return safe_text
 
 
+def _image_filename_from_url(url):
+    """Fallback alt text when a writer omits it: the filename from the URL."""
+    name = urlparse(url).path.rsplit("/", 1)[-1]
+    return name or url
+
+
+def _render_inline_image(direction, url, alt_text):
+    """Build the floated inline <img> for an imgl/imgr token. Smaller than
+    the top-level hero image and floated so surrounding text wraps it."""
+    alt = (alt_text or "").strip() or _image_filename_from_url(url)
+    side_class = "story-inline-img-left" if direction == "imgl" else "story-inline-img-right"
+    safe_url = html.escape(url, quote=True)
+    safe_alt = html.escape(alt, quote=True)
+    return f'<img class="story-inline-img {side_class}" src="{safe_url}" alt="{safe_alt}" loading="lazy">'
+
+
 def parse_story_content(content):
     """Render story text into a readable article structure with SEO-friendly blocks."""
     if not content:
@@ -44,6 +66,13 @@ def parse_story_content(content):
     while i < len(lines):
         line = lines[i].strip()
         if not line:
+            i += 1
+            continue
+
+        img_match = IMG_TOKEN_RE.match(line)
+        if img_match:
+            direction, url, alt_text = img_match.groups()
+            blocks.append(_render_inline_image(direction, url, alt_text))
             i += 1
             continue
 
@@ -86,7 +115,7 @@ def parse_story_content(content):
             current = lines[i].strip()
             if not current:
                 break
-            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+)", current):
+            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+)", current):
                 break
             paragraph_lines.append(current)
             i += 1
@@ -105,9 +134,9 @@ TICKER_MARKER_RE = re.compile(r"^(#{1,6}\s*|\*\s+|\d+\.\s+)")
 
 def build_ticker_text(content):
     """Plain-text feed for the reading marquee at the top of the story page.
-    Strips this project's markdown-style markers (#, *, __, **) and joins every
-    paragraph/block with ' * ' so the whole story can be read in one continuous
-    pass while it scrolls."""
+    Strips this project's markdown-style markers (#, *, __, **, imgl/imgr) and
+    joins every paragraph/block with ' * ' so the whole story can be read in
+    one continuous pass while it scrolls."""
     if not content:
         return ""
 
@@ -119,8 +148,13 @@ def build_ticker_text(content):
             line = line.strip()
             if not line:
                 continue
-            line = TICKER_MARKER_RE.sub("", line)
-            line = line.replace("**", "").replace("__", "")
+            img_match = IMG_TOKEN_RE.match(line)
+            if img_match:
+                _, img_url, img_alt = img_match.groups()
+                line = (img_alt or "").strip() or _image_filename_from_url(img_url)
+            else:
+                line = TICKER_MARKER_RE.sub("", line)
+                line = line.replace("**", "").replace("__", "")
             if line:
                 lines.append(line)
         text = " ".join(lines).strip()
