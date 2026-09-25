@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.views import View
 
 from AUTHENTICATION.models import Auth
+from ARCHIVE.models import ArchiveImage
 from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, info_logger, is_rate_limited, set_cache
 from SERVICE_INTERNAL.email_single import _try_send_story_views_alert_email
 from STAFF.models import AuthorFollow, StaffProfile
@@ -21,6 +22,12 @@ URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 #   Must be checked before headings/bold/italic so the URL + alt text are
 #   never consumed by those markers (see DOCS/NEWS_CONTENT_CONVENTION.MD).
 IMG_TOKEN_RE = re.compile(r"^(imgl|imgr)\s+(\S+)(?:\s+(.*))?$")
+
+#   INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
+#   the image token above (keyword, URL, optional trailing text) but
+#   renders as a downloadable link in the normal flow of the paragraph
+#   instead of a floated picture -- see _render_inline_file below.
+FILE_TOKEN_RE = re.compile(r"^filel\s+(\S+)(?:\s+(.*))?$")
 
 STORY_404_CONTENT = (
     "This page does not exist. We may not have enough stories published yet, "
@@ -44,14 +51,71 @@ def _image_filename_from_url(url):
     return name or url
 
 
+def _archive_dimensions_for_url(url):
+    """(width, height) for `url` if it is a picture that was uploaded
+    through /archive/ (see ARCHIVE.views.ArchiveUploadView, which now
+    requires and stores the real Cloudinary-confirmed size on every
+    ArchiveImage row) -- (None, None) for any other URL, e.g. one pasted
+    from outside the project."""
+    dimensions = ArchiveImage.objects.filter(url=url).values("width", "height").first()
+    if not dimensions:
+        return None, None
+    return dimensions["width"], dimensions["height"]
+
+
 def _render_inline_image(direction, url, alt_text):
     """Build the floated inline <img> for an imgl/imgr token. Smaller than
-    the top-level hero image and floated so surrounding text wraps it."""
+    the top-level hero image and floated so surrounding text wraps it.
+
+    Width/height: if `url` is a picture from /archive/, its real, stored
+    size (see _archive_dimensions_for_url above) is rendered straight onto
+    the <img width height> attributes -- the browser reserves the right
+    box before the picture even starts downloading, so there is no layout
+    shift and no need to wait for the file to load. Any other URL (one
+    pasted from outside the project, where no size is known ahead of time)
+    still gets a size: a tiny inline `onload` sets width/height from the
+    image's own natural size once it has actually loaded, which is the
+    only way to know it without one. Either way the CSS on `.story-inline-img`
+    (max-width/max-height) is what actually caps the on-page size -- these
+    attributes are about reserving space and giving the browser real
+    numbers to shrink from, not about overriding that cap."""
     alt = (alt_text or "").strip() or _image_filename_from_url(url)
     side_class = "story-inline-img-left" if direction == "imgl" else "story-inline-img-right"
     safe_url = html.escape(url, quote=True)
     safe_alt = html.escape(alt, quote=True)
-    return f'<img class="story-inline-img {side_class}" src="{safe_url}" alt="{safe_alt}" loading="lazy">'
+
+    width, height = _archive_dimensions_for_url(url)
+    if width and height:
+        size_attrs = f' width="{width}" height="{height}"'
+        onload_attr = ""
+    else:
+        size_attrs = ""
+        onload_attr = ' onload="if(!this.getAttribute(\'width\')){this.width=this.naturalWidth;this.height=this.naturalHeight;}"'
+
+    return (
+        f'<img class="story-inline-img {side_class}" src="{safe_url}" alt="{safe_alt}"'
+        f'{size_attrs} loading="lazy"{onload_attr}>'
+    )
+
+
+def _render_inline_file(url, display_text):
+    """Build the inline downloadable link for a "filel URL text" token. This
+    sits in the normal flow of the paragraph (unlike imgl/imgr, it is never
+    floated -- a file has no picture to wrap text around), but clicking it
+    downloads the file instead of navigating the reader away from the
+    story. The `download` attribute only actually forces a download for a
+    same-origin URL in most browsers, which is exactly what the
+    `cloudinary_proxy` template filter is for (see
+    ARCHIVE.templatetags.archive_extras) -- any file uploaded through this
+    project and served back through /archive/cdn/... downloads correctly;
+    an arbitrary external URL still gets a normal link."""
+    label = (display_text or "").strip() or _image_filename_from_url(url)
+    safe_url = html.escape(url, quote=True)
+    safe_label = html.escape(label, quote=True)
+    return (
+        f'<a class="story-inline-file" href="{safe_url}" download rel="noopener noreferrer">'
+        f'<span class="story-inline-file-icon" aria-hidden="true">&#128206;</span>{safe_label}</a>'
+    )
 
 
 def parse_story_content(content):
@@ -73,6 +137,13 @@ def parse_story_content(content):
         if img_match:
             direction, url, alt_text = img_match.groups()
             blocks.append(_render_inline_image(direction, url, alt_text))
+            i += 1
+            continue
+
+        file_match = FILE_TOKEN_RE.match(line)
+        if file_match:
+            url, display_text = file_match.groups()
+            blocks.append(_render_inline_file(url, display_text))
             i += 1
             continue
 
@@ -115,7 +186,7 @@ def parse_story_content(content):
             current = lines[i].strip()
             if not current:
                 break
-            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+)", current):
+            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|filel\s+)", current):
                 break
             paragraph_lines.append(current)
             i += 1
@@ -134,9 +205,9 @@ TICKER_MARKER_RE = re.compile(r"^(#{1,6}\s*|\*\s+|\d+\.\s+)")
 
 def build_ticker_text(content):
     """Plain-text feed for the reading marquee at the top of the story page.
-    Strips this project's markdown-style markers (#, *, __, **, imgl/imgr) and
-    joins every paragraph/block with ' * ' so the whole story can be read in
-    one continuous pass while it scrolls."""
+    Strips this project's markdown-style markers (#, *, __, **, imgl/imgr,
+    filel) and joins every paragraph/block with ' * ' so the whole story
+    can be read in one continuous pass while it scrolls."""
     if not content:
         return ""
 
@@ -153,8 +224,13 @@ def build_ticker_text(content):
                 _, img_url, img_alt = img_match.groups()
                 line = (img_alt or "").strip() or _image_filename_from_url(img_url)
             else:
-                line = TICKER_MARKER_RE.sub("", line)
-                line = line.replace("**", "").replace("__", "")
+                file_match = FILE_TOKEN_RE.match(line)
+                if file_match:
+                    file_url, file_text = file_match.groups()
+                    line = (file_text or "").strip() or _image_filename_from_url(file_url)
+                else:
+                    line = TICKER_MARKER_RE.sub("", line)
+                    line = line.replace("**", "").replace("__", "")
             if line:
                 lines.append(line)
         text = " ".join(lines).strip()

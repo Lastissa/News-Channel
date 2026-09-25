@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Archive · {{ project_name }} Images {% endblock %}
+{% block meta_description %}Browse the picture archive.{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="archive-shell" data-gallery-endpoint="{% url 'archive:gallery' %}">
+  <div class="archive-header-bar">
+    <h1>Archive</h1>
+    <div class="archive-header-actions">
+      {% if can_upload %}
+      <button type="button" class="archive-action-btn primary" data-archive-add-btn
+              hx-get="{% url 'archive:upload_modal' %}"
+              hx-target="[data-archive-overlay]"
+              hx-swap="innerHTML">+ Add Image</button>
+      {% comment %} EDIT ADDED IMAGES is a separate, not-yet-built task; the
+           button is placed here now to match the final header layout, but
+           stays disabled until that task starts. {% endcomment %}
+      <button type="button" class="archive-action-btn" disabled title="Coming soon">Edit Added Images</button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% include "ARCHIVE/partials/gallery_grid.html" %}
+
+  <div data-archive-overlay></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+<script src="{% static 'archive/js/archive.js' %}" defer></script>
+{% endblock %}

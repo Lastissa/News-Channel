@@ -110,9 +110,12 @@ def _validate_image_file(file) -> None:
         raise ImageUploadError("Unsupported image type. Please upload a JPEG, PNG file.")
 
 
-def _run_upload(file, folder: str, preset: dict, tag: str, public_id: str | None = None) -> str:
+def _run_upload(file, folder: str, preset: dict, tag: str, public_id: str | None = None) -> dict:
     """Shared Cloudinary call used by both upload functions below. Returns
-    the `secure_url` string. Any Cloudinary side failure is logged and
+    the raw Cloudinary result dict (secure_url, width, height, ...) -- not
+    just the URL -- so a caller that needs the *actual* stored size (e.g.
+    upload_archive_image below) doesn't have to guess it from whatever the
+    uploader typed into the form. Any Cloudinary side failure is logged and
     re-raised as ImageUploadError, so callers never need to know the SDK
     exists or catch cloudinary's own exception type.
 
@@ -145,7 +148,7 @@ def _run_upload(file, folder: str, preset: dict, tag: str, public_id: str | None
         raise ImageUploadError("Cloudinary did not return an image URL.")
 
     info_logger(msg=f"CLOUDINARY UPLOAD OK ({tag}): {secure_url}")
-    return secure_url
+    return result
 
 
 def upload_profile_image(file, user_id) -> str:
@@ -154,13 +157,14 @@ def upload_profile_image(file, user_id) -> str:
     upload below. The picture replaces the user's previous uploaded avatar
     (same public id, overwritten), so re-uploading never piles up images."""
     _validate_image_file(file)
-    return _run_upload(
+    result = _run_upload(
         file,
         folder=_AVATAR_FOLDER,
         preset=_PROFILE_IMAGE_PRESET,
         tag="avatar",
         public_id=_avatar_public_id(user_id),
     )
+    return result.get("secure_url") or result.get("url")
 
 
 def upload_news_image(file, quality=ImageQuality.MEDIUM) -> str:
@@ -168,4 +172,44 @@ def upload_news_image(file, quality=ImageQuality.MEDIUM) -> str:
     news page `<select name="image_quality">` sent (low/medium/high)."""
     _validate_image_file(file)
     preset = ImageQuality.resolve(quality)
-    return _run_upload(file, folder="abureport/news", preset=preset, tag="news")
+    result = _run_upload(file, folder="abureport/news", preset=preset, tag="news")
+    return result.get("secure_url") or result.get("url")
+
+
+def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=None) -> tuple[str, int, int]:
+    """Public /archive/ gallery upload, open to any signed in user (see
+    ARCHIVE.views.ArchiveUploadView). `quality` picks the same auto-quality
+    tier as the news upload above, but the width/height are whatever the
+    uploader typed into the Add image form, so a copy of the preset dict is
+    taken here instead of mutating the shared ImageQuality preset.
+
+    If either box was filled in, the tier's own fixed width (e.g. 1600 for
+    MEDIUM) is dropped first -- otherwise a height-only request would keep
+    that leftover width in the transform and Cloudinary would constrain to
+    a `1600 x height` box instead of scaling by height alone. `limit` never
+    upscales, it only ever caps a dimension down.
+
+    Returns `(secure_url, actual_width, actual_height)`. The width/height
+    are read back from Cloudinary's own upload result, not from the
+    `width`/`height` arguments -- those are only a requested *ceiling*
+    (`crop: limit`), the real stored size can end up smaller (e.g. a photo
+    narrower than the requested width is never upscaled). Callers (see
+    ARCHIVE.views.ArchiveUploadView) persist these actual numbers so every
+    picture in the archive can be rendered with correct <img width height>
+    attributes wherever it is later embedded, instead of that information
+    being lost after upload."""
+    _validate_image_file(file)
+    preset = dict(ImageQuality.resolve(quality))
+    if width or height:
+        preset.pop("width", None)
+        preset.pop("height", None)
+        if width:
+            preset["width"] = width
+        if height:
+            preset["height"] = height
+        preset["crop"] = "limit"
+    result = _run_upload(file, folder="abureport/archive", preset=preset, tag="archive")
+    secure_url = result.get("secure_url") or result.get("url")
+    actual_width = result.get("width") or width or 0
+    actual_height = result.get("height") or height or 0
+    return secure_url, actual_width, actual_height

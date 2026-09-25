@@ -1,0 +1,54 @@
+<div class="archive-modal-layer" data-archive-modal role="presentation">
+  <div class="archive-modal-backdrop" data-archive-modal-close></div>
+  <div class="archive-modal-card" role="dialog" aria-modal="true" aria-labelledby="archive-modal-title">
+    <div class="archive-modal-head">
+      <h3 id="archive-modal-title">Add image</h3>
+      <button type="button" class="archive-modal-close" data-archive-modal-close aria-label="Close">&times;</button>
+    </div>
+
+    <p class="archive-modal-error" data-archive-upload-error hidden></p>
+
+    <form data-archive-upload-form data-endpoint="{% url 'archive:upload' %}">
+      {% csrf_token %}
+      <div class="archive-modal-field">
+        <label for="archive-upload-file">Picture (from your phone or device)</label>
+        <input id="archive-upload-file" type="file" name="image_file" accept="image/jpeg,image/png" required
+               data-archive-upload-file>
+        <div class="archive-modal-preview" data-archive-upload-preview hidden>
+          <img data-archive-upload-preview-img alt="Selected picture preview">
+        </div>
+      </div>
+
+      <div class="archive-modal-row">
+        <div class="archive-modal-field">
+          <label for="archive-upload-width">Width (px)</label>
+          <input id="archive-upload-width" type="number" name="width" min="50" max="4000" required>
+        </div>
+        <div class="archive-modal-field">
+          <label for="archive-upload-height">Height (px)</label>
+          <input id="archive-upload-height" type="number" name="height" min="50" max="4000" required>
+        </div>
+      </div>
+
+      <div class="archive-modal-field">
+        <label for="archive-upload-quality">Quality</label>
+        <select id="archive-upload-quality" name="quality">
+          {% for value, label in quality_choices %}
+          <option value="{{ value }}" {% if value == default_quality %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="archive-modal-field">
+        <label for="archive-upload-alt">Description</label>
+        <input id="archive-upload-alt" type="text" name="alt" maxlength="150"
+               placeholder="Short description of the picture" required>
+      </div>
+
+      <div class="archive-modal-actions">
+        <button type="button" class="archive-action-btn" data-archive-modal-close>Cancel</button>
+        <button type="submit" class="archive-action-btn primary" data-archive-upload-submit>Upload image</button>
+      </div>
+    </form>
+  </div>
+</div>

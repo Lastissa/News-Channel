@@ -33,7 +33,8 @@ INSTALLED_APPS = [
     'BLOG',
     'HOME',
     'STAFF',
-    'ADMIN'
+    'ADMIN',
+    'ARCHIVE'
     
 ]
 
