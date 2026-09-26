@@ -19,6 +19,14 @@ CATEGORY = [
 ]
 class Blog(models.Model):
     image_1 = models.URLField(blank=True, null=True)
+    #   THE EXACT CLOUDINARY ASSET `image_1` LIVES AT (blank when image_1 is
+    #   a pasted external URL, not an uploaded file -- see AddNewsView).
+    #   Kept so a FUTURE "edit story" upload can overwrite THIS SAME asset
+    #   in place (SERVICE_INTERNAL.images.upload_news_image `public_id=`)
+    #   instead of leaving it behind as an orphan while a brand new file
+    #   gets created for the replacement picture -- same pattern already
+    #   used by upload_profile_image for avatars.
+    image_public_id = models.CharField(max_length=255, blank=True, default="")
     image_info = models.CharField(max_length=100, default="The image is self explanatory.")    #   THE ABOUT PICTURE THHAT WILL SHOW SLIGHTLY BELOW THE PICTURE IN IMAGE 
     author = models.ForeignKey('AUTHENTICATION.Auth', on_delete=models.CASCADE, related_name='blogs', limit_choices_to= {'is_staff':True})
     category = models.CharField(max_length=20, choices=CATEGORY, blank=False, null=False)

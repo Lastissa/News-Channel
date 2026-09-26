@@ -331,11 +331,18 @@ class AddNewsView(View):
         #   AN UPLOADED FILE ALWAYS WINS OVER A PASTED URL. Nothing is sent
         #   to cloudinary until this line, i.e. not while the staff member
         #   is still typing/previewing, only once they publish.
+        image_public_id = ""
         if image_file:
             try:
-                image_url = upload_news_image(image_file, quality=image_quality)
+                uploaded_image = upload_news_image(image_file, quality=image_quality)
             except ImageUploadError as exc:
                 return _response({"detail": str(exc)}, status=400)
+            image_url = uploaded_image["secure_url"]
+            #   SAVED ONTO THE ROW BELOW SO A FUTURE "EDIT STORY" UPLOAD CAN
+            #   PASS THIS BACK INTO upload_news_image(public_id=...) AND
+            #   OVERWRITE THIS EXACT ASSET IN PLACE INSTEAD OF LEAVING IT AS
+            #   AN ORPHAN WHILE A NEW ONE GETS CREATED FOR THE REPLACEMENT.
+            image_public_id = uploaded_image["public_id"]
         elif image_url:
             validator = URLValidator(schemes=["http", "https"])
             try:
@@ -356,6 +363,7 @@ class AddNewsView(View):
                 author=request.user,
                 heading=heading,
                 image_1=image_url or None,
+                image_public_id=image_public_id,
                 category=category,
                 content=content,
             )

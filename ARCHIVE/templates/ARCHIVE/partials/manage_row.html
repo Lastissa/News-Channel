@@ -13,8 +13,13 @@
     <form class="archive-manage-row-form"
           hx-post="{% url 'archive:item_edit' item.id %}"
           hx-target="#archive-manage-list" hx-swap="outerHTML"
+          hx-encoding="multipart/form-data"
           hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
       <input type="text" name="alt" value="{{ item.alt }}" maxlength="150" required aria-label="Description">
+      {# OPTIONAL: attaching a file here REPLACES the item's existing picture/file in place -- #}
+      {# same Cloudinary asset, same id -- instead of leaving the old one behind as an orphan #}
+      {# (see ARCHIVE.views.ArchiveItemEditView). Leave empty to just edit the description. #}
+      <input type="file" name="upload_file" accept="{% if item.kind == 'image' %}image/jpeg,image/png{% endif %}" aria-label="Replace picture or file">
       <button type="submit" class="archive-action-btn">Save</button>
     </form>
     <div class="archive-manage-row-meta">

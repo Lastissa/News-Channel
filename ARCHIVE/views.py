@@ -315,12 +315,27 @@ class ArchiveManageListView(View):
 
 
 class ArchiveItemEditView(View):
-    """Updates the description of one of *this* user's own archive items.
-    Always re-renders the manage list (page 1 of it), whether the edit
-    succeeded or not, so the popup never needs a second request shape for
-    the error case -- errors just show up as a banner above the same
-    list. On success, `HX-Trigger` tells archive.js to also refresh the
-    public gallery grid behind the popup."""
+    """Updates one of *this* user's own archive items: the description
+    always, and -- when an `upload_file` is attached to the same request
+    -- the underlying picture/file too.
+
+    A replacement upload reuses the item's OWN `public_id` (see
+    SERVICE_INTERNAL.images.upload_archive_image / upload_archive_file
+    `public_id=`), so it overwrites that exact Cloudinary asset in place:
+    same id, same slot, old bytes gone. That is the whole point -- it is
+    what stops an edit from leaving the previous upload behind as an
+    orphan while a second, disconnected asset gets created for the new
+    one. A row created before `public_id` existed (blank) falls back to
+    a fresh upload the one time, and the returned id is then saved onto
+    the row so every edit after that one overwrites in place.
+
+    The replacement must match the item's existing `kind` -- an image
+    slot stays an image, a file slot stays a file; swapping kind is not
+    supported here. Always re-renders the manage list (page 1 of it),
+    whether the edit succeeded or not, so the popup never needs a second
+    request shape for the error case -- errors just show up as a banner
+    above the same list. On success, `HX-Trigger` tells archive.js to
+    also refresh the public gallery grid behind the popup."""
 
     def post(self, request, pk):
         if not is_authenticated(request.user):
@@ -328,26 +343,82 @@ class ArchiveItemEditView(View):
 
         item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
         alt = (request.POST.get("alt") or "").strip()
+        replacement_file = request.FILES.get("upload_file")
 
         error = None
         if not alt:
             error = "Description can't be empty."
         elif len(alt) > ALT_MAX_LENGTH:
             error = f"The description is limited to {ALT_MAX_LENGTH} characters."
-        elif ArchiveImage.objects.filter(url__iexact=item.url, alt__iexact=alt).exclude(pk=item.pk).exists():
-            error = "Another item already uses this exact description."
+
+        #   ONLY SET WHEN A REPLACEMENT UPLOAD ACTUALLY SUCCEEDED, so the
+        #   dedupe check and the save below both know whether `item.url`
+        #   is about to change.
+        new_url = None
+
+        if not error and replacement_file:
+            if item.kind == ArchiveKind.IMAGE:
+                quality = (request.POST.get("quality") or item.quality).strip().lower()
+                if quality not in QUALITY_LABELS:
+                    error = "Select a valid image quality."
+
+                width = item.width
+                if request.POST.get("width"):
+                    width = _parse_dimension(request.POST.get("width"))
+                    if width in (None, "invalid"):
+                        error = error or f"Width must be a whole number between {MIN_DIMENSION} and {MAX_DIMENSION}."
+
+                height = item.height
+                if not error and request.POST.get("height"):
+                    height = _parse_dimension(request.POST.get("height"))
+                    if height in (None, "invalid"):
+                        error = f"Height must be a whole number between {MIN_DIMENSION} and {MAX_DIMENSION}."
+
+                if not error:
+                    try:
+                        uploaded = upload_archive_image(
+                            replacement_file, quality=quality, width=width, height=height, public_id=item.public_id or None
+                        )
+                    except ImageUploadError as exc:
+                        error = str(exc)
+                    else:
+                        new_url = uploaded["secure_url"]
+                        item.quality = quality
+                        item.width = uploaded["width"]
+                        item.height = uploaded["height"]
+                        item.public_id = item.public_id or uploaded.get("public_id", "")
+            else:
+                try:
+                    uploaded = upload_archive_file(replacement_file, public_id=item.public_id or None)
+                except ImageUploadError as exc:
+                    error = str(exc)
+                else:
+                    new_url = uploaded["secure_url"]
+                    item.original_filename = uploaded["original_filename"]
+                    item.file_size = uploaded["bytes"]
+                    item.public_id = item.public_id or uploaded.get("public_id", "")
+
+        if not error:
+            dedupe_url = new_url or item.url
+            if ArchiveImage.objects.filter(url__iexact=dedupe_url, alt__iexact=alt).exclude(pk=item.pk).exists():
+                error = "Another item already uses this exact description."
 
         if not error:
             item.alt = alt
+            if new_url:
+                item.url = new_url
+            update_fields = ["alt"]
+            if new_url:
+                update_fields += ["url", "quality", "width", "height", "public_id", "original_filename", "file_size"]
             try:
-                item.save(update_fields=["alt"])
+                item.save(update_fields=list(dict.fromkeys(update_fields)))
             except IntegrityError:
                 error = "Another item already uses this exact description."
 
         context = _paginate_own(request.user, page_number=1)
         context["error"] = error
         if not error:
-            context["notice"] = "Description updated."
+            context["notice"] = "Picture/file updated." if new_url else "Description updated."
         response = render(request, "ARCHIVE/partials/manage_list.html", context)
         if not error:
             response["HX-Trigger"] = "archive:refresh"

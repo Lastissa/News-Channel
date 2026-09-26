@@ -167,13 +167,28 @@ def upload_profile_image(file, user_id) -> str:
     return result.get("secure_url") or result.get("url")
 
 
-def upload_news_image(file, quality=ImageQuality.MEDIUM) -> str:
+def upload_news_image(file, quality=ImageQuality.MEDIUM, public_id: str | None = None) -> dict:
     """Staff-only news/story image upload. `quality` is whatever the Add
-    news page `<select name="image_quality">` sent (low/medium/high)."""
+    news page `<select name="image_quality">` sent (low/medium/high).
+
+    `public_id` is the exact Cloudinary asset a story's picture ALREADY
+    lives at (`Blog.image_public_id`). Pass it in on an edit and the new
+    picture overwrites that same asset in place -- same id, same URL
+    slot, old bytes gone -- instead of a second, unrelated file getting
+    created next to it while the first one sits there unused. Leave it
+    unset on a first-time publish; Cloudinary then allocates a brand new
+    id, which the caller MUST save back onto the Blog row (see
+    `image_public_id` above `result["public_id"]`) so the next edit has
+    something to pass back in here. Without that save, every edit looks
+    like a first-time publish again and the orphaning starts right back
+    up.
+
+    Returns a dict (`secure_url`, `public_id`), not just the bare URL --
+    callers need the id to persist for the reason above."""
     _validate_image_file(file)
     preset = ImageQuality.resolve(quality)
-    result = _run_upload(file, folder="abureport/news", preset=preset, tag="news")
-    return result.get("secure_url") or result.get("url")
+    result = _run_upload(file, folder="abureport/news", preset=preset, tag="news", public_id=public_id)
+    return {"secure_url": result.get("secure_url") or result.get("url"), "public_id": result.get("public_id", "")}
 
 
 #   NON-IMAGE FILE UPLOAD SECTION (Archive "Add file")
@@ -217,25 +232,36 @@ def _validate_archive_file(file, original_name: str) -> str:
     return ext
 
 
-def upload_archive_file(file) -> dict:
+def upload_archive_file(file, public_id: str | None = None) -> dict:
     """Public /archive/ gallery upload for a non-image file (see
     upload_archive_image below for the picture path). Returns a dict with
     everything ARCHIVE.views.ArchiveUploadView needs to persist an
     ArchiveImage row (`kind="file"`) and everything a later moderator
     action needs to remove the asset again (see
-    SERVICE_INTERNAL.images.destroy_archive_asset)."""
+    SERVICE_INTERNAL.images.destroy_archive_asset).
+
+    `public_id` is an EXISTING ArchiveImage row's own `public_id`. Pass it
+    in when a user is replacing the file already attached to that row
+    (see ARCHIVE.views.ArchiveItemEditView) and the new file overwrites
+    the old one at the exact same Cloudinary id -- one asset for that
+    row's whole lifetime, never two. Leave it unset for a brand new
+    upload; Cloudinary allocates a fresh id, which the caller must save
+    onto the row's `public_id` field the same way ArchiveUploadView
+    already does today."""
     original_name = getattr(file, "name", "") or "file"
     ext = _validate_archive_file(file, original_name)
+
+    if public_id:
+        placement = {"public_id": public_id, "unique_filename": False, "overwrite": True, "invalidate": True}
+    else:
+        placement = {"folder": "abureport/archive", "use_filename": True, "unique_filename": True, "overwrite": False}
 
     try:
         result = cloudinary.uploader.upload(
             file,
             resource_type="raw",
-            folder="abureport/archive",
-            use_filename=True,
-            unique_filename=True,
-            overwrite=False,
             tags=["archive", "archive-file"],
+            **placement,
         )
     except CloudinaryError as exc:
         error_logger(msg=f"CLOUDINARY UPLOAD FAILED (archive-file): {exc}")
@@ -271,7 +297,7 @@ def destroy_archive_asset(public_id: str, resource_type: str = "image") -> None:
         error_logger(msg=f"CLOUDINARY DESTROY FAILED ({public_id}): {exc}")
 
 
-def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=None) -> dict:
+def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=None, public_id: str | None = None) -> dict:
     """Public /archive/ gallery upload, open to any signed in user (see
     ARCHIVE.views.ArchiveUploadView). `quality` picks the same auto-quality
     tier as the news upload above, but the width/height are whatever the
@@ -293,9 +319,17 @@ def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=N
     ARCHIVE.views.ArchiveUploadView) persist these actual numbers so every
     picture in the archive can be rendered with correct <img width height>
     attributes wherever it is later embedded, instead of that information
-    being lost after upload. `public_id` is kept too so a later delete
-    (see destroy_archive_asset above) can remove the exact Cloudinary
-    asset instead of only the database row."""
+    being lost after upload. The returned `public_id` is kept so a later
+    delete (see destroy_archive_asset above) can remove the exact
+    Cloudinary asset instead of only the database row.
+
+    Pass the `public_id` ARGUMENT (an existing ArchiveImage row's own
+    stored id) when this call is REPLACING that row's picture rather than
+    creating a new archive entry -- see ARCHIVE.views.ArchiveItemEditView.
+    The new picture then overwrites the old one at that exact id instead
+    of a second, disconnected asset getting created while the first one
+    is left behind as an orphan. Leave it unset for a brand new archive
+    upload."""
     _validate_image_file(file)
     preset = dict(ImageQuality.resolve(quality))
     if width or height:
@@ -306,7 +340,7 @@ def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=N
         if height:
             preset["height"] = height
         preset["crop"] = "limit"
-    result = _run_upload(file, folder="abureport/archive", preset=preset, tag="archive")
+    result = _run_upload(file, folder="abureport/archive", preset=preset, tag="archive", public_id=public_id)
     secure_url = result.get("secure_url") or result.get("url")
     return {
         "secure_url": secure_url,

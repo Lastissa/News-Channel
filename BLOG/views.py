@@ -11,7 +11,7 @@ from django.views import View
 
 from AUTHENTICATION.models import Auth
 from ARCHIVE.models import ArchiveImage
-from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, info_logger, is_rate_limited, set_cache
+from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
 from SERVICE_INTERNAL.email_single import _try_send_story_views_alert_email
 from STAFF.models import AuthorFollow, StaffProfile
 from .models import Blog, Comment
@@ -291,12 +291,23 @@ class StoryDetailView(View):
         author_recent_stories = Blog.objects.filter(author=blog.author).exclude(pk=blog.pk).order_by("-date_created")[:3]
 
 
-        Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
-        blog.refresh_from_db(fields=["views"])
+        #   ONLY A CONFIRMED NON-BOT REQUEST EVER MOVES THE COUNTER. A bot hit
+        #   is logged (IP + User-Agent) for visibility but never touches
+        #   `views` -- see SERVICE_INTERNAL.abstract.is_bot_request.
+        if is_bot_request(request):
+            info_logger(
+                msg=(
+                    f"BOT VIEW (no +1) on '{blog.slug}': ip={get_client_ip(request)} "
+                    f"ua={request.META.get('HTTP_USER_AGENT', '')[:200]!r}"
+                )
+            )
+        else:
+            Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
+            blog.refresh_from_db(fields=["views"])
 
-        alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
-        if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
-            _try_send_story_views_alert_email(blog.author, blog)
+            alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
+            if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
+                _try_send_story_views_alert_email(blog.author, blog)
 
         if request.user.is_authenticated:
             # THROUGH LET ME ACCESS THE BG MODEL THAT DJANGO CREATE FOR M2M

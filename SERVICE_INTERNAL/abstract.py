@@ -28,6 +28,45 @@ def get_client_ip(request)-> str:
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
+#   USER-AGENT SUBSTRINGS (already lowercased) THAT MARK A REQUEST AS A BOT:
+#   search engine/SEO crawlers, link-preview/unfurl bots (Slack, Discord,
+#   WhatsApp, Telegram, social share cards), and the common scripted-request
+#   libraries a real browser never sends. Not exhaustive -- a bot can always
+#   fake its User-Agent -- but it catches every well behaved crawler plus
+#   anything using a scraping/HTTP-client default UA. Extend this set rather
+#   than replacing it with a stricter/looser check.
+BOT_USER_AGENT_MARKERS = (
+    "bot", "crawl", "spider", "slurp", "mediapartners", "facebookexternalhit",
+    "whatsapp", "telegrambot", "discordbot", "slackbot", "skypeuripreview",
+    "curl/", "wget/", "python-requests", "python-urllib", "scrapy", "axios/",
+    "headlesschrome", "phantomjs", "ahrefsbot", "semrushbot", "mj12bot",
+    "dotbot", "petalbot", "bingpreview", "yandex", "duckduckbot", "applebot",
+    "linkedinbot", "pinterest", "embedly", "quora link preview", "outbrain",
+    "vkshare", "w3c_validator", "google-inspectiontool", "postmanruntime",
+    "go-http-client", "java/", "libwww-perl", "okhttp",
+)
+
+
+def is_bot_request(request) -> bool:
+    """Best-effort bot/crawler detection off the User-Agent header alone.
+    Used to gate a "+1" style counter (see BLOG.views.StoryDetailView.get,
+    the `views` counter on Blog) so a search crawler or a link-preview
+    fetch never gets counted as a real reader. A missing/empty User-Agent
+    is treated as a bot too -- a real browser always sends one, so its
+    absence is itself the strongest signal here. This is NOT a security
+    control (a bot can always lie in its User-Agent); it is only meant to
+    keep the counter honest against well behaved crawlers and the default
+    UAs of common HTTP libraries."""
+    if request is None:
+        return True
+
+    user_agent = (request.META.get("HTTP_USER_AGENT") or "").strip().lower()
+    if not user_agent:
+        return True
+
+    return any(marker in user_agent for marker in BOT_USER_AGENT_MARKERS)
+
+
 def is_rate_limited(request, timeout_window=60, max_requests=10, reset_timeout = False):
     """
     ### Rate limit the user after the max request so if max is 4 , the 4th getd blocked
