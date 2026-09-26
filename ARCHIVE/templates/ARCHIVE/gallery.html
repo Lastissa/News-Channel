@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Archive · {{ project_name }} Images {% endblock %}
-{% block meta_description %}Browse the picture archive.{% endblock %}
+{% block title %}Archive · {{ project_name }} Images & Files{% endblock %}
+{% block meta_description %}Browse, upload and download the shared {{ project_name }} picture and file archive.{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -11,21 +11,24 @@
 
 {% block content %}
 <section class="archive-shell" data-gallery-endpoint="{% url 'archive:gallery' %}">
-  <div class="archive-header-bar">
-    <h1>Archive</h1>
+  <header class="archive-header-bar">
+    <div class="archive-heading">
+      <h1>Archive</h1>
+      <p class="archive-subtitle">Find, upload and download images &amp; files shared to the {{ project_name }} archive.</p>
+    </div>
     <div class="archive-header-actions">
       {% if can_upload %}
       <button type="button" class="archive-action-btn primary" data-archive-add-btn
               hx-get="{% url 'archive:upload_modal' %}"
               hx-target="[data-archive-overlay]"
-              hx-swap="innerHTML">+ Add Image</button>
-      {% comment %} EDIT ADDED IMAGES is a separate, not-yet-built task; the
-           button is placed here now to match the final header layout, but
-           stays disabled until that task starts. {% endcomment %}
-      <button type="button" class="archive-action-btn" disabled title="Coming soon">Edit Added Images</button>
+              hx-swap="innerHTML">+ Add Image / File</button>
+      <button type="button" class="archive-action-btn" data-archive-manage-btn
+              hx-get="{% url 'archive:manage_modal' %}"
+              hx-target="[data-archive-overlay]"
+              hx-swap="innerHTML">Edit Added Images</button>
       {% endif %}
     </div>
-  </div>
+  </header>
 
   {% include "ARCHIVE/partials/gallery_grid.html" %}
 

@@ -14,11 +14,22 @@
   margin-bottom: 22px;
 }
 
+.archive-heading { min-width: 0; }
+
 .archive-header-bar h1 {
   margin: 0;
   font-family: var(--font-display);
   font-size: 1.6rem;
   color: var(--ink);
+  font-weight: bold;
+
+}
+
+.archive-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--ink);
+  max-width: 60ch;
 }
 
 .archive-header-actions {
@@ -30,7 +41,7 @@
 .archive-action-btn {
   border: 1px solid var(--line);
   border-radius: var(--radius-s);
-  background: var(--surface);
+  background: red(--surface);
   color: var(--ink);
   padding: 9px 16px;
   font-weight: 700;
@@ -87,6 +98,36 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* ---------- file (non-image) preview: a centered download icon instead
+   of a broken/blank <img>, since there is nothing to thumbnail ---------- */
+.archive-card-media-file {
+  display: flex;
+}
+
+.archive-card-file-icon {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--amber-deep);
+  text-decoration: none;
+}
+
+.archive-card-file-icon svg {
+  width: 46px;
+  height: 46px;
+}
+
+.archive-card-file-ext {
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--slate);
+  text-transform: uppercase;
 }
 
 .archive-card-body {
@@ -281,6 +322,23 @@
   object-fit: contain;
 }
 
+.archive-modal-preview-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  word-break: break-all;
+}
+
+.archive-modal-preview-file svg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--amber-deep);
+}
+
 .archive-modal-field input,
 .archive-modal-field select {
   width: 100%;
@@ -316,4 +374,127 @@
   gap: 10px;
   margin-top: 4px;
   flex-wrap: wrap;
+}
+
+/* ---------- Edit Added Images modal ---------- */
+.archive-manage-card {
+  width: min(94vw, 560px);
+}
+
+.archive-manage-hint {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--slate);
+}
+
+.archive-manage-notice {
+  margin: 0 0 12px;
+  color: var(--amber-deep);
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+
+.archive-manage-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.archive-manage-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 10px;
+}
+
+.archive-manage-row-media {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--paper-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.archive-manage-row-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.archive-manage-row-media-file svg {
+  width: 26px;
+  height: 26px;
+  color: var(--amber-deep);
+}
+
+.archive-manage-row-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.archive-manage-row-form {
+  display: flex;
+  gap: 8px;
+}
+
+.archive-manage-row-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-dim, transparent);
+  color: var(--ink);
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.archive-manage-row-form input:focus {
+  outline: none;
+  border-color: var(--amber-alt);
+}
+
+.archive-manage-row-form button {
+  padding: 7px 12px;
+  font-size: 0.78rem;
+}
+
+.archive-manage-row-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: var(--slate);
+}
+
+.archive-manage-row-delete {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--danger);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.archive-manage-row-delete svg { width: 17px; height: 17px; }
+
+.archive-manage-row-delete:hover,
+.archive-manage-row-delete:focus-visible {
+  background: var(--paper-dim);
+  border-color: var(--danger);
+}
+
+.archive-manage-more {
+  width: 100%;
+  margin-top: 4px;
 }

@@ -115,6 +115,25 @@ Rule:
 - This token is parsed before headings, bold, and italic, so an image URL or its alt text is never partially consumed by #, **, or __.
 - Do not introduce an alternate syntax for inline images.
 
+### 8) INLINE FILES
+
+Any line that starts with filel should be treated as an inline, downloadable file link.
+
+Example:
+
+filel https://a.com/report.pdf 2025 Annual Report
+
+Rule:
+- The first word on the line is the keyword: filel.
+- The second word is the file URL.
+- Everything after the URL, on the same line, is the link text shown to the reader.
+- Unlike imgl/imgr, a filel link is never floated -- it sits inside the normal paragraph flow, as a plain download link.
+- Clicking it downloads the file instead of navigating the reader away from the story.
+- If no link text is given after the URL, the parser falls back to the filename taken from the URL. Example: filel https://a.com/report.pdf produces the visible text "report.pdf".
+- This token is parsed before headings, bold, and italic, so a file URL or its link text is never partially consumed by #, **, or __.
+- Do not introduce an alternate syntax for inline files.
+- The easiest way to get a filel line: upload the file to /archive/ (Add Image / File), then use its "Copy url" button, which copies a ready `filel <url> <description>` line straight to the clipboard.
+
 ---
 
 ## WRITING STYLE FOR AUTHORS

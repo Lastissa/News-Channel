@@ -1,0 +1,33 @@
+{% load archive_extras %}
+<div class="archive-manage-row" id="archive-manage-row-{{ item.id }}" data-manage-row>
+  <div class="archive-manage-row-media{% if item.kind == 'file' %} archive-manage-row-media-file{% endif %}">
+    {% with proxied_url=item.url|cloudinary_proxy %}
+    {% if item.kind == 'image' %}
+    <img src="{{ proxied_url }}" alt="{{ item.alt }}" loading="lazy">
+    {% else %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    {% endif %}
+    {% endwith %}
+  </div>
+  <div class="archive-manage-row-body">
+    <form class="archive-manage-row-form"
+          hx-post="{% url 'archive:item_edit' item.id %}"
+          hx-target="#archive-manage-list" hx-swap="outerHTML"
+          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      <input type="text" name="alt" value="{{ item.alt }}" maxlength="150" required aria-label="Description">
+      <button type="submit" class="archive-action-btn">Save</button>
+    </form>
+    <div class="archive-manage-row-meta">
+      <span>{% if item.kind == "image" %}{{ item.quality_label }} · {{ item.width }}&times;{{ item.height }}{% else %}{{ item.file_size_label }}{% endif %}</span>
+      <span>{{ item.date_created|date:"M j, Y" }}</span>
+    </div>
+  </div>
+  <button type="button" class="archive-manage-row-delete"
+          hx-post="{% url 'archive:item_delete' item.id %}"
+          hx-target="#archive-manage-list" hx-swap="outerHTML"
+          hx-confirm="Delete this item? This can't be undone."
+          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+          aria-label="Delete this item" title="Delete">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m-6 0 .6 9.4A2 2 0 0 0 8.6 17h2.8a2 2 0 0 0 2-1.6L14 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>

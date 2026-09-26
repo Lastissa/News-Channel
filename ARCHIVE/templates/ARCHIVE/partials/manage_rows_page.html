@@ -1,0 +1,12 @@
+{% for item in items %}
+  {% include "ARCHIVE/partials/manage_row.html" %}
+{% endfor %}
+{% if not items and page == 1 %}
+<p class="archive-empty" data-archive-manage-empty>You haven't added anything yet.</p>
+{% endif %}
+{% if has_next %}
+<button type="button" class="archive-action-btn archive-manage-more"
+        hx-post="{% url 'archive:manage_list' %}" hx-vals='{"page": "{{ next_page }}"}'
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+        hx-target="this" hx-swap="outerHTML">Load more</button>
+{% endif %}

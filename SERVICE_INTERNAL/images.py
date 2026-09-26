@@ -176,7 +176,102 @@ def upload_news_image(file, quality=ImageQuality.MEDIUM) -> str:
     return result.get("secure_url") or result.get("url")
 
 
-def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=None) -> tuple[str, int, int]:
+#   NON-IMAGE FILE UPLOAD SECTION (Archive "Add file")
+#   ------------------------------------------------------------
+#   Cloudinary has no transform pipeline for arbitrary files -- they go up
+#   as a `resource_type="raw"` asset, bytes in, bytes out, same as a plain
+#   object store would do it. Kept in its own block since it shares almost
+#   nothing with the image presets above beyond the Cloudinary client.
+
+ARCHIVE_FILE_MAX_BYTES = getattr(settings, "ARCHIVE_FILE_UPLOAD_MAX_MB", 20) * 1024 * 1024
+
+#   Deliberately an allow list, not a block list: anything not on here is
+#   rejected, including anything executable. Extend this set rather than
+#   loosening the check with a blanket "anything goes".
+ALLOWED_ARCHIVE_FILE_EXTENSIONS = {
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "csv", "txt", "rtf", "zip", "rar", "7z",
+    "mp3", "wav", "mp4", "mov", "json",
+}
+
+
+def _archive_file_extension(original_name: str) -> str:
+    return original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ""
+
+
+def _validate_archive_file(file, original_name: str) -> str:
+    """Raises ImageUploadError for a bad archive file upload, otherwise
+    returns the lowercase extension it validated against
+    ALLOWED_ARCHIVE_FILE_EXTENSIONS."""
+    if file is None:
+        raise ImageUploadError("No file was received.")
+
+    size = getattr(file, "size", None)
+    if size is not None and size > ARCHIVE_FILE_MAX_BYTES:
+        raise ImageUploadError(f"File is too large. Max allowed size is {ARCHIVE_FILE_MAX_BYTES // (1024 * 1024)}MB.")
+
+    ext = _archive_file_extension(original_name)
+    if ext not in ALLOWED_ARCHIVE_FILE_EXTENSIONS:
+        allowed = ", ".join(sorted(ALLOWED_ARCHIVE_FILE_EXTENSIONS))
+        raise ImageUploadError(f'Unsupported file type ".{ext or "?"}". Allowed types: {allowed}.')
+    return ext
+
+
+def upload_archive_file(file) -> dict:
+    """Public /archive/ gallery upload for a non-image file (see
+    upload_archive_image below for the picture path). Returns a dict with
+    everything ARCHIVE.views.ArchiveUploadView needs to persist an
+    ArchiveImage row (`kind="file"`) and everything a later moderator
+    action needs to remove the asset again (see
+    SERVICE_INTERNAL.images.destroy_archive_asset)."""
+    original_name = getattr(file, "name", "") or "file"
+    ext = _validate_archive_file(file, original_name)
+
+    try:
+        result = cloudinary.uploader.upload(
+            file,
+            resource_type="raw",
+            folder="abureport/archive",
+            use_filename=True,
+            unique_filename=True,
+            overwrite=False,
+            tags=["archive", "archive-file"],
+        )
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY UPLOAD FAILED (archive-file): {exc}")
+        raise ImageUploadError("Could not upload the file right now. Please try again.") from exc
+
+    secure_url = result.get("secure_url") or result.get("url")
+    if not secure_url:
+        error_logger(msg=f"CLOUDINARY UPLOAD (archive-file) RETURNED NO URL: {result}")
+        raise ImageUploadError("Cloudinary did not return a file URL.")
+
+    info_logger(msg=f"CLOUDINARY UPLOAD OK (archive-file): {secure_url}")
+    return {
+        "secure_url": secure_url,
+        "public_id": result.get("public_id", ""),
+        "resource_type": "raw",
+        "bytes": result.get("bytes") or getattr(file, "size", 0) or 0,
+        "original_filename": original_name,
+        "format": ext,
+    }
+
+
+def destroy_archive_asset(public_id: str, resource_type: str = "image") -> None:
+    """Best effort delete of a Cloudinary asset belonging to an
+    ArchiveImage row (see ARCHIVE.views.ArchiveItemDeleteView). Never
+    raises -- a failed remote delete must not stop the database row from
+    being removed, it just leaves an orphaned asset on Cloudinary that can
+    be cleaned up by hand later."""
+    if not public_id:
+        return
+    try:
+        cloudinary.uploader.destroy(public_id, resource_type=resource_type or "image", invalidate=True)
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY DESTROY FAILED ({public_id}): {exc}")
+
+
+def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=None) -> dict:
     """Public /archive/ gallery upload, open to any signed in user (see
     ARCHIVE.views.ArchiveUploadView). `quality` picks the same auto-quality
     tier as the news upload above, but the width/height are whatever the
@@ -189,15 +284,18 @@ def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=N
     a `1600 x height` box instead of scaling by height alone. `limit` never
     upscales, it only ever caps a dimension down.
 
-    Returns `(secure_url, actual_width, actual_height)`. The width/height
-    are read back from Cloudinary's own upload result, not from the
-    `width`/`height` arguments -- those are only a requested *ceiling*
-    (`crop: limit`), the real stored size can end up smaller (e.g. a photo
-    narrower than the requested width is never upscaled). Callers (see
+    Returns a dict: `secure_url`, `public_id`, `resource_type` (always
+    `"image"` here), and `width`/`height`. The width/height are read back
+    from Cloudinary's own upload result, not from the `width`/`height`
+    arguments -- those are only a requested *ceiling* (`crop: limit`), the
+    real stored size can end up smaller (e.g. a photo narrower than the
+    requested width is never upscaled). Callers (see
     ARCHIVE.views.ArchiveUploadView) persist these actual numbers so every
     picture in the archive can be rendered with correct <img width height>
     attributes wherever it is later embedded, instead of that information
-    being lost after upload."""
+    being lost after upload. `public_id` is kept too so a later delete
+    (see destroy_archive_asset above) can remove the exact Cloudinary
+    asset instead of only the database row."""
     _validate_image_file(file)
     preset = dict(ImageQuality.resolve(quality))
     if width or height:
@@ -210,6 +308,10 @@ def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=N
         preset["crop"] = "limit"
     result = _run_upload(file, folder="abureport/archive", preset=preset, tag="archive")
     secure_url = result.get("secure_url") or result.get("url")
-    actual_width = result.get("width") or width or 0
-    actual_height = result.get("height") or height or 0
-    return secure_url, actual_width, actual_height
+    return {
+        "secure_url": secure_url,
+        "public_id": result.get("public_id", ""),
+        "resource_type": "image",
+        "width": result.get("width") or width or 0,
+        "height": result.get("height") or height or 0,
+    }

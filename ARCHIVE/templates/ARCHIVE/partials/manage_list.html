@@ -1,0 +1,7 @@
+<div class="archive-manage-list" id="archive-manage-list">
+  {% if error %}<p class="archive-modal-error" data-archive-manage-error>{{ error }}</p>{% endif %}
+  {% if notice %}<p class="archive-manage-notice" data-archive-manage-notice>{{ notice }}</p>{% endif %}
+  <div class="archive-manage-rows" id="archive-manage-rows">
+    {% include "ARCHIVE/partials/manage_rows_page.html" %}
+  </div>
+</div>

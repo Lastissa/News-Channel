@@ -1,5 +1,12 @@
-/* /archive/ page behavior: the "+ Add Image" htmx popup (blurred wait state
-   with a 5 second watchdog) and the multipart upload submit inside it.
+/* /archive/ page behavior:
+   - the "+ Add Image / File" htmx popup (blurred wait state with a 5
+     second watchdog), its live preview (picture thumbnail or file icon),
+     and the multipart upload submit inside it.
+   - the "Edit Added Images" htmx popup uses the same watchdog/close
+     plumbing; its own edit/delete rows are plain htmx forms (see
+     ARCHIVE/templates/ARCHIVE/partials/manage_row.html), so they need no
+     JS beyond listening for the "archive:refresh" event those forms
+     trigger on success, to keep the public grid behind the popup in sync.
    Pagination itself needs no JS -- the Prev/page/Next buttons in
    gallery_grid.html are plain hx-post + hx-target and htmx does the swap. */
 (function () {
@@ -8,11 +15,10 @@
   var shell = document.querySelector(".archive-shell");
   if (!shell) return;
 
-  var ADD_MODAL_TIMEOUT_MS = 5000;
+  var MODAL_TIMEOUT_MS = 5000;
 
   var mainContent = document.getElementById("main-content");
   var overlayHost = document.querySelector("[data-archive-overlay]");
-  var addBtn = document.querySelector("[data-archive-add-btn]");
   var galleryEndpoint = shell.dataset.galleryEndpoint;
 
   function getCookie(name) {
@@ -56,6 +62,17 @@
     }, 2600);
   }
 
+  function refreshGridToPage1() {
+    if (window.htmx && galleryEndpoint) {
+      window.htmx.ajax("POST", galleryEndpoint, {
+        target: "#archive-grid-shell",
+        swap: "outerHTML",
+        values: { page: 1 },
+        headers: { "X-CSRFToken": getCookie("csrftoken") },
+      });
+    }
+  }
+
   var currentPreviewObjectUrl = null;
 
   function revokePreviewObjectUrl() {
@@ -70,10 +87,11 @@
     if (overlayHost) overlayHost.innerHTML = "";
   }
 
-  /* ---------- Add Image: show a preview of the chosen picture before it
-     uploads, and pre-fill width/height from its real size so the required
-     boxes rarely need typing by hand -- the uploader can still edit them
-     to request a smaller export. ---------- */
+  /* ---------- Add Image / File: show a preview of whatever was chosen
+     before it uploads. A picture gets the usual thumbnail + pre-filled
+     width/height (still editable) and shows the image-only fields; any
+     other file gets a plain file icon + its name, and the image-only
+     fields (width/height/quality) are hidden since they don't apply. ---------- */
   document.addEventListener("change", function (event) {
     var fileInput = event.target;
     if (!fileInput.matches || !fileInput.matches("[data-archive-upload-file]")) return;
@@ -83,37 +101,60 @@
 
     var previewWrap = form.querySelector("[data-archive-upload-preview]");
     var previewImg = form.querySelector("[data-archive-upload-preview-img]");
+    var previewFile = form.querySelector("[data-archive-upload-preview-file]");
+    var previewFilename = form.querySelector("[data-archive-upload-preview-filename]");
     var widthInput = form.querySelector("#archive-upload-width");
     var heightInput = form.querySelector("#archive-upload-height");
+    var imageOnlyFields = form.querySelectorAll("[data-archive-image-only]");
 
     revokePreviewObjectUrl();
 
     var file = fileInput.files && fileInput.files[0];
     if (!file) {
       if (previewWrap) previewWrap.hidden = true;
-      if (previewImg) previewImg.removeAttribute("src");
+      if (previewImg) { previewImg.hidden = true; previewImg.removeAttribute("src"); }
+      if (previewFile) previewFile.hidden = true;
+      for (var i = 0; i < imageOnlyFields.length; i++) imageOnlyFields[i].style.display = "";
       return;
     }
 
-    currentPreviewObjectUrl = URL.createObjectURL(file);
-    if (previewImg) previewImg.src = currentPreviewObjectUrl;
-    if (previewWrap) previewWrap.hidden = false;
+    var isImage = (file.type || "").indexOf("image/") === 0;
 
-    var probe = new Image();
-    probe.onload = function () {
-      if (widthInput && !widthInput.value) widthInput.value = probe.naturalWidth;
-      if (heightInput && !heightInput.value) heightInput.value = probe.naturalHeight;
-    };
-    probe.src = currentPreviewObjectUrl;
+    for (var j = 0; j < imageOnlyFields.length; j++) {
+      imageOnlyFields[j].style.display = isImage ? "" : "none";
+    }
+
+    if (isImage) {
+      currentPreviewObjectUrl = URL.createObjectURL(file);
+      if (previewImg) { previewImg.src = currentPreviewObjectUrl; previewImg.hidden = false; }
+      if (previewFile) previewFile.hidden = true;
+      if (previewWrap) previewWrap.hidden = false;
+
+      var probe = new Image();
+      probe.onload = function () {
+        if (widthInput && !widthInput.value) widthInput.value = probe.naturalWidth;
+        if (heightInput && !heightInput.value) heightInput.value = probe.naturalHeight;
+      };
+      probe.src = currentPreviewObjectUrl;
+    } else {
+      if (previewImg) previewImg.hidden = true;
+      if (previewFile) previewFile.hidden = false;
+      if (previewFilename) previewFilename.textContent = file.name;
+      if (previewWrap) previewWrap.hidden = false;
+      if (widthInput) widthInput.value = "";
+      if (heightInput) heightInput.value = "";
+    }
   });
 
-  /* ---------- Add Image: blur the page while the htmx popup loads,
-     unblur (+ timeout message) if nothing arrives within 5 seconds ---------- */
-  if (addBtn && overlayHost && mainContent) {
+  /* ---------- Add Image/File + Edit Added Images: blur the page while
+     the htmx popup loads, unblur (+ timeout message) if nothing arrives
+     within 5 seconds. Both header buttons share this behavior. ---------- */
+  function bindOpenWatchdog(btn) {
+    if (!btn || !overlayHost || !mainContent) return;
     var watchdogTimer = null;
     var pendingXhr = null;
 
-    addBtn.addEventListener("htmx:beforeRequest", function (event) {
+    btn.addEventListener("htmx:beforeRequest", function (event) {
       pendingXhr = event.detail && event.detail.xhr;
       mainContent.classList.add("archive-page-blur");
       watchdogTimer = window.setTimeout(function () {
@@ -122,10 +163,10 @@
         pendingXhr = null;
         mainContent.classList.remove("archive-page-blur");
         toast("Timeout, please try again.", "error");
-      }, ADD_MODAL_TIMEOUT_MS);
+      }, MODAL_TIMEOUT_MS);
     });
 
-    addBtn.addEventListener("htmx:afterRequest", function (event) {
+    btn.addEventListener("htmx:afterRequest", function (event) {
       pendingXhr = null;
       if (watchdogTimer) { window.clearTimeout(watchdogTimer); watchdogTimer = null; }
       mainContent.classList.remove("archive-page-blur");
@@ -133,12 +174,15 @@
       var status = event.detail && event.detail.xhr ? event.detail.xhr.status : 0;
       if (!event.detail.successful && status !== 0) {
         var responseText = event.detail.xhr ? event.detail.xhr.responseText : "";
-        toast(extractDetail(responseText, "Could not open the upload form."), "error");
+        toast(extractDetail(responseText, "Could not open the popup."), "error");
       }
       /* status === 0 already got its own message from the watchdog above,
          unless it was a plain network drop -- either way nothing more to say. */
     });
   }
+
+  bindOpenWatchdog(document.querySelector("[data-archive-add-btn]"));
+  bindOpenWatchdog(document.querySelector("[data-archive-manage-btn]"));
 
   /* ---------- close the popup: backdrop, close button, Escape ---------- */
   document.addEventListener("click", function (event) {
@@ -148,8 +192,17 @@
     if (event.key === "Escape" && overlayHost && overlayHost.querySelector("[data-archive-modal]")) closeModal();
   });
 
-  /* ---------- Add Image: the actual upload submit (plain fetch, not htmx,
-     so the multipart file upload behaves exactly like every other image
+  /* ---------- Edit Added Images: an edit/save or a delete inside the
+     manage popup re-renders the manage list itself via plain htmx (see
+     manage_row.html) and, on success, sends back an "HX-Trigger:
+     archive:refresh" response header -- htmx turns that into a DOM event
+     on the element that made the request, which bubbles up to here. ---------- */
+  document.body.addEventListener("archive:refresh", function () {
+    refreshGridToPage1();
+  });
+
+  /* ---------- Add Image/File: the actual upload submit (plain fetch, not
+     htmx, so the multipart file upload behaves exactly like every other
      upload form in this project) ---------- */
   document.addEventListener("submit", function (event) {
     var form = event.target;
@@ -177,32 +230,25 @@
         var payload = {};
         try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* non JSON body, fall back below */ }
 
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Upload image"; }
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Upload"; }
 
         if (!result.ok) {
-          var message = payload.detail || "Could not upload the image.";
+          var message = payload.detail || "Could not upload.";
           if (errorNode) { errorNode.textContent = message; errorNode.hidden = false; }
           else toast(message, "error");
           return;
         }
 
         closeModal();
-        toast(payload.detail || "Image added to the archive.");
+        toast(payload.detail || "Added to the archive.");
 
-        /* Refresh the grid back to page 1 so the new picture shows up at
-           the top, the same way the rest of the archive pager swaps. */
-        if (window.htmx && galleryEndpoint) {
-          window.htmx.ajax("POST", galleryEndpoint, {
-            target: "#archive-grid-shell",
-            swap: "outerHTML",
-            values: { page: 1 },
-            headers: { "X-CSRFToken": getCookie("csrftoken") },
-          });
-        }
+        /* Refresh the grid back to page 1 so the new item shows up at the
+           top, the same way the rest of the archive pager swaps. */
+        refreshGridToPage1();
       })
       .catch(function () {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Upload image"; }
-        if (errorNode) { errorNode.textContent = "Network error. The image was not uploaded."; errorNode.hidden = false; }
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Upload"; }
+        if (errorNode) { errorNode.textContent = "Network error. Nothing was uploaded."; errorNode.hidden = false; }
       });
   });
 })();

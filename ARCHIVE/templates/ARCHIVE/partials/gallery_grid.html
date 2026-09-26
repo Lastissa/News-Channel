@@ -5,26 +5,39 @@
   <div class="archive-grid">
     {% for image in images %}
     {% with proxied_url=image.url|cloudinary_proxy %}
-    <article class="archive-card">
-      <div class="archive-card-media">
+    <article class="archive-card" id="archive-card-{{ image.id }}">
+      <div class="archive-card-media{% if image.kind == 'file' %} archive-card-media-file{% endif %}">
+        {% if image.kind == 'image' %}
         <img src="{{ proxied_url }}" width="{{ image.width }}" height="{{ image.height }}"
              alt="{{ image.alt }}" loading="lazy" onerror="this.onerror=null;this.src='/static/404.jpg';">
+        {% else %}
+        <a class="archive-card-file-icon" href="{{ proxied_url }}?filename={{ image.original_filename|urlencode }}"
+           download="{{ image.original_filename }}" aria-label="Download {{ image.alt }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {% if image.file_extension %}<span class="archive-card-file-ext">.{{ image.file_extension|lower }}</span>{% endif %}
+        </a>
+        {% endif %}
       </div>
       <div class="archive-card-body">
         <p class="archive-card-desc">{{ image.alt }}</p>
         <div class="archive-card-meta">
           <span class="archive-card-uploader" title="Uploaded by">{{ image.uploader_email }}</span>
+          {% if image.kind == 'image' %}
           <span class="archive-card-quality-tag">{{ image.quality_label }}</span>
+          {% else %}
+          <span class="archive-card-quality-tag">{{ image.file_size_label }}</span>
+          {% endif %}
         </div>
         <div class="archive-card-actions">
-          <a class="archive-card-btn" href="{{ proxied_url }}" download target="_blank" rel="noopener noreferrer">
+          <a class="archive-card-btn" href="{{ proxied_url }}{% if image.kind == 'file' %}?filename={{ image.original_filename|urlencode }}{% endif %}"
+             download="{{ image.original_filename }}" target="_blank" rel="noopener noreferrer">
             <svg viewBox="0 0 20 20" class="archive-card-btn-icon" aria-hidden="true"><path d="M10 3v9m0 0l-3.5-3.5M10 12l3.5-3.5M4 15h12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Download
           </a>
           <button type="button" class="archive-card-btn" data-share-btn
-                  data-share-url="{{ request.scheme }}://{{ request.get_host }}{{ proxied_url }}">
+                  data-share-url="{% if image.kind == 'image' %}imgl {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% else %}filel {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% endif %}">
             <svg viewBox="0 0 20 20" class="archive-card-btn-icon" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 13V5a1.5 1.5 0 0 1 1.5-1.5H13" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-            Copy URL
+            Copy url
           </button>
         </div>
       </div>
@@ -62,6 +75,6 @@
   </nav>
   {% endif %}
   {% else %}
-  <p class="archive-empty">No pictures in the archive yet.</p>
+  <p class="archive-empty">No pictures or files in the archive yet.</p>
   {% endif %}
 </div>
