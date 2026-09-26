@@ -10,6 +10,7 @@ from django.db import IntegrityError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
+from django.contrib import messages
 
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import error_logger, is_rate_limited
@@ -153,6 +154,8 @@ class ArchiveGalleryView(View):
     def get(self, request):
         context = _paginate(page_number=1)
         context["can_upload"] = is_authenticated(request.user)
+        if not request.user.is_authenticated:
+            messages.info(request, message="Log In To Upload Your Own Images")
         return render(request, "ARCHIVE/gallery.html", context)
 
     def post(self, request):

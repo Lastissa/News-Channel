@@ -39,7 +39,7 @@ cloudinary.config(
 #   before it ever leaves the server.
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 
-MAX_UPLOAD_BYTES = getattr(settings, "IMAGE_UPLOAD_MAX_MB", 8) * 1024 * 1024
+MAX_UPLOAD_BYTES = getattr(settings, "IMAGE_UPLOAD_MAX_MB", 5) * 1024 * 1024
 
 
 class ImageUploadError(Exception):

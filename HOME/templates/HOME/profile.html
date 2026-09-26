@@ -58,8 +58,8 @@
       <div class="profile-setting-block">
         <div class="setting-row">
           <div class="setting-copy">
-            <span class="setting-label">Alert</span>
-            <small>{% if user.receive_email_login_alert %}Receiving login alert{% else %}Not receiving login alert{% endif %}</small>
+            <span class="setting-label">Login Alert</span>
+            {% comment %} <small>{% if user.receive_email_login_alert %}Receiving login alert{% else %}Not receiving login alert{% endif %}</small> {% endcomment %}
           </div>
           <div class="newsletter-toggle-wrap">
             <button
@@ -82,7 +82,7 @@
         <div class="setting-row">
           <div class="setting-copy">
             <span class="setting-label">Story views alert</span>
-            <small>{% if profile.get_blog_notification %}Receiving view alert for stories{% else %}Not receiving view alert{% endif %}</small>
+            {% comment %} <small>{% if profile.get_blog_notification %}Receiving view alert for stories{% else %}Not receiving view alert{% endif %}</small> {% endcomment %}
           </div>
           <div class="newsletter-toggle-wrap">
             <button
@@ -108,7 +108,7 @@
             Currently i plan to send all news with info that they once they have at least one suscribed author, they get only news alert from that one
             {% endcomment %}
             <span class="setting-label">News Alert</span>
-            <small>{% if user.send_newsletter %}Receiving news updates{% else %}Not receiving news updates{% endif %}</small>
+            {% comment %} <small>{% if user.send_newsletter %}Receiving news updates{% else %}Not receiving news updates{% endif %}</small> {% endcomment %}
           </div>
           <div class="newsletter-toggle-wrap">
             <button

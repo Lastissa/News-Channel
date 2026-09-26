@@ -109,7 +109,7 @@ class Blog(models.Model):
         return self.author.email.split("@")[0].title()
 
     def __str__(self):
-        return f"{self.author.email} {self.views} + {self.heading[:20]}"
+        return f"{self.author.email.split("@")[0]}. {self.views} Views. {self.heading[:20]}"
     
 class Comment(models.Model):
     """Comment / Feedback under the blog post"""
