@@ -29,6 +29,7 @@ from SERVICE_INTERNAL.abstract import (
 from SERVICE_INTERNAL.config import About, StaffConfig
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
+from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
 from STAFF.models import GENDER_CHOICES, FollowRelationship, StaffProfile
@@ -366,6 +367,14 @@ class AddNewsView(View):
                 {"detail": "You already have a story with this exact heading in this category. Edit the heading or choose a different category."},
                 status=400,
             )
+
+        story_url = f"{About.domain.rstrip('/')}{reverse('blog:story_detail', args=[blog.slug])}"
+        #   TELL BING/INDEXNOW RIGHT AWAY THAT THIS ONE STORY EXISTS, instead
+        #   of waiting for their crawler to stumble on it later -- see
+        #   SERVICE_INTERNAL.indexnow.ping_indexnow. Fire-and-forget: this
+        #   can never fail the publish itself.
+        ping_indexnow(story_url)
+
         return _response(
             {"detail": "Story published.", "story_url": reverse("blog:story_detail", args=[blog.slug]), "id": blog.pk},
             status=201,

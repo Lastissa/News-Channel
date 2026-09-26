@@ -36,7 +36,7 @@
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
             <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
             <li><a href="{% url 'home:profile' %}#reading-history">Stories history</a></li>
-            <li><a href="{% url 'home:profile' %}#recent-comments">Comment history</a></li>
+            <li><a href="{% url 'home:profile' %}#recent-comments">Comment history</a></li>          <li>portfolio</li>
           </ul>
         </li>
         <li class="nav-logout-item">
@@ -50,7 +50,6 @@
         <li><a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}">Log in</a></li>
         {% endif %}
         {% if request.user.is_authenticated and request.user.is_staff == True %}
-        <li>portfolio</li>
         {% endif %}
       </ul>
     </nav>

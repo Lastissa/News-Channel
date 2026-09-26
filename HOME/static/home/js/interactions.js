@@ -386,12 +386,6 @@
       });
   });
 
-  /* ---------- profile avatar: select, resize, preview, confirm, then upload ----------
-     Picking a file only opens the adjust window. The photo is repositioned and
-     zoomed there, cropped to a square on a canvas, and nothing leaves the
-     browser until "Confirm upload" is pressed. The upload goes to the same
-     endpoint as before, and the server stores it over the user's existing
-     avatar instead of adding a new image. */
   (function initAvatarCropper() {
     var MAX_AVATAR_BYTES = 8 * 1024 * 1024;   /* largest file we will even open */
     var OUTPUT_PX = 512;                      /* same size as the preset in SERVICE_INTERNAL/images.py */
