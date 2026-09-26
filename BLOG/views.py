@@ -18,10 +18,21 @@ from .models import Blog, Comment
 
 URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 
-#   INLINE FLOATED IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text".
-#   Must be checked before headings/bold/italic so the URL + alt text are
-#   never consumed by those markers (see DOCS/NEWS_CONTENT_CONVENTION.MD).
-IMG_TOKEN_RE = re.compile(r"^(imgl|imgr)\s+(\S+)(?:\s+(.*))?$")
+#   INLINE IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text" (floated,
+#   text wraps around it) / "imgc URL alt text" (centered, blocking -- the
+#   surrounding text does NOT wrap it, still kept smaller than the
+#   top-level/hero image). Must be checked before headings/bold/italic so
+#   the URL + alt text are never consumed by those markers (see
+#   DOCS/NEWS_CONTENT_CONVENTION.MD).
+IMG_TOKEN_RE = re.compile(r"^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$")
+
+#   Which floated/blocking CSS class each keyword above renders with -- see
+#   _render_inline_image below.
+IMG_SIDE_CLASSES = {
+    "imgl": "story-inline-img-left",
+    "imgr": "story-inline-img-right",
+    "imgc": "story-inline-img-center",
+}
 
 #   INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
 #   the image token above (keyword, URL, optional trailing text) but
@@ -64,8 +75,11 @@ def _archive_dimensions_for_url(url):
 
 
 def _render_inline_image(direction, url, alt_text):
-    """Build the floated inline <img> for an imgl/imgr token. Smaller than
-    the top-level hero image and floated so surrounding text wraps it.
+    """Build the inline <img> for an imgl/imgr/imgc token. Always smaller
+    than the top-level hero image. imgl/imgr float left/right so
+    surrounding text wraps it; imgc is centered and blocking -- it sits on
+    its own line and nothing wraps around it, it is just kept smaller than
+    the hero image the same way imgl/imgr are.
 
     Width/height: if `url` is a picture from /archive/, its real, stored
     size (see _archive_dimensions_for_url above) is rendered straight onto
@@ -80,7 +94,7 @@ def _render_inline_image(direction, url, alt_text):
     attributes are about reserving space and giving the browser real
     numbers to shrink from, not about overriding that cap."""
     alt = (alt_text or "").strip() or _image_filename_from_url(url)
-    side_class = "story-inline-img-left" if direction == "imgl" else "story-inline-img-right"
+    side_class = IMG_SIDE_CLASSES.get(direction, "story-inline-img-left")
     safe_url = html.escape(url, quote=True)
     safe_alt = html.escape(alt, quote=True)
 
@@ -114,7 +128,7 @@ def _render_inline_file(url, display_text):
     safe_label = html.escape(label, quote=True)
     return (
         f'<a class="story-inline-file" href="{safe_url}" download rel="noopener noreferrer">'
-        f'<span class="story-inline-file-icon" aria-hidden="true">&#128206;</span>{safe_label}</a>'
+        f'<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>{safe_label}</a>'
     )
 
 
@@ -186,7 +200,7 @@ def parse_story_content(content):
             current = lines[i].strip()
             if not current:
                 break
-            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|filel\s+)", current):
+            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|filel\s+)", current):
                 break
             paragraph_lines.append(current)
             i += 1
@@ -203,39 +217,49 @@ def parse_story_content(content):
 TICKER_MARKER_RE = re.compile(r"^(#{1,6}\s*|\*\s+|\d+\.\s+)")
 
 
+def _clean_content_block(block):
+    """Plain-text rendering of one content block (one paragraph/heading/list
+    chunk, i.e. the text between blank lines): strips this project's
+    markdown-style markers (#, *, __, **) and replaces an inline
+    imgl/imgr/imgc token with its alt text and a filel token with its link
+    text, so nothing but readable prose survives. Shared by build_ticker_text
+    (the whole story, for the reading marquee) and the og/meta excerpt built
+    in StoryDetailView.get (just the story's first block) -- neither should
+    ever leak a raw imgl/imgr/imgc/filel token, or a leftover #/*/**/__
+    marker, into what a reader (or a search engine's snippet/the page's own
+    <head> tags) sees."""
+    lines = []
+    for line in block.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        img_match = IMG_TOKEN_RE.match(line)
+        if img_match:
+            _, img_url, img_alt = img_match.groups()
+            line = (img_alt or "").strip() or _image_filename_from_url(img_url)
+        else:
+            file_match = FILE_TOKEN_RE.match(line)
+            if file_match:
+                file_url, file_text = file_match.groups()
+                line = (file_text or "").strip() or _image_filename_from_url(file_url)
+            else:
+                line = TICKER_MARKER_RE.sub("", line)
+                line = line.replace("**", "").replace("__", "")
+        if line:
+            lines.append(line)
+    return " ".join(lines).strip()
+
+
 def build_ticker_text(content):
     """Plain-text feed for the reading marquee at the top of the story page.
-    Strips this project's markdown-style markers (#, *, __, **, imgl/imgr,
-    filel) and joins every paragraph/block with ' * ' so the whole story
-    can be read in one continuous pass while it scrolls."""
+    Cleans every paragraph/block with _clean_content_block above and joins
+    them with ' * ' so the whole story can be read in one continuous pass
+    while it scrolls."""
     if not content:
         return ""
 
     blocks = [block for block in re.split(r"\n\s*\n", content.strip()) if block.strip()]
-    cleaned_blocks = []
-    for block in blocks:
-        lines = []
-        for line in block.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            img_match = IMG_TOKEN_RE.match(line)
-            if img_match:
-                _, img_url, img_alt = img_match.groups()
-                line = (img_alt or "").strip() or _image_filename_from_url(img_url)
-            else:
-                file_match = FILE_TOKEN_RE.match(line)
-                if file_match:
-                    file_url, file_text = file_match.groups()
-                    line = (file_text or "").strip() or _image_filename_from_url(file_url)
-                else:
-                    line = TICKER_MARKER_RE.sub("", line)
-                    line = line.replace("**", "").replace("__", "")
-            if line:
-                lines.append(line)
-        text = " ".join(lines).strip()
-        if text:
-            cleaned_blocks.append(text)
+    cleaned_blocks = [text for block in blocks if (text := _clean_content_block(block))]
 
     return " * ".join(cleaned_blocks)
 
@@ -304,9 +328,11 @@ class StoryDetailView(View):
             AuthorFollow.objects.filter(author=blog.author).count() if author_has_portfolio else 0
         )
         #   FOR OG DESCRIPTION TO BE CLEAN AND CLEAR carrying the first paragrah 
-        og_descr = re.split(r'\n\s*\n', blog.content.strip(), maxsplit=1)[0]
-        og_descr = og_descr.lstrip('#')
-        for chars in ['**', '__']:og_descr = og_descr.replace(chars, '')
+        #   -- _clean_content_block also drops any imgl/imgr/imgc/filel token
+        #   down to just its alt/link text, so one never leaks into the
+        #   <head> meta/JSON-LD tags this feeds (see StoryDetailView.get context).
+        og_descr_block = re.split(r'\n\s*\n', blog.content.strip(), maxsplit=1)[0]
+        og_descr = _clean_content_block(og_descr_block)
         if len(og_descr) > 400: og_descr = og_descr[:400]
         context = {
             "blog": blog,

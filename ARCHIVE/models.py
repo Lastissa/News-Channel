@@ -42,7 +42,7 @@ class ArchiveImage(models.Model):
     #   ARCHIVE.views.ArchiveUploadView -- so every picture in the archive
     #   always has real dimensions to render with (used for the <img width
     #   height> attributes here and wherever this picture is embedded via an
-    #   imgl/imgr token, see BLOG.views._render_inline_image). Left at 0/0
+    #   imgl/imgr/imgc token, see BLOG.views._render_inline_image). Left at 0/0
     #   for kind=FILE, where a pixel size makes no sense.
     width = models.PositiveIntegerField(default=0)
     height = models.PositiveIntegerField(default=0)

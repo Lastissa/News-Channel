@@ -72,10 +72,24 @@
     return safe;
   }
 
-  /* INLINE FLOATED IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text".
+  /* INLINE IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text" (floated,
+     text wraps around it) / "imgc URL alt text" (centered, blocking --
+     never floated/wrapped, still kept smaller than the hero image).
      Checked before headings/bold/italic so the URL + alt text are never
      consumed by those markers -- mirrors IMG_TOKEN_RE in BLOG/views.py. */
-  var imgTokenRe = /^(imgl|imgr)\s+(\S+)(?:\s+(.*))?$/;
+  var imgTokenRe = /^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$/;
+
+  /* INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
+     the image token above (keyword, URL, optional trailing text) but
+     renders as a downloadable link in the normal flow of the paragraph --
+     mirrors FILE_TOKEN_RE / _render_inline_file in BLOG/views.py. */
+  var fileTokenRe = /^filel\s+(\S+)(?:\s+(.*))?$/;
+
+  var IMG_SIDE_CLASSES = {
+    imgl: "story-inline-img-left",
+    imgr: "story-inline-img-right",
+    imgc: "story-inline-img-center"
+  };
 
   function imageFilenameFromUrl(url) {
     var withoutQuery = url.split(/[?#]/)[0];
@@ -85,8 +99,14 @@
 
   function renderInlineImage(direction, url, altText) {
     var alt = (altText || "").trim() || imageFilenameFromUrl(url);
-    var sideClass = direction === "imgl" ? "story-inline-img-left" : "story-inline-img-right";
+    var sideClass = IMG_SIDE_CLASSES[direction] || "story-inline-img-left";
     return '<img class="story-inline-img ' + sideClass + '" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">';
+  }
+
+  function renderInlineFile(url, displayText) {
+    var label = (displayText || "").trim() || imageFilenameFromUrl(url);
+    return '<a class="story-inline-file" href="' + escapeAttr(url) + '" download rel="noopener noreferrer">' +
+      '<span class="story-inline-file-icon" aria-hidden="true">&#128206;</span>' + escapeHtml(label) + "</a>";
   }
 
   function parseStoryContent(content) {
@@ -98,7 +118,7 @@
     var headingRe = /^(#+)\s*(.*)$/;
     var bulletRe = /^\*\s+/;
     var orderedRe = /^\d+\.\s+/;
-    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+)/;
+    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|filel\s+)/;
 
     while (i < lines.length) {
       var line = lines[i].trim();
@@ -107,6 +127,13 @@
       var imgMatch = line.match(imgTokenRe);
       if (imgMatch) {
         blocks.push(renderInlineImage(imgMatch[1], imgMatch[2], imgMatch[3]));
+        i += 1;
+        continue;
+      }
+
+      var fileMatch = line.match(fileTokenRe);
+      if (fileMatch) {
+        blocks.push(renderInlineFile(fileMatch[1], fileMatch[2]));
         i += 1;
         continue;
       }

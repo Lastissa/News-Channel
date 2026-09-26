@@ -35,7 +35,8 @@
             Download
           </a>
           <button type="button" class="archive-card-btn" data-share-btn
-                  data-share-url="{% if image.kind == 'image' %}imgl {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% else %}filel {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% endif %}">
+                  data-share-url="{{request.scheme }}://{{ request.get_host }}{{ proxied_url }}">
+                  {% comment %} data-share-url="{% if image.kind == 'image' %}imgl {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% else %}filel {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% endif %}"> {% endcomment %}
             <svg viewBox="0 0 20 20" class="archive-card-btn-icon" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 13V5a1.5 1.5 0 0 1 1.5-1.5H13" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
             Copy url
           </button>

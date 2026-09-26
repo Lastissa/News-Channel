@@ -4,7 +4,7 @@ instead of res.cloudinary.com (see ARCHIVE.views.CloudinaryProxyView,
 which does the real fetch behind the scenes). Used everywhere an <img>,
 download link, or og:image in the project points at a picture this
 project uploaded to Cloudinary (archive pictures, story hero images,
-inline imgl/imgr pictures, avatars, ...).
+inline imgl/imgr/imgc pictures, avatars, ...).
 """
 
 import re

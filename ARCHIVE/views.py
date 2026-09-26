@@ -367,7 +367,7 @@ class ArchiveItemDeleteView(View):
         item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
         destroy_archive_asset(item.public_id, item.resource_type)
         item.delete()
-
+        "TODO: also delete it in the cloudinary table itslelf, not just here."
         context = _paginate_own(request.user, page_number=1)
         context["notice"] = "Item deleted."
         response = render(request, "ARCHIVE/partials/manage_list.html", context)

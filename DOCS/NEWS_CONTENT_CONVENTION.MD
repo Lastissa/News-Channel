@@ -98,20 +98,22 @@ Rule:
 
 ### 7) INLINE IMAGES
 
-Any line that starts with imgl or imgr should be treated as an inline, floated image.
+Any line that starts with imgl, imgr, or imgc should be treated as an inline image.
 
 Example:
 
 imgl https://a.com/pic.jpg A cat sitting
 imgr https://a.com/pic.jpg A dog running
+imgc https://a.com/pic.jpg A city skyline at night
 
 Rule:
-- The first word on the line is the keyword: imgl or imgr.
+- The first word on the line is the keyword: imgl, imgr, or imgc.
 - The second word is the image URL.
 - Everything after the URL, on the same line, is the alt text.
 - imgl floats the image left. imgr floats the image right. In both cases the surrounding paragraph text wraps around the image; it is never rendered as its own full-width block.
+- imgc centers the image and blocks -- it sits on its own line, and unlike imgl/imgr nothing wraps around it.
 - If no alt text is given after the URL, the parser falls back to the filename taken from the URL. Example: imgl https://a.com/cat.jpg produces alt="cat.jpg".
-- The inline image is always rendered smaller than the page's top-level (hero) image.
+- The inline image (imgl, imgr, or imgc) is always rendered smaller than the page's top-level (hero) image.
 - This token is parsed before headings, bold, and italic, so an image URL or its alt text is never partially consumed by #, **, or __.
 - Do not introduce an alternate syntax for inline images.
 
@@ -127,7 +129,7 @@ Rule:
 - The first word on the line is the keyword: filel.
 - The second word is the file URL.
 - Everything after the URL, on the same line, is the link text shown to the reader.
-- Unlike imgl/imgr, a filel link is never floated -- it sits inside the normal paragraph flow, as a plain download link.
+- Unlike imgl/imgr, a filel link is never floated -- it sits inside the normal paragraph flow, as a plain download link (imgc is not floated either, but it still blocks onto its own line the way a picture does; filel never does that).
 - Clicking it downloads the file instead of navigating the reader away from the story.
 - If no link text is given after the URL, the parser falls back to the filename taken from the URL. Example: filel https://a.com/report.pdf produces the visible text "report.pdf".
 - This token is parsed before headings, bold, and italic, so a file URL or its link text is never partially consumed by #, **, or __.
@@ -150,6 +152,7 @@ Recommended guidance for writers:
 - Paste links normally as full URLs.
 - Use bold or italic only when needed, using the allowed markers.
 - Start a new line with imgl or imgr, followed by the image URL and optional alt text, to place a small inline image that floats left or right.
+- Start a new line with imgc, followed by the image URL and optional alt text, to place a small inline image that is centered and blocking instead of floated.
 
 ---
 
@@ -157,7 +160,7 @@ Recommended guidance for writers:
 
 To avoid conflict, the parser should process content in this order:
 
-1. Detect inline image tokens (imgl/imgr) first, so their URL and alt text are never consumed by another marker
+1. Detect inline image tokens (imgl/imgr/imgc) first, so their URL and alt text are never consumed by another marker
 2. Detect heading blocks next
 3. Detect unordered and ordered list blocks next
 4. Detect URL links in text
@@ -178,7 +181,7 @@ This is the most important rule:
 - Italic: __ only
 - Bold: ** only
 - Link: http:// or https:// only
-- Inline image: imgl (left) or imgr (right) only
+- Inline image: imgl (left), imgr (right), or imgc (centered, blocking) only
 
 Do not introduce alternate patterns for the same purpose. This keeps the editor simple and the parser reliable.
 

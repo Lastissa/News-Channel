@@ -722,9 +722,43 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .story-inline-img-left { float: left; margin: 4px 18px 12px 0;}
 .story-inline-img-right { float: right; margin: 4px 0 12px 18px; }
+/*  imgc: centered and blocking -- unlike imgl/imgr it is never floated, so
+    text never wraps it, it just sits on its own line. Still kept
+    noticeably smaller than the top-level hero (.story-hero-figure), and
+    a little larger than the floated imgl/imgr variant since it has a full
+    line to itself. `clear: both` keeps it below any imgl/imgr float still
+    open above it instead of sitting beside one. */
+.story-inline-img-center {
+  float: none; clear: both; display: block; margin: 14px auto;
+  max-width: min(65%, 460px); max-height: 320px;
+}
 @media (max-width: 599.98px) {
   .story-inline-img { max-width: min(55%, 200px); max-height: 190px; }
+  .story-inline-img-center { max-width: min(85%, 320px); max-height: 260px; }
 }
+/*  filel: inline downloadable file link (never floated -- a file has no
+    picture to wrap text around, see DOCS/NEWS_CONTENT_CONVENTION.MD). Kept
+    here alongside the imgl/imgr/imgc rules above because both the
+    published story page (story_detail.html) and the Add News live preview
+    (add-news-editor.js) render the real story-body markup styled straight
+    from this file -- see the comment on .editor-preview-frame in
+    add-news.css. `.story-body a.story-inline-file` beats the plain
+    `.story-body a` link styling below (underline + amber color) on
+    specificity so this renders as its own pill-shaped button instead. */
+.story-inline-file,
+.story-body a.story-inline-file {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 4px 0; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper-dim); color: var(--ink);
+  font-weight: 700; font-size: 0.92rem; text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.story-body a.story-inline-file:hover, .story-body a.story-inline-file:focus-visible,
+.story-inline-file:hover, .story-inline-file:focus-visible {
+  background: var(--ink); color: var(--paper); border-color: var(--ink); transform: translateY(-1px);
+}
+.story-inline-file-icon { font-size: 1.05em; line-height: 1; }
 .story-body > p,
 .story-body > ul,
 .story-body > ol,
@@ -808,9 +842,13 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .author-card-tags {
   display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px;
 }
+/*  Parallelogram tag, same slanted-cut look as .story-kicker above (the
+    category chip in the story header) for visual consistency between the
+    two -- clip-path replaces the plain rounded-pill shape. */
 .author-card-tag {
-  display: inline-flex; padding: 3px 9px; border-radius: 999px; background: var(--paper-dim);
-  border: 1px solid var(--line); color: var(--ink-soft); font-size: 0.72rem; font-weight: 700;
+  display: inline-flex; padding: 4px 12px 4px 16px; background: var(--nav-bg);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  border: none; color: var(--nav-fg); font-size: 0.72rem; font-weight: 700;
   letter-spacing: 0.05em; text-transform: uppercase;
 }
 .author-card-label {
