@@ -17,7 +17,7 @@
     </h1>
     <div class="profile-header-actions">
       {% if is_admin_user %}
-        <a href="{% url 'control:staff_create' %}" class="profile-add-news-link">+ Staff</a>
+        <a href="{% url 'control:panel' %}" class="profile-add-news-link">PANEL</a>
       {% endif %}
       {% if show_staff_dashboard %}
         <a href="{% url 'home:add_news' %}" class="profile-add-news-link" data-add-news-link> <b>+</b> NeWs</a>
@@ -168,55 +168,6 @@
     </aside>
 
     <main class="profile-main">
-      {% if is_admin_user %}
-        <section class="profile-card profile-panel" id="staff-directory">
-          <div class="panel-header">
-            <h3>All staff</h3>
-            <span class="panel-tag">{{ staff_directory_page_obj.paginator.count }} total</span>
-          </div>
-          <div id="profile-staff-list" class="profile-bookmark-shell" data-staff-page="{{ staff_directory_page_obj.number }}" data-staff-endpoint="{% url 'control:staff_directory' %}">
-            {% if staff_directory %}
-            <ul class="profile-list staff-directory-list">
-              {% for member in staff_directory %}
-              <li>
-                <div>
-                  <strong>{{ member.heading }}</strong>
-                  <small>{{ member.detail }}</small>
-                </div>
-                <a href="{{ member.url }}">Open</a>
-              </li>
-              {% endfor %}
-            </ul>
-            {% else %}
-            <p class="empty-copy">This is Almost impossible to reach as you are a staff yourself and you are supposed to show but only reachable if no staff account was found though. Contact Developer +2348113577875</p>
-            {% endif %}
-          </div>
-
-          {% if staff_directory_page_obj.paginator.num_pages > 1 %}
-          <nav class="story-pagination profile-staff-pagination" aria-label="Staff pagination">
-            {% if staff_directory_page_obj.has_previous %}
-              <button type="button" class="story-page-btn page-nav" data-staff-page-btn data-page="{{ staff_directory_page_obj.previous_page_number }}">Prev</button>
-            {% endif %}
-
-            {% for page_num in staff_directory_page_range %}
-              {% if page_num == staff_directory_page_obj.paginator.ELLIPSIS %}
-                <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
-              {% else %}
-                <button type="button" class="story-page-btn {% if page_num == staff_directory_page_obj.number %}is-active{% endif %}"
-                        data-staff-page-btn data-page="{{ page_num }}"
-                        aria-label="Go to page {{ page_num }}"
-                        {% if page_num == staff_directory_page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
-              {% endif %}
-            {% endfor %}
-
-            {% if staff_directory_page_obj.has_next %}
-              <button type="button" class="story-page-btn page-nav" data-staff-page-btn data-page="{{ staff_directory_page_obj.next_page_number }}">Next</button>
-            {% endif %}
-          </nav>
-          {% endif %}
-        </section>
-      {% endif %}
-
       {% if show_staff_dashboard %}
         <section class="profile-card profile-panel staff-panel" id="staff-access">
           <div class="panel-header">

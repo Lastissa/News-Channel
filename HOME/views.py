@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 10  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
+TEASER_PLACEHOLDER_COUNT = 10  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
 
 
 def handler404(request, exception=None):
@@ -168,6 +169,21 @@ def _page_context(page, user):
     }
 
 
+def _teaser_items():
+    """Data for the hero's side/teaser carousel (HOME/home.html).
+
+    TODO: no real data source decided yet. Swap this out (a query, a
+    settings list, whatever it ends up being) once that's settled — the
+    template only ever reads heading / body / image off each item, so as
+    long as this keeps returning dicts with that shape (any of the three
+    can be blank/omitted) nothing else needs to change. Until then it just
+    returns enough identical placeholder slots for the carousel to have
+    something to animate between, and the template falls back to a plain
+    "Coming soon" label whenever heading and body are both empty.
+    """
+    return [{"heading": "", "body": "", "image": ""} for _ in range(TEASER_PLACEHOLDER_COUNT)]
+
+
 def _resolve_page_number(raw_value, *, default=1):
     if raw_value is None or raw_value == "":
         return default
@@ -230,6 +246,7 @@ class HomeView(View):
 
         context = {
             "featured_posts": featured,
+            "teaser_items": _teaser_items(),
             "categories": CATEGORY,
             "query": query,
             "active_category": category,
@@ -883,22 +900,10 @@ class ProfileView(View):
             raise Http404("Page not found.")
         stories_page = stories_paginator.get_page(stories_page_number)
 
-        #   ADMIN AUTHORITY PANEL: the staff directory only loads for admins
-        #   and superusers, deferred import keeps ADMIN.views free to import
-        #   from HOME.views without a circular reference.
-        staff_directory = []
-        staff_directory_page_obj = None
-        staff_directory_page_range = []
-        if admin_only(request.user):
-            from ADMIN.views import staff_directory_page, staff_directory_rows
-
-            staff_page_number = _resolve_page_number(request.GET.get("staff_page"), default=1)
-            staff_paginator, staff_page = staff_directory_page(staff_page_number)
-            staff_directory = staff_directory_rows(list(staff_page.object_list))
-            staff_directory_page_obj = staff_page
-            staff_directory_page_range = list(
-                staff_paginator.get_elided_page_range(staff_page.number, on_each_side=1, on_ends=1)
-            )
+        #   ADMIN AUTHORITY PANEL: the staff directory, mass email, active
+        #   sessions, site socials, speciality search and analytics all moved
+        #   to ADMIN.views.PanelView / templates/ADMIN/panel.html, reachable
+        #   from the "PANEL" link above instead of living on this page.
         # if profile:
         #     agg = FollowRelationship.objects.filter(Q(followee_id=profile.id) | Q(follower_id=profile.id))
         #     agg = agg.aggregate(followers=Count("id", filter=Q(followee_id=profile.id)),following=Count("id", filter=Q(follower_id=profile.id)),) if profile else {"followers": 0, "following": 0}
@@ -935,9 +940,6 @@ class ProfileView(View):
             "role_choices": StaffConfig.role_choices() if is_admin else [],
             "protected_roles": sorted(StaffConfig.PROTECTED_ROLES) if is_admin else [],
             'staff_profile': get_cache('session-count') or 0,
-            "staff_directory": staff_directory,
-            "staff_directory_page_obj": staff_directory_page_obj,
-            "staff_directory_page_range": staff_directory_page_range,
             "speciality_csv": ", ".join(profile.speciality) if profile and isinstance(profile.speciality, list) else "",
         }
         return render(request, "HOME/profile.html", context)

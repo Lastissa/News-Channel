@@ -114,3 +114,55 @@ def _try_send_new_story_batch_email(blog: object):
 
     _dispatch_batch_email(recipients, subject, build_html_for)
     info_logger(msg=f"BATCH EMAIL: new story alert queued for {len(recipients)} recipients (author={author.email}, blog={blog.pk})")
+
+
+def _try_send_panel_mass_email(sender_full_name, subject, body_html, recipients, sent_by_email):
+    """PANEL "send mass email" action.
+
+    Unlike the other batch senders in this file the display name on the
+    `from` header is the sending admin's own StaffProfile.full_name (never
+    the project name), so the receiver always knows a real person sent it.
+    Recipient email addresses are resolved server side by the caller and
+    never round-trip through the client -- this function only ever receives
+    the final address list.
+    """
+    if getattr(settings, 'DEBUG'):
+        from_email = "noreply@resend.dev"
+    else:
+        from_email = "noreply@abureport.com.ng"
+    from_header = f"{sender_full_name} <{from_email}>"
+
+    recipients = [r for r in recipients if r]
+    if not recipients:
+        info_logger(msg=f"PANEL MASS EMAIL: nothing to send for subject={subject}, no eligible recipients")
+        return 0
+
+    def build_html_for(email):
+        return _build_email_html(
+            title=subject,
+            main_content=body_html,
+            end_note=f"{sender_full_name} \u2014 {About.project_name}",
+            unsubscribe_query="",
+            preference_note="",
+        )
+
+    sent_total = 0
+    for i in range(0, len(recipients), BATCH_CHUNK_SIZE):
+        chunk = recipients[i:i + BATCH_CHUNK_SIZE]
+        params = [
+            {
+                "from": from_header,
+                "to": [email],
+                "subject": subject,
+                "html": build_html_for(email),
+            }
+            for email in chunk
+        ]
+        try:
+            resend.Batch.send(params)
+            sent_total += len(chunk)
+        except Exception as exc:
+            error_logger(msg=f"PANEL MASS EMAIL SEND FAILED: chunk starting at {i} subject={subject} error={exc}")
+
+    info_logger(msg=f"PANEL MASS EMAIL: dispatched {sent_total}/{len(recipients)} total, subject={subject}, sent_by={sent_by_email}")
+    return sent_total

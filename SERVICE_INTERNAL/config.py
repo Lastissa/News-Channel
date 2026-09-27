@@ -72,29 +72,46 @@ def custom_context_processors(request):
     if request and request.COOKIES.get("abureport-theme") in {"dark", "light"}:
         theme = request.COOKIES.get("abureport-theme")
 
+    #   SITE SETTINGS: twitter/x, facebook and the three contact addresses are
+    #   editable from PANEL (ADMIN.models.SiteSettings) instead of hardcoded
+    #   here. Deferred import avoids an app-loading-order issue, and a blank
+    #   field on the settings row falls back to the About defaults below so a
+    #   fresh install with no row saved yet never shows an empty link.
+    try:
+        from ADMIN.models import SiteSettings
+
+        site_settings = SiteSettings.get_solo()
+    except Exception:
+        site_settings = None
+
+    facebook = (site_settings.facebook_handle if site_settings else "") or About.facebook
+    tweeter = (site_settings.twitter_handle if site_settings else "") or About.tweeter
+    partnership_email = (site_settings.promotion_email if site_settings else "") or About.email
+    tech_expert_email = (site_settings.tech_expert_email if site_settings else "") or ""
+    support_email = (site_settings.support_email if site_settings else "") or ""
+
     #   SEO: every social link that actually has a value, used for the sitewide
     #   JSON-LD "sameAs" list so an empty handle never renders as a blank entry.
-    social_links = [
-        url for url in (About.facebook, About.tweeter, About.whatsapp, About.instagram, About.linkedin)
-        if url
-    ]
-    twitter_username = About.tweeter.rstrip("/").split("/")[-1] if About.tweeter else ""
+    social_links = [url for url in (facebook, tweeter, About.whatsapp, About.instagram, About.linkedin) if url]
+    twitter_username = tweeter.rstrip("/").split("/")[-1] if tweeter else ""
 
     return {
         "project_name": About.project_name,
         "version": About.version,
         'project_cachphrase': About.project_cachphrase,
         'site_domain': About.domain,
-        'facebook': About.facebook,
+        'facebook': facebook,
         'instagram': About.instagram,
         'linkedin': About.linkedin,
         'whatsapp': About.whatsapp,
-        'tweeter': About.tweeter,
+        'tweeter': tweeter,
         'twitter_username': twitter_username,
         'social_links': social_links,
         'contact_email': About.contact_email,
         'nav_categories': CATEGORY,
-        'partnership_email': About.email,
+        'partnership_email': partnership_email,
+        'tech_expert_email': tech_expert_email,
+        'support_email': support_email,
         'whatsapp_dm': About.whatsapp_dm,
         'mobile': About.mobile,
         'theme_preference': theme,

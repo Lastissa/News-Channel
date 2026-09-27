@@ -8,7 +8,6 @@ GENDER_CHOICES = [
 ]
 STAFF_ROLE = [
     ('FOUNDER','Founder'),
-    ('CO-FOUNDER', 'Co-Founder'),
     ('SNR-JOURNALIST', 'Snr-Journalist'),
     ('JOURNALIST', 'Journalist'),
 ]

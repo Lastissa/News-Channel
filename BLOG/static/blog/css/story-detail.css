@@ -1,6 +1,6 @@
 /* ---------- top-of-page reading ticker ---------- */
 .story-ticker {
-  background: var(--brand);
+  background: linear-gradient(var(--brand) , 90%, var(--brand-deep));
   overflow: hidden;
   white-space: nowrap;
   padding: 10px 0;
@@ -20,7 +20,7 @@
   color: var(--ink);
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   letter-spacing: 0.01em;
 }
 

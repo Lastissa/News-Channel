@@ -4,6 +4,7 @@
 {% block content %}
 {% static 'home_no_bg.svg' as placeholder %}
 {% if not is_filtered %}
+<div class="hero-row">
 <section class="hero" id="hero-carousel" aria-label="Featured stories" data-autoplay="6000">
   {% if featured_posts %}
   <div class="hero-track">
@@ -75,7 +76,41 @@ Written by {{post.author.staffprofile.full_name}} @ abureport.com.ng
   </div>
   {% endif %}
 </section>
+
+{% comment %}
+  Side/teaser carousel. A block of its own, not nested inside .hero — it
+  just shares .hero-row's flex line on desktop (70vw/30vw split, divider
+  between them) and fades between slides on its own, no user controls.
+  Mobile: it detaches from the hero entirely (own margin-top) and becomes
+  a multi-tab peek carousel — the active tab is a genuinely wider box, the
+  rest share the remaining space evenly, sliding right to left as it
+  auto-advances. Same markup drives both layouts; CSS + hero-teaser.js
+  handle the rest.
+
+  teaser_items comes from HomeView (see HOME/views.py, _teaser_items()).
+  It's placeholder "coming soon" data for now — each item is already a
+  dict with heading/body/image keys so swapping in real data later needs
+  no template changes.
+{% endcomment %}
+<aside class="hero-teaser" id="teaser-carousel" aria-label="More stories on the way" data-autoplay="4200">
+  <div class="teaser-track">
+    {% for item in teaser_items %}
+    <div class="teaser-slide {% if forloop.first %}is-active{% endif %}"
+         data-index="{{ forloop.counter0 }}"
+         {% if item.image %}style="--teaser-image: url('{{ item.image }}');"{% endif %}>
+      <div class="teaser-slide-inner">
+        {% comment %} I WILL STILL CHANGE THE LAYOUT , PLEASE REMIND BE, THIS IS JUST A DUMMY LAYOUT {% endcomment %}
+        {% if item.heading %}<p class="teaser-heading">{{ item.heading }}</p>{% endif %}
+        {% if item.body %}<p class="teaser-body">{{ item.body }}</p>{% endif %}
+        {% if not item.heading and not item.body %}<p class="teaser-placeholder">Coming soon</p>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</aside>
+</div>
 {% endif %}
+
 
 <section class="story-grid-section">
   <div class="section-heading">

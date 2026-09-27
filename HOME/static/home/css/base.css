@@ -37,6 +37,7 @@
   --header-h: 64px;
   --brand: #22D3EE; 
   --brand-deep: #0B6E8A;
+  --red-linar-grad: linear-gradient(180deg, #ff6b8b 0%, #e02447 100%);
   color-scheme: light;
 }
 
@@ -66,6 +67,7 @@ html[data-theme="dark"] {
   --shadow-raised: 0 10px 28px rgba(0, 0, 0, 0.5);
   --brand: #0B6E8A;
   --brand-deep: #22D3EE;
+  --red-linar-grad: linear-gradient(180deg, #d04664 0%, #9d243a 100%);
   color-scheme: dark;
 }
 
@@ -312,10 +314,20 @@ html[data-theme="dark"] .icon-moon { display: block; }
 }
 .notfound-home-link:hover { background: var(--amber-deep); }
 
-/* ---------- Hero carousel ---------- */
-.hero { position: relative; overflow: hidden; background: var(--nav-bg); border-bottom-left-radius: 25px;}
-.hero-track { position: relative; height: 75vh; min-height: 400px; max-height: 640px; background: var(--nav-bg); }
-@media (max-width:899px) {.hero-track { position: relative; height: 53vh;min-height: 0;max-height: none; background: var(--nav-bg);}}
+/* ---------- Hero row: main carousel + side teaser ---------- */
+/* .hero and .hero-teaser are separate, sibling blocks — .hero-row only
+   exists to lay them out. Desktop: a 70/30 flex row with a divider between
+   them. Mobile: they detach completely (column, teaser gets margin-top)
+   and the teaser becomes its own "peek" carousel underneath the hero. */
+.hero-row { display: flex; align-items: stretch; width: 100%; }
+
+.hero { position: relative; overflow: hidden; background: var(--nav-bg); border-bottom-left-radius: 25px; width: 70vw; height: 70vh; min-height: 400px; max-height: 640px; }
+.hero-track { position: relative; height: 100%; background: var(--nav-bg); }
+.hero-empty { height: 100%; display: flex; flex-direction: column; justify-content: center; }
+@media (max-width:899px) {
+  .hero-row { flex-direction: column; }
+  .hero { width: 100%; height: 45vh; min-height: 0; max-height: none; }
+}
 .hero-slide {
   position: absolute; inset: 0; background-image: var(--slide-image); background-size: cover; background-position: center;
   background-color: var(--nav-bg);
@@ -368,6 +380,53 @@ html[data-theme="dark"] .icon-moon { display: block; }
 
 @media (min-width: 900px) {
   .hero-content { padding: 40px 60px 110px; }
+}
+
+/* ---------- Hero teaser (side carousel) ---------- */
+/* A separate block from .hero that shares .hero-row's flex line on desktop
+   and stands completely on its own on mobile. Auto-advances only — no
+   arrows/dots on either layout. Desktop: slides are stacked full-bleed and
+   crossfade. Mobile: slides sit side by side and the active one is a
+   genuinely wider box (flex-basis swap, not just a visual scale trick) —
+   hero-teaser.js reads the active slide's real offsetLeft afterwards and
+   slides the whole strip so focus moves right to left. */
+.hero-teaser {
+  position: relative; width: 30vw; overflow: hidden;
+  background: transparent; border-left: 2px solid var(--brand-deep);
+  height: 70vh; min-height: 400px; max-height: 640px;
+}
+.teaser-track { position: relative; height: 100%; transition: transform 0.6s ease; will-change: transform; }
+.teaser-slide {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 10px; background-size: cover; background-position: center;
+  background-color: var(--nav-bg-dynamic); background-image: var(--teaser-image, none);
+  opacity: 0; visibility: hidden; transition: opacity 0.9s ease, visibility 0s linear 0.9s;
+}
+.teaser-slide.is-active { opacity: 1; visibility: visible; transition: opacity 0.9s ease, visibility 0s linear 0s; }
+.teaser-slide-inner { position: relative; z-index: 1; max-width: 100%; }
+.teaser-heading, .teaser-placeholder { color: #FAF8F3; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; margin: 0; }
+.teaser-body { color: rgba(250,248,243,0.75); font-size: 0.85rem; margin: 8px 0 0; }
+
+@media (max-width: 899px) {
+  .hero-teaser {
+    width: 100%; height: auto; min-height: 0; max-height: none;
+    border-left: none; margin-top: 20px; padding: 1px 10px;
+  }
+  .teaser-track { height: auto; display: flex; align-items: stretch; gap: 12px; transform: translateX(0); }
+  .teaser-slide {
+    /* Fixed, non-transitioning flex-basis: the size change is instant so
+       hero-teaser.js can read the new offsetLeft immediately and get an
+       exact number for the strip's slide transform — no fighting between
+       an animating box size and an animating position at once. */
+    position: relative; inset: auto; height: 96px;
+    flex: 0 0 32%; min-width: 110px;
+    border-radius: var(--radius-m); opacity: 0.65; visibility: visible;
+    transition: opacity 0.4s ease;
+    padding: 12px;
+  }
+  .teaser-slide.is-active { flex: 0 0 46%; opacity: 1; }
+  .teaser-heading, .teaser-placeholder { font-size: 0.92rem; }
+  .teaser-body { display: none; }
 }
 
 /* ---------- Story grid ---------- */
@@ -692,19 +751,20 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .meta-label { margin: 0; font-size: 0.72rem; color: var(--slate); text-transform: uppercase; letter-spacing: 0.06em; }
 .meta-author { font-weight: 700; color: var(--ink); }
 .story-metrics {
-  display: flex; flex-wrap: wrap; gap: 12px; color: var(--slate); font-size: 0.83rem;
+  display: flex; flex-wrap: wrap; gap: 12px; color: var(--ink); font-size: 0.83rem; font-weight: 500;
 }
-.story-metrics span { display: inline-flex; gap: 4px; align-items: center; background: var(--paper-dim); border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; }
-.story-metrics strong { color: var(--ink); }
+.story-metrics span { display: inline-flex; gap: 4px; align-items: center; background: var(--paper-dim); border: 1px solid none; border-radius: 20px; padding: 6px 10px; }
+/* .story-metrics span { display: inline-flex; gap: 4px; align-items: center; background: linear-gradient(var(--brand) 50%, var(--brand-deep)); border: 1px solid none; border-radius: 20px; padding: 6px 10px; } */
+.story-metrics strong { font-weight: 800; }
 .story-hero-figure {
-  margin: 0 0 20px; border-radius: 20px; overflow: hidden; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: var(--shadow-card);
+  margin: 0 0 20px; border-radius: 20px; overflow: hidden; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow-card);
   max-width: 720px; margin-left: auto; margin-right: auto;
 }
 .story-hero-figure img {
   width: 100%; display: block; max-height: 420px; object-fit: cover; filter: saturate(0.9) contrast(0.98) brightness(0.97);
 }
 .story-hero-figure figcaption {
-  padding: 12px 16px 14px; font-size: 0.86rem; color: var(--ink-soft); font-style: italic; text-align: right; background: var(--paper-dim);
+  padding: 12px 16px 14px; font-size: 0.86rem; color: var(--ink-soft); font-style: italic; text-align: right; background: var(--paper);
 }
 .story-body {
   overflow-wrap: anywhere;
@@ -715,8 +775,8 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
     noticeably smaller than the top-level hero (.story-hero-figure, which
     caps at 720px wide / 420px tall). */
 .story-inline-img {
-  max-width: min(45%, 280px); max-height: 260px; width: auto; height: auto;
-  object-fit: cover; display: block; border-radius: 12px; border: 1px solid var(--line);
+  max-width: min(50%, 300px); max-height: 260px; width: auto; height: auto;
+  object-fit: cover; display: block; border-radius: 10px; border: 1px solid var(--line);
   box-shadow: var(--shadow-card); background: var(--paper-dim);
   filter: saturate(0.9) contrast(0.98) brightness(0.97);
 }
@@ -782,8 +842,10 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .story-like-btn, .comment-submit-btn, .comment-like-btn {
   display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 99px; padding: 11px 18px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
-.story-like-btn {
-  background: linear-gradient(180deg, #f2b24d 0%, #d18200 100%); color: rgb(91, 28, 28); box-shadow: 0 8px 16px rgba(191, 123, 0, 0.22);
+.story-like-btn { 
+  background: var(--red-linar-grad); 
+  color: #fff; 
+  box-shadow: 0 8px 16px rgba(224, 36, 71, 0.25); 
 }
 
 /* ---------- Author follow ---------- */
@@ -857,10 +919,10 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .author-card-copy h3 { margin: 0 0 10px; font-size: 1.4rem; color: var(--ink); }
 .author-card-copy p { color: var(--ink-soft); }
 .author-socials {
-  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;
+  display: flex; gap: 1px; flex-wrap: wrap; margin-top: 14px;
 }
 .author-socials a {
-  display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 999px; background: var(--paper-dim); border: 1px solid var(--line); font-size: 0.8rem; font-weight: 600; color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center; margin: 6px 10px; border-radius: 999px; background: white; border: 1px solid var(--line); font-size: 0.8rem; font-weight: 600; color: var(--ink-soft);
 }
 .author-more-stories {
   margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--line);
@@ -893,11 +955,9 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .comment-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .comment-like-form, .comment-delete-form { display: inline-flex; }
-.comment-like-btn {
-  border: 1px solid var(--line); background: var(--paper-dim); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
-}
+
 .comment-delete-btn {
-  border: 1px solid rgba(179, 64, 42, 0.25); background: rgba(179, 64, 42, 0.08); color: var(--danger); border-radius: 999px; padding: 10px 12px; font-weight: 700; font-size: 0.78rem; cursor: pointer;
+background: transparent; color: var(--danger); padding: 3px 3px; font-weight: 700; font-size: 0.78rem; cursor: pointer;
 }
 .empty-comments { color: var(--slate); margin: 0; }
 .sr-only {

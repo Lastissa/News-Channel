@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Panel · {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="panel-shell">
+  <div class="panel-header-bar">
+    <h1>PANEL</h1>
+    <div class="panel-header-actions">
+      <span class="panel-role-tag">{% if is_superuser %}Superuser{% else %}Admin{% endif %}</span>
+      <a href="{% url 'home:profile' %}" class="panel-back-link">&larr; Profile</a>
+    </div>
+  </div>
+
+  <div class="panel-grid">
+
+    <section class="panel-card panel-card-wide" id="panel-staff-gallery" aria-label="Staff directory">
+      <div class="panel-card-header">
+        <h2>Staff directory</h2>
+        <div class="panel-card-header-actions">
+          <span class="panel-eyebrow">Drag to scroll</span>
+          <a href="{% url 'control:staff_create' %}" class="panel-ghost-btn">+ New staff</a>
+        </div>
+      </div>
+      <div class="panel-gallery-viewport" data-gallery-viewport tabindex="0" aria-label="Staff, scroll horizontally">
+        <div class="panel-gallery-track" data-gallery-track
+             data-next-page="{{ gallery_next_page|default:'' }}"
+             data-has-next="{{ gallery_has_next|yesno:'true,false' }}"
+             data-endpoint="{% url 'control:panel_gallery' %}">
+          {% for member in gallery_items %}
+          <a class="panel-gallery-card" href="{{ member.url }}">
+            <span class="panel-gallery-avatar">
+              {% if member.profile_img %}
+                <img data-src="{{ member.profile_img }}" alt="" loading="lazy" class="panel-lazy-avatar">
+              {% else %}
+                <span class="panel-gallery-initial">{{ member.heading|slice:":1" }}</span>
+              {% endif %}
+            </span>
+            <span class="panel-gallery-name">{{ member.heading }}</span>
+            <span class="panel-gallery-role">{{ member.authority }}</span>
+          </a>
+          {% endfor %}
+          {% if not gallery_items %}
+            <p class="empty-copy">No staff accounts found.</p>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="panel-card" id="panel-mass-email" aria-label="Send mass email">
+      <div class="panel-card-header">
+        <h2>Send mass email</h2>
+      </div>
+      {% if not sender_full_name %}
+        <p class="panel-warning">Your staff profile has no full name set. Add one on your profile before you can send mass email.</p>
+      {% endif %}
+      <form class="panel-form" data-mass-email-form data-endpoint="{% url 'control:panel_mass_email' %}" data-search-endpoint="{% url 'control:panel_staff_search' %}">
+        <div class="panel-field">
+          <label for="mass-email-subject">Email heading</label>
+          <input id="mass-email-subject" type="text" name="subject" maxlength="150" required placeholder="e.g. Scheduled maintenance this weekend">
+        </div>
+        <div class="panel-field">
+          <label for="mass-email-body">Message body</label>
+          <textarea id="mass-email-body" name="body" rows="5" required placeholder="Write the message..."></textarea>
+        </div>
+
+        <div class="panel-field">
+          <label>Recipients</label>
+          <div class="panel-toggle-row" data-recipient-toggles>
+            <button type="button" class="panel-toggle-chip" data-toggle="member">Member</button>
+            <button type="button" class="panel-toggle-chip" data-toggle="staff">Staff</button>
+            <button type="button" class="panel-toggle-chip" data-toggle="admin">Admin</button>
+            <button type="button" class="panel-toggle-chip panel-toggle-add" data-toggle-add>+ Search</button>
+          </div>
+          <div class="panel-recipient-search" data-recipient-search hidden>
+            <input type="text" placeholder="Search staff by full name..." data-recipient-search-input>
+            <div class="panel-recipient-results" data-recipient-results></div>
+          </div>
+          <div class="panel-recipient-pills" data-recipient-pills></div>
+          <input type="hidden" name="extra_account_ids" data-extra-account-ids value="">
+        </div>
+
+        <div class="panel-form-footer">
+          <span class="panel-sender-note">From: {{ sender_full_name|default:"—" }} &middot; recipient addresses stay hidden</span>
+          <button type="submit" class="panel-primary-btn" data-mass-email-send {% if not sender_full_name %}disabled{% endif %}>Send</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel-card" id="panel-sessions" aria-label="Active sessions">
+      <div class="panel-card-header">
+        <h2>Active sessions</h2>
+        <span class="panel-eyebrow">{{ sessions_total_people }} logged in</span>
+      </div>
+      <div class="panel-row-list" data-sessions-list
+           data-page="{{ sessions_page_obj.number }}"
+           data-num-pages="{{ sessions_page_obj.paginator.num_pages }}"
+           data-has-next="{{ sessions_page_obj.has_next|yesno:'true,false' }}"
+           data-has-previous="{{ sessions_page_obj.has_previous|yesno:'true,false' }}"
+           data-endpoint="{% url 'control:panel_sessions' %}"
+           data-logout-endpoint="{% url 'control:panel_session_logout' 0 %}">
+        {% for row in sessions_rows %}
+        <div class="panel-row" data-session-row data-account-id="{{ row.id }}">
+          <span>{{ row.email_masked }}</span>
+          <button type="button" class="panel-danger-link" data-session-logout>Log out</button>
+        </div>
+        {% empty %}
+        <p class="empty-copy">Nobody is currently logged in.</p>
+        {% endfor %}
+      </div>
+      <div class="panel-pager" data-sessions-pager></div>
+    </section>
+
+    <section class="panel-card" id="panel-socials" aria-label="Site socials">
+      <div class="panel-card-header">
+        <h2>Site socials</h2>
+      </div>
+      <form class="panel-form" data-settings-form data-endpoint="{% url 'control:panel_settings' %}">
+        <div class="panel-field">
+          <label for="settings-twitter">Twitter / X URL</label>
+          <input id="settings-twitter" type="url" name="twitter_handle" value="{{ site_settings.twitter_handle }}" placeholder="https://x.com/handle">
+        </div>
+        <div class="panel-field">
+          <label for="settings-facebook">Facebook URL</label>
+          <input id="settings-facebook" type="url" name="facebook_handle" value="{{ site_settings.facebook_handle }}" placeholder="https://facebook.com/page">
+        </div>
+        <div class="panel-field">
+          <label for="settings-promotion">Promotion email <small>(partnership)</small></label>
+          <input id="settings-promotion" type="email" name="promotion_email" value="{{ site_settings.promotion_email }}" placeholder="partnerships@domain">
+        </div>
+        <div class="panel-field">
+          <label for="settings-tech">Tech expert email <small>(glitches)</small></label>
+          <input id="settings-tech" type="email" name="tech_expert_email" value="{{ site_settings.tech_expert_email }}" placeholder="tech@domain">
+        </div>
+        <div class="panel-field">
+          <label for="settings-support">Support email <small>(customer issues)</small></label>
+          <input id="settings-support" type="email" name="support_email" value="{{ site_settings.support_email }}" placeholder="support@domain">
+        </div>
+        <div class="panel-form-footer">
+          <span class="panel-sender-note" data-settings-feedback></span>
+          <button type="submit" class="panel-primary-btn">Save</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel-card panel-card-wide" id="panel-speciality" aria-label="Search staff by speciality">
+      <div class="panel-card-header">
+        <h2>Search staff by speciality</h2>
+      </div>
+      <div class="panel-field">
+        <input type="search" placeholder="e.g. Politics, Education" data-speciality-input data-endpoint="{% url 'control:panel_speciality' %}">
+      </div>
+      <div class="panel-row-list" data-speciality-list data-page="1"></div>
+      <div class="panel-pager" data-speciality-pager></div>
+    </section>
+
+    <section class="panel-card panel-card-wide" id="panel-analytics" aria-label="Analytics" data-analytics-card data-endpoint="{% url 'control:panel_analytics' %}">
+      <div class="panel-card-header">
+        <h2>Analytics</h2>
+        <span class="panel-eyebrow">Loads when in view</span>
+      </div>
+      <div class="panel-metric-grid" data-analytics-skeleton>
+        <div class="panel-metric-skel"></div>
+        <div class="panel-metric-skel"></div>
+        <div class="panel-metric-skel"></div>
+        <div class="panel-metric-skel"></div>
+        <div class="panel-metric-skel"></div>
+      </div>
+      <div class="panel-metric-grid" data-analytics-data hidden></div>
+    </section>
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ block.super }}
+  <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+  <script src="{% static 'control/js/panel.js' %}" defer></script>
+{% endblock %}
