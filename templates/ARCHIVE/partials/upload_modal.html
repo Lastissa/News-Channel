@@ -50,6 +50,8 @@
                placeholder="Short description of the picture or file" required>
       </div>
 
+      {# Real upload-progress bar (byte progress via XMLHttpRequest, see
+         archive.js) -- hidden until the "Upload" button is pressed. #}
       <div class="archive-upload-progress" data-archive-upload-progress hidden role="progressbar" aria-label="Upload progress">
         <div class="archive-upload-progress-fill" data-archive-upload-progress-fill></div>
       </div>

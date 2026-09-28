@@ -21,6 +21,10 @@
       {# (see ARCHIVE.views.ArchiveItemEditView). Leave empty to just edit the description. #}
       <input type="file" name="upload_file" accept="{% if item.kind == 'image' %}image/jpeg,image/png{% endif %}" aria-label="Replace picture or file">
       <button type="submit" class="archive-action-btn">Save</button>
+      {# Same upload-progress bar as the Add modal (see archive.js) -- shown
+         while this Save request is in flight, real byte progress when a
+         replacement file is attached. Own line: the row above it stays a
+         normal input/input/button flex row. #}
       <div class="archive-upload-progress" data-archive-upload-progress hidden role="progressbar" aria-label="Upload progress">
         <div class="archive-upload-progress-fill" data-archive-upload-progress-fill></div>
       </div>

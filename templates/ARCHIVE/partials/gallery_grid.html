@@ -1,5 +1,9 @@
 {% load static %}
 {% load archive_extras %}
+{# NOTE: this partial is the *contents* of #archive-grid-shell only -- the
+   shell div itself lives in gallery.html and is never re-created by a page
+   swap (see the comment there + archive.js), so its height can be animated
+   between pages instead of just jumping. #}
 {% if images %}
   <div class="archive-grid">
     {% for image in images %}

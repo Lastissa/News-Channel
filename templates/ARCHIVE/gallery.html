@@ -44,6 +44,13 @@
     <button type="submit" class="archive-action-btn archive-search-btn">Search</button>
   </form>
 
+  {# This wrapper used to live inside gallery_grid.html itself and get swapped
+     outerHTML on every page/search request -- which meant the element being
+     measured for a height transition was destroyed and re-created on every
+     swap, so it could never actually animate. It now stays put (only its
+     contents are swapped, see gallery_grid.html + archive.js), so the
+     skeleton-loading + grow/shrink transition on pagination has something
+     stable to animate. #}
   <div class="archive-grid-shell" id="archive-grid-shell" data-archive-page-size="{{ page_size }}">
     {% include "ARCHIVE/partials/gallery_grid.html" %}
   </div>
