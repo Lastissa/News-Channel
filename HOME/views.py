@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 10  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
-TEASER_PLACEHOLDER_COUNT = 10  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
+TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
 
 
 def handler404(request, exception=None):
@@ -181,7 +181,7 @@ def _teaser_items():
     something to animate between, and the template falls back to a plain
     "Coming soon" label whenever heading and body are both empty.
     """
-    return [{"heading": "", "body": "", "image": ""} for _ in range(TEASER_PLACEHOLDER_COUNT)]
+    return [{"heading": "", "body": "", "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9LquW15nA8m7k3ozal_1o3QFN9Gk-Fr5ciHGFBbkIuOwKeoDCwK72ycM&s=10"} for _ in range(TEASER_PLACEHOLDER_COUNT)]
 
 
 def _resolve_page_number(raw_value, *, default=1):

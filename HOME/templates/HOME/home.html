@@ -32,7 +32,7 @@
         <p class="hero-label"><span class="dot"></span>Latest Story</p>
         <h1 class="hero-headline"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h1>
         {% comment %} i comment it out bcos its good for only by email@domain.com  not staff full name {% endcomment %}
-          <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }}</p>
+          <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }} </p>
         <div class="hero-actions">
           <a class="glass-btn" href="{% url 'blog:story_detail' post.slug %}" target="_self">Read story</a>
           <button type="button" class="glass-btn glass-btn-outline glass-btn-icon"
