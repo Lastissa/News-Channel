@@ -34,7 +34,8 @@ INSTALLED_APPS = [
     'HOME',
     'STAFF',
     'ADMIN',
-    'ARCHIVE'
+    'ARCHIVE',
+    'Partner'
     
 ]
 

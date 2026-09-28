@@ -11,10 +11,10 @@ CATEGORY = [
     ('ORGANIZATION', 'ORGANIZATION'),
     ('JAMB', 'JAMB'),
     ('WAEC', 'WAEC'),
+    ('NECO', 'NECO'),
     ('POSTUTME', 'POSTUTME'),
     ('SCHOLARSHIP', 'SCHOLARSHIP'),
     ('TECHNOLOGY', 'TECHNOLOGY'),
-    ('SECURITY', 'SECURITY'),
     ('GENERAL', 'GENERAL'),
 ]
 class Blog(models.Model):

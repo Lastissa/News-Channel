@@ -1,4 +1,5 @@
 import logging
+import random
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, logout as auth_logout
@@ -181,7 +182,16 @@ def _teaser_items():
     something to animate between, and the template falls back to a plain
     "Coming soon" label whenever heading and body are both empty.
     """
-    return [{"heading": "", "body": "", "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9LquW15nA8m7k3ozal_1o3QFN9Gk-Fr5ciHGFBbkIuOwKeoDCwK72ycM&s=10"} for _ in range(TEASER_PLACEHOLDER_COUNT)]
+    from django.templatetags.static import static
+    curent_dummy_image = [
+        static('partner/ad_demo_1.jpg'),
+        static('partner/ad_demo_2.png'),
+        static('partner/ad_demo_3.jpg'),
+        static('partner/ad_demo_4.jpg'),
+        static('partner/ad_demo_5.jpg'),
+    ]
+    len_current_dummy = len(curent_dummy_image) -1  if bool(curent_dummy_image) else 0
+    return [{"heading": f"Hello fam {_}", "body": "body", "image": curent_dummy_image[random.randint(0, len_current_dummy)]} for _ in range(TEASER_PLACEHOLDER_COUNT)]
 
 
 def _resolve_page_number(raw_value, *, default=1):
