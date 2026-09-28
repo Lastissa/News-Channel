@@ -47,8 +47,8 @@
     var node = document.createElement("div");
     node.textContent = message;
     node.style.cssText =
-      "font-family:var(--font-body);font-size:0.86rem;padding:10px 16px;border-radius:8px;color:#fff;text-align:center;max-width:min(92vw,480px);" +
-      "background:" + (tone === "error" ? "#B3402A" : "#0E1B2C") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);" +
+      "font-family:var(--font-body);font-size:0.86rem;padding:10px 16px;border-radius:8px;color:var(--toast-fg);text-align:center;max-width:min(92vw,480px);" +
+      "background:" + (tone === "error" ? "var(--toast-bg-error)" : "var(--toast-bg)") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);" +
       "opacity:0;transform:translateY(6px);transition:opacity .18s ease, transform .18s ease;";
     toastHost.appendChild(node);
     requestAnimationFrame(function () {
@@ -67,7 +67,9 @@
       window.htmx.ajax("POST", galleryEndpoint, {
         target: "#archive-grid-shell",
         swap: "outerHTML",
-        values: { page: 1 },
+        /* keep whatever is typed in the description search, so the refresh
+           after an upload/edit doesn't silently drop the filter */
+        values: { page: 1, descr: (document.querySelector("[data-archive-search]") || {}).value || "" },
         headers: { "X-CSRFToken": getCookie("csrftoken") },
       });
     }

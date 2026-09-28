@@ -3,6 +3,9 @@ add a picture or file (see ArchiveUploadModalView / ArchiveUploadView
 below), and only the uploader can edit or delete their own item again (see
 ArchiveManageModalView / ArchiveItemEditView / ArchiveItemDeleteView)."""
 
+import re
+from difflib import SequenceMatcher
+
 import requests
 from django.conf import settings
 from django.core.paginator import Paginator
@@ -32,6 +35,12 @@ MIN_DIMENSION = 50
 MAX_DIMENSION = 4000
 
 ALT_MAX_LENGTH = 150
+
+#   DESCRIPTION SEARCH ("descr" search key on the gallery page): a search word
+#   counts as matching a word in an item's description when they are at least
+#   this similar (0.70 == 70%), so typos and near spellings ("pictur",
+#   "wedding" vs "weding") still find the item, not just exact words.
+DESCR_MATCH_THRESHOLD = 0.70
 
 #   {"low": "Low", "medium": "Medium", "high": "High"} -- the human word
 #   before the " - ..." blurb in ImageQuality.CHOICES.
@@ -108,14 +117,79 @@ def _serialize_images(images):
     ]
 
 
-def _paginate(page_number):
-    qs = ArchiveImage.objects.select_related("author").order_by("-date_created")
-    paginator = Paginator(qs, PAGE_SIZE)
+def _descr_words(text):
+    return re.findall(r"\w+", (text or "").lower())
+
+
+def _word_similarity(query_word, desc_word):
+    """0.0 - 1.0 similarity of one search word against one description word.
+    An exact match or a typed-so-far prefix ("pict" -> "picture") is a full
+    match, anything else falls back to difflib's ratio."""
+    if query_word == desc_word:
+        return 1.0
+    if len(query_word) >= 3 and desc_word.startswith(query_word):
+        return 1.0
+    matcher = SequenceMatcher(None, query_word, desc_word)
+    #   cheap upper bounds first, the exact ratio is the slow part
+    if matcher.real_quick_ratio() < DESCR_MATCH_THRESHOLD or matcher.quick_ratio() < DESCR_MATCH_THRESHOLD:
+        return 0.0
+    return matcher.ratio()
+
+
+def _descr_score(query_words, description):
+    """None when the description does not match; otherwise the average of the
+    best per-word similarity (1.0 == every search word found exactly). Every
+    search word has to find a description word that is at least
+    DESCR_MATCH_THRESHOLD similar, so "red car" needs both, not just one."""
+    desc_words = _descr_words(description)
+    if not desc_words:
+        return None
+    total = 0.0
+    for query_word in query_words:
+        best = max(_word_similarity(query_word, desc_word) for desc_word in desc_words)
+        if best < DESCR_MATCH_THRESHOLD:
+            return None
+        total += best
+    return total / len(query_words)
+
+
+def _descr_ranked_ids(descr):
+    """Ids of every item whose description matches `descr` (fuzzy, see above),
+    best match first, newest first among equal matches. Only id + alt are
+    read from the database, the comparison itself is done here."""
+    query_words = _descr_words(descr)
+    if not query_words:
+        return []
+    scored = []
+    for item_id, alt in ArchiveImage.objects.order_by("-date_created").values_list("id", "alt"):
+        score = _descr_score(query_words, alt)
+        if score is not None:
+            scored.append((score, item_id))
+    scored.sort(key=lambda pair: -pair[0])   #   stable, so newest stays first on ties
+    return [item_id for _score, item_id in scored]
+
+
+def _clean_descr(raw_value):
+    return (raw_value or "").strip()[:ALT_MAX_LENGTH]
+
+
+def _paginate(page_number, descr=""):
+    if descr:
+        ranked_ids = _descr_ranked_ids(descr)
+        paginator = Paginator(ranked_ids, PAGE_SIZE)
+    else:
+        paginator = Paginator(ArchiveImage.objects.select_related("author").order_by("-date_created"), PAGE_SIZE)
     if page_number > paginator.num_pages and paginator.num_pages:
         raise Http404("Page not found.")
     page = paginator.get_page(page_number)
+    if descr:
+        by_id = ArchiveImage.objects.select_related("author").in_bulk(list(page.object_list))
+        page_items = [by_id[item_id] for item_id in page.object_list if item_id in by_id]
+    else:
+        page_items = page.object_list
     return {
-        "images": _serialize_images(page.object_list),
+        "images": _serialize_images(page_items),
+        "descr": descr,
         "page": page.number,
         "num_pages": paginator.num_pages,
         "has_next": page.has_next(),
@@ -152,7 +226,7 @@ class ArchiveGalleryView(View):
     whatever page the (still anonymous-allowed) viewer is on."""
 
     def get(self, request):
-        context = _paginate(page_number=1)
+        context = _paginate(page_number=1, descr=_clean_descr(request.GET.get("descr")))
         context["can_upload"] = is_authenticated(request.user)
         if not request.user.is_authenticated:
             messages.info(request, message="Log In To Upload Your Own Images")
@@ -160,7 +234,7 @@ class ArchiveGalleryView(View):
 
     def post(self, request):
         page_number = _resolve_page_number(request.POST.get("page"), default=1)
-        context = _paginate(page_number=page_number)
+        context = _paginate(page_number=page_number, descr=_clean_descr(request.POST.get("descr")))
         return render(request, "ARCHIVE/partials/gallery_grid.html", context)
 
 

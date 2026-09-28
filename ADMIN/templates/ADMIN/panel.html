@@ -50,6 +50,7 @@
           {% if not gallery_items %}
             <p class="empty-copy">No staff accounts found.</p>
           {% endif %}
+          <button type="button" class="panel-gallery-load-more" data-gallery-load-more{% if not gallery_has_next %} hidden{% endif %}>Load more</button>
         </div>
       </div>
     </section>
@@ -108,7 +109,10 @@
            data-logout-endpoint="{% url 'control:panel_session_logout' 0 %}">
         {% for row in sessions_rows %}
         <div class="panel-row" data-session-row data-account-id="{{ row.id }}">
-          <span>{{ row.email_masked }}</span>
+          <span class="panel-row-main">
+            <span>{{ row.email_masked }}</span>
+            {% if row.logged_in_at %}<span class="panel-row-sub">Logged in {{ row.logged_in_at }}</span>{% endif %}
+          </span>
           <button type="button" class="panel-danger-link" data-session-logout>Log out</button>
         </div>
         {% empty %}
@@ -132,6 +136,10 @@
           <input id="settings-facebook" type="url" name="facebook_handle" value="{{ site_settings.facebook_handle }}" placeholder="https://facebook.com/page">
         </div>
         <div class="panel-field">
+          <label for="settings-whatsapp">WhatsApp channel URL</label>
+          <input id="settings-whatsapp" type="url" name="whatsapp_channel" value="{{ site_settings.whatsapp_channel }}" placeholder="https://www.whatsapp.com/channel/...">
+        </div>
+        <div class="panel-field">
           <label for="settings-promotion">Promotion email <small>(partnership)</small></label>
           <input id="settings-promotion" type="email" name="promotion_email" value="{{ site_settings.promotion_email }}" placeholder="partnerships@domain">
         </div>
@@ -142,6 +150,10 @@
         <div class="panel-field">
           <label for="settings-support">Support email <small>(customer issues)</small></label>
           <input id="settings-support" type="email" name="support_email" value="{{ site_settings.support_email }}" placeholder="support@domain">
+        </div>
+        <div class="panel-field">
+          <label for="settings-support-mobile">Customer support mobile</label>
+          <input id="settings-support-mobile" type="tel" name="customer_support_mobile" value="{{ site_settings.customer_support_mobile }}" placeholder="+234xxxxxxxxxx">
         </div>
         <div class="panel-form-footer">
           <span class="panel-sender-note" data-settings-feedback></span>
@@ -159,21 +171,6 @@
       </div>
       <div class="panel-row-list" data-speciality-list data-page="1"></div>
       <div class="panel-pager" data-speciality-pager></div>
-    </section>
-
-    <section class="panel-card panel-card-wide" id="panel-analytics" aria-label="Analytics" data-analytics-card data-endpoint="{% url 'control:panel_analytics' %}">
-      <div class="panel-card-header">
-        <h2>Analytics</h2>
-        <span class="panel-eyebrow">Loads when in view</span>
-      </div>
-      <div class="panel-metric-grid" data-analytics-skeleton>
-        <div class="panel-metric-skel"></div>
-        <div class="panel-metric-skel"></div>
-        <div class="panel-metric-skel"></div>
-        <div class="panel-metric-skel"></div>
-        <div class="panel-metric-skel"></div>
-      </div>
-      <div class="panel-metric-grid" data-analytics-data hidden></div>
     </section>
 
   </div>

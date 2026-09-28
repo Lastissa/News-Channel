@@ -51,7 +51,7 @@
   <nav class="story-pagination archive-pagination" aria-label="Archive pages">
     {% if has_previous %}
     <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ previous_page }}"}'
+            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ previous_page }}", "descr": "{{ descr|escapejs }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-target="#archive-grid-shell" hx-swap="outerHTML">Prev</button>
     {% endif %}
@@ -60,7 +60,7 @@
         <span class="story-page-btn is-ellipsis" aria-hidden="true">…</span>
       {% else %}
         <button type="button" class="story-page-btn {% if page_num == page %}is-active{% endif %}" data-archive-page-btn
-                hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ page_num }}"}'
+                hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ page_num }}", "descr": "{{ descr|escapejs }}"}'
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-target="#archive-grid-shell" hx-swap="outerHTML"
                 {% if page_num == page %}aria-current="page"{% endif %}
@@ -69,13 +69,17 @@
     {% endfor %}
     {% if has_next %}
     <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ next_page }}"}'
+            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ next_page }}", "descr": "{{ descr|escapejs }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-target="#archive-grid-shell" hx-swap="outerHTML">Next</button>
     {% endif %}
   </nav>
   {% endif %}
   {% else %}
+  {% if descr %}
+  <p class="archive-empty">No pictures or files have a description close to &ldquo;{{ descr }}&rdquo;.</p>
+  {% else %}
   <p class="archive-empty">No pictures or files in the archive yet.</p>
+  {% endif %}
   {% endif %}
 </div>

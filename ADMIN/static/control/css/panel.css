@@ -1,3 +1,18 @@
+/* Staff directory background -- change this one value to restyle just the
+   Staff directory card so it stands apart from the other panel cards.
+   Dark mode gets its own value because the light one would glare there. */
+:root {
+  --panel-staff-bg: #FFF3D6;
+}
+
+html[data-theme="dark"] {
+  --panel-staff-bg: #17283F;
+}
+
+#panel-staff-gallery {
+  background: var(--panel-staff-bg);
+}
+
 .panel-shell {
   max-width: 100%;
 }
@@ -125,6 +140,36 @@
   display: flex;
   gap: 14px;
   width: max-content;
+}
+
+/* "Load more" sits at the end of the strip, so it is the last thing reached
+   when scrolling; replaces the old scroll-triggered auto fetching. */
+.panel-gallery-load-more {
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.panel-gallery-load-more:hover:not(:disabled) {
+  border-color: var(--amber-alt-deep);
+  color: var(--amber-alt-deep);
+}
+
+.panel-gallery-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.panel-gallery-load-more[hidden] {
+  display: none;
 }
 
 .panel-gallery-card {
@@ -397,6 +442,13 @@
   border-bottom: none;
 }
 
+.panel-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .panel-row-name {
   font-weight: 600;
 }
@@ -460,47 +512,6 @@
 .panel-pager button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-/* ---------- Analytics ---------- */
-.panel-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-}
-
-.panel-metric-skel {
-  height: 62px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, var(--paper-dim) 25%, var(--line) 50%, var(--paper-dim) 75%);
-  background-size: 200% 100%;
-  animation: panel-skel-shimmer 1.3s ease-in-out infinite;
-}
-
-@keyframes panel-skel-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.panel-metric-card {
-  background: var(--paper-dim);
-  border-radius: 8px;
-  padding: 12px 14px;
-}
-
-.panel-metric-label {
-  font-size: 0.72rem;
-  color: var(--slate);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0 0 4px;
-}
-
-.panel-metric-value {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--ink);
-  margin: 0;
 }
 
 @media (max-width: 860px) {

@@ -15,6 +15,10 @@ class SiteSettings(models.Model):
     promotion_email = models.EmailField(blank=True, default="", help_text="For partnership / advertising inquiries.")
     tech_expert_email = models.EmailField(blank=True, default="", help_text="For reporting glitches / bugs in the system.")
     support_email = models.EmailField(blank=True, default="", help_text="For customer / usage problems, not software bugs.")
+    whatsapp_channel = models.URLField(blank=True, default="", help_text="WhatsApp channel invite / URL.")
+    customer_support_mobile = models.CharField(
+        max_length=32, blank=True, default="", help_text="Customer support phone / WhatsApp number shown to readers."
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

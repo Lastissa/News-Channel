@@ -613,7 +613,7 @@ def _staff_achievement_text(profile):
 class PanelView(View):
     """Main PANEL page. Admin and superuser only -- everything else on this
     page (gallery paging, sessions, settings save, mass email, speciality
-    search, analytics) is fetched lazily by panel.js against the JSON
+    search) is fetched lazily by panel.js against the JSON
     endpoints below, this view only renders the shell plus the first page of
     the staff gallery so the page is never empty on first paint."""
 
@@ -687,14 +687,24 @@ def _active_sessions_page(page_number):
     page = paginator.get_page(page_number)
 
     session_counts = {}
+    latest_logins = {}
     for account in page.object_list:
-        session_counts[account.pk] = UserSession.objects.filter(user=account).count()
+        account_sessions = UserSession.objects.filter(user=account).order_by("-logged_in_at")
+        session_counts[account.pk] = account_sessions.count()
+        latest_session = account_sessions.first()
+        latest_logins[account.pk] = latest_session.logged_in_at if latest_session else None
 
     rows = [
         {
             "id": account.pk,
             "email_masked": _mask_email(account.email),
             "session_count": session_counts.get(account.pk, 0),
+            #   MOST RECENT LOGIN AMONG THIS ACCOUNT'S ACTIVE SESSIONS, SHOWN ON
+            #   THE PANEL SO AN ADMIN CAN SEE WHEN SOMEONE ACTUALLY SIGNED IN.
+            "logged_in_at": (
+                timezone.localtime(latest_logins[account.pk]).strftime("%b %d, %Y \u00b7 %I:%M %p")
+                if latest_logins.get(account.pk) else ""
+            ),
         }
         for account in page.object_list
     ]
@@ -765,6 +775,8 @@ class PanelSiteSettingsUpdateView(View):
         settings_row.promotion_email = (request.POST.get("promotion_email") or "").strip()
         settings_row.tech_expert_email = (request.POST.get("tech_expert_email") or "").strip()
         settings_row.support_email = (request.POST.get("support_email") or "").strip()
+        settings_row.whatsapp_channel = (request.POST.get("whatsapp_channel") or "").strip()
+        settings_row.customer_support_mobile = (request.POST.get("customer_support_mobile") or "").strip()
         settings_row.save()
 
         info_logger(msg=f"PANEL: site settings updated by {request.user.email}")
@@ -925,32 +937,6 @@ class PanelSpecialityView(View):
                 "has_previous": page.has_previous(),
                 "previous_page": page.previous_page_number() if page.has_previous() else None,
                 "count": paginator.count,
-            },
-            status=200,
-        )
-
-
-class PanelAnalyticsView(View):
-    """Only ever hit once the analytics card scrolls into view client side,
-    to avoid paying for these aggregate queries on every PANEL page load."""
-
-    def get(self, request):
-        if not admin_only(request.user):
-            return JsonResponse({"detail": "Admin access is required to view This Page."}, status=403)
-
-        member_count = Auth.objects.filter(is_staff=False, is_admin=False, is_superuser=False).count()
-        staff_count = Auth.objects.filter(is_staff=True, is_admin=False, is_superuser=False).count()
-        admin_count = Auth.objects.filter(Q(is_admin=True) | Q(is_superuser=True)).count()
-        published_count = Blog.objects.count()
-        active_people = UserSession.objects.order_by().values("user_id").distinct().count()
-
-        return JsonResponse(
-            {
-                "member_count": member_count,
-                "staff_count": staff_count,
-                "admin_count": admin_count,
-                "published_count": published_count,
-                "active_people": active_people,
             },
             status=200,
         )

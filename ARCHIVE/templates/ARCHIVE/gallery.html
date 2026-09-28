@@ -30,6 +30,20 @@
     </div>
   </header>
 
+  {# DESCRIPTION SEARCH (search key "descr"): fuzzy, ~70% similar words count, see ARCHIVE.views._descr_score. #}
+  {# Works with htmx (live, as you type) and without it (plain GET form submit). #}
+  <form class="archive-search" role="search" method="get" action="{% url 'archive:gallery' %}">
+    <label class="archive-search-label" for="archive-search-descr">Search descriptions</label>
+    <input id="archive-search-descr" class="archive-search-input" type="search" name="descr" value="{{ descr }}"
+           maxlength="150" placeholder="Search by description, close spellings work too" autocomplete="off"
+           data-archive-search
+           hx-post="{% url 'archive:gallery' %}"
+           hx-trigger="input changed delay:350ms, search"
+           hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+           hx-target="#archive-grid-shell" hx-swap="outerHTML">
+    <button type="submit" class="archive-action-btn archive-search-btn">Search</button>
+  </form>
+
   {% include "ARCHIVE/partials/gallery_grid.html" %}
 
   <div data-archive-overlay></div>

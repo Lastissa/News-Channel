@@ -216,6 +216,15 @@ def _user_sessions_for_profile(user, request):
     
     
 
+def _ad_center_items():
+    """Content of the AD CENTER bar at the top of the home page. Each item is
+    {"text": ..., "url": ...} and is rendered as an underlined link. Placeholder
+    "coming soon" data for now -- replace the list below (or load it from the
+    database) and the template needs no changes. External urls (http...) open
+    in a new tab automatically."""
+    return [{"text": f"coming soon {number}", "url": "#"} for number in range(1, 5)]
+
+
 class HomeView(View):
     """Landing page: hero carousel of featured stories and paginated story grid."""
 
@@ -244,8 +253,21 @@ class HomeView(View):
             raise Http404("Page not found.")
         page = paginator.get_page(page_number)
 
+        #   HEADLINE TICKER: same continuous marquee behaviour as the top-of-page
+        #   reading ticker on the story page (BLOG.views.build_ticker_text /
+        #   BLOG/static/blog/js/story-ticker.js), but fed with the headings of
+        #   whatever stories are actually on this page (hero + grid) instead of
+        #   one story's content. Empty on a filtered/search view, same as the
+        #   hero row above.
+        headline_ticker_text = (
+            " * ".join(post.heading for post in list(featured) + list(page.object_list) if post.heading)
+            if not is_filtered else ""
+        )
+
         context = {
             "featured_posts": featured,
+            "headline_ticker_text": headline_ticker_text,
+            "ad_center_items": _ad_center_items(),
             "teaser_items": _teaser_items(),
             "categories": CATEGORY,
             "query": query,

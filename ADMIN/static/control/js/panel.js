@@ -27,8 +27,8 @@
     var node = document.createElement("div");
     node.textContent = message;
     node.style.cssText =
-      "font-family:var(--font-body);font-size:0.86rem;padding:10px 16px;border-radius:8px;color:#fff;text-align:center;max-width:min(92vw,480px);" +
-      "background:" + (tone === "error" ? "#B3402A" : "#0E1B2C") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);" +
+      "font-family:var(--font-body);font-size:0.86rem;padding:10px 16px;border-radius:8px;color:var(--toast-fg);text-align:center;max-width:min(92vw,480px);" +
+      "background:" + (tone === "error" ? "var(--toast-bg-error)" : "var(--toast-bg)") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);" +
       "opacity:0;transform:translateY(6px);transition:opacity .18s ease, transform .18s ease;";
     toastHost.appendChild(node);
     requestAnimationFrame(function () {
@@ -138,34 +138,69 @@
       return a;
     }
 
+    var loadMoreBtn = track.querySelector("[data-gallery-load-more]");
+
+    function setLoadMoreLabel(loading) {
+      if (!loadMoreBtn) return;
+      loadMoreBtn.disabled = loading;
+      loadMoreBtn.textContent = loading ? "Loading..." : "Load more";
+    }
+
+    /* Only ever runs from a tap on the "Load more" button now. It used to be
+       fired by the scroll listener and the auto-scroll tick, and when there was
+       no next page it fell back to requesting page 1 again -- which is what
+       made mobile hammer the endpoint forever and never reach an end. */
     function loadMore() {
       if (loadingMore) return;
       var hasNext = track.dataset.hasNext === "true";
       var endpoint = track.dataset.endpoint;
-      if (!endpoint) return;
+      if (!endpoint || !hasNext) return;
 
       loadingMore = true;
-      var page = hasNext ? track.dataset.nextPage : "1";
+      setLoadMoreLabel(true);
+      var page = track.dataset.nextPage;
 
       fetch(endpoint + "?page=" + encodeURIComponent(page), { credentials: "same-origin" })
-        .then(function (response) { return response.json(); })
+        .then(function (response) {
+          if (!response.ok) throw new Error("bad response");
+          return response.json();
+        })
         .then(function (data) {
-          (data.items || []).forEach(function (member) { track.appendChild(renderCard(member)); });
+          var items = data.items || [];
+          items.forEach(function (member) {
+            var card = renderCard(member);
+            if (loadMoreBtn) track.insertBefore(card, loadMoreBtn);
+            else track.appendChild(card);
+          });
           observeLazyImages(track);
           track.dataset.hasNext = data.has_next ? "true" : "false";
           track.dataset.nextPage = data.next_page || "";
           loadingMore = false;
+
+          if (data.has_next && items.length) {
+            /* more was loaded and there is still more: keep the animation going */
+            setLoadMoreLabel(false);
+          } else {
+            /* nothing further to load: remove the button and stop the animation */
+            if (loadMoreBtn) loadMoreBtn.hidden = true;
+            if (autoTimer) {
+              window.cancelAnimationFrame(autoTimer);
+              autoTimer = null;
+            }
+          }
         })
-        .catch(function () { loadingMore = false; });
+        .catch(function () {
+          loadingMore = false;
+          setLoadMoreLabel(false);
+          toast("Could not load more staff.", "error");
+        });
     }
 
-    function maybeLoadMore() {
-      var remaining = track.scrollWidth - viewport.scrollLeft - viewport.clientWidth;
-      if (remaining < viewport.clientWidth) loadMore();
-    }
+    if (loadMoreBtn) loadMoreBtn.addEventListener("click", loadMore);
 
     /* pointer drag */
     viewport.addEventListener("pointerdown", function (event) {
+      if (event.target.closest && event.target.closest("[data-gallery-load-more]")) return;
       isDragging = true;
       didDrag = false;
       userPaused = true;
@@ -198,7 +233,6 @@
 
     viewport.addEventListener("mouseenter", function () { userPaused = true; });
     viewport.addEventListener("mouseleave", function () { if (!isDragging) userPaused = false; });
-    viewport.addEventListener("scroll", maybeLoadMore);
 
     /* ping-pong auto-scroll: right to the end, then back to the start */
     function tick() {
@@ -208,7 +242,6 @@
           if (viewport.scrollLeft >= maxScroll - 2) autoDir = -1;
           else if (viewport.scrollLeft <= 2) autoDir = 1;
           viewport.scrollLeft += autoDir * 0.6;
-          if (autoDir > 0) maybeLoadMore();
         }
       }
       autoTimer = window.requestAnimationFrame(tick);
@@ -236,8 +269,19 @@
         div.dataset.sessionRow = "";
         div.dataset.accountId = row.id;
 
+        var main = document.createElement("span");
+        main.className = "panel-row-main";
+
         var email = document.createElement("span");
         email.textContent = row.email_masked;
+        main.appendChild(email);
+
+        if (row.logged_in_at) {
+          var loginInfo = document.createElement("span");
+          loginInfo.className = "panel-row-sub";
+          loginInfo.textContent = "Logged in " + row.logged_in_at;
+          main.appendChild(loginInfo);
+        }
 
         var btn = document.createElement("button");
         btn.type = "button";
@@ -245,7 +289,7 @@
         btn.dataset.sessionLogout = "";
         btn.textContent = "Log out";
 
-        div.appendChild(email);
+        div.appendChild(main);
         div.appendChild(btn);
         list.appendChild(div);
       });
@@ -595,59 +639,5 @@
     var runSearch = debounce(function () { load(input.value.trim(), 1); }, 300);
     input.addEventListener("input", runSearch);
     load("", 1);
-  })();
-
-  /* ---------- analytics: lazy, only once scrolled into view ---------- */
-  (function () {
-    var card = document.querySelector("[data-analytics-card]");
-    if (!card) return;
-    var skeleton = card.querySelector("[data-analytics-skeleton]");
-    var dataHost = card.querySelector("[data-analytics-data]");
-    var loaded = false;
-
-    function metric(label, value) {
-      var div = document.createElement("div");
-      div.className = "panel-metric-card";
-      var l = document.createElement("p");
-      l.className = "panel-metric-label";
-      l.textContent = label;
-      var v = document.createElement("p");
-      v.className = "panel-metric-value";
-      v.textContent = value;
-      div.appendChild(l);
-      div.appendChild(v);
-      return div;
-    }
-
-    function load() {
-      if (loaded) return;
-      loaded = true;
-      fetch(card.dataset.endpoint, { credentials: "same-origin" })
-        .then(function (response) { return response.json(); })
-        .then(function (data) {
-          dataHost.appendChild(metric("Members", data.member_count));
-          dataHost.appendChild(metric("Staff", data.staff_count));
-          dataHost.appendChild(metric("Admins", data.admin_count));
-          dataHost.appendChild(metric("Published stories", data.published_count));
-          dataHost.appendChild(metric("Currently logged in", data.active_people));
-          skeleton.hidden = true;
-          dataHost.hidden = false;
-        })
-        .catch(function () {
-          loaded = false;
-          toast("Could not load analytics.", "error");
-        });
-    }
-
-    if ("IntersectionObserver" in window) {
-      var observer = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) { load(); observer.disconnect(); }
-        });
-      }, { rootMargin: "100px" });
-      observer.observe(card);
-    } else {
-      load();
-    }
   })();
 })();

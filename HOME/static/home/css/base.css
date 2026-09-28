@@ -38,6 +38,13 @@
   --brand: #22D3EE; 
   --brand-deep: #0B6E8A;
   --red-linar-grad: linear-gradient(180deg, #ff6b8b 0%, #e02447 100%);
+  /* Toast popup colours -- edit these two to restyle every toast across the
+     site (panel.js, interactions.js, archive.js all read them). Kept
+     separate per theme because a colour that reads fine on the light page
+     background can disappear against the dark one. */
+  --toast-bg: #0E1B2C;
+  --toast-bg-error: #B3402A;
+  --toast-fg: #ffffff;
   color-scheme: light;
 }
 
@@ -68,6 +75,12 @@ html[data-theme="dark"] {
   --brand: #0B6E8A;
   --brand-deep: #22D3EE;
   --red-linar-grad: linear-gradient(180deg, #d04664 0%, #9d243a 100%);
+  /* Dark-mode toast colours -- the light-mode --toast-bg (dark navy) reads
+     fine on the light page but disappears against the already-dark page
+     background, so it needs its own, lighter value here. */
+  --toast-bg: #34537A;
+  --toast-bg-error: #D6533A;
+  --toast-fg: #ffffff;
   color-scheme: dark;
 }
 
@@ -337,6 +350,12 @@ html[data-theme="dark"] .icon-moon { display: block; }
 .hero-slide.is-active { opacity: 1; visibility: visible; transition: opacity 0.9s ease, visibility 0s linear 0s; }
 .hero-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14,27,44,0.05) 0%, rgba(14,27,44,0.55) 55%, rgba(14,27,44,0.92) 100%); }
 .hero-content { position: relative; z-index: 2; padding: 32px 20px 96px; max-width: 720px; }
+/* whole slide (image included) is a link to the story: the overlay sits under
+   the text, the text lets clicks fall through to it, real links/buttons keep
+   working on their own */
+.hero-slide-link { position: absolute; inset: 0; z-index: 1; }
+.hero-content { pointer-events: none; }
+.hero-content a, .hero-content button { pointer-events: auto; }
 .hero-label { display: flex; align-items: center; gap: 8px; color: var(--amber); font-weight: 600; font-size: 0.85rem; margin-bottom: 10px; }
 .hero-label .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
 .hero-headline { color: #FAF8F3; font-size: clamp(1.6rem, 5vw, 2.6rem); line-height: 1.14; margin-bottom: 10px; }
@@ -429,11 +448,93 @@ html[data-theme="dark"] .icon-moon { display: block; }
   .teaser-body { display: none; }
 }
 
+/* ---------- Home tickers ---------- */
+/* Two endless marquees share the same track/segment classes and the same
+   script (headline-ticker.js, which clones the segment until it is wider than
+   the bar, so the loop never shows a gap):
+   - .ad-ticker: rectangular AD CENTER bar at the very top of the page, every
+     item an underlined link passed from HomeView (ad_center_items).
+   - .headline-ticker: story headings scrolling in the "Headlines" row, right
+     beside the parallelogram "Headlines" label, taking the remaining space.
+   All ticker text is bold. */
+.ad-ticker,
+.headline-ticker {
+  overflow: hidden;
+  white-space: nowrap;
+  font-weight: 700;
+}
+/* TOP MOST TICKER */
+.ad-ticker {
+  background: linear-gradient(var(--brand), 90%, var(--brand-deep));
+  color: var(--ink);
+  padding: 8px 0;
+}
+
+/* HEADLINE TICKER */
+.headline-ticker {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: linear-gradient(var(--paper), 95%, var(--slate));
+  color: var(--ink);
+  padding: 7px 0;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+
+.headline-ticker-track {
+  display: inline-flex;
+  width: max-content;
+  animation: headline-ticker-scroll 30s linear infinite;
+  will-change: transform;
+}
+
+.headline-ticker-track:hover { animation-play-state: paused; }
+
+.headline-ticker-segment {
+  display: inline-block;
+  padding-right: 28px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.ticker-sep { margin: 0 14px; font-weight: 700; }
+.ad-ticker .ticker-sep { color: var(--amber); }
+
+.ad-ticker-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ad-ticker-link:hover { color: var(--amber); }
+
+/* shifts by exactly one group width (set from JS as --ticker-shift), so the
+   restart is invisible; -50% is only the fallback before the script runs */
+@keyframes headline-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--ticker-shift, -50%)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .headline-ticker-track { animation: none; }
+  .ad-ticker, .headline-ticker { overflow-x: auto; }
+}
+
 /* ---------- Story grid ---------- */
-.story-grid-section { max-width: 1180px; margin: 0 auto; padding: 48px 20px 24px; }
-.section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
-.section-heading h2 { font-size: 1.5rem; }
-.clear-filter { color: var(--amber-deep); font-weight: 600; font-size: 0.9rem; }
+.story-grid-section {margin: 0 auto; padding: 30px 20px 12px; }
+.section-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+/* "Headlines" label: parallelogram, the marquee sits right beside it */
+.section-heading h2 {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 7px 24px;
+  font-size: 1.15rem;
+  background: var(--nav-bg);
+  color: var(--nav-fg);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+.clear-filter { margin-left: auto; color: var(--amber-deep); font-weight: 600; font-size: 0.9rem; }
 
 .story-grid { display: grid; grid-template-columns: 1fr; gap: 22px; }
 @media (min-width: 640px) { .story-grid { grid-template-columns: repeat(2, 1fr); } }

@@ -206,6 +206,42 @@
   flex-shrink: 0;
 }
 
+/* ---------- description search ---------- */
+.archive-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+
+.archive-search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.archive-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--input-fill);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.archive-search-input:focus-visible {
+  outline: 2px solid var(--amber-alt-deep);
+  outline-offset: 1px;
+}
+
+.archive-search-btn { flex: 0 0 auto; }
+
 .archive-empty {
   text-align: center;
   color: var(--slate);

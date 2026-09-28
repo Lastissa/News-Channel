@@ -67,7 +67,7 @@ class StaffConfig:
 
 def custom_context_processors(request):
     from BLOG.models import CATEGORY
-
+    default_social = "https://www.abureport.com.ng/404/" # so to raise a friednly error if not set
     theme = "light"
     if request and request.COOKIES.get("abureport-theme") in {"dark", "light"}:
         theme = request.COOKIES.get("abureport-theme")
@@ -84,16 +84,18 @@ def custom_context_processors(request):
     except Exception:
         site_settings = None
 
-    facebook = (site_settings.facebook_handle if site_settings else "") or About.facebook
-    tweeter = (site_settings.twitter_handle if site_settings else "") or About.tweeter
-    partnership_email = (site_settings.promotion_email if site_settings else "") or About.email
-    tech_expert_email = (site_settings.tech_expert_email if site_settings else "") or ""
-    support_email = (site_settings.support_email if site_settings else "") or ""
+    facebook = (site_settings.facebook_handle if site_settings else default_social) #or About.facebook
+    tweeter = (site_settings.twitter_handle if site_settings else default_social) #or About.tweeter
+    partnership_email = (site_settings.promotion_email if site_settings else default_social) #or About.email
+    tech_expert_email = (site_settings.tech_expert_email if site_settings else default_social)
+    support_email = (site_settings.support_email if site_settings else default_social)
+    whatsapp = (site_settings.whatsapp_channel if site_settings else default_social) #or About.whatsapp
+    customer_support_mobile = (site_settings.customer_support_mobile if site_settings else default_social) #or About.mobile
 
     #   SEO: every social link that actually has a value, used for the sitewide
     #   JSON-LD "sameAs" list so an empty handle never renders as a blank entry.
-    social_links = [url for url in (facebook, tweeter, About.whatsapp, About.instagram, About.linkedin) if url]
-    twitter_username = tweeter.rstrip("/").split("/")[-1] if tweeter else ""
+    social_links = [url for url in (facebook, tweeter, whatsapp, About.instagram, About.linkedin) if url]
+    twitter_username = tweeter.rstrip("/").split("/")[-1] if tweeter else default_social
 
     return {
         "project_name": About.project_name,
@@ -103,7 +105,7 @@ def custom_context_processors(request):
         'facebook': facebook,
         'instagram': About.instagram,
         'linkedin': About.linkedin,
-        'whatsapp': About.whatsapp,
+        'whatsapp': whatsapp,
         'tweeter': tweeter,
         'twitter_username': twitter_username,
         'social_links': social_links,
@@ -114,5 +116,6 @@ def custom_context_processors(request):
         'support_email': support_email,
         'whatsapp_dm': About.whatsapp_dm,
         'mobile': About.mobile,
+        'customer_support_mobile': customer_support_mobile,
         'theme_preference': theme,
     }

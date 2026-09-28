@@ -3,6 +3,21 @@
 {% load format_copy_btn %}
 {% block content %}
 {% static 'home_no_bg.svg' as placeholder %}
+{% comment %}
+  AD CENTER: rectangular scrolling bar. Every item comes from HomeView
+  (ad_center_items, see HOME/views.py) as {text, url}, and each one is an
+  underlined link. The JS clones the segment to make the loop endless, the
+  clones are aria-hidden / not focusable.
+{% endcomment %}
+{% if ad_center_items %}
+<div class="ad-ticker" aria-label="Sponsored">
+  <div class="headline-ticker-track" data-ticker-track>
+    <span class="headline-ticker-segment" data-ticker-segment>
+      {% for item in ad_center_items %}<a class="ad-ticker-link" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %}>{{ item.text }}</a><span class="ticker-sep" aria-hidden="true">*</span>{% endfor %}
+    </span>
+  </div>
+</div>
+{% endif %}
 {% if not is_filtered %}
 <div class="hero-row">
 <section class="hero" id="hero-carousel" aria-label="Featured stories" data-autoplay="6000">
@@ -11,8 +26,10 @@
     {% for post in featured_posts %}
         <article class="hero-slide {% if forloop.first %}is-active{% endif %}"style="--slide-image: url('{{ post.image_1|default:placeholder}}');" data-index="{{ forloop.counter0 }}">
       <div class="hero-scrim"></div>
+      {# whole slide (image included) opens the story; headline link below stays the accessible one #}
+      <a class="hero-slide-link" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true"></a>
       <div class="hero-content">
-        <p class="hero-label"><span class="dot"></span>Featured story</p>
+        <p class="hero-label"><span class="dot"></span>Latest Story</p>
         <h1 class="hero-headline"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h1>
         {% comment %} i comment it out bcos its good for only by email@domain.com  not staff full name {% endcomment %}
           <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }}</p>
@@ -71,7 +88,7 @@ Written by {{post.author.staffprofile.full_name}} @ abureport.com.ng
 
   {% else %}
   <div class="hero-empty">
-    <p class="hero-label"><span class="dot"></span>Featured story</p>
+    <p class="hero-label"><span class="dot"></span>Latest story</p>
     <h1 class="hero-headline hero-headline-empty">No stories yet</h1>
   </div>
   {% endif %}
@@ -121,6 +138,13 @@ Written by {{post.author.staffprofile.full_name}} @ abureport.com.ng
         Headlines
       {% endif %}
     </h2>
+    {% if headline_ticker_text %}
+    <div class="headline-ticker" aria-hidden="true">
+      <div class="headline-ticker-track" data-ticker-track data-ticker-speed="35">
+        <span class="headline-ticker-segment" data-ticker-segment>{{ headline_ticker_text }}<span class="ticker-sep">*</span></span>
+      </div>
+    </div>
+    {% endif %}
     {% if is_filtered %}<a class="clear-filter" href="{% url 'home:home' %}">Clear</a>{% endif %}
   </div>
 
@@ -169,4 +193,9 @@ Written by {{post.author.staffprofile.full_name}} @ abureport.com.ng
 
 {% block newsletter_popup %}
 {% include "includes/newsletter_popup.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'home/js/headline-ticker.js' %}" defer></script>
 {% endblock %}

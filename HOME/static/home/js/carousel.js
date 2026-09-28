@@ -16,6 +16,7 @@
   var reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var swipeStartX = null;
   var touchStartX = null;
+  var suppressClick = false;
 
   function goTo(index) {
     slides[current].classList.remove("is-active");
@@ -51,12 +52,21 @@
   hero.addEventListener("pointerup", function (event) {
     if (swipeStartX === null) return;
     var delta = event.clientX - swipeStartX;
+    /* a drag must not count as a click on the full-slide story link */
+    if (Math.abs(delta) > 10) {
+      suppressClick = true;
+      window.setTimeout(function () { suppressClick = false; }, 0);
+    }
     if (Math.abs(delta) > 60) {
       if (delta < 0) next(); else prev();
       start();
     }
     swipeStartX = null;
   });
+
+  hero.addEventListener("click", function (event) {
+    if (suppressClick) { event.preventDefault(); event.stopPropagation(); }
+  }, true);
 
   hero.addEventListener("pointerleave", function () {
     swipeStartX = null;
