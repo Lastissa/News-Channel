@@ -544,6 +544,14 @@
   margin: 0;
 }
 
+/* `.profile-list div` (class + element) outranks `.published-story-actions`
+   above, which silently turned this row into a vertical stack. Open, Edit and
+   Delete are meant to sit side by side. */
+.profile-list .published-story-actions {
+  flex-direction: row;
+  gap: 10px;
+}
+
 .published-story-delete-btn {
   width: 34px;
   height: 34px;

@@ -22,37 +22,53 @@
   }
 
   var toastHost = null;
+  var topToastHost = null;
 
   function dismissToast(node) {
     if (!node || node.dataset.dismissed === "true") return;
     node.dataset.dismissed = "true";
     node.style.opacity = "0";
-    node.style.transform = "translateY(6px)";
+    node.style.transform = node.dataset.placement === "top" ? "translateY(-6px)" : "translateY(6px)";
     window.setTimeout(function () { node.remove(); }, 200);
   }
 
-  function toast(message, tone) {
-    if (!toastHost) {
-      toastHost = document.createElement("div");
-      toastHost.setAttribute("aria-live", "polite");
-      toastHost.style.cssText = "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;";
-      document.body.appendChild(toastHost);
+  /* placement "top" is a notice that sits just under the sticky header (used
+     for the "this post was last updated ..." story notice, a django message
+     tagged "story-edited"). It stays long enough to be read and closes on
+     click. Anything else is the usual short-lived toast at the bottom. */
+  function toast(message, tone, placement) {
+    var atTop = placement === "top";
+    var host = atTop ? topToastHost : toastHost;
+    if (!host) {
+      host = document.createElement("div");
+      host.setAttribute("aria-live", "polite");
+      host.style.cssText = atTop
+        ? "position:fixed;left:50%;top:calc(var(--header-h, 64px) + 10px);transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;"
+        : "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;";
+      document.body.appendChild(host);
+      if (atTop) { topToastHost = host; } else { toastHost = host; }
     }
 
     var node = document.createElement("div");
     node.textContent = message;
+    node.dataset.placement = atTop ? "top" : "bottom";
     node.style.cssText =
       "font-family:var(--font-body);font-size:0.86rem;padding:10px 16px;border-radius:8px;color:var(--toast-fg);text-align:center;max-width:min(92vw,480px);" +
       "background:" + (tone === "error" ? "var(--toast-bg-error)" : "var(--toast-bg)") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);" +
-      "opacity:0;transform:translateY(6px);transition:opacity .18s ease, transform .18s ease;";
-    toastHost.appendChild(node);
+      "opacity:0;transform:translateY(" + (atTop ? "-6px" : "6px") + ");transition:opacity .18s ease, transform .18s ease;" +
+      (atTop ? "cursor:pointer;" : "");
+    if (atTop) {
+      node.setAttribute("role", "status");
+      node.addEventListener("click", function () { dismissToast(node); });
+    }
+    host.appendChild(node);
     requestAnimationFrame(function () {
       node.style.opacity = "1";
       node.style.transform = "translateY(0)";
     });
     window.setTimeout(function () {
       dismissToast(node);
-    }, 2600);
+    }, atTop ? 8000 : 2600);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -64,7 +80,7 @@
       if (!text) return;
       var classes = node.className ? node.className.split(" ") : [];
       var tone = classes.indexOf("error") !== -1 || classes.indexOf("danger") !== -1 ? "error" : "success";
-      toast(text, tone);
+      toast(text, tone, classes.indexOf("story-edited") !== -1 ? "top" : "bottom");
     });
   });
 
@@ -824,6 +840,11 @@
         actions = '<div class="profile-bookmark-actions">' + actions + '</div>';
       }
       if (config === PROFILE_LISTS.published) {
+        /* Edit reuses data-add-news-link so it gets the same quick
+           connection check before the (heavier) editor page opens. */
+        if (item.edit_url) {
+          actions += '<a href="' + item.edit_url + '" class="published-story-edit-link" data-add-news-link>Edit</a>';
+        }
         actions += '<form method="post" data-published-story-delete-form data-endpoint="/profile/stories/' + item.blog_id + '/delete/">' +
           '<button type="submit" class="published-story-delete-btn" aria-label="Delete ' + (item.heading || "Untitled story") + '" title="Delete story">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>' +

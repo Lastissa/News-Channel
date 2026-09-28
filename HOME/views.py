@@ -438,6 +438,192 @@ class AddNewsView(View):
         )
 
 
+class EditNewsView(View):
+    """Staff only. Re-opens one of the signed in author's OWN published stories
+    in the same two pane editor as AddNewsView, prefilled, and saves it back in
+    place. Reached from the "Published stories" list on the profile page.
+
+    WHAT CAN CHANGE: the banner (a pasted image link or an uploaded file, plus
+    its one line caption `image_info`), the `category` and the `content`.
+
+    THE HEADING CAN NEVER CHANGE. It is not read from the request at all, and it
+    is left out of `update_fields` when saving, so even a hand built POST that
+    carries a `heading` cannot touch it (see the long note on `Blog.heading`:
+    the public URL slug is built from it once and must keep describing the
+    story).
+
+    An edit that changes nothing is not saved, so `last_edited` (and with it
+    the "this post was last updated ..." notice readers see on the story page)
+    only moves when something really changed.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if not staff_only(request.user):
+            return redirect("home:profile")
+        return super().dispatch(request, *args, **kwargs)
+
+    @staticmethod
+    def _own_story(request, blog_id):
+        return Blog.objects.filter(pk=blog_id, author=request.user).first()
+
+    def get(self, request, blog_id):
+        blog = self._own_story(request, blog_id)
+        if blog is None:
+            messages.error(request, "Story not found. You can only edit stories you published.")
+            return redirect("home:profile")
+
+        #   STORIES PUBLISHED UNDER A CATEGORY THAT NO LONGER EXISTS IN CATEGORY
+        #   (e.g. SECURITY). Without this the <select> would have no option for
+        #   the story's real category and the browser would silently fall back to
+        #   another one on save.
+        current_categories = {value for value, _ in CATEGORY}
+        return render(
+            request,
+            "HOME/edit_news.html",
+            {
+                "blog": blog,
+                "legacy_category": blog.category if blog.category not in current_categories else "",
+            },
+        )
+
+    def post(self, request, blog_id):
+        blog = self._own_story(request, blog_id)
+        if blog is None:
+            return _response({"detail": "Story not found."}, status=404)
+
+        #   NOTE: `heading` is deliberately never read from request.POST.
+        image_url = (request.POST.get("image_1") or "").strip()
+        image_file = request.FILES.get("image_file")
+        image_quality = (request.POST.get("image_quality") or ImageQuality.MEDIUM).strip().lower()
+        default_image_info = Blog._meta.get_field("image_info").default
+        image_info = (request.POST.get("image_info") or "").strip() or default_image_info
+        category = (request.POST.get("category") or "").strip().upper()
+        content = (request.POST.get("content") or "").strip()
+
+        allowed_categories = {value for value, _ in CATEGORY} | {blog.category}
+        if category not in allowed_categories:
+            return _response({"detail": "Select a valid category."}, status=400)
+        if not content:
+            return _response({"detail": "The story content cannot be empty."}, status=400)
+        if len(image_info) > Blog._meta.get_field("image_info").max_length:
+            return _response({"detail": "The image description is limited to 100 characters."}, status=400)
+
+        new_image_url = blog.image_1
+        new_public_id = blog.image_public_id
+
+        if not image_file:
+            if image_url:
+                validator = URLValidator(schemes=["http", "https"])
+                try:
+                    validator(image_url)
+                except ValidationError:
+                    return _response({"detail": "The image link must be a valid http or https URL."}, status=400)
+                if len(image_url) > Blog._meta.get_field("image_1").max_length:
+                    return _response({"detail": "The image link is too long."}, status=400)
+                #   THE BOX IS PREFILLED WITH THE CURRENT BANNER LINK, SO THE
+                #   SAME VALUE COMING BACK MEANS "LEAVE THE BANNER ALONE"
+                #   (this also keeps the Cloudinary public id of an uploaded one).
+                if image_url != (blog.image_1 or ""):
+                    new_image_url = image_url
+                    new_public_id = ""
+            else:
+                #   BOX CLEARED AND NO FILE PICKED: THE BANNER IS REMOVED
+                new_image_url = None
+                new_public_id = ""
+
+        #   THE SAME AUTHOR CANNOT HOLD THE SAME HEADING TWICE IN ONE CATEGORY
+        #   (mirrors the database constraint), so moving a story into another
+        #   category can collide with a sibling story. Checked BEFORE anything is
+        #   sent to Cloudinary so a refused edit never leaves a new picture behind.
+        if (
+            category != blog.category
+            and Blog.objects.filter(author=request.user, category=category, heading__iexact=blog.heading)
+            .exclude(pk=blog.pk)
+            .exists()
+        ):
+            return _response(
+                {"detail": "You already have a story with this exact heading in that category. Choose a different category."},
+                status=400,
+            )
+
+        story_path = reverse("blog:story_detail", args=[blog.slug])
+
+        def normalised(text):
+            return (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+        changed = bool(
+            image_file
+            or (new_image_url or "") != (blog.image_1 or "")
+            or new_public_id != blog.image_public_id
+            or image_info != blog.image_info
+            or category != blog.category
+            or normalised(content) != normalised(blog.content)
+        )
+        if not changed:
+            return _response({"detail": "No changes to save.", "changed": False, "story_url": story_path, "id": blog.pk}, status=200)
+
+        #   AN UPLOADED FILE ALWAYS WINS OVER A PASTED URL, same rule as Add.
+        #   Passing the story's existing `image_public_id` makes Cloudinary
+        #   overwrite that same asset instead of orphaning it (see
+        #   SERVICE_INTERNAL.images.upload_news_image). A story whose banner was
+        #   a pasted link has no id yet, so it gets a fresh one that is saved.
+        if image_file:
+            try:
+                uploaded_image = upload_news_image(
+                    image_file,
+                    quality=image_quality,
+                    public_id=blog.image_public_id or None,
+                )
+            except ImageUploadError as exc:
+                return _response({"detail": str(exc)}, status=400)
+            new_image_url = uploaded_image["secure_url"]
+            new_public_id = uploaded_image["public_id"]
+        elif blog.image_public_id and not new_public_id:
+            #   THE BANNER MOVED FROM AN UPLOADED FILE TO A PASTED LINK (or was
+            #   removed). Same as deleting a story today, the old Cloudinary
+            #   asset is not destroyed, it is only logged so it can be cleaned
+            #   by hand.
+            info_logger(msg=f"EDIT STORY {blog.pk}: banner no longer uses Cloudinary asset {blog.image_public_id}")
+
+        blog.image_1 = new_image_url
+        blog.image_public_id = new_public_id
+        blog.image_info = image_info
+        blog.category = category
+        blog.content = content
+        blog.last_edited = timezone.now()
+
+        #   update_fields, not a bare save(): a full save would write back the
+        #   `views` / `likes` this request loaded and wipe any that came in while
+        #   the author was editing. "heading" is intentionally absent from the
+        #   list. "last_updated" must be listed for its auto_now to fire (it
+        #   feeds the sitemap lastmod and the dateModified JSON-LD).
+        try:
+            blog.save(
+                update_fields=[
+                    "image_1",
+                    "image_public_id",
+                    "image_info",
+                    "category",
+                    "content",
+                    "last_edited",
+                    "last_updated",
+                ]
+            )
+        except IntegrityError:
+            return _response(
+                {"detail": "You already have a story with this exact heading in that category. Choose a different category."},
+                status=400,
+            )
+
+        #   TELL BING/INDEXNOW THE PAGE CHANGED, same fire-and-forget ping Add uses
+        ping_indexnow(f"{About.domain.rstrip('/')}{story_path}")
+
+        return _response(
+            {"detail": "Story updated.", "changed": True, "story_url": story_path, "id": blog.pk},
+            status=200,
+        )
+
+
 class NewsletterSubscribeView(View):
     """Footer newsletter signup. The email becomes a real account with a fixed
     dev only starter password and the newsletter flag switched on. The visitor
@@ -860,6 +1046,7 @@ class ProfilePublishedView(View):
                 "views": blog.views,
                 "date_created": blog.date_created.isoformat(),
                 "url": reverse("blog:story_detail", args=[blog.slug]),
+                "edit_url": reverse("home:edit_news", args=[blog.id]),
             }
             for blog in page.object_list
         ]

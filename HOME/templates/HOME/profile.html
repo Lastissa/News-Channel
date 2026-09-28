@@ -268,6 +268,8 @@
                 </div>
                 <div class="published-story-actions">
                   <a href="{% url 'blog:story_detail' blog.slug %}">Open</a>
+                  {% comment %} EDIT: reuses data-add-news-link so it gets the same quick connection check as "+ NeWs" before the editor page opens. {% endcomment %}
+                  <a href="{% url 'home:edit_news' blog.id %}" class="published-story-edit-link" data-add-news-link>Edit</a>
                   <form method="post" action="{% url 'home:profile_published_delete' blog.id %}" data-published-story-delete-form data-endpoint="{% url 'home:profile_published_delete' blog.id %}">
                     {% csrf_token %}
                     <button type="submit" class="published-story-delete-btn" aria-label="Delete {{ blog.heading }}" title="Delete story">

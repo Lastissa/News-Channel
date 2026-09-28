@@ -3,6 +3,7 @@ import re
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.contrib import messages
 from django.db.models import F, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -271,6 +272,19 @@ class StoryDetailView(View):
             return render(
                 request,"blog/story_404.html",{"blog_id": blog_slug, "decoy_content": STORY_404_CONTENT},status=404,)
             
+        #   A STORY STAFF HAVE EDITED SINCE PUBLISHING TELLS THE READER SO, EVERY
+        #   TIME IT IS OPENED. `last_edited` is only ever set by
+        #   HOME.views.EditNewsView, so null means "never edited" and nothing is
+        #   shown. The "story-edited" tag is what interactions.js keys off to
+        #   show this one as a notice at the TOP of the page instead of the
+        #   usual bottom toast.
+        if blog.last_edited:
+            messages.info(
+                request,
+                f"This post was last updated {blog.edited_gap_label} after its initial publication.",
+                extra_tags="story-edited",
+            )
+
         blog_content = parse_story_content(blog.content)
         ticker_text = build_ticker_text(blog.content)
 

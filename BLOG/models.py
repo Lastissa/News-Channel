@@ -62,6 +62,13 @@ class Blog(models.Model):
     likes = models.PositiveIntegerField(default=0)
     non_anonymous_viewer = models.ManyToManyField("AUTHENTICATION.Auth", related_name="non_anonymous_viewer", blank=True)   #   TRACKIG THE PEOPLE WHO VEIWED SO I CAN CREATE THEIR HISTORY
     last_updated = models.DateTimeField(auto_now=True, blank=True, null=True, help_text="CHANGES ANYTIME UPDATES IS MADE")
+    #   SET ONLY BY HOME.views.EditNewsView WHEN A STAFF MEMBER ACTUALLY EDITS A
+    #   PUBLISHED STORY, AND NULL FOR A STORY THAT WAS NEVER EDITED. `last_updated`
+    #   above cannot answer "was this story edited?" because auto_now fills it in
+    #   at creation too (and the migration that added it stamped every older row
+    #   with one shared timestamp), so it is never null. The "this post was last
+    #   updated ..." notice on the story page keys off this field instead.
+    last_edited = models.DateTimeField(blank=True, null=True, help_text="SET ONLY WHEN STAFF EDIT THE STORY AFTER PUBLISHING, NULL IF NEVER EDITED")
     date_created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -92,6 +99,31 @@ class Blog(models.Model):
             base = slugify(self.heading)[:340] or "story"
             Blog.objects.filter(pk=self.pk).update(slug=f"{base}-{self.pk}")
             self.slug = f"{base}-{self.pk}"
+
+    @property
+    def edited_gap_label(self):
+        """How long after first publication the last edit happened, worded for
+        the story page notice: "5 minutes", "3 hours", "2 days", "1 week".
+        Under a week it is minutes / hours / days, from a week on it is whole
+        weeks. Empty string when the story was never edited."""
+        if not self.last_edited or not self.date_created:
+            return ""
+
+        seconds = max(int((self.last_edited - self.date_created).total_seconds()), 0)
+
+        def plural(amount, unit):
+            return f"{amount} {unit}{'' if amount == 1 else 's'}"
+
+        if seconds < 60:
+            return "less than a minute"
+        if seconds < 3600:
+            return plural(seconds // 60, "minute")
+        if seconds < 86400:
+            return plural(seconds // 3600, "hour")
+        days = seconds // 86400
+        if days < 7:
+            return plural(days, "day")
+        return plural(days // 7, "week")
 
     @property
     def word_count(self):

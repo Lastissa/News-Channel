@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Edit news | {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block meta_description %}Staff editor for updating a published news story on {{ project_name }}.{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <meta name="viewport" content="initial-scale=1">
+  {% comment %} <meta name="viewport" content="initial-scale=0.5, width=1200"> {% endcomment %}
+  <style>
+    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }
+    .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
+      @media (max-width: 899.98px) {
+        .editor-shell {padding: 0;}
+      }
+    .editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .editor-toolbar h1 { margin: 0; font-size: 1.5rem; color: var(--ink); }
+    .editor-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .editor-loading-note { color: var(--slate); font-size: 0.82rem; }
+    .editor-preview-toggle, .editor-publish-btn {
+      border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--nav-bg);
+      color: var(--nav-fg); font: inherit; font-weight: 700; font-size: 0.85rem; padding: 9px 14px; cursor: pointer;
+    }
+    .editor-publish-btn { background: var(--amber-alt); }
+    .editor-workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+    .editor-pane {
+      border: 1px solid var(--line); border-radius: var(--radius-l); background: var(--surface);
+      height: calc(100vh - 150px); min-height: 420px; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .editor-shell.preview-off .editor-preview-pane { display: none; }
+    .editor-shell.preview-off .editor-workspace { grid-template-columns: 1fr; }
+    .editor-shell.is-loading .editor-workspace { filter: blur(7px); pointer-events: none; user-select: none; }
+    @media (max-width: 899.98px) {
+      .editor-workspace { grid-template-columns: 1fr; }
+      .editor-pane { height: auto; min-height: 0; }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<section class="editor-shell is-loading"
+         id="editor-shell"
+         data-published="{{ blog.date_created|date:'j M Y' }}"
+         data-heavy-css="{% static 'home/css/add-news.css' %}"
+         data-heavy-js="{% static 'home/js/edit-news-editor.js' %}">
+  <div class="editor-toolbar">
+    <h1>edit news</h1>
+    <div class="editor-actions">
+      <span class="editor-loading-note" data-editor-loading-note>Preparing editor...</span>
+      <button type="button" class="editor-preview-toggle" data-editor-preview-toggle hidden>Hide preview</button>
+      <button type="submit" form="edit-news-form" class="editor-publish-btn" data-editor-publish disabled>Save changes</button>
+    </div>
+  </div>
+  
+  <div class="editor-workspace">
+    <div class="editor-pane editor-preview-pane">
+      <div class="editor-pane-header">Preview</div>
+      <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
+    </div>
+    <div class="editor-pane second-tab editor-form-pane">
+      <div class="editor-pane-header">Editor</div>
+      <div class="editor-form-scroll">
+        <form id="edit-news-form" class="editor-form" method="post" action="{% url 'home:edit_news' blog.id %}" data-editor-form data-endpoint="{% url 'home:edit_news' blog.id %}" novalidate>
+          {% csrf_token %}
+          <div class="editor-field">
+            <label for="editor-heading">Heading <small>(locked)</small></label>
+            {% comment %} NO name ATTRIBUTE ON PURPOSE: the heading is never sent to the server, and EditNewsView never reads one. {% endcomment %}
+            <input id="editor-heading" type="text" value="{{ blog.heading }}" data-editor-heading disabled aria-disabled="true" autocomplete="off">
+            <small class="editor-convention-hint">The heading cannot be changed once a story is published, because the story link is built from it. Only the image, category and content can be edited.</small>
+          </div>
+
+          <div class="editor-field">
+            <label for="editor-image">Image URL</label>
+            <input id="editor-image" type="url" name="image_1" value="{{ blog.image_1|default:'' }}" data-editor-image placeholder="https://example.com/image.jpg" autocomplete="off">
+            <input id="editor-image-file" type="file" name="image_file" data-editor-image-file accept="image/jpeg,image/png" hidden>
+            <div class="editor-image-actions">
+              <button type="button" class="editor-upload-btn" data-editor-upload-btn>Upload file</button>
+              <span class="editor-image-filename" data-editor-image-filename hidden></span>
+              <button type="button" class="editor-upload-btn editor-image-clear-btn" data-editor-image-clear hidden>Remove File</button>
+            </div>
+              <small class="editor-convention-hint">Clear the link and pick no file to remove the image. A newly picked file stays on your device until you save, then it replaces the current one.</small>
+          </div>
+
+          <div class="editor-field" data-editor-image-quality-field hidden>
+            <label for="editor-image-quality">Image quality <small>(applies to uploaded file only)</small></label>
+            <select id="editor-image-quality" name="image_quality" data-editor-image-quality>
+              <option value="low">Low - smallest file, fastest story loading time</option>
+              <option value="medium" selected>Medium - balanced</option>
+              <option value="high">High - best detail, largest file - heavy story loading time</option>
+            </select>
+          </div>
+
+          <div class="editor-field">
+            <label for="editor-image-info">Image description <small>(optional)</small></label>
+            <input id="editor-image-info" type="text" name="image_info" maxlength="100" value="{{ blog.image_info }}" data-editor-image-info placeholder="The image is self explanatory." autocomplete="off">
+          </div>
+
+          <div class="editor-field">
+            <label for="editor-category">Category</label>
+            <select id="editor-category" name="category" data-editor-category>
+              {% if legacy_category %}
+                {% comment %} THE STORY'S OWN CATEGORY NO LONGER EXISTS IN THE CATEGORY LIST, KEEP IT SELECTABLE SO SAVING DOES NOT SILENTLY MOVE THE STORY. {% endcomment %}
+                <option value="{{ legacy_category }}" selected>{{ legacy_category|title }}</option>
+              {% endif %}
+              {% for value, label in nav_categories %}
+                <option value="{{ value }}"{% if value == blog.category %} selected{% endif %}>{{ label|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="editor-field">
+          <label for="editor-content">Content</label>
+          <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content...">{{ blog.content }}</textarea>
+
+          <b class="prompt">FORMATTING GUIDE — OPTIONAL</b>
+
+          <small class="editor-convention-hint">
+            You may write the entire content as plain text without using any formatting syntax.
+          </small>
+
+          <small class="editor-convention-hint">
+            The first paragraph should preferably - NOT A MUST - remain plain text, without headings, bullets, numbering, bold, or italic formatting.
+          </small>
+
+          <small class="editor-convention-hint">
+            Leave a blank line between paragraphs.
+          </small>
+
+          <small class="editor-convention-hint"><b>#</b> = subheading.</small>
+          <small class="editor-convention-hint"><b>##</b> = smaller subheading.</small>
+          <small class="editor-convention-hint"><b>###</b> = smaller subheading.</small>
+          <small class="editor-convention-hint"><b>*</b> = bullet point.</small>
+          <small class="editor-convention-hint"><b>1.</b>, <b>2.</b>, etc. = numbered points.</small>
+          <small class="editor-convention-hint"><b>**text**</b> = bold.</small>
+          <small class="editor-convention-hint"><b>__text__</b> = italic.</small>
+          <small class="editor-convention-hint"><b>imgl URL alt text</b> = inline image, floated left, text wraps around it.</small>
+          <small class="editor-convention-hint"><b>imgr URL alt text</b> = inline image, floated right, text wraps around it.</small>
+          <small class="editor-convention-hint"><b>imgc URL alt text</b> = inline image, floated center, text wraps around it.</small>
+          <small class="editor-convention-hint"><b>filel URL alt text</b> = inline downloadable file <svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>, text wraps around it.</small>
+          <small class="editor-convention-hint">
+            For imgl/imgr, alt text is optional; if left out, the image filename from the URL is used instead.
+          </small>
+
+          <small class="editor-convention-hint">
+            Use these formatting rules only when they improve the structure or readability of the content.
+          </small>
+        </div>
+        </form>
+      </div>
+    </div>
+
+    {% comment %} <div class="editor-pane editor-preview-pane">
+      <div class="editor-pane-header">Preview</div>
+      <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
+    </div> {% endcomment %}
+  </div>
+</section>
+
+<script>
+  /* LIGHT PHASE: runs at parse time, before the heavy editor. It tells the
+     user the page is still fetching its parts, then pulls them in. The heavy
+     files are ordinary static assets so repeat visits come from cache. */
+  (function () {
+    "use strict";
+    var shell = document.getElementById("editor-shell");
+
+    var lightHost = null;
+    function lightToast(message, tone) {
+      if (!lightHost) {
+        lightHost = document.createElement("div");
+        lightHost.style.cssText = "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;";
+        document.body.appendChild(lightHost);
+      }
+      while (lightHost.children.length >= 2) {
+        lightHost.firstElementChild.remove();
+      }
+      var node = document.createElement("div");
+      node.textContent = message;
+      node.style.cssText = "font-family:inherit;font-size:0.86rem;padding:10px 16px;border-radius:8px;color:#fff;text-align:center;max-width:min(92vw,480px);" +
+        "background:" + (tone === "error" ? "#B3402A" : "#0E1B2C") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);";
+      node.addEventListener("click", function () { node.remove(); });
+      lightHost.appendChild(node);
+      window.setTimeout(function () { node.remove(); }, 4200);
+    }
+    window.editorToast = lightToast;
+
+    lightToast("Best experience on desktop");
+
+    var css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = shell.dataset.heavyCss;
+    document.head.appendChild(css);
+
+    var js = document.createElement("script");
+    js.src = shell.dataset.heavyJs;
+    js.defer = true;
+    js.onerror = function () {
+      lightToast("components failed to load. Check your connection & reload the page.", "error");
+    };
+    document.head.appendChild(js);
+  })();
+</script>
+{% endblock %}
+
+{% block footer %}{% endblock %}
+{% block floating_social %}{% endblock %}

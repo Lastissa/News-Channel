@@ -14,6 +14,7 @@ urlpatterns = [
     path("profile/comments/", views.ProfileCommentsView.as_view(), name="profile_comments"),
     path("profile/stories/", views.ProfilePublishedView.as_view(), name="profile_published"),
     path("profile/stories/<int:blog_id>/delete/", views.ProfilePublishedDeleteView.as_view(), name="profile_published_delete"),
+    path("profile/stories/<int:blog_id>/edit/", views.EditNewsView.as_view(), name="edit_news"),
     path("profile/settings/newsletter/", views.ProfileNewsletterToggleView.as_view(), name="profile_newsletter_toggle"),
     path("profile/settings/send-newsletter/", views.ProfileSendNewsletterToggleView.as_view(), name="profile_send_newsletter_toggle"),
     path("profile/settings/blog-notification/", views.ProfileBlogNotificationToggleView.as_view(), name="profile_blog_notification_toggle"),
