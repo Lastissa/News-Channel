@@ -1313,3 +1313,27 @@ class UnsubscribeView(View):
     "TODO: Handle unsuscribe logic for when user want to stop receving email click"
     def get(self, request):
         return render(request, 'HOME/unsubscribe.html')
+    
+
+MOST_VIEWED_COUNT = 3
+
+class MostViewedView(View):
+    """JSON for the home page's "Most viewed" rail (see
+    HOME/static/home/js/most-viewed.js)."""
+
+    def get(self, request):
+        posts = (
+            Blog.objects.select_related("author__staffprofile")
+            .order_by("-views", "-date_created")[:MOST_VIEWED_COUNT]
+        )
+        results = [
+            {
+                "heading": post.heading,
+                "url": reverse("blog:story_detail", args=[post.slug]),
+                "image": post.image_1 or "",
+                "views": post.views,
+                "category": post.get_category_display(),
+            }
+            for post in posts
+        ]
+        return JsonResponse({"results": results}, status=200)

@@ -28,5 +28,6 @@ urlpatterns = [
     path("newsletter/", views.NewsletterSubscribeView.as_view(), name="newsletter"),
     path("privacy-policy/", views.PrivacyPolicyView.as_view(), name="privacy_policy"),
     path("promote-your-bussiness/", views.PromoteView.as_view(), name="promote"),
+    path("most-viewed/", views.MostViewedView.as_view(), name="most_viewed"),
 ]
 

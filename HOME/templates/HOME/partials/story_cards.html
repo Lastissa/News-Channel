@@ -30,5 +30,12 @@
     </div>
   </div>
 </article>
+{% if forloop.first and page_obj.number == 1 and not is_filtered %}
+{% include "HOME/partials/reading_rails.html" %}
+{% endif %}
+{% empty %}
+{% if page_obj.number == 1 and not is_filtered %}
+{% include "HOME/partials/reading_rails.html" %}
+{% endif %}
 {% endfor %}
 <div class="page-meta" data-has-more="{% if page_obj.has_next %}true{% else %}false{% endif %}" data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.number }}{% endif %}" hidden></div>
