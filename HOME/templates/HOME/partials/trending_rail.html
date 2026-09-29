@@ -1,0 +1,19 @@
+{% comment %}
+  popular: top 3 by Blog.views, site wide (not personalized), so it is
+  the same for every visitor and safe to fetch once client side from
+  HOME.views.MostViewedView rather than computed on every HomeView render.
+  Starts hidden + with skeleton rows; most-viewed.js swaps in the real
+  markup and un-hides the section once the fetch resolves, and simply
+  leaves it hidden if the fetch fails or the site has no stories yet.
+  Included once, from HOME/partials/story_cards.html, inside
+  .headline-feature next to the first (lead) headline card -- stays a
+  plain vertical row list at every width (base.css), it never becomes a
+  3-across grid, it only moves from below the lead card (mobile) to its
+  right (desktop, see .headline-feature in base.css).
+{% endcomment %}
+<section class="trending-section" id="trending-section" data-endpoint="{% url 'home:most_viewed' %}" aria-label="popular stories" hidden>
+  <div class="section-heading">
+    <h2>Popular Stories</h2>
+  </div>
+  <ol class="trending-list" id="trending-list"></ol>
+</section>

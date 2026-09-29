@@ -67,7 +67,7 @@
               class="toggle-switch {% if user.receive_email_login_alert %}is-on{% endif %}"
               aria-pressed="{{ user.receive_email_login_alert|yesno:'true,false' }}"
               data-newsletter-toggle
-              data-enable-url="{% url 'home:profile_newsletter_toggle' %}"
+              data-enable-url="{% url 'home:profile_login_alert_toggle' %}"
               data-enabled="{{ user.receive_email_login_alert|yesno:'true,false' }}"
               data-on-text="Receiving login alert"
               data-off-text="Not receiving login alert">

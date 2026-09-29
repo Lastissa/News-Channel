@@ -1,3 +1,4 @@
 from django.contrib import admin
 
-# Register your models here.
+from Partner.models import AdvertText
+admin.site.register([AdvertText])

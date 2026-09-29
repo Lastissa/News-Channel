@@ -233,7 +233,7 @@ class ArchiveGalleryView(View):
         context = _paginate(page_number=1, descr=_clean_descr(request.GET.get("descr")))
         context["can_upload"] = is_authenticated(request.user)
         if not request.user.is_authenticated:
-            messages.info(request, message="Log In To Upload Your Own Images")
+            messages.info(request, message="Log In To Upload Your Own Files")
         return render(request, "ARCHIVE/gallery.html", context)
 
     def post(self, request):

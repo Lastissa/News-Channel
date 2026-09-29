@@ -1,0 +1,31 @@
+{% comment %}
+  PICK UP WHAT YOU WERE READING: signed in readers only, their last 3 read
+  stories (HOME/views.py HomeView, continue_reading -- see the comment
+  there on what "last read" actually means today). Nothing renders here at
+  all for a logged out visitor or a reader with no reading history yet.
+  Included once, from HOME/partials/story_cards.html, right after
+  .headline-feature (the first card + trending sidebar row) -- the include
+  site guards this with `page_obj.number == 1 and not is_filtered` so it is
+  never repeated on page 2+ or on a search/category result.
+{% endcomment %}
+{% if user.is_authenticated and continue_reading %}
+<section class="continue-section" aria-label="Continue reading">
+  <div class="section-heading">
+    <h2>Pick up what you were reading</h2>
+  </div>
+  <div class="continue-rail">
+    {% for cpost in continue_reading %}
+    <article class="continue-card">
+      <a class="continue-card-media" href="{% url 'blog:story_detail' cpost.slug %}" tabindex="-1">
+        <img src="{{ cpost.image_1|default:placeholder }}" alt="" loading="lazy">
+      </a>
+      <div class="continue-card-body">
+        <span class="tag">{{ cpost.get_category_display|title }}</span>
+        <h3 class="continue-card-title"><a href="{% url 'blog:story_detail' cpost.slug %}">{{ cpost.heading }}</a></h3>
+        <span class="continue-card-meta">{{ cpost.date_created|timesince }} ago</span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

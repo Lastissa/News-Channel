@@ -73,7 +73,7 @@ class Auth(AbstractBaseUser):
         if self.is_admin: staff_type = "Admin"
         if self.is_superuser: staff_type = "S-Admin"
         
-        return f"{self.email}: staff type : {staff_type}"
+        return f"{self.email}({staff_type})"
 
 
 class PasswordResetKey(models.Model):

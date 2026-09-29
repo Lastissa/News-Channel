@@ -1,4 +1,4 @@
-/* MOST VIEWED RAIL (HOME/templates/HOME/home.html, #trending-section)
+/* POPULAR RAIL (HOME/templates/HOME/home.html, #trending-section)
    The top-3-by-views list is not part of HomeView's own render (see the
    docstring on HOME.views.MostViewedView for why) -- it is fetched once,
    here, right after the page loads. The section ships hidden with 3
@@ -33,7 +33,7 @@
     var url = escapeHtml(post.url || "#");
     return (
       '<li class="trending-item">' +
-        '<span class="trending-rank">' + "-" + "</span>" +
+        // '<span class="trending-rank">' + "-" + "</span>" +
         '<a class="trending-media" href="' + url + '" tabindex="-1">' +
           '<img src="' + escapeHtml(post.image || FALLBACK_IMG) + '" alt="" loading="lazy" ' +
           'onerror="this.onerror=null;this.src=\'' + FALLBACK_IMG + '\';">' +

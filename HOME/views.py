@@ -22,6 +22,7 @@ from HOME.models import Bookmark
 from SERVICE_INTERNAL.abstract import (
     _optimization,
     _response,
+    cache_or_run,
     get_cache,
     info_logger,
     is_rate_limited,
@@ -140,6 +141,7 @@ class SitemapXmlView(View):
             )
 
         return render(request, "HOME/sitemap.xml", {"urls": urls}, content_type="application/xml")
+
 class FavicoView(View):
     def get(self, request):
         return redirect(to='/static/logo.jpg', preserve_request=True, permanent=True)
@@ -232,7 +234,12 @@ def _ad_center_items():
     "coming soon" data for now -- replace the list below (or load it from the
     database) and the template needs no changes. External urls (http...) open
     in a new tab automatically."""
-    return [{"text": f"coming soon {number}", "url": "#"} for number in range(1, 5)]
+    from Partner.models import AdvertText
+    active_advert = AdvertText.objects.filter(expiry_date__gte = timezone.now(), is_active = True)
+    if active_advert:
+        return [{"text": i.ad_content, "url": i.url  or "#"} for i in active_advert]
+    else:
+        return [{'text': 'Do You Know You Can Boost Your Bussiness Online Presence By Clicking HERE', 'url': 'https:localhost:8000/missing/'}]
 
 
 class HomeView(View):
@@ -675,10 +682,13 @@ class PromoteView(View):
         return render(request, "HOME/promote.html")
 
 
-class ProfileNewsletterToggleView(View):
-    """Toggle newsletter delivery without a full page refresh."""
+class ProfileLoginAlert(View):
+    """Toggle Login Alert Wether to receive mail or not for login."""
 
     def post(self, request):
+        remaining_seconds, limited = is_rate_limited(request, 3, 5,True)
+        if limited:
+            return JsonResponse({'detail': f'SPAM: oga calm down for {remaining_seconds} sec!!!'.upper()})
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in to update settings.", "enabled": False}, status=401)
 

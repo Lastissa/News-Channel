@@ -177,17 +177,18 @@ def set_cache(key, value, timeout = None):
 def get_cache(key):
     value = cache.get(key)
     if not value:
+        info_logger(msg=f"CACHE-GET: No Cache Was Found With the key ({key})")
         return False
     return value
 
 def cache_or_run(key, fn, timeout=300):
-    # value = get_cache(key)
-    # if value:
-    #     return value
+    value = get_cache(key)
+    if value:
+        return value
     value = fn()
-    # if value is not None:
-    #     set_cache(key, value, timeout)
-    #     info_logger(msg=f"CACHE-SET: {key} set since no key was found")
-    # else:
-        # raise Exception("BEFORE CACHE CAN SET, THE FN NEED TO RETURN SOMETHING")
+    if value is not None:
+        set_cache(key, value, timeout)
+        info_logger(msg=f"CACHE-SET: {key} set since no key was found in the cache")
+    else:
+        raise Exception("BEFORE CACHE CAN SET, THE FN NEED TO RETURN SOMETHING")
     return value

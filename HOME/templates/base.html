@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% csrf_token %}
     <title>{% block title %}{{ project_name }} · {{ project_cachphrase }}{% endblock %}</title>
-    <meta name="description" content="{% block meta_description %}{{ project_cachphrase }}{% endblock %}">
+    <meta name="description" content="{% block meta_description %} - {{ project_cachphrase }}{% endblock %}">
     {% block meta_robots %}<meta name="robots" content="index, follow">{% endblock %}
     <meta property="og:site_name" content="{{ project_name }}">
     <link rel="canonical" href="{{ site_domain }}{{ request.path }}">

@@ -1,6 +1,29 @@
 {% extends "base.html" %}
 {% load static %}
 {% load format_copy_btn %}
+
+{% block title %}
+{% spaceless %}
+{% if is_filtered %}
+  {% if query %}Results for "{{ query|truncatechars:50 }}" - ABUREPORT
+  {% elif active_category %}Latest On {{ active_category|title }} -  ABUREPORT
+  {% else %}{{block.super}}
+  {% endif %}
+  {% if page_obj.number > 1 %} - Page {{ page_obj.number }}{% endif %}
+{% else %}
+  {{ block.super }}
+{% endif %}
+{% endspaceless %}
+{% endblock title %}
+
+
+{% block meta_description %}
+{% spaceless %}
+{% if is_filtered %}{% if query %}Results for {{ query|truncatechars:50 }} - ABUREPORT{% elif active_category %}Latest On {{ active_category|title }} - ABUREPORT{% endif %}{% else %}{{block.super}} {% endif %}
+{% endspaceless %}
+{% endblock meta_description %}
+
+
 {% block content %}
 {% static 'home_no_bg.svg' as placeholder %}
 {% comment %}
@@ -135,7 +158,7 @@ oficial website at https://www.abureport.com.ng
   <div class="section-heading">
     <h2 id="headline">
       {% if is_filtered %}
-        {% if query %}Results for "{{ query }}"{% elif active_category %}{{ active_category|title }}{% endif %}
+        {% if query %}Results for "{{ query }}"{% elif active_category %} Latest On {{ active_category|title }}{% endif %}
       {% else %}
         Headlines
       {% endif %}
