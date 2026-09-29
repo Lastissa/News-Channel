@@ -285,6 +285,12 @@ class StoryDetailView(View):
                 extra_tags="story-edited",
             )
 
+        #   THE STORY ROW ABOVE COMES FROM A 100s CACHE, SO ITS `likes` CAN BE
+        #   STALE. Other readers may have liked/unliked meanwhile, so the
+        #   counter is always re-read from the database before rendering.
+        blog.refresh_from_db(fields=["likes"])
+        is_liked = request.user.is_authenticated and blog.id in request.session.get("liked_blogs", [])
+
         blog_content = parse_story_content(blog.content)
         ticker_text = build_ticker_text(blog.content)
 
@@ -369,6 +375,7 @@ class StoryDetailView(View):
             "author_tags": author_tags,
             "author_recent_stories": author_recent_stories,
             "is_bookmarked": is_bookmarked,
+            "is_liked": is_liked,
             "bookmark_count": blog.bookmarked_by.count(),
             "author_portfolio_url": author_portfolio_url,
             "follow_endpoint": (
@@ -413,6 +420,12 @@ class BookmarkNotFoundView(View):
 
 
 class BlogLikeView(View):
+    """Toggle. A story the reader already liked is unliked (counter -1), any
+    other story is liked (counter +1). The counter is moved with an atomic
+    F() update and then READ BACK from the database, so the number returned is
+    the real total (other readers may have liked meanwhile), never a guessed
+    +1 / -1."""
+
     def post(self, request, blog_id):
         blog = get_object_or_404(Blog, pk=blog_id)
         user = _authenticated_user(request)
@@ -423,15 +436,20 @@ class BlogLikeView(View):
 
         liked_blogs = request.session.get("liked_blogs", [])
         if blog.id in liked_blogs:
-            return JsonResponse({"detail": "You already liked this story.", "likes": blog.likes or 0}, status=200)
+            #   `likes__gt=0` keeps the PositiveIntegerField from going below 0.
+            Blog.objects.filter(pk=blog.pk, likes__gt=0).update(likes=F("likes") - 1)
+            liked_blogs = [liked_id for liked_id in liked_blogs if liked_id != blog.id]
+            liked, detail = False, "Like removed."
+        else:
+            Blog.objects.filter(pk=blog.pk).update(likes=F("likes") + 1)
+            liked_blogs = list(dict.fromkeys([*liked_blogs, blog.id]))
+            liked, detail = True, "Story liked."
 
-        blog.likes = (blog.likes or 0) + 1
-        blog.save(update_fields=["likes"])
-        liked_blogs = list(dict.fromkeys([*liked_blogs, blog.id]))
         request.session["liked_blogs"] = liked_blogs
         request.session.modified = True
 
-        return JsonResponse({"detail": "Story liked.", "likes": blog.likes}, status=200)
+        likes = Blog.objects.values_list("likes", flat=True).get(pk=blog.pk)
+        return JsonResponse({"detail": detail, "likes": likes, "liked": liked}, status=200)
 
 class CommentCreateView(View):
     def post(self, request, blog_id):

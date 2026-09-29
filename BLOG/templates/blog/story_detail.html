@@ -122,11 +122,11 @@
               {{ blog.views }} views
             </span>
             <span><strong>Word count</strong> {{ blog.word_count }}</span>
-            <span class="metric-item" aria-label="{{ blog.likes }} likes">
+            <span class="metric-item" data-story-like-metric aria-label="{{ blog.likes }} likes">
               <svg viewBox="0 0 20 20" class="metric-icon" aria-hidden="true">
                 <path d="M10 17s-6.5-4-8-8.2C1 5.8 2.6 3.5 5.2 3.3c1.5-.1 2.9.8 3.6 2 .7-1.2 2.1-2.1 3.6-2 2.6.2 4.2 2.5 3.2 5.5-1.5 4.2-8 8.2-8 8.2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
               </svg>
-              {{ blog.likes }}
+              <span data-story-like-metric-count>{{ blog.likes }}</span>
             </span>
           </div>
           <div class="story-copy-link-row">
@@ -170,8 +170,8 @@ oficial website at https://www.abureport.com.ng
     <div class="article-actions">
       <form method="post" action="{% url 'blog:blog_like' blog.id %}" class="action-form" data-story-like-form data-endpoint="{% url 'blog:blog_like' blog.id %}">
         {% csrf_token %}
-        <button type="submit" class="story-like-btn" data-story-like-btn>
-          Like article
+        <button type="submit" class="story-like-btn" data-story-like-btn data-liked="{% if is_liked %}true{% else %}false{% endif %}" aria-pressed="{% if is_liked %}true{% else %}false{% endif %}">
+          <span data-story-like-label>{% if is_liked %}Unlike article{% else %}Like article{% endif %}</span>
           <span class="like-badge" data-story-like-count>{{ blog.likes }}</span>
         </button>
       </form>

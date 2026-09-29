@@ -1,0 +1,28 @@
+{% comment %} Body of #profile-bookmarks-list. Rendered on first paint by profile.html and re-rendered by home:profile_bookmarks for search and paging. {% endcomment %}
+{% if recent_bookmarks %}
+<ul class="profile-list">
+  {% for bookmark in recent_bookmarks %}
+    <li>
+      <div>
+        <strong>{{ bookmark.blog.heading }}</strong>
+        <small>{{ bookmark.created_at|date:"M d, Y" }}</small>
+      </div>
+      <div class="profile-bookmark-actions">
+        <a href="{% url 'blog:story_detail' bookmark.blog.slug %}">Open</a>
+        <button type="button" class="profile-bookmark-toggle" data-bookmark-btn data-endpoint="{% url 'home:bookmark' bookmark.blog_id %}" data-saved="true" aria-pressed="true" aria-label="Remove {{ bookmark.blog.heading }} from bookmarks" title="Rem BookMark">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4-6.5 4V4.5a1 1 0 0 1 1-1Z" fill="var(--nav-bg)" />
+          </svg>
+        </button>
+      </div>
+    </li>
+  {% endfor %}
+</ul>
+{% elif search_query %}
+<p class="empty-copy">No bookmarks match &quot;{{ search_query }}&quot;.</p>
+{% else %}
+<p class="empty-copy">No bookmarks saved yet. All news you bookmarked appear here.</p>
+{% endif %}
+
+{% url 'home:profile_bookmarks' as bookmarks_endpoint %}
+{% include "HOME/partials/profile_list_pagination.html" with page_obj=bookmark_page_obj page_range=bookmark_page_range endpoint=bookmarks_endpoint target_id="profile-bookmarks-list" search_id="bookmark-search" label="Bookmark" %}

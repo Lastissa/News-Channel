@@ -1,0 +1,29 @@
+{% comment %}
+  Shared pager for the HTMX profile lists (published / bookmarks / history).
+  Expects: page_obj, page_range, endpoint, target_id, search_id, label.
+  hx-target / hx-include sit on the <nav> and are inherited by every button, so
+  a page change keeps whatever is typed in the list's search box.
+{% endcomment %}
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="story-pagination" aria-label="{{ label }} pagination"
+     hx-target="#{{ target_id }}" hx-swap="innerHTML" hx-include="#{{ search_id }}">
+  {% if page_obj.has_previous %}
+    <button type="button" class="story-page-btn page-nav" hx-get="{{ endpoint }}?page={{ page_obj.previous_page_number }}">Prev</button>
+  {% endif %}
+
+  {% for page_num in page_range %}
+    {% if page_num == page_obj.paginator.ELLIPSIS %}
+      <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+    {% else %}
+      <button type="button" class="story-page-btn {% if page_num == page_obj.number %}is-active{% endif %}"
+              hx-get="{{ endpoint }}?page={{ page_num }}"
+              aria-label="Go to page {{ page_num }}"
+              {% if page_num == page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+    <button type="button" class="story-page-btn page-nav" hx-get="{{ endpoint }}?page={{ page_obj.next_page_number }}">Next</button>
+  {% endif %}
+</nav>
+{% endif %}

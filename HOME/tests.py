@@ -317,11 +317,10 @@ class ProfileEditLinkTests(QuietTestCase):
         self.blog = make_story(self.author)
         self.client.force_login(self.author)
 
-    def test_published_payload_carries_the_edit_url(self, _ping):
+    def test_published_list_carries_the_edit_url(self, _ping):
         response = self.client.get(reverse("home:profile_published"))
         self.assertEqual(response.status_code, 200)
-        item = response.json()["items"][0]
-        self.assertEqual(item["edit_url"], reverse("home:edit_news", args=[self.blog.id]))
+        self.assertContains(response, f'href="{reverse("home:edit_news", args=[self.blog.id])}"')
 
     def test_profile_page_lists_an_edit_link_per_story(self, _ping):
         response = self.client.get(reverse("home:profile"))
@@ -414,3 +413,65 @@ class StoryUpdatedNoticeTests(QuietTestCase):
 
         notices = list(self.story().context["messages"])
         self.assertEqual(str(notices[0]), "This post was last updated less than a minute after its initial publication.")
+
+
+@mock.patch("HOME.views.ping_indexnow")
+class ProfileListSearchTests(QuietTestCase):
+    """Published stories, bookmarks and reading history are HTMX lists: each
+    endpoint answers `?q=` with a rendered fragment filtered by story heading."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = make_staff()
+        self.jamb = make_story(self.author, heading="JAMB result checker opens")
+        self.waec = make_story(self.author, heading="WAEC timetable released")
+        self.client.force_login(self.author)
+
+    def test_published_search_filters_by_heading(self, _ping):
+        response = self.client.get(reverse("home:profile_published"), {"q": "jamb"})
+        self.assertContains(response, "JAMB result checker opens")
+        self.assertNotContains(response, "WAEC timetable released")
+
+    def test_published_search_only_covers_the_signed_in_authors_stories(self, _ping):
+        other = make_staff("other@example.com")
+        make_story(other, heading="JAMB story by someone else")
+        response = self.client.get(reverse("home:profile_published"), {"q": "jamb"})
+        self.assertNotContains(response, "someone else")
+
+    def test_published_search_with_no_match_says_so(self, _ping):
+        response = self.client.get(reverse("home:profile_published"), {"q": "zzz"})
+        self.assertContains(response, "No published stories match")
+
+    def test_published_search_is_staff_only(self, _ping):
+        self.client.logout()
+        member = Auth.objects.create_user(email="member2@example.com")
+        self.client.force_login(member)
+        response = self.client.get(reverse("home:profile_published"), {"q": "jamb"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_bookmark_search_filters_by_heading(self, _ping):
+        from HOME.models import Bookmark
+        Bookmark.objects.create(user=self.author, blog=self.jamb)
+        Bookmark.objects.create(user=self.author, blog=self.waec)
+        response = self.client.get(reverse("home:profile_bookmarks"), {"q": "waec"})
+        self.assertContains(response, "WAEC timetable released")
+        self.assertNotContains(response, "JAMB result checker opens")
+
+    def test_history_search_filters_by_heading(self, _ping):
+        self.jamb.non_anonymous_viewer.add(self.author)
+        self.waec.non_anonymous_viewer.add(self.author)
+        response = self.client.get(reverse("home:profile_history"), {"q": "timetable"})
+        self.assertContains(response, "WAEC timetable released")
+        self.assertNotContains(response, "JAMB result checker opens")
+
+    def test_pager_keeps_the_search_box_value(self, _ping):
+        for n in range(6):
+            make_story(self.author, heading=f"Scholarship update {n}")
+        response = self.client.get(reverse("home:profile_published"), {"q": "scholarship"})
+        self.assertContains(response, 'hx-include="#published-search"')
+        self.assertContains(response, f'hx-get="{reverse("home:profile_published")}?page=2"')
+
+    def test_profile_page_renders_all_three_search_boxes(self, _ping):
+        response = self.client.get(reverse("home:profile"))
+        for box_id in ("published-search", "bookmark-search", "history-search"):
+            self.assertContains(response, f'id="{box_id}"')

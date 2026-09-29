@@ -952,6 +952,11 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   color: #fff; 
   box-shadow: 0 8px 16px rgba(224, 36, 71, 0.25); 
 }
+/* already liked: outlined, so the same button reads as "click to unlike" */
+.story-like-btn[data-liked="true"] {
+  background: transparent; color: var(--danger); border-color: var(--danger); box-shadow: none;
+}
+.story-like-btn[data-liked="true"] .like-badge { background: rgba(179, 64, 42, 0.14); }
 
 /* ---------- Author follow ---------- */
 .follow-btn {

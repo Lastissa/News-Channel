@@ -1,7 +1,9 @@
 import json
+from unittest import mock
 
 from django.core.cache import cache
 from django.db import connection
+from django.db.models import F
 from django.test import TestCase, RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 
@@ -78,7 +80,11 @@ __Please note:__ deadlines are strict.
         self.assertIn('<ul>', html)
         self.assertIn('<ol>', html)
 
-    def test_blog_like_is_unique_per_user(self):
+    def _like(self, blog):
+        return self.client.post(f"/story/{blog.id}/like/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
+    @mock.patch("AUTHENTICATION.signals._try_send_login_email")
+    def test_blog_like_toggles_and_returns_the_real_total(self, _mail):
         blog = Blog.objects.create(
             author=self.author,
             category="GENERAL",
@@ -87,14 +93,58 @@ __Please note:__ deadlines are strict.
         )
         self.client.force_login(self.author)
 
-        first = self.client.post(f"/story/{blog.id}/like/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
-        second = self.client.post(f"/story/{blog.id}/like/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
-
+        first = self._like(blog)
         self.assertEqual(first.status_code, 200)
         self.assertEqual(json.loads(first.content)["likes"], 1)
+        self.assertTrue(json.loads(first.content)["liked"])
+
+        #   ANOTHER READER LIKES BETWEEN OUR TWO CLICKS
+        Blog.objects.filter(pk=blog.pk).update(likes=F("likes") + 4)
+
+        second = self._like(blog)
+        payload = json.loads(second.content)
         self.assertEqual(second.status_code, 200)
-        self.assertEqual(json.loads(second.content)["likes"], 1)
-        self.assertEqual(json.loads(second.content)["detail"], "You already liked this story.")
+        self.assertEqual(payload["likes"], 4)  #   THE REAL TOTAL, NOT 1 - 1 = 0
+        self.assertFalse(payload["liked"])
+        self.assertEqual(payload["detail"], "Like removed.")
+        blog.refresh_from_db()
+        self.assertEqual(blog.likes, 4)
+
+        third = self._like(blog)
+        self.assertEqual(json.loads(third.content)["likes"], 5)
+        self.assertTrue(json.loads(third.content)["liked"])
+
+    @mock.patch("AUTHENTICATION.signals._try_send_login_email")
+    def test_unlike_never_takes_the_counter_below_zero(self, _mail):
+        blog = Blog.objects.create(
+            author=self.author,
+            category="GENERAL",
+            heading="Daily news update",
+            content="A short update.",
+        )
+        self.client.force_login(self.author)
+        session = self.client.session
+        session["liked_blogs"] = [blog.id]
+        session.save()
+
+        response = self._like(blog)
+
+        self.assertEqual(json.loads(response.content)["likes"], 0)
+        self.assertFalse(json.loads(response.content)["liked"])
+
+    def test_anonymous_like_is_rejected(self):
+        blog = Blog.objects.create(
+            author=self.author,
+            category="GENERAL",
+            heading="Daily news update",
+            content="A short update.",
+        )
+
+        response = self._like(blog)
+
+        self.assertEqual(response.status_code, 401)
+        blog.refresh_from_db()
+        self.assertEqual(blog.likes, 0)
 
     def test_only_one_comment_per_story_is_allowed(self):
         blog = Blog.objects.create(

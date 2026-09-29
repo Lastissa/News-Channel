@@ -1317,3 +1317,32 @@ html.avatar-crop-open {
     min-width: 160px;
   }
 }
+
+/* ---------- Profile list search (HTMX): published / bookmarks / history ---------- */
+.profile-search { margin: 0 0 12px; }
+
+.profile-search label {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.profile-search input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.profile-search input:focus-visible {
+  outline: 2px solid var(--amber-alt-deep);
+  outline-offset: 1px;
+  border-color: var(--amber-alt-deep);
+}
+
+/* htmx puts .htmx-request on the list while its search / page request is in flight */
+.profile-bookmark-shell.htmx-request { opacity: 0.55; }

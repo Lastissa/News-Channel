@@ -1,0 +1,33 @@
+{% comment %} Body of #profile-published-list. Rendered on first paint by profile.html and re-rendered by home:profile_published for search and paging. {% endcomment %}
+{% if published_stories %}
+<ul class="profile-list">
+  {% for blog in published_stories %}
+  <li data-published-story-item>
+    <div>
+      <strong>{{ blog.heading }}</strong>
+      <small>{{ blog.views }} view{{ blog.views|pluralize }} &bull; {{ blog.date_created|date:"M d, Y" }}</small>
+    </div>
+    <div class="published-story-actions">
+      <a href="{% url 'blog:story_detail' blog.slug %}">Open</a>
+      {% comment %} EDIT: reuses data-add-news-link so it gets the same quick connection check as "+ NeWs" before the editor page opens. {% endcomment %}
+      <a href="{% url 'home:edit_news' blog.id %}" class="published-story-edit-link" data-add-news-link>Edit</a>
+      <form method="post" action="{% url 'home:profile_published_delete' blog.id %}" data-published-story-delete-form data-endpoint="{% url 'home:profile_published_delete' blog.id %}">
+        {% csrf_token %}
+        <button type="submit" class="published-story-delete-btn" aria-label="Delete {{ blog.heading }}" title="Delete story">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
+          </svg>
+        </button>
+      </form>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% elif search_query %}
+<p class="empty-copy">No published stories match &quot;{{ search_query }}&quot;.</p>
+{% else %}
+<p class="empty-copy">No stories published yet.</p>
+{% endif %}
+
+{% url 'home:profile_published' as published_endpoint %}
+{% include "HOME/partials/profile_list_pagination.html" with page_obj=stories_page_obj page_range=stories_page_range endpoint=published_endpoint target_id="profile-published-list" search_id="published-search" label="Published stories" %}

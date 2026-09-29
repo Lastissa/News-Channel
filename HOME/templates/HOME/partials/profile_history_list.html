@@ -1,0 +1,21 @@
+{% comment %} Body of #profile-history-list. Rendered on first paint by profile.html and re-rendered by home:profile_history for search and paging. {% endcomment %}
+{% if reading_history %}
+<ul class="profile-list">
+  {% for blog in reading_history %}
+  <li>
+    <div>
+      <strong>{{ blog.heading }}</strong>
+      <small>{{ blog.date_created|date:"M d, Y" }}</small>
+    </div>
+    <a href="{% url 'blog:story_detail' blog.slug %}">Open</a>
+  </li>
+  {% endfor %}
+</ul>
+{% elif search_query %}
+<p class="empty-copy">No stories in your history match &quot;{{ search_query }}&quot;.</p>
+{% else %}
+<p class="empty-copy">No reading history yet. All news you view shows here</p>
+{% endif %}
+
+{% url 'home:profile_history' as history_endpoint %}
+{% include "HOME/partials/profile_list_pagination.html" with page_obj=history_page_obj page_range=history_page_range endpoint=history_endpoint target_id="profile-history-list" search_id="history-search" label="Reading history" %}
