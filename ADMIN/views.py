@@ -24,7 +24,7 @@ from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email
-from SERVICE_INTERNAL.email_single import _try_send_staff_welcome_email
+from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
 from ADMIN.models import SiteSettings
@@ -193,10 +193,13 @@ class StaffDetailView(View):
         else:
             authority = "Staff"
 
+        own_profile = StaffProfile.objects.filter(auth=request.user).first()
+
         return render(
             request,
             "ADMIN/staff_detail.html",
             {
+                "sender_full_name": own_profile.full_name.strip() if own_profile and own_profile.full_name else "",
                 "staff_account": account,
                 "staff_profile": profile,
                 "staff_display_name": (profile.full_name.strip() if profile and profile.full_name else "") or "NO USERNAME",
@@ -431,6 +434,64 @@ class StaffBanToggleView(_SuperuserWriteView):
             },
             status=200,
         )
+
+
+STAFF_MAIL_SUBJECT_MAX = 150
+STAFF_MAIL_BODY_MAX = 5000
+
+
+class StaffMailSendView(View):
+    """Send one email to the staff member whose detail page the admin is on.
+
+    "Only while in their profile" is enforced by construction: the recipient
+    is looked up from the staff id in THIS URL and nothing else. No address,
+    id or recipient list is ever read from the request body, so the endpoint
+    cannot be used to mail anyone but the person the page belongs to.
+
+    Like the PANEL mass email, the sending admin needs a StaffProfile
+    full_name: it becomes the From display name."""
+
+    def post(self, request, staff_id):
+        remaining_seconds, limited = is_rate_limited(request, 30, 5)
+        if limited:
+            return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        #   AFTER the admin check on purpose: a non admin must not be able to
+        #   tell which staff ids exist from a 404 versus a 403
+        account = _staff_account_or_404(staff_id)
+
+        sender_profile = StaffProfile.objects.filter(auth=request.user).first()
+        sender_full_name = sender_profile.full_name.strip() if sender_profile and sender_profile.full_name else ""
+        if not sender_full_name:
+            return JsonResponse(
+                {"detail": "Your staff profile has no full name set. An admin cannot send email without one."},
+                status=409,
+            )
+
+        #   one line: a subject is never allowed to carry line breaks
+        subject = " ".join((request.POST.get("subject") or "").split())
+        body = (request.POST.get("body") or "").strip()
+        if not subject:
+            return JsonResponse({"detail": "Enter an email heading."}, status=400)
+        if len(subject) > STAFF_MAIL_SUBJECT_MAX:
+            return JsonResponse({"detail": f"The email heading is limited to {STAFF_MAIL_SUBJECT_MAX} characters."}, status=400)
+        if not body:
+            return JsonResponse({"detail": "Enter the email body."}, status=400)
+        if len(body) > STAFF_MAIL_BODY_MAX:
+            return JsonResponse({"detail": f"The email body is limited to {STAFF_MAIL_BODY_MAX} characters."}, status=400)
+
+        profile = StaffProfile.objects.filter(auth=account).first()
+        recipient_name = (profile.full_name.strip() if profile and profile.full_name else "") or "this staff member"
+
+        if not _try_send_staff_direct_email(sender_full_name, account.email, subject, body):
+            return JsonResponse({"detail": "The email could not be sent. Try again shortly."}, status=502)
+
+        #   who wrote to whom and the heading, never the message itself
+        info_logger(msg=f"STAFF MAIL: {request.user.email} sent '{subject}' to {account.email}")
+
+        return JsonResponse({"detail": f"Email sent to {recipient_name}."}, status=200)
 
 
 class OwnRoleUpdateView(View):

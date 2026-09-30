@@ -742,9 +742,28 @@
     });
   })();
 
-  /* ---------- profile pagination (JSON): comments + admin staff lists. Bookmarks,
-     reading history and published stories are server rendered HTMX partials. ---------- */
+  /* ---------- profile pagination: bookmarks + reading history share one flow ---------- */
   var PROFILE_LISTS = {
+    bookmark: {
+      listId: "profile-bookmarks-list",
+      endpointKey: "bookmarkEndpoint",
+      paginationSelector: ".profile-bookmark-pagination",
+      buttonAttr: "data-bookmark-page-btn",
+      emptyText: "No bookmarks saved yet.",
+      dateKey: "created_at",
+      loadError: "Could not load bookmarks.",
+      netError: "Connection issue. Bookmarks could not be loaded.",
+    },
+    history: {
+      listId: "profile-history-list",
+      endpointKey: "historyEndpoint",
+      paginationSelector: ".profile-history-pagination",
+      buttonAttr: "data-history-page-btn",
+      emptyText: "No reading history yet.",
+      dateKey: "date_created",
+      loadError: "Could not load history.",
+      netError: "Connection issue. History could not be loaded.",
+    },
     comment: {
       listId: "profile-comments-list",
       endpointKey: "commentsEndpoint",
@@ -776,6 +795,17 @@
       loadError: "Could not load the published news.",
       netError: "Connection issue. The published news could not be loaded.",
     },
+    published: {
+      listId: "profile-published-list",
+      endpointKey: "publishedEndpoint",
+      paginationSelector: ".profile-published-pagination",
+      buttonAttr: "data-published-page-btn",
+      emptyText: "No stories published yet.",
+      dateKey: "date_created",
+      viewsKey: "views",
+      loadError: "Could not load published stories.",
+      netError: "Connection issue. Published stories could not be loaded.",
+    },
   };
 
   function renderProfileItems(config, payload) {
@@ -785,29 +815,46 @@
     var linkLabel = config.linkLabel || "Open";
     var html = '<ul class="profile-list">';
     items.forEach(function (item) {
-      var detailText = item[config.excerptKey] || "";
+      var detailText = "";
+      if (config.excerptKey) {
+        detailText = item[config.excerptKey] || "";
+      } else {
+        var parts = [];
+        if (config.viewsKey && typeof item[config.viewsKey] === "number") {
+          parts.push(item[config.viewsKey] + " view" + (item[config.viewsKey] === 1 ? "" : "s"));
+        }
+        var rawDate = item[config.dateKey];
+        if (rawDate) {
+          parts.push(new Date(rawDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }));
+        }
+        detailText = parts.join(" \u2022 ");
+      }
       /* item.url is always sent by the server as a slug-based /story/<slug>/
          link; item.blog_id only remains as a raw numeric fallback so an
          older cached payload without "url" doesn't render a dead link. */
       var actions = '<a href="' + (item.url || '/story/' + item.blog_id + '/') + '">' + linkLabel + '</a>';
-      html += '<li><div><strong>' + (item.heading || "Untitled story") + '</strong><small>' + detailText + '</small></div>' + actions + '</li>';
+      if (config === PROFILE_LISTS.bookmark) {
+        actions += '<button type="button" class="profile-bookmark-toggle" data-bookmark-btn data-endpoint="/bookmark/' + item.blog_id + '/" data-saved="true" aria-pressed="true" aria-label="Remove bookmark" title="Remove bookmark">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4-6.5 4V4.5a1 1 0 0 1 1-1Z" fill="currentColor"/></svg>' +
+          '<span class="visually-hidden">Remove bookmark</span></button>';
+        actions = '<div class="profile-bookmark-actions">' + actions + '</div>';
+      }
+      if (config === PROFILE_LISTS.published) {
+        /* Edit reuses data-add-news-link so it gets the same quick
+           connection check before the (heavier) editor page opens. */
+        if (item.edit_url) {
+          actions += '<a href="' + item.edit_url + '" class="published-story-edit-link" data-add-news-link>Edit</a>';
+        }
+        actions += '<form method="post" data-published-story-delete-form data-endpoint="/profile/stories/' + item.blog_id + '/delete/">' +
+          '<button type="submit" class="published-story-delete-btn" aria-label="Delete ' + (item.heading || "Untitled story") + '" title="Delete story">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg>' +
+          '<span class="visually-hidden">Delete story</span></button></form>';
+        actions = '<div class="published-story-actions">' + actions + '</div>';
+      }
+      html += '<li' + (config === PROFILE_LISTS.published ? ' data-published-story-item' : '') + '><div><strong>' + (item.heading || "Untitled story") + '</strong><small>' + detailText + '</small></div>' + actions + '</li>';
     });
     return html + "</ul>";
   }
-
-  /* ---------- HTMX profile lists (published / bookmarks / history): surface failures ---------- */
-  var HTMX_PROFILE_LISTS = "#profile-published-list, #profile-bookmarks-list, #profile-history-list";
-  document.addEventListener("htmx:responseError", function (event) {
-    var target = event.detail && event.detail.target;
-    if (!target || !target.matches || !target.matches(HTMX_PROFILE_LISTS)) return;
-    var xhr = event.detail.xhr;
-    toast(extractDetail(xhr ? xhr.responseText : "", "Could not load this list."), "error");
-  });
-  document.addEventListener("htmx:sendError", function (event) {
-    var target = event.detail && event.detail.target;
-    if (!target || !target.matches || !target.matches(HTMX_PROFILE_LISTS)) return;
-    toast("Connection issue. The list could not be loaded.", "error");
-  });
 
   /* ---------- published story deletion ---------- */
   document.addEventListener("submit", function (event) {
@@ -843,9 +890,8 @@
         if (item) item.remove();
 
         var list = document.getElementById("profile-published-list");
-        var storyList = list && list.querySelector("ul.profile-list");
-        if (storyList && !storyList.querySelector("[data-published-story-item]")) {
-          storyList.outerHTML = '<p class="empty-copy">No stories on this page.</p>';
+        if (list && !list.querySelector("[data-published-story-item]")) {
+          list.innerHTML = '<p class="empty-copy">No stories published yet.</p>';
         }
 
         var total = document.querySelector("#published-stories .panel-tag");
@@ -957,11 +1003,14 @@
   }
 
   document.addEventListener("click", function (event) {
-    var pageBtn = event.target.closest("[data-comments-page-btn], [data-staff-page-btn], [data-staff-published-page-btn]");
+    var pageBtn = event.target.closest("[data-bookmark-page-btn], [data-history-page-btn], [data-comments-page-btn], [data-published-page-btn], [data-staff-page-btn], [data-staff-published-page-btn]");
     if (!pageBtn) return;
 
-    var kind = "comment";
-    if (pageBtn.hasAttribute("data-staff-published-page-btn")) kind = "staffPublished";
+    var kind = "bookmark";
+    if (pageBtn.hasAttribute("data-history-page-btn")) kind = "history";
+    else if (pageBtn.hasAttribute("data-comments-page-btn")) kind = "comment";
+    else if (pageBtn.hasAttribute("data-published-page-btn")) kind = "published";
+    else if (pageBtn.hasAttribute("data-staff-published-page-btn")) kind = "staffPublished";
     else if (pageBtn.hasAttribute("data-staff-page-btn")) kind = "staff";
     var config = PROFILE_LISTS[kind];
     var list = document.getElementById(config.listId);
@@ -1066,41 +1115,6 @@
     }
   }
 
-  /* ---------- story like: toggle (like / unlike). The count is set optimistically,
-     then ALWAYS replaced by the real total the server read back from the
-     database, since other readers may have liked or unliked in the meantime. ---------- */
-  function setStoryLikeVisual(button, liked) {
-    button.dataset.liked = liked ? "true" : "false";
-    button.setAttribute("aria-pressed", liked ? "true" : "false");
-    var label = button.querySelector("[data-story-like-label]");
-    if (label) label.textContent = liked ? "Unlike article" : "Like article";
-    /* keep the top heart in sync with the bottom button */
-    var top = document.querySelector("[data-story-like-metric]");
-    if (top) {
-      top.dataset.liked = liked ? "true" : "false";
-      top.setAttribute("aria-pressed", liked ? "true" : "false");
-    }
-  }
-
-  /* top heart: same action as the bottom button, so submit the same form */
-  document.addEventListener("click", function (event) {
-    var top = event.target.closest("[data-story-like-metric]");
-    if (!top) return;
-    var form = document.querySelector("[data-story-like-form]");
-    if (form) form.requestSubmit();
-  });
-
-  function setStoryLikeCount(total) {
-    var countNode = document.querySelector("[data-story-like-count]");
-    if (countNode) countNode.textContent = String(total);
-    var metric = document.querySelector("[data-story-like-metric]");
-    if (metric) {
-      metric.setAttribute("aria-label", (metric.dataset.liked === "true" ? "Unlike this story, " : "Like this story, ") + total + " likes");
-      var metricCount = metric.querySelector("[data-story-like-metric-count]");
-      if (metricCount) metricCount.textContent = String(total);
-    }
-  }
-
   document.addEventListener("submit", function (event) {
     var storyForm = event.target.closest("[data-story-like-form]");
     if (!storyForm) return;
@@ -1111,20 +1125,11 @@
 
     var countNode = document.querySelector("[data-story-like-count]");
     var oldValue = countNode ? Number(countNode.textContent.trim()) || 0 : 0;
-    var wasLiked = button.dataset.liked === "true";
+    var previousText = button.innerHTML;
     button.dataset.pending = "true";
     button.disabled = true;
     button.classList.add("is-pending");
-    setStoryLikeVisual(button, !wasLiked);
-    setStoryLikeCount(Math.max(0, oldValue + (wasLiked ? -1 : 1)));
-
-    function revert() {
-      button.dataset.pending = "false";
-      button.disabled = false;
-      button.classList.remove("is-pending");
-      setStoryLikeVisual(button, wasLiked);
-      setStoryLikeCount(oldValue);
-    }
+    if (countNode) countNode.textContent = oldValue + 1;
 
     fetch(storyForm.dataset.endpoint, {
       method: "POST",
@@ -1135,24 +1140,26 @@
         return response.text().then(function (text) { return { ok: response.ok, status: response.status, text: text }; });
       })
       .then(function (result) {
-        if (!result.ok) {
-          revert();
-          toast(extractDetail(result.text, "Could not update your like."), "error");
-          return;
-        }
-        var payload = {};
-        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) {}
         button.dataset.pending = "false";
         button.disabled = false;
         button.classList.remove("is-pending");
-        if (typeof payload.liked === "boolean") setStoryLikeVisual(button, payload.liked);
-        /* typeof check, not "||": a real total of 0 is falsy but valid */
-        if (typeof payload.likes === "number") setStoryLikeCount(payload.likes);
-        toast(payload.detail || (payload.liked ? "Story liked." : "Like removed."));
+        if (!result.ok) {
+          if (countNode) countNode.textContent = String(oldValue);
+          button.innerHTML = previousText;
+          toast(extractDetail(result.text, "Could not like this story."), "error");
+          return;
+        }
+        var payload = result.text ? JSON.parse(result.text) : {};
+        if (countNode) countNode.textContent = String(payload.likes || oldValue);
+        toast(payload.detail || "Story liked.");
       })
       .catch(function () {
-        revert();
-        toast("Connection issue. Your like was not saved.", "error");
+        button.dataset.pending = "false";
+        button.disabled = false;
+        button.classList.remove("is-pending");
+        if (countNode) countNode.textContent = String(oldValue);
+        button.innerHTML = previousText;
+        toast("Connection issue. The like was not saved.", "error");
       });
   });
 
@@ -1317,21 +1324,9 @@
     if (!button || button.dataset.pending === "true") return;
     var countNode = likeForm.querySelector("[data-comment-like-count]");
     var oldValue = countNode ? Number(countNode.textContent.trim()) || 0 : 0;
-    var wasLiked = button.dataset.liked === "true";
-    var summaryNode = likeForm.closest("[data-comment-item]")?.querySelector("[data-comment-like-summary]");
-    function showCount(total) {
-      if (countNode) countNode.textContent = String(total);
-      if (summaryNode) summaryNode.textContent = total + " like" + (total === 1 ? "" : "s");
-    }
-    function showLiked(liked) {
-      button.dataset.liked = liked ? "true" : "false";
-      button.setAttribute("aria-pressed", liked ? "true" : "false");
-      button.title = liked ? "Unlike" : "Like";
-    }
     button.dataset.pending = "true";
     button.disabled = true;
-    showLiked(!wasLiked);
-    showCount(Math.max(0, oldValue + (wasLiked ? -1 : 1)));
+    if (countNode) countNode.textContent = String(oldValue + 1);
 
     fetch(likeForm.dataset.endpoint, {
       method: "POST",
@@ -1345,23 +1340,20 @@
         button.dataset.pending = "false";
         button.disabled = false;
         if (!result.ok) {
-          showLiked(wasLiked);
-          showCount(oldValue);
-          toast(extractDetail(result.text, "Could not update your like."), "error");
+          if (countNode) countNode.textContent = String(oldValue);
+          toast(extractDetail(result.text, "Could not like the comment."), "error");
           return;
         }
-        var payload = {};
-        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) {}
-        if (typeof payload.liked === "boolean") showLiked(payload.liked);
-        /* real total from the server; typeof check because 0 is valid */
-        if (typeof payload.likes === "number") showCount(payload.likes);
-        toast(payload.detail || (payload.liked ? "Comment liked." : "Like removed."));
+        var payload = JSON.parse(result.text || "{}");
+        if (countNode) countNode.textContent = String(payload.likes || oldValue);
+        var summaryNode = likeForm.closest("[data-comment-item]")?.querySelector("[data-comment-like-summary]");
+        if (summaryNode) summaryNode.textContent = (payload.likes || oldValue) + " like" + ((payload.likes || oldValue) === 1 ? "" : "s");
+        toast(payload.detail || "Comment liked.");
       })
       .catch(function () {
         button.dataset.pending = "false";
         button.disabled = false;
-        showLiked(wasLiked);
-        showCount(oldValue);
+        if (countNode) countNode.textContent = String(oldValue);
         toast("Connection issue. The comment like was not saved.", "error");
       });
   });
@@ -1635,6 +1627,46 @@
         })
         .finally(function () {
           statusToggle.disabled = false;
+        });
+    });
+  }
+
+  /*  SEND MAIL. One email to THIS staff member. The recipient is decided by the
+      server from the staff id in the endpoint, nothing here can change it. */
+  var mailBlock = shell.querySelector("[data-mail-block]");
+  var mailSend = mailBlock && mailBlock.querySelector("[data-mail-send]");
+
+  if (mailSend && !mailSend.disabled) {
+    var mailSubject = mailBlock.querySelector("[data-mail-subject]");
+    var mailBody = mailBlock.querySelector("[data-mail-body]");
+    var mailFeedback = mailBlock.querySelector("[data-mail-feedback]");
+
+    mailSend.addEventListener("click", function () {
+      var subject = mailSubject.value.trim();
+      var body = mailBody.value.trim();
+      if (!subject || !body) {
+        say(mailFeedback, "Enter an email heading and a message.", true);
+        return;
+      }
+      var who = mailBlock.dataset.mailRecipient || "this staff member";
+      if (!window.confirm("Send this email to " + who + "?")) return;
+
+      mailSend.disabled = true;
+      say(mailFeedback, "Sending...", false);
+
+      post(shell.dataset.mailEndpoint, { subject: subject, body: body })
+        .then(function (result) {
+          if (result.ok) {
+            mailSubject.value = "";
+            mailBody.value = "";
+          }
+          say(mailFeedback, result.data.detail || (result.ok ? "Email sent." : "Could not send the email."), !result.ok);
+        })
+        .catch(function () {
+          say(mailFeedback, "Connection issue. The email may not have been sent.", true);
+        })
+        .finally(function () {
+          mailSend.disabled = false;
         });
     });
   }

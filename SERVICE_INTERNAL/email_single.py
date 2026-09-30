@@ -8,6 +8,7 @@ part of the template -- every "prefilled" sender below just supplies content
 to that one method.
 """
 
+import re
 from urllib.parse import quote
 import resend
 
@@ -15,6 +16,7 @@ from SERVICE_INTERNAL.abstract import info_logger, error_logger
 from SERVICE_INTERNAL.config import About
 
 from django.conf import settings
+from django.utils.html import escape, linebreaks
 
 from concurrent.futures import ThreadPoolExecutor
 #FOR THE ASYNC LIKE IN PROD SINCE USING NORMAL THREADING IS HEAVY AND I CANNOT AFFORD A 8MB
@@ -99,10 +101,13 @@ def _build_email_html(title, main_content, end_note="", header_extra="", unsubsc
 </html>"""
 
 
-def _dispatch_email(receiver, subject, html_message, no_async=None):
+def _dispatch_email(receiver, subject, html_message, no_async=None, from_name=None):
     """
     Never raises: any failure here is caught and logged, so an undecided or
     broken mail step can never break the request that triggered it.
+    from_name : display name on the From header, the project name when omitted.
+    Returns True / False (sent / failed) when no_async is set, because the
+    caller is then waiting for the result; None on the fire and forget path.
     TODO: divide email into two version, one for async and one for normal. THE ASYN SHOULD FIRE ALWAYS UNLESS A PARAM SAYING no_async=True is passed in the function 
     """
     def _send():
@@ -112,7 +117,7 @@ def _dispatch_email(receiver, subject, html_message, no_async=None):
             
             
             params = {
-                "from": f"{About.project_name} <{from_email}>",
+                "from": f"{from_name or About.project_name} <{from_email}>",
                 # 'to':"lastissa11@gmail.com", # change this is in for @resend.dev email domain as resedn no go colllect normal emailm except this
                 "to": [receiver],
                 "subject": subject,
@@ -120,9 +125,11 @@ def _dispatch_email(receiver, subject, html_message, no_async=None):
             }
             resend.Emails.send(params)
             info_logger(msg=f"EMAIL: dispatched to {receiver} subject={subject}")
+            return True
         except Exception as exc:
             error_logger(msg=f"EMAIL SEND FAILED: to={receiver} subject={subject} error={exc}")
-    if no_async:_send()
+            return False
+    if no_async:return _send()
     else:_EMAIL_EXECUTOR.submit(_send)
 
 """
@@ -176,7 +183,7 @@ def _try_send_password_reset_email(user: object, reset_link: str):
         title="Password Reset Requested",
         main_content=main_content,
         end_note=f"{About.project_name} Team",
-        unsubscribe_query=f"type=password_reset&email={quote(user.email)}",
+        unsubscribe_query=f"",
     )
     _dispatch_email(user.email, subject, html_message)
 
@@ -197,7 +204,7 @@ def _try_send_password_reset_success_email(user: object):
         title="Password Changed",
         main_content=main_content,
         end_note=f"{About.project_name} Team",
-        unsubscribe_query=f"type=password_reset&email={quote(user.email)}",
+        unsubscribe_query=f"",
     )
     _dispatch_email(user.email, subject, html_message)
     info_logger(msg=f"EMAIL: password reset success notice sent to {user.email}")
@@ -274,3 +281,31 @@ def _try_send_staff_welcome_email(user: object, password: str, full_name: str = 
     )
     _dispatch_email(user.email, subject, html_message)
     info_logger(msg=f"EMAIL: staff welcome credentials sent to {user.email}")
+
+
+def _try_send_staff_direct_email(sender_full_name, recipient_email, subject, body):
+    """
+    ADMIN "send mail" box on the staff detail page (ADMIN.views.StaffMailSendView):
+    one admin writing to ONE staff member.
+
+    `subject` and `body` are PLAIN TEXT typed by an admin. They are escaped
+    here, at the one place the markup is built, so no caller can forget to and
+    nothing typed can ever become HTML inside the email.
+
+    The From display name is the sending admin's own full name (like the
+    PANEL mass email), so the staff member knows a real person wrote it.
+    Sent inline, not on the background pool, because the admin is waiting to
+    be told whether it went out. Returns True / False.
+    """
+    #   A name containing < > " or a line break would corrupt the From header
+    display_name = re.sub(r'[<>"\r\n]', "", sender_full_name).strip() or About.project_name
+    html_message = _build_email_html(
+        title=escape(subject),
+        main_content=linebreaks(body, autoescape=True),
+        end_note=escape(f"{display_name}, {About.project_name}"),
+        unsubscribe_query="",   #   a personal message, nothing to unsubscribe from
+    )
+    sent = _dispatch_email(recipient_email, subject, html_message, no_async=True, from_name=display_name)
+    if sent:
+        info_logger(msg=f"EMAIL: direct staff message from {sender_full_name} sent to {recipient_email}")
+    return sent

@@ -15,6 +15,7 @@ urlpatterns = [
     path("staff/<int:staff_id>/role/", views.StaffRoleUpdateView.as_view(), name="staff_role"),
     path("staff/<int:staff_id>/gender/", views.StaffGenderUpdateView.as_view(), name="staff_gender"),
     path("staff/<int:staff_id>/status/", views.StaffBanToggleView.as_view(), name="staff_status"),
+    path("staff/<int:staff_id>/mail/", views.StaffMailSendView.as_view(), name="staff_mail"),
     path("me/role/", views.OwnRoleUpdateView.as_view(), name="own_role"),
 
     path("panel/", views.PanelView.as_view(), name="panel"),

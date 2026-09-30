@@ -10,7 +10,8 @@
          data-speciality-endpoint="{% url 'control:staff_speciality' staff_account.id %}"
          data-role-endpoint="{% url 'control:staff_role' staff_account.id %}"
          data-gender-endpoint="{% url 'control:staff_gender' staff_account.id %}"
-         data-status-endpoint="{% url 'control:staff_status' staff_account.id %}">
+         data-status-endpoint="{% url 'control:staff_status' staff_account.id %}"
+         data-mail-endpoint="{% url 'control:staff_mail' staff_account.id %}">
 
   {% csrf_token %}
 
@@ -140,6 +141,32 @@
         </div>
         <p class="staff-record-feedback" data-status-feedback role="status" aria-live="polite"></p>
       </div>
+
+      {% comment %} WRITE: SEND MAIL
+            One email to THIS staff member only. The address is resolved on the
+            server from the staff id in this page's URL (data-mail-endpoint),
+            it is never a field the browser sends. The From name is the sending
+            admin's own full name. {% endcomment %}
+      {% if can_edit_staff %}
+      <div class="profile-setting-block staff-record-block" data-mail-block data-mail-recipient="{{ staff_display_name }}">
+        <div class="staff-record-block-head">
+          <span class="setting-label">Send mail</span>
+          <small>To this staff member only</small>
+        </div>
+        {% if not sender_full_name %}
+        <p class="staff-record-note">Your staff profile has no full name set. Add one on your profile before you can send email.</p>
+        {% endif %}
+        <input type="text" class="staff-record-input" data-mail-subject maxlength="150"
+               placeholder="Email heading" aria-label="Email heading"
+               {% if not sender_full_name %}disabled{% endif %}>
+        <textarea class="staff-record-textarea" data-mail-body rows="6" maxlength="5000"
+                  placeholder="Write your message..." aria-label="Message body"
+                  {% if not sender_full_name %}disabled{% endif %}></textarea>
+        <button type="button" class="profile-action-btn primary" data-mail-send
+                {% if not sender_full_name %}disabled{% endif %}>Send email</button>
+        <p class="staff-record-feedback" data-mail-feedback role="status" aria-live="polite"></p>
+      </div>
+      {% endif %}
     </aside>
 
     <main class="profile-main">
