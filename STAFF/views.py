@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views import View
 
 from AUTHENTICATION.models import Auth
-from BLOG.models import CATEGORY, Blog, Comment
+from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark
 from SERVICE_INTERNAL.abstract import _optimization, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
@@ -183,7 +183,7 @@ def _coverage_and_readership(author, story_count, total_views):
         .annotate(total=Count("id"), views=Sum("views"))
         .order_by("-total", "-views", "category")
     )
-    labels = dict(CATEGORY)
+    labels = dict(get_category_choices())
     parsed = [
         {
             "label": labels.get(row["category"], row["category"]).title(),

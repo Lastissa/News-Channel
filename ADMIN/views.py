@@ -7,17 +7,19 @@ work stays in HOME.views; this module only holds the extra authority an admin
 
 import logging
 
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
-from django.db.models import Q
+from django.db import IntegrityError, transaction
+from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
+from django.template.defaultfilters import title as title_case
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
 from AUTHENTICATION.models import Auth, UserSession
-from BLOG.models import Blog
+from BLOG.models import Blog, Category
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
@@ -635,6 +637,7 @@ class PanelView(View):
                 "is_superuser": bool(request.user.is_superuser),
                 "sender_full_name": own_profile.full_name.strip() if own_profile and own_profile.full_name else "",
                 "site_settings": SiteSettings.get_solo(),
+                "category_rows": _category_rows(),
                 "gallery_items": staff_directory_rows(list(gallery_page.object_list)),
                 "gallery_has_next": gallery_page.has_next(),
                 "gallery_next_page": gallery_page.next_page_number() if gallery_page.has_next() else None,
@@ -782,6 +785,96 @@ class PanelSiteSettingsUpdateView(View):
         info_logger(msg=f"PANEL: site settings updated by {request.user.email}")
 
         return JsonResponse({"detail": "Site settings saved."}, status=200)
+
+
+def _category_rows():
+    """Every news category in menu order with the number of stories that
+    currently carry it. Read straight from the table (not the cache) because
+    PANEL needs the row ids and must always show what is really stored."""
+    story_counts = dict(Blog.objects.order_by().values_list("category").annotate(total=Count("id")))
+    return [
+        {"id": category.id, "name": category.name, "label": title_case(category.name), "story_count": story_counts.get(category.name, 0)}
+        for category in Category.objects.all()
+    ]
+
+
+class PanelCategoryCreateView(View):
+    """Adds a news category. It reaches the navbar menu, the story form and
+    every category check straight away: Category.save() rebuilds the no-TTL
+    category cache (BLOG/signals.py), so nothing here touches the cache."""
+
+    def post(self, request):
+        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        if limited:
+            return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        name = " ".join((request.POST.get("name") or "").split()).upper()
+        if not name:
+            return JsonResponse({"detail": "Enter a category name."}, status=400)
+
+        category = Category(name=name)
+        try:
+            #   full_clean: length, allowed characters and the case insensitive duplicate check
+            category.full_clean()
+            #   atomic: a constraint failure rolls back only this save, it never
+            #   leaves a surrounding transaction (ATOMIC_REQUESTS) broken
+            with transaction.atomic():
+                category.save()
+        except ValidationError as error:
+            return JsonResponse({"detail": error.messages[0]}, status=400)
+        except IntegrityError:
+            #   two admins adding the same name at the same instant, the database constraint wins
+            return JsonResponse({"detail": "That category already exists."}, status=400)
+
+        info_logger(msg=f"PANEL: category {category.name} added by {request.user.email}")
+
+        #   NOT always 0: re-adding a retired category (e.g. SECURITY) brings back
+        #   the stories that were still carrying it
+        story_count = Blog.objects.filter(category=category.name).count()
+        detail = f"{title_case(category.name)} added."
+        if story_count:
+            detail += f" {story_count} existing {'story shows' if story_count == 1 else 'stories show'} under it again."
+
+        return JsonResponse(
+            {
+                "detail": detail,
+                "category": {"id": category.id, "name": category.name, "label": title_case(category.name), "story_count": story_count},
+            },
+            status=201,
+        )
+
+
+class PanelCategoryDeleteView(View):
+    """Removes a news category from the menu and the story form. Stories that
+    already carry it are NOT touched: they stay published and editable (see
+    HOME.views.EditNewsView `legacy_category`). The last remaining category
+    cannot be removed, otherwise nobody could publish a story any more."""
+
+    def post(self, request, category_id):
+        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        if limited:
+            return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        category = Category.objects.filter(pk=category_id).first()
+        if category is None:
+            return JsonResponse({"detail": "Category not found."}, status=404)
+        if Category.objects.count() <= 1:
+            return JsonResponse({"detail": "At least one category has to stay so stories can still be published."}, status=400)
+
+        name = category.name
+        story_count = Blog.objects.filter(category=name).count()
+        category.delete()
+
+        info_logger(msg=f"PANEL: category {name} removed by {request.user.email} ({story_count} stories still carry it)")
+
+        detail = f"{title_case(name)} removed."
+        if story_count:
+            detail += f" {story_count} existing {'story stays' if story_count == 1 else 'stories stay'} published under it."
+        return JsonResponse({"detail": detail, "story_count": story_count}, status=200)
 
 
 class PanelStaffSearchView(View):

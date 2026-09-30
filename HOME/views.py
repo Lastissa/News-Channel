@@ -17,7 +17,7 @@ from django.utils.text import Truncator
 from django.views import View
 
 from AUTHENTICATION.models import Auth, UserSession
-from BLOG.models import Blog, CATEGORY, Comment
+from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark
 from SERVICE_INTERNAL.abstract import (
     _optimization,
@@ -286,7 +286,7 @@ class HomeView(View):
             "headline_ticker_text": headline_ticker_text,
             "ad_center_items": _ad_center_items(),
             "teaser_items": _teaser_items(),
-            "categories": CATEGORY,
+            "categories": get_category_choices(),
             "query": query,
             "active_category": category,
             "is_filtered": is_filtered,
@@ -379,7 +379,7 @@ class AddNewsView(View):
             return _response({"detail": "The heading cannot be empty."}, status=400)
         if len(heading) > 100:
             return _response({"detail": "The heading is limited to 100 characters."}, status=400)
-        if category not in {value for value, _ in CATEGORY}:
+        if category not in {value for value, _ in get_category_choices()}:
             return _response({"detail": "Select a valid category."}, status=400)
         if not content:
             return _response({"detail": "The story content cannot be empty."}, status=400)
@@ -479,11 +479,11 @@ class EditNewsView(View):
             messages.error(request, "Story not found. You can only edit stories you published.")
             return redirect("home:profile")
 
-        #   STORIES PUBLISHED UNDER A CATEGORY THAT NO LONGER EXISTS IN CATEGORY
-        #   (e.g. SECURITY). Without this the <select> would have no option for
+        #   STORIES PUBLISHED UNDER A CATEGORY THAT NO LONGER EXISTS (removed
+        #   from PANEL, or never seeded, e.g. SECURITY). Without this the <select> would have no option for
         #   the story's real category and the browser would silently fall back to
         #   another one on save.
-        current_categories = {value for value, _ in CATEGORY}
+        current_categories = {value for value, _ in get_category_choices()}
         return render(
             request,
             "HOME/edit_news.html",
@@ -507,7 +507,7 @@ class EditNewsView(View):
         category = (request.POST.get("category") or "").strip().upper()
         content = (request.POST.get("content") or "").strip()
 
-        allowed_categories = {value for value, _ in CATEGORY} | {blog.category}
+        allowed_categories = {value for value, _ in get_category_choices()} | {blog.category}
         if category not in allowed_categories:
             return _response({"detail": "Select a valid category."}, status=400)
         if not content:
@@ -840,67 +840,84 @@ class ProfileImageUpdateView(View):
         return JsonResponse({"detail": "Profile image updated.", "valid": True, "image_url": image_url}, status=200)
 
 
-PROFILE_LIST_PAGE_SIZE = 5
-
-
-def _profile_search_term(request):
-    """The `q` box above a profile list, trimmed. Empty string = no search."""
-    return (request.GET.get("q") or "").strip()[:100]
-
-
-def _profile_list_page(request, queryset):
-    """Paginate an already searched queryset for an HTMX profile list. An
-    out of range page falls back to the nearest valid one (a search can
-    shrink the result set under the page the reader is on)."""
-    paginator = Paginator(queryset, PROFILE_LIST_PAGE_SIZE)
-    page = paginator.get_page(_resolve_page_number(request.GET.get("page"), default=1))
-    page_range = list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1))
-    return page, page_range
-
-
 class ProfileBookmarksView(View):
-    """HTMX: the searchable, paginated bookmark list on the profile page.
-    Answers with the same `profile_bookmarks_list.html` fragment the profile
-    page includes on first paint. `?q=` filters by story heading."""
+    """Return a paginated bookmark payload for the profile page."""
 
     def get(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in to view bookmarks."}, status=401)
 
-        search_query = _profile_search_term(request)
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
         bookmarks_qs = Bookmark.objects.filter(user=request.user).select_related("blog").order_by("-created_at")
-        if search_query:
-            bookmarks_qs = bookmarks_qs.filter(blog__heading__icontains=search_query)
+        paginator = Paginator(bookmarks_qs, 5)
+        if page_number > paginator.num_pages and paginator.num_pages:
+            raise Http404("Page not found.")
 
-        page, page_range = _profile_list_page(request, bookmarks_qs)
-        return render(request, "HOME/partials/profile_bookmarks_list.html", {
-            "recent_bookmarks": page.object_list,
-            "bookmark_page_obj": page,
-            "bookmark_page_range": page_range,
-            "search_query": search_query,
-        })
+        page = paginator.get_page(page_number)
+        items = [
+            {
+                "id": bookmark.id,
+                "blog_id": bookmark.blog_id,
+                "heading": bookmark.blog.heading,
+                "created_at": bookmark.created_at.isoformat(),
+                "url": reverse("blog:story_detail", args=[bookmark.blog.slug]),
+            }
+            for bookmark in page.object_list
+        ]
+
+        return JsonResponse(
+            {
+                "items": items,
+                "page": page.number,
+                "num_pages": paginator.num_pages,
+                "has_previous": page.has_previous(),
+                "has_next": page.has_next(),
+                "next_page": page.next_page_number() if page.has_next() else None,
+                "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "count": paginator.count,
+            },
+            status=200,
+        )
 
 
 class ProfileHistoryView(View):
-    """HTMX: the searchable, paginated reading-history list on the profile
-    page. `?q=` filters by story heading."""
+    """Return a paginated reading-history payload for the profile page."""
 
     def get(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in to view history."}, status=401)
 
-        search_query = _profile_search_term(request)
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
         history_qs = Blog.objects.filter(non_anonymous_viewer=request.user).order_by("-date_created")
-        if search_query:
-            history_qs = history_qs.filter(heading__icontains=search_query)
+        paginator = Paginator(history_qs, 5)
+        if page_number > paginator.num_pages and paginator.num_pages:
+            raise Http404("Page not found.")
 
-        page, page_range = _profile_list_page(request, history_qs)
-        return render(request, "HOME/partials/profile_history_list.html", {
-            "reading_history": page.object_list,
-            "history_page_obj": page,
-            "history_page_range": page_range,
-            "search_query": search_query,
-        })
+        page = paginator.get_page(page_number)
+        items = [
+            {
+                "id": blog.id,
+                "blog_id": blog.id,
+                "heading": blog.heading,
+                "date_created": blog.date_created.isoformat(),
+                "url": reverse("blog:story_detail", args=[blog.slug]),
+            }
+            for blog in page.object_list
+        ]
+
+        return JsonResponse(
+            {
+                "items": items,
+                "page": page.number,
+                "num_pages": paginator.num_pages,
+                "has_previous": page.has_previous(),
+                "has_next": page.has_next(),
+                "next_page": page.next_page_number() if page.has_next() else None,
+                "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "count": paginator.count,
+            },
+            status=200,
+        )
 
 
 class ProfileCommentsView(View):
@@ -1018,25 +1035,45 @@ class ProfileStaffUpdateView(View):
 
 
 class ProfilePublishedView(View):
-    """HTMX: the searchable, paginated published-stories list on the staff
-    profile. `?q=` filters by story heading."""
+    """Return a paginated published-stories payload for the staff profile."""
 
     def get(self, request):
         if not staff_only(request.user):
             return JsonResponse({"detail": "Staff access is required to view published stories!. Refresh Page"}, status=401)
 
-        search_query = _profile_search_term(request)
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
         published_qs = Blog.objects.filter(author=request.user).order_by("-date_created")
-        if search_query:
-            published_qs = published_qs.filter(heading__icontains=search_query)
+        paginator = Paginator(published_qs, 5)
+        if page_number > paginator.num_pages and paginator.num_pages:
+            raise Http404("Page not found.")
 
-        page, page_range = _profile_list_page(request, published_qs)
-        return render(request, "HOME/partials/profile_published_list.html", {
-            "published_stories": page.object_list,
-            "stories_page_obj": page,
-            "stories_page_range": page_range,
-            "search_query": search_query,
-        })
+        page = paginator.get_page(page_number)
+        items = [
+            {
+                "id": blog.id,
+                "blog_id": blog.id,
+                "heading": blog.heading,
+                "views": blog.views,
+                "date_created": blog.date_created.isoformat(),
+                "url": reverse("blog:story_detail", args=[blog.slug]),
+                "edit_url": reverse("home:edit_news", args=[blog.id]),
+            }
+            for blog in page.object_list
+        ]
+
+        return JsonResponse(
+            {
+                "items": items,
+                "page": page.number,
+                "num_pages": paginator.num_pages,
+                "has_previous": page.has_previous(),
+                "has_next": page.has_next(),
+                "next_page": page.next_page_number() if page.has_next() else None,
+                "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "count": paginator.count,
+            },
+            status=200,
+        )
 
 
 class ProfilePublishedDeleteView(View):

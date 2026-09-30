@@ -132,6 +132,26 @@ __Please note:__ deadlines are strict.
         self.assertEqual(json.loads(response.content)["likes"], 0)
         self.assertFalse(json.loads(response.content)["liked"])
 
+    @mock.patch("AUTHENTICATION.signals._try_send_login_email")
+    def test_comment_like_toggles_and_returns_the_real_total(self, _mail):
+        blog = Blog.objects.create(author=self.author, category="GENERAL", heading="Commented story", content="Body.")
+        comment = Comment.objects.create(blog=blog, author=self.author, content="Nice one")
+        self.client.force_login(self.author)
+        url = f"/story/comment/{comment.id}/like/"
+        ajax = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+
+        first = json.loads(self.client.post(url, **ajax).content)
+        self.assertEqual((first["likes"], first["liked"]), (1, True))
+
+        Comment.objects.filter(pk=comment.pk).update(likes=F("likes") + 2)  # other readers
+
+        second = json.loads(self.client.post(url, **ajax).content)
+        self.assertEqual((second["likes"], second["liked"]), (2, False))
+        self.assertEqual(second["detail"], "Like removed.")
+
+        third = json.loads(self.client.post(url, **ajax).content)
+        self.assertEqual((third["likes"], third["liked"]), (3, True))
+
     def test_anonymous_like_is_rejected(self):
         blog = Blog.objects.create(
             author=self.author,

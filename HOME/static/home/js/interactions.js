@@ -1074,14 +1074,28 @@
     button.setAttribute("aria-pressed", liked ? "true" : "false");
     var label = button.querySelector("[data-story-like-label]");
     if (label) label.textContent = liked ? "Unlike article" : "Like article";
+    /* keep the top heart in sync with the bottom button */
+    var top = document.querySelector("[data-story-like-metric]");
+    if (top) {
+      top.dataset.liked = liked ? "true" : "false";
+      top.setAttribute("aria-pressed", liked ? "true" : "false");
+    }
   }
+
+  /* top heart: same action as the bottom button, so submit the same form */
+  document.addEventListener("click", function (event) {
+    var top = event.target.closest("[data-story-like-metric]");
+    if (!top) return;
+    var form = document.querySelector("[data-story-like-form]");
+    if (form) form.requestSubmit();
+  });
 
   function setStoryLikeCount(total) {
     var countNode = document.querySelector("[data-story-like-count]");
     if (countNode) countNode.textContent = String(total);
     var metric = document.querySelector("[data-story-like-metric]");
     if (metric) {
-      metric.setAttribute("aria-label", total + " likes");
+      metric.setAttribute("aria-label", (metric.dataset.liked === "true" ? "Unlike this story, " : "Like this story, ") + total + " likes");
       var metricCount = metric.querySelector("[data-story-like-metric-count]");
       if (metricCount) metricCount.textContent = String(total);
     }
@@ -1303,9 +1317,21 @@
     if (!button || button.dataset.pending === "true") return;
     var countNode = likeForm.querySelector("[data-comment-like-count]");
     var oldValue = countNode ? Number(countNode.textContent.trim()) || 0 : 0;
+    var wasLiked = button.dataset.liked === "true";
+    var summaryNode = likeForm.closest("[data-comment-item]")?.querySelector("[data-comment-like-summary]");
+    function showCount(total) {
+      if (countNode) countNode.textContent = String(total);
+      if (summaryNode) summaryNode.textContent = total + " like" + (total === 1 ? "" : "s");
+    }
+    function showLiked(liked) {
+      button.dataset.liked = liked ? "true" : "false";
+      button.setAttribute("aria-pressed", liked ? "true" : "false");
+      button.title = liked ? "Unlike" : "Like";
+    }
     button.dataset.pending = "true";
     button.disabled = true;
-    if (countNode) countNode.textContent = String(oldValue + 1);
+    showLiked(!wasLiked);
+    showCount(Math.max(0, oldValue + (wasLiked ? -1 : 1)));
 
     fetch(likeForm.dataset.endpoint, {
       method: "POST",
@@ -1319,20 +1345,23 @@
         button.dataset.pending = "false";
         button.disabled = false;
         if (!result.ok) {
-          if (countNode) countNode.textContent = String(oldValue);
-          toast(extractDetail(result.text, "Could not like the comment."), "error");
+          showLiked(wasLiked);
+          showCount(oldValue);
+          toast(extractDetail(result.text, "Could not update your like."), "error");
           return;
         }
-        var payload = JSON.parse(result.text || "{}");
-        if (countNode) countNode.textContent = String(payload.likes || oldValue);
-        var summaryNode = likeForm.closest("[data-comment-item]")?.querySelector("[data-comment-like-summary]");
-        if (summaryNode) summaryNode.textContent = (payload.likes || oldValue) + " like" + ((payload.likes || oldValue) === 1 ? "" : "s");
-        toast(payload.detail || "Comment liked.");
+        var payload = {};
+        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) {}
+        if (typeof payload.liked === "boolean") showLiked(payload.liked);
+        /* real total from the server; typeof check because 0 is valid */
+        if (typeof payload.likes === "number") showCount(payload.likes);
+        toast(payload.detail || (payload.liked ? "Comment liked." : "Like removed."));
       })
       .catch(function () {
         button.dataset.pending = "false";
         button.disabled = false;
-        if (countNode) countNode.textContent = String(oldValue);
+        showLiked(wasLiked);
+        showCount(oldValue);
         toast("Connection issue. The comment like was not saved.", "error");
       });
   });

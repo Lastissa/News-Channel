@@ -23,10 +23,9 @@
 
     <section class="panel-card panel-card-wide" id="panel-staff-gallery" aria-label="Staff directory">
       <div class="panel-card-header">
-        <h2>Staff directory</h2>
+        <h2>Staff</h2>
         <div class="panel-card-header-actions">
-          <span class="panel-eyebrow">Drag to scroll</span>
-          <a href="{% url 'control:staff_create' %}" class="panel-ghost-btn">+ New staff</a>
+          <a href="{% url 'control:staff_create' %}" class="panel-ghost-btn">+ Staff</a>
         </div>
       </div>
       <div class="panel-gallery-viewport" data-gallery-viewport tabindex="0" aria-label="Staff, scroll horizontally">
@@ -160,6 +159,35 @@
           <button type="submit" class="panel-primary-btn">Save</button>
         </div>
       </form>
+    </section>
+
+    <section class="panel-card" id="panel-categories" aria-label="News categories">
+      <div class="panel-card-header">
+        <h2>News categories</h2>
+        <span class="panel-eyebrow" data-category-total>{{ category_rows|length }} active</span>
+      </div>
+      <form class="panel-form" data-category-form data-endpoint="{% url 'control:panel_category_create' %}">
+        <div class="panel-field">
+          <label for="category-name">Add a category</label>
+          <input id="category-name" type="text" name="name" maxlength="20" required autocomplete="off" placeholder="e.g. Sports">
+        </div>
+        <div class="panel-form-footer">
+          <button type="submit" class="panel-primary-btn">Add</button>
+        </div>
+      </form>
+      <div class="panel-row-list" data-category-list data-delete-endpoint="{% url 'control:panel_category_delete' 0 %}">
+        {% for category in category_rows %}
+        <div class="panel-row" data-category-row data-category-id="{{ category.id }}" data-category-label="{{ category.label }}" data-story-count="{{ category.story_count }}">
+          <span class="panel-row-main">
+            <span>{{ category.label }}</span>
+            <span class="panel-row-sub" data-category-stories>{{ category.story_count }} stor{{ category.story_count|pluralize:"y,ies" }}</span>
+          </span>
+          <button type="button" class="panel-danger-link" data-category-remove>Remove</button>
+        </div>
+        {% empty %}
+        <p class="empty-copy" data-category-empty>No categories yet.</p>
+        {% endfor %}
+      </div>
     </section>
 
     <section class="panel-card panel-card-wide" id="panel-speciality" aria-label="Search staff by speciality">

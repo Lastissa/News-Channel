@@ -1,22 +1,125 @@
+import logging
 import re
 
-from django.db import models
+from django.core.cache import cache
+from django.core.validators import RegexValidator
+from django.db import DatabaseError, models
 from django.db.models.functions import Lower
 from django.utils.text import slugify
 
+logger = logging.getLogger(__name__)
 
-CATEGORY = [
-    ('UNIVERSITY', 'UNIVERSITY'),
-    ('POLYTECHNIC', 'POLYTECHNIC'),
-    ('ORGANIZATION', 'ORGANIZATION'),
-    ('JAMB', 'JAMB'),
-    ('WAEC', 'WAEC'),
-    ('NECO', 'NECO'),
-    ('POSTUTME', 'POSTUTME'),
-    ('SCHOLARSHIP', 'SCHOLARSHIP'),
-    ('TECHNOLOGY', 'TECHNOLOGY'),
-    ('GENERAL', 'GENERAL'),
-]
+
+#   -------------------------------------------------------------------------
+#   NEWS CATEGORIES
+#   -------------------------------------------------------------------------
+#   These used to be a hardcoded CATEGORY list in this file. Every category is
+#   now a row in Category, added and removed by admins / superusers from the
+#   PANEL page (ADMIN.views.PanelCategoryCreateView / PanelCategoryDeleteView).
+#   The ten original categories are inserted by migration 0016_seed_categories.
+#
+#   Nothing outside this file should ever query Category to build a menu,
+#   a dropdown or a validation set. Call get_category_choices() instead: it
+#   reads ONE cache entry that has NO TTL, and that entry is rebuilt from the
+#   table (BLOG/signals.py) the moment a Category is added, changed or removed.
+#
+#   THE CACHE KEY BELOW IS OWNED BY THIS FEATURE ALONE. Do not reuse the
+#   string, do not build another key that could equal it, and do not change
+#   what is stored under it without bumping the trailing version (v1 -> v2):
+#   Redis keeps a no-TTL value across deploys, so a new shape stored under an
+#   old key would be served to the new code forever.
+CATEGORY_CACHE_KEY = "BLOG.Category::choices::v1"
+
+_CACHE_MISS = object()
+
+category_name_validator = RegexValidator(
+    regex=r"^[A-Za-z0-9]+(?:[ -][A-Za-z0-9]+)*$",
+    message="Use letters, numbers, single spaces or hyphens only.",
+)
+
+
+class Category(models.Model):
+    """One news category. `name` is BOTH the value stored on Blog.category and
+    the label readers see (templates title-case it), which is exactly how the
+    old hardcoded list behaved: ('JAMB', 'JAMB').
+
+    Stored in capitals and unique regardless of case. Deliberately NOT
+    renamable from PANEL: stories keep this text in Blog.category, so a rename
+    would orphan them or collide with the unique story constraint. Removing a
+    category only retires it (existing stories stay published, see
+    HOME.views.EditNewsView `legacy_category`).
+
+    Changes made with QuerySet.update() or bulk_create() bypass the signals
+    that refresh the cache. Use save() / delete(), or call
+    refresh_category_cache() yourself afterwards.
+    """
+
+    #   max_length MUST stay equal to Blog.category.max_length
+    name = models.CharField(
+        max_length=20,
+        validators=[category_name_validator],
+        help_text="Letters, numbers, single spaces or hyphens. Saved in capitals.",
+    )
+
+    class Meta:
+        ordering = ["id"]   #   MENU ORDER = THE ORDER THEY WERE ADDED
+        verbose_name_plural = "categories"
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"),
+                name="unique_category_name_lower",
+                violation_error_message="That category already exists.",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.name = " ".join((self.name or "").split()).upper()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
+def _load_category_choices():
+    """The only place the Category table is read to build the choices list."""
+    return [(name, name) for name in Category.objects.values_list("name", flat=True)]
+
+
+def _is_choices_list(value):
+    return isinstance(value, list) and all(isinstance(item, tuple) and len(item) == 2 for item in value)
+
+
+def refresh_category_cache():
+    """Invalidate the cached categories and store the current ones. Runs after
+    every committed Category change (BLOG/signals.py). The stale entry is
+    deleted BEFORE the table is read, so if that read ever failed the cache
+    would be left empty (the next reader rebuilds it) rather than stale."""
+    cache.delete(CATEGORY_CACHE_KEY)
+    choices = _load_category_choices()
+    cache.set(CATEGORY_CACHE_KEY, choices, timeout=None)   #   timeout=None: NEVER EXPIRES
+    return choices
+
+
+def get_category_choices():
+    """[(value, label), ...] for every current category, in menu order.
+
+    Served from the cache; built from the table once when the cache is empty.
+    Safe to call while the table does not exist yet (system checks call it
+    through Blog.category before `migrate` has created the table): that
+    returns [] and, importantly, is NOT cached, otherwise a no-TTL cache would
+    remember the empty answer forever.
+    """
+    cached = cache.get(CATEGORY_CACHE_KEY, _CACHE_MISS)
+    #   A value of the wrong shape (foreign write, older version) is treated as a miss and healed.
+    if _is_choices_list(cached):
+        return cached
+    try:
+        return refresh_category_cache()
+    except DatabaseError:
+        logger.warning("BLOG categories could not be read from the database; returning none, nothing cached.")
+        return []
+
+
 class Blog(models.Model):
     image_1 = models.URLField(blank=True, null=True)
     #   THE EXACT CLOUDINARY ASSET `image_1` LIVES AT (blank when image_1 is
@@ -29,7 +132,7 @@ class Blog(models.Model):
     image_public_id = models.CharField(max_length=255, blank=True, default="")
     image_info = models.CharField(max_length=100, default="The image is self explanatory.")    #   THE ABOUT PICTURE THHAT WILL SHOW SLIGHTLY BELOW THE PICTURE IN IMAGE 
     author = models.ForeignKey('AUTHENTICATION.Auth', on_delete=models.CASCADE, related_name='blogs', limit_choices_to= {'is_staff':True})
-    category = models.CharField(max_length=20, choices=CATEGORY, blank=False, null=False)
+    category = models.CharField(max_length=20, choices=get_category_choices, blank=False, null=False)
     #   SEO/GEO URL SLUG. GENERATED ONCE FROM `heading` THE FIRST TIME THE STORY
     #   IS SAVED (SEE save() BELOW) AND NEVER TOUCHED AGAIN. IT REPLACES THE OLD
     #   /blog/<id>/ NUMERIC PATH WITH A DESCRIPTIVE /blog/<slug>-<id>/ PATH.
@@ -124,6 +227,13 @@ class Blog(models.Model):
         if days < 7:
             return plural(days, "day")
         return plural(days // 7, "week")
+
+    def get_category_display(self):
+        """Category.name is both value and label, so the label IS the stored
+        value. Defined here so Django does not generate the choices-based one,
+        which would read the category cache once per story card on listing
+        pages (a network round trip each on Redis)."""
+        return self.category
 
     @property
     def word_count(self):

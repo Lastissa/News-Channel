@@ -71,7 +71,7 @@ html[data-theme="dark"] {
 }
 
 .panel-card {
-  background: var(--surface);
+  background: transparent;
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
   box-shadow: var(--shadow-card);

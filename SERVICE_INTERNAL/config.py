@@ -66,7 +66,7 @@ class StaffConfig:
 
 
 def custom_context_processors(request):
-    from BLOG.models import CATEGORY
+    from BLOG.models import get_category_choices
     default_social = "https://www.abureport.com.ng/404/" # so to raise a friednly error if not set
     theme = "light"
     if request and request.COOKIES.get("abureport-theme") in {"dark", "light"}:
@@ -110,7 +110,7 @@ def custom_context_processors(request):
         'twitter_username': twitter_username,
         'social_links': social_links,
         'contact_email': About.contact_email,
-        'nav_categories': CATEGORY,
+        'nav_categories': get_category_choices(),
         'partnership_email': partnership_email,
         'tech_expert_email': tech_expert_email,
         'support_email': support_email,

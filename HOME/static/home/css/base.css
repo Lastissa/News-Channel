@@ -1067,8 +1067,13 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .comment-like-form, .comment-delete-form { display: inline-flex; }
 
 .comment-delete-btn {
-background: transparent; color: var(--danger); padding: 3px 3px; font-weight: 700; font-size: 0.78rem; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; padding: 0; margin: 0;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; color: var(--danger); line-height: 0; cursor: pointer;
 }
+.comment-delete-btn svg { display: block; width: 20px; height: 20px; pointer-events: none; }
+.comment-delete-btn:hover, .comment-delete-btn:focus-visible { border-color: var(--danger); background: rgba(179, 64, 42, 0.08); }
 .empty-comments { color: var(--slate); margin: 0; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
@@ -1547,3 +1552,21 @@ background: transparent; color: var(--danger); padding: 3px 3px; font-weight: 70
 .trending-title a:hover { text-decoration: underline; text-decoration-color: var(--amber); text-underline-offset: 2px; }
 .trending-meta { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--slate); }
 .trending-eye { width: 14px; height: 14px; flex: none; }
+/* ---------- Top like heart (mirrors the bottom like button) ---------- */
+.story-metrics .metric-like-btn {
+  display: inline-flex; gap: 4px; align-items: center; cursor: pointer;
+  background: var(--paper-dim); border: 1px solid transparent; border-radius: 20px;
+  padding: 6px 10px; font: inherit; color: inherit;
+}
+.story-metrics .metric-like-btn .metric-icon { fill: none; }
+.story-metrics .metric-like-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
+.story-metrics .metric-like-btn[data-liked="true"] { color: #e02447; }
+.story-metrics .metric-like-btn[data-liked="true"] .metric-icon { fill: #e02447; }
+.story-metrics .metric-like-btn span { background: none; padding: 0; border-radius: 0; }
+
+/* ---------- Comment like: unliked = outlined, liked = red ---------- */
+.comment-like-btn { background: transparent; color: var(--ink); border-color: var(--line); padding: 8px 14px; }
+.comment-like-btn .comment-like-icon { color: transparent; -webkit-text-stroke: 1.2px currentColor; }
+.comment-like-btn[data-liked="true"] { color: #e02447; border-color: #e02447; }
+.comment-like-btn[data-liked="true"] .comment-like-icon { color: #e02447; -webkit-text-stroke: 0; }
+.comment-toolbar { align-items: center; }

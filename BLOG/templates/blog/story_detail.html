@@ -122,12 +122,13 @@
               {{ blog.views }} views
             </span>
             <span><strong>Word count</strong> {{ blog.word_count }}</span>
-            <span class="metric-item" data-story-like-metric aria-label="{{ blog.likes }} likes">
+            {% comment %} Same action as the "Like article" button at the bottom: clicking submits that form, and both stay in sync (see setStoryLikeVisual in interactions.js). {% endcomment %}
+            <button type="button" class="metric-item metric-like-btn" data-story-like-metric data-liked="{% if is_liked %}true{% else %}false{% endif %}" aria-pressed="{% if is_liked %}true{% else %}false{% endif %}" aria-label="{% if is_liked %}Unlike this story{% else %}Like this story{% endif %}, {{ blog.likes }} likes">
               <svg viewBox="0 0 20 20" class="metric-icon" aria-hidden="true">
-                <path d="M10 17s-6.5-4-8-8.2C1 5.8 2.6 3.5 5.2 3.3c1.5-.1 2.9.8 3.6 2 .7-1.2 2.1-2.1 3.6-2 2.6.2 4.2 2.5 3.2 5.5-1.5 4.2-8 8.2-8 8.2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                <path d="M10 17s-6.5-4-8-8.2C1 5.8 2.6 3.5 5.2 3.3c1.5-.1 2.9.8 3.6 2 .7-1.2 2.1-2.1 3.6-2 2.6.2 4.2 2.5 3.2 5.5-1.5 4.2-8 8.2-8 8.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
               </svg>
               <span data-story-like-metric-count>{{ blog.likes }}</span>
-            </span>
+            </button>
           </div>
           <div class="story-copy-link-row">
             <button type="button" class="copy-link-btn" data-share-btn data-share-url="{{ site_domain }}{{ request.path }}"
@@ -329,16 +330,18 @@ oficial website at https://www.abureport.com.ng
               <div class="comment-toolbar">
                 <form method="post" action="{% url 'blog:comment_like' comment.id %}" class="comment-like-form" data-comment-like-form data-endpoint="{% url 'blog:comment_like' comment.id %}">
                   {% csrf_token %}
-                  <button type="submit" class="comment-like-btn" data-comment-like-btn>
-                    <span aria-hidden="true">❤</span>
+                  {% with is_comment_liked=comment.id|in_list:liked_comment_ids %}
+                  <button type="submit" class="comment-like-btn" data-comment-like-btn data-liked="{% if is_comment_liked %}true{% else %}false{% endif %}" aria-pressed="{% if is_comment_liked %}true{% else %}false{% endif %}" title="{% if is_comment_liked %}Unlike{% else %}Like{% endif %}">
+                    <span class="comment-like-icon" aria-hidden="true">❤</span>
                     <span class="comment-like-count" data-comment-like-count>{{ comment.likes }}</span>
                   </button>
+                  {% endwith %}
                 </form>
                 {% if request.user.is_authenticated and comment.author_id == request.user.id %}
                   <form method="post" action="{% url 'blog:comment_delete' comment.id %}" class="comment-delete-form" data-comment-delete-form data-endpoint="{% url 'blog:comment_delete' comment.id %}">
                     {% csrf_token %}
-                    <button type="submit" class="comment-delete-btn" data-comment-delete-btn>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#E53935">
+                    <button type="submit" class="comment-delete-btn" data-comment-delete-btn aria-label="Delete comment" title="Delete comment">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#E53935" aria-hidden="true">
   <path d="M9 3v1H4v2h1v13a2 2 0 002 2h10a2 2 0 002-2V6h1V4h-5V3H9zm2 2h2v.001L13 5h-2zM6 6h12v13a1 1 0 01-1 1H7a1 1 0 01-1-1V6zm2 2v10h2V8H8zm6 0v10h2V8h-2z"/>
 </svg>
                     </button>

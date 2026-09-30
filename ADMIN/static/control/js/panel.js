@@ -394,6 +394,116 @@
     });
   })();
 
+  /* ---------- news categories: add + remove ---------- */
+  (function () {
+    var form = document.querySelector("[data-category-form]");
+    var list = document.querySelector("[data-category-list]");
+    if (!form || !list) return;
+
+    var total = document.querySelector("[data-category-total]");
+    var input = form.querySelector("input[name='name']");
+    var submitBtn = form.querySelector("button[type='submit']");
+    var deleteTemplate = list.dataset.deleteEndpoint || "";
+
+    function storyCopy(count) {
+      return count + (count === 1 ? " story" : " stories");
+    }
+
+    function syncTotal() {
+      var count = list.querySelectorAll("[data-category-row]").length;
+      var empty = list.querySelector("[data-category-empty]");
+      if (total) total.textContent = count + " active";
+      if (!count && !empty) {
+        list.insertAdjacentHTML("beforeend", '<p class="empty-copy" data-category-empty>No categories yet.</p>');
+      }
+      if (count && empty) empty.remove();
+    }
+
+    function buildRow(category) {
+      var row = document.createElement("div");
+      row.className = "panel-row";
+      row.dataset.categoryRow = "";
+      row.dataset.categoryId = category.id;
+      row.dataset.categoryLabel = category.label;
+      row.dataset.storyCount = category.story_count;
+
+      var main = document.createElement("span");
+      main.className = "panel-row-main";
+
+      var name = document.createElement("span");
+      name.textContent = category.label;
+      main.appendChild(name);
+
+      var stories = document.createElement("span");
+      stories.className = "panel-row-sub";
+      stories.dataset.categoryStories = "";
+      stories.textContent = storyCopy(category.story_count);
+      main.appendChild(stories);
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "panel-danger-link";
+      btn.dataset.categoryRemove = "";
+      btn.textContent = "Remove";
+
+      row.appendChild(main);
+      row.appendChild(btn);
+      return row;
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (submitBtn.dataset.pending === "true") return;
+      submitBtn.dataset.pending = "true";
+      submitBtn.disabled = true;
+
+      postForm(form.dataset.endpoint, new FormData(form)).then(function (result) {
+        submitBtn.dataset.pending = "false";
+        submitBtn.disabled = false;
+        if (!result.ok) {
+          toast(extractDetail(result.text, "Could not add that category."), "error");
+          return;
+        }
+        var data = {};
+        try { data = JSON.parse(result.text); } catch (e) { data = {}; }
+        if (data.category) list.appendChild(buildRow(data.category));
+        input.value = "";
+        syncTotal();
+        toast(extractDetail(result.text, "Category added."));
+      });
+    });
+
+    list.addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-category-remove]");
+      if (!btn) return;
+      var row = btn.closest("[data-category-row]");
+      if (!row || btn.dataset.pending === "true") return;
+
+      var label = row.dataset.categoryLabel || "this category";
+      var stories = Number(row.dataset.storyCount) || 0;
+      var warning = "Remove " + label + "? It disappears from the menu and the story form.";
+      if (stories) warning += " " + storyCopy(stories) + " stay published under it.";
+      if (!window.confirm(warning)) return;
+
+      var endpoint = deleteTemplate.replace(/0\/delete\/?$/, row.dataset.categoryId + "/delete/");
+
+      btn.dataset.pending = "true";
+      btn.disabled = true;
+
+      postForm(endpoint, new FormData()).then(function (result) {
+        if (!result.ok) {
+          btn.dataset.pending = "false";
+          btn.disabled = false;
+          toast(extractDetail(result.text, "Could not remove that category."), "error");
+          return;
+        }
+        row.remove();
+        syncTotal();
+        toast(extractDetail(result.text, "Category removed."));
+      });
+    });
+  })();
+
   /* ---------- mass email composer ---------- */
   (function () {
     var form = document.querySelector("[data-mass-email-form]");

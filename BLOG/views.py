@@ -376,6 +376,7 @@ class StoryDetailView(View):
             "author_recent_stories": author_recent_stories,
             "is_bookmarked": is_bookmarked,
             "is_liked": is_liked,
+            "liked_comment_ids": request.session.get("liked_comments", []) if request.user.is_authenticated else [],
             "bookmark_count": blog.bookmarked_by.count(),
             "author_portfolio_url": author_portfolio_url,
             "follow_endpoint": (
@@ -508,12 +509,17 @@ class CommentLikeView(View):
 
         liked_comments = request.session.get("liked_comments", [])
         if comment.id in liked_comments:
-            return JsonResponse({"detail": "You already liked this comment.", "likes": comment.likes or 0}, status=200)
-
-        comment.likes = (comment.likes or 0) + 1
-        comment.save(update_fields=["likes"])
-        liked_comments = list(dict.fromkeys([*liked_comments, comment.id]))
+            #   UNLIKE. `likes__gt=0` keeps the PositiveIntegerField from going below 0.
+            Comment.objects.filter(pk=comment.pk, likes__gt=0).update(likes=F("likes") - 1)
+            liked_comments = [liked_id for liked_id in liked_comments if liked_id != comment.id]
+            liked, detail = False, "Like removed."
+        else:
+            Comment.objects.filter(pk=comment.pk).update(likes=F("likes") + 1)
+            liked_comments = list(dict.fromkeys([*liked_comments, comment.id]))
+            liked, detail = True, "Comment liked."
         request.session["liked_comments"] = liked_comments
         request.session.modified = True
 
-        return JsonResponse({"detail": "Comment liked.", "likes": comment.likes}, status=200)
+        #   READ THE REAL TOTAL BACK: other readers may have liked meanwhile.
+        likes = Comment.objects.values_list("likes", flat=True).get(pk=comment.pk)
+        return JsonResponse({"detail": detail, "likes": likes, "liked": liked}, status=200)
