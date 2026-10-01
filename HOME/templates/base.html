@@ -41,8 +41,9 @@
         })();
     </script>
     
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="stylesheet" href="{% static 'home/css/base.css' %}">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
+<link rel="stylesheet" href="{% static 'home/css/base.css' %}">
     {% block extra_head %}
     {% comment %} TITLE AND DESCRIPTION ALREADY TAKEN CARE OF BY NoRMAL TITLE AND DESCRPTION META TAG AS THEY ARE ALWAYS PRESENT {% endcomment %}
     {% comment %} <meta property="og:title" content="{{project_name}}">
