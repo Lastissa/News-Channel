@@ -264,7 +264,15 @@ def build_ticker_text(content):
 
     return " * ".join(cleaned_blocks)
 
-
+class StoryHome(View):
+    """Redirect to the latest story. This is not meant to exist as a page
+    itself, but it is useful for SEO purposes to have a /blog/ URL that
+    points to the latest story instead of a bare numeric ID."""
+    def get(self, request):
+        latest_story = Blog.objects.order_by("-date_created").first()
+        if latest_story:
+            return redirect("blog:story_detail", blog_slug=latest_story.slug)
+        return render(request, "blog/story_404.html", {"blog_id": "latest", "decoy_content": STORY_404_CONTENT}, status=404)
 class StoryDetailView(View):
     def get(self, request, blog_slug):
         blog = cache_or_run(f"blog-{blog_slug}", lambda: Blog.objects.filter(slug=blog_slug).select_related("author__staffprofile").first(), timeout=100)

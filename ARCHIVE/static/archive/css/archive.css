@@ -248,7 +248,7 @@
   padding: 40px 0;
 }
 
-.archive-pagination { margin-top: 28px; }
+.archive-pagination { margin-top: 28px; margin-bottom: 28px;}
 
 /* ---------- blur the page behind the Add image popup while it loads ---------- */
 .archive-page-blur {

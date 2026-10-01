@@ -7,6 +7,7 @@ app_name = "blog"
 urlpatterns = [
     #   SEO/GEO: descriptive slug instead of the bare numeric id, e.g.
     #   /blog/how-to-pass-jamb-2026-104/ instead of /blog/104/.
+    path('', views.StoryHome.as_view(), name="story_home"), # redirect to the latest story, not meant to exist but for SEO purposes
     path("<slug:blog_slug>/", views.StoryDetailView.as_view(), name="story_detail"),
     path("<int:blog_id>/like/", views.BlogLikeView.as_view(), name="blog_like"),
     path("bookmark-not-found/", views.BookmarkNotFoundView.as_view(), name="bookmark_not_found"),
