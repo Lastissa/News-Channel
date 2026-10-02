@@ -1,4 +1,5 @@
 import logging
+import math
 import secrets
 import string
 from urllib.parse import quote, urlsplit
@@ -6,6 +7,7 @@ from urllib.parse import quote, urlsplit
 from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views import View
@@ -23,6 +25,21 @@ logger = logging.getLogger(__name__)
 #   the account and both must still be there for a password change to pass.
 RESET_KEY_LENGTH = 6
 RESET_SIGN_LENGTH = 10
+
+#   RATE LIMIT FOR "SEND ME A RESET LINK": 3 attempts per 5 minutes per IP.
+#   It has its own scope so login attempts from the same IP never use it up.
+RESET_REQUEST_MAX = 3
+RESET_REQUEST_WINDOW = 300
+RESET_SENT_SESSION_KEY = "password_reset_sent_email"
+
+
+def _wait_text(seconds):
+    """429 message helper: '45 seconds' / '3 minutes'."""
+    seconds = max(int(seconds or 1), 1)
+    if seconds < 60:
+        return f"{seconds} second{'s' if seconds != 1 else ''}"
+    minutes = math.ceil(seconds / 60)
+    return f"{minutes} minute{'s' if minutes != 1 else ''}"
 
 
 def _return_to(request):
@@ -215,6 +232,13 @@ class PasswordResetView(View):
                     {"stage": "confirm", "email": email, "key": key, "sign": sign},
                 )
             return render(request, "auth/password_reset.html", {"stage": "invalid"}, status=400)
+
+        #   "Link sent" page. It is a plain GET (the POST redirects here), so
+        #   refreshing it can never submit the form, and never sends a new mail.
+        if request.GET.get("sent") == "1":
+            sent_email = request.session.get(RESET_SENT_SESSION_KEY)
+            if sent_email:
+                return render(request, "auth/password_reset.html", {"stage": "sent", "email": sent_email})
         return render(request, "auth/password_reset.html", {"stage": "request"})
 
     def post(self, request):
@@ -224,16 +248,26 @@ class PasswordResetView(View):
         return self._request_link(request)
 
     def _request_link(self, request):
-        remaining_time, is_limited = is_rate_limited(request, timeout_window=60, max_requests=3)
+        email = (request.POST.get("email") or "").strip()
+        remaining_time, is_limited = is_rate_limited(
+            request,
+            timeout_window=RESET_REQUEST_WINDOW,
+            max_requests=RESET_REQUEST_MAX,
+            scope="password-reset-request",
+        )
         if is_limited:
             return render(
                 request,
                 "auth/password_reset.html",
-                {"stage": "request", "error": f"Too frequent requests. Try again in {remaining_time} seconds."},
+                {
+                    "stage": "request",
+                    "email": email,
+                    "retry_after": max(int(remaining_time or 1), 1),
+                    "error": f"Too many reset requests. Try again in {_wait_text(remaining_time)}.",
+                },
                 status=429,
             )
 
-        email = (request.POST.get("email") or "").strip()
         if not email or "@" not in email:
             return render(
                 request,
@@ -256,7 +290,11 @@ class PasswordResetView(View):
             _try_send_password_reset_email(user, _build_reset_link(user, key, sign))
             info_logger(msg=f"PASSWORD RESET: link generated for {user.email}")
 
-        return render(request, "auth/password_reset.html", {"stage": "sent", "email": email})
+        #   POST -> redirect -> GET: the browser's current page is now a plain
+        #   GET, so a refresh (or the back button) cannot re-submit the form
+        #   and trigger another mail.
+        request.session[RESET_SENT_SESSION_KEY] = email
+        return redirect(f"{reverse('auth:password_reset')}?sent=1")
 
     def _confirm(self, request):
         remaining_time, is_limited = is_rate_limited(request, timeout_window=60, max_requests=5)
