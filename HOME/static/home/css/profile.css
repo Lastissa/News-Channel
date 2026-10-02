@@ -1013,7 +1013,7 @@
 .profile-action-btn.danger {
   color: #fff;
   border-color: var(--careful-btn-bg);
-  background: yellow;
+  background: red;
   border-radius: 0;
 }
 
