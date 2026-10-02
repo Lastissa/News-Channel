@@ -78,3 +78,11 @@
   min-height: auto; padding: 5px 12px; font-size: 0.72rem; border-radius: 999px;
 }
 .follow-btn-inline .follow-icon { width: 14px; height: 14px; }
+
+/* Report a problem with this story: mailto to the support email */
+.story-report-note {
+  margin: 28px 0 0; padding: 12px 14px; border-left: 3px solid var(--brand-deep);
+  background: var(--paper-dim); color: var(--slate); font-size: 0.9rem;
+}
+.story-report-note a { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.story-report-note a:hover { color: var(--brand-deep); }

@@ -504,6 +504,185 @@
     });
   })();
 
+  /* ---------- text awareness: scrolling home bar, add + edit + delete ---------- */
+  (function () {
+    var form = document.querySelector("[data-ta-form]");
+    var list = document.querySelector("[data-ta-list]");
+    var initial = document.getElementById("ta-initial");
+    if (!form || !list) return;
+
+    var total = document.querySelector("[data-ta-total]");
+    var updateTemplate = list.dataset.updateEndpoint || "";
+    var deleteTemplate = list.dataset.deleteEndpoint || "";
+    var STATUS_LABEL = { live: "Live", paused: "Paused", expired: "Expired" };
+    var items = [];
+    try { items = JSON.parse(initial ? initial.textContent : "[]") || []; } catch (e) { items = []; }
+
+    function endpointFor(template, id) { return template.replace(/0\/(update|delete)\/?$/, id + "/$1/"); }
+
+    function el(tag, className, text) {
+      var node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function field(labelText, control, id) {
+      var wrap = el("div", "panel-field");
+      var label = el("label", "", labelText);
+      label.setAttribute("for", id);
+      control.id = id;
+      wrap.appendChild(label);
+      wrap.appendChild(control);
+      return wrap;
+    }
+
+    function buildRow(item) {
+      var row = el("div", "panel-row ta-row");
+      row.dataset.taRow = "";
+      row.dataset.id = item.id;
+
+      var main = el("span", "panel-row-main");
+      main.appendChild(el("span", "ta-text", item.content));
+      var sub = el("span", "panel-row-sub");
+      sub.appendChild(el("span", "ta-status ta-status-" + item.status, STATUS_LABEL[item.status] || item.status));
+      sub.appendChild(document.createTextNode(" Ends " + item.expiry_label + (item.url ? " \u00b7 has link" : "") + (item.added_by ? " \u00b7 by " + item.added_by : "")));
+      main.appendChild(sub);
+
+      var actions = el("span", "ta-actions");
+      var edit = el("button", "panel-ghost-btn", "Edit");
+      edit.type = "button";
+      edit.dataset.taEdit = "";
+      var del = el("button", "panel-danger-link", "Delete");
+      del.type = "button";
+      del.dataset.taDelete = "";
+      actions.appendChild(edit);
+      actions.appendChild(del);
+
+      row.appendChild(main);
+      row.appendChild(actions);
+      return row;
+    }
+
+    function buildEditor(item) {
+      var row = el("form", "panel-form ta-editor");
+      row.dataset.taEditor = "";
+      row.dataset.id = item.id;
+      row.noValidate = false;
+
+      var content = el("textarea");
+      content.name = "content"; content.rows = 2; content.maxLength = 400; content.required = true; content.value = item.content;
+      var url = el("input");
+      url.type = "url"; url.name = "url"; url.value = item.url; url.placeholder = "https://...";
+      var expiry = el("input");
+      expiry.type = "datetime-local"; expiry.name = "expiry_date"; expiry.required = true; expiry.value = item.expiry_input;
+
+      var key = "ta-" + item.id + "-";
+      row.appendChild(field("Text", content, key + "c"));
+      row.appendChild(field("Link (optional)", url, key + "u"));
+      row.appendChild(field("Stops showing on", expiry, key + "e"));
+
+      var activeWrap = el("label", "ta-check");
+      var active = el("input");
+      active.type = "checkbox"; active.name = "is_active"; active.value = "1"; active.checked = item.is_active;
+      activeWrap.appendChild(active);
+      activeWrap.appendChild(document.createTextNode(" Show on the home page"));
+      row.appendChild(activeWrap);
+
+      var footer = el("div", "panel-form-footer");
+      var cancel = el("button", "panel-ghost-btn", "Cancel");
+      cancel.type = "button"; cancel.dataset.taCancel = "";
+      var save = el("button", "panel-primary-btn", "Save");
+      save.type = "submit";
+      footer.appendChild(cancel);
+      footer.appendChild(save);
+      row.appendChild(footer);
+      return row;
+    }
+
+    function render() {
+      list.textContent = "";
+      items.forEach(function (item) { list.appendChild(buildRow(item)); });
+      if (!items.length) list.appendChild(el("p", "empty-copy", "No text yet. Readers will see the default placeholder until you add one."));
+      if (total) {
+        var live = items.filter(function (item) { return item.status === "live"; }).length;
+        total.textContent = live + " live";
+      }
+    }
+
+    function indexOfId(id) {
+      for (var i = 0; i < items.length; i += 1) if (String(items[i].id) === String(id)) return i;
+      return -1;
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var btn = form.querySelector("button[type='submit']");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      postForm(form.dataset.endpoint, new FormData(form)).then(function (result) {
+        btn.disabled = false;
+        if (!result.ok) { toast(extractDetail(result.text, "Could not add that text."), "error"); return; }
+        var data = JSON.parse(result.text || "{}");
+        if (data.item) items.unshift(data.item);
+        form.reset();
+        render();
+        toast(extractDetail(result.text, "Text added."));
+      }).catch(function () { btn.disabled = false; toast("Connection issue. Nothing was added.", "error"); });
+    });
+
+    list.addEventListener("click", function (event) {
+      var row = event.target.closest("[data-ta-row]");
+      var editor = event.target.closest("[data-ta-editor]");
+
+      if (event.target.closest("[data-ta-edit]") && row) {
+        var item = items[indexOfId(row.dataset.id)];
+        if (item) row.replaceWith(buildEditor(item));
+        return;
+      }
+      if (event.target.closest("[data-ta-cancel]") && editor) {
+        var original = items[indexOfId(editor.dataset.id)];
+        if (original) editor.replaceWith(buildRow(original));
+        return;
+      }
+      var delBtn = event.target.closest("[data-ta-delete]");
+      if (delBtn && row) {
+        if (delBtn.disabled) return;
+        if (!window.confirm("Delete this text? It stops scrolling on the home page straight away.")) return;
+        delBtn.disabled = true;
+        postForm(endpointFor(deleteTemplate, row.dataset.id), new FormData()).then(function (result) {
+          if (!result.ok) { delBtn.disabled = false; toast(extractDetail(result.text, "Could not delete that text."), "error"); return; }
+          var at = indexOfId(row.dataset.id);
+          if (at !== -1) items.splice(at, 1);
+          render();
+          toast(extractDetail(result.text, "Text deleted."));
+        }).catch(function () { delBtn.disabled = false; toast("Connection issue. Nothing was deleted.", "error"); });
+      }
+    });
+
+    list.addEventListener("submit", function (event) {
+      var editor = event.target.closest("[data-ta-editor]");
+      if (!editor) return;
+      event.preventDefault();
+      var save = editor.querySelector("button[type='submit']");
+      if (save.disabled) return;
+      var data = new FormData(editor);
+      if (!editor.querySelector("input[name='is_active']").checked) data.set("is_active", "0");
+      save.disabled = true;
+      postForm(endpointFor(updateTemplate, editor.dataset.id), data).then(function (result) {
+        save.disabled = false;
+        if (!result.ok) { toast(extractDetail(result.text, "Could not save that text."), "error"); return; }
+        var payload = JSON.parse(result.text || "{}");
+        var at = indexOfId(editor.dataset.id);
+        if (at !== -1 && payload.item) items[at] = payload.item;
+        render();
+        toast(extractDetail(result.text, "Text updated."));
+      }).catch(function () { save.disabled = false; toast("Connection issue. Nothing was saved.", "error"); });
+    });
+
+    render();
+  })();
+
   /* ---------- mass email composer ---------- */
   (function () {
     var form = document.querySelector("[data-mass-email-form]");

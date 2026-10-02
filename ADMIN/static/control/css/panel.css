@@ -525,3 +525,19 @@ html[data-theme="dark"] {
     gap: 10px;
   }
 }
+
+/* ---------- Text awareness ---------- */
+.ta-row { align-items: flex-start; }
+.ta-text { font-weight: 600; overflow-wrap: anywhere; }
+.ta-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.ta-status {
+  display: inline-block; margin-right: 6px; padding: 1px 12px 1px 8px; font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; color: #fff;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+}
+.ta-status-live { background: var(--success); }
+.ta-status-paused { background: var(--slate); }
+.ta-status-expired { background: var(--danger); }
+.ta-editor { padding: 12px 0; border-bottom: 1px solid var(--line); animation: taOpen .22s ease both; }
+.ta-check { display: flex; align-items: center; gap: 6px; font-size: 0.86rem; }
+@keyframes taOpen { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

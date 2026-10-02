@@ -168,6 +168,13 @@ oficial website at https://www.abureport.com.ng
       {{ blog_content_html|safe }}
     </div>
 
+    {% if support_email and "@" in support_email %}
+    <p class="story-report-note">
+      Noticed any missing or inappropriate content in this story?
+      <a href="mailto:{{ support_email }}?subject=Story%20report%20-%20{{ blog.heading|urlencode }}&amp;body=Story%3A%20{{ site_domain|urlencode:'' }}{{ request.path|urlencode:'' }}%0A%0AWhat%20I%20noticed%3A%0A">Click here to draft us a mail</a>.
+    </p>
+    {% endif %}
+
     <div class="article-actions">
       <form method="post" action="{% url 'blog:blog_like' blog.id %}" class="action-form" data-story-like-form data-endpoint="{% url 'blog:blog_like' blog.id %}">
         {% csrf_token %}

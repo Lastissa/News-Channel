@@ -8,6 +8,7 @@ work stays in HOME.views; this module only holds the extra authority an admin
 import logging
 
 from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
@@ -16,6 +17,7 @@ from django.shortcuts import redirect, render
 from django.template.defaultfilters import title as title_case
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views import View
 
 from AUTHENTICATION.models import Auth, UserSession
@@ -27,6 +29,7 @@ from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_s
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
+from Partner.models import AdvertText
 from ADMIN.models import SiteSettings
 from STAFF.models import GENDER_CHOICES, StaffProfile
 
@@ -701,6 +704,7 @@ class PanelView(View):
                 "sender_full_name": own_profile.full_name.strip() if own_profile and own_profile.full_name else "",
                 "site_settings": SiteSettings.get_solo(),
                 "category_rows": _category_rows(),
+                "text_awareness_items": _text_awareness_items(),
                 "gallery_items": staff_directory_rows(list(gallery_page.object_list)),
                 "gallery_has_next": gallery_page.has_next(),
                 "gallery_next_page": gallery_page.next_page_number() if gallery_page.has_next() else None,
@@ -1096,3 +1100,125 @@ class PanelSpecialityView(View):
             },
             status=200,
         )
+
+
+"""
+------------------------------------------------------------
+#   TEXT AWARENESS
+------------------------------------------------------------
+The scrolling bar at the top of the home page (HOME.views._ad_center_items)
+shows every Partner.AdvertText row that is active and not expired. These
+three endpoints let an admin add, edit and delete those rows from PANEL.
+"""
+
+TEXT_AWARENESS_LIST_LIMIT = 100   #   newest rows shown in PANEL
+
+
+def _text_awareness_item(row):
+    expiry = timezone.localtime(row.expiry_date)
+    if not row.is_active:
+        status = "paused"
+    elif row.expiry_date < timezone.now():
+        status = "expired"
+    else:
+        status = "live"
+    return {
+        "id": row.id,
+        "content": row.ad_content,
+        "url": row.url or "",
+        "expiry_input": expiry.strftime("%Y-%m-%dT%H:%M"),
+        "expiry_label": expiry.strftime("%d %b %Y, %H:%M"),
+        "is_active": row.is_active,
+        "status": status,
+        "added_by": _mask_email(row.author.email) if row.author_id else "",
+    }
+
+
+def _text_awareness_items():
+    rows = AdvertText.objects.select_related("author").order_by("-date_created")[:TEXT_AWARENESS_LIST_LIMIT]
+    return [_text_awareness_item(row) for row in rows]
+
+
+def _clean_text_awareness(post):
+    """Validate the posted fields. Returns (values, error)."""
+    content = " ".join((post.get("content") or "").split())
+    if not content:
+        return None, "Enter the text to scroll."
+    if len(content) > 400:
+        return None, "The text can be at most 400 characters."
+
+    url = (post.get("url") or "").strip()
+    if url:
+        if not url.lower().startswith(("http://", "https://")):
+            return None, "The link must start with http:// or https://"
+        try:
+            URLValidator(schemes=["http", "https"])(url)
+        except ValidationError:
+            return None, "Enter a valid link, or leave it empty."
+
+    expiry = parse_datetime((post.get("expiry_date") or "").strip())
+    if expiry is None:
+        return None, "Pick when this text should stop showing."
+    if timezone.is_naive(expiry):
+        expiry = timezone.make_aware(expiry, timezone.get_current_timezone())
+
+    is_active = (post.get("is_active") or "").lower() in ("1", "true", "on", "yes")
+    return {"ad_content": content, "url": url or None, "expiry_date": expiry, "is_active": is_active}, None
+
+
+def _text_awareness_guard(request):
+    """Rate limit + admin check shared by the three endpoints. Returns an error response or None."""
+    remaining_seconds, limited = is_rate_limited(request, 10, 6)
+    if limited:
+        return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
+    if not admin_only(request.user):
+        return JsonResponse({"detail": "Admin access is required."}, status=403)
+    return None
+
+
+class PanelTextAwarenessCreateView(View):
+    def post(self, request):
+        denied = _text_awareness_guard(request)
+        if denied:
+            return denied
+        values, error = _clean_text_awareness(request.POST)
+        if error:
+            return JsonResponse({"detail": error}, status=400)
+        if values["expiry_date"] <= timezone.now():
+            return JsonResponse({"detail": "The end time has to be in the future."}, status=400)
+
+        row = AdvertText.objects.create(author=request.user, **values)
+        info_logger(msg=f"PANEL: text awareness {row.id} added by {request.user.email}")
+        return JsonResponse({"detail": "Text added to the scrolling bar.", "item": _text_awareness_item(row)}, status=201)
+
+
+class PanelTextAwarenessUpdateView(View):
+    def post(self, request, item_id):
+        denied = _text_awareness_guard(request)
+        if denied:
+            return denied
+        row = AdvertText.objects.select_related("author").filter(pk=item_id).first()
+        if row is None:
+            return JsonResponse({"detail": "That text no longer exists."}, status=404)
+        values, error = _clean_text_awareness(request.POST)
+        if error:
+            return JsonResponse({"detail": error}, status=400)
+
+        for field, value in values.items():
+            setattr(row, field, value)
+        row.save()
+        info_logger(msg=f"PANEL: text awareness {row.id} edited by {request.user.email}")
+        return JsonResponse({"detail": "Text updated.", "item": _text_awareness_item(row)}, status=200)
+
+
+class PanelTextAwarenessDeleteView(View):
+    def post(self, request, item_id):
+        denied = _text_awareness_guard(request)
+        if denied:
+            return denied
+        row = AdvertText.objects.filter(pk=item_id).first()
+        if row is None:
+            return JsonResponse({"detail": "That text no longer exists."}, status=404)
+        row.delete()
+        info_logger(msg=f"PANEL: text awareness {item_id} deleted by {request.user.email}")
+        return JsonResponse({"detail": "Text deleted."}, status=200)
