@@ -272,13 +272,20 @@ class StoryHome(View):
         latest_story = Blog.objects.order_by("-date_created").first()
         if latest_story:
             return redirect("blog:story_detail", blog_slug=latest_story.slug)
-        return render(request, "blog/story_404.html", {"blog_id": "latest", "decoy_content": STORY_404_CONTENT}, status=404)
+        return render(request, "blog/story_404.html", {"blog_id": "latest", "decoy_content": STORY_404_CONTENT, "suggested_stories": _suggested_stories()}, status=404)
+def _suggested_stories():
+    """Latest stories for the "you might be interested in" block of the story 404 page."""
+    from HOME.views import latest_stories_for_404  #   LOCAL IMPORT: HOME.views already imports BLOG.models
+
+    return latest_stories_for_404()
+
+
 class StoryDetailView(View):
     def get(self, request, blog_slug):
         blog = cache_or_run(f"blog-{blog_slug}", lambda: Blog.objects.filter(slug=blog_slug).select_related("author__staffprofile").first(), timeout=100)
         if blog is None:
             return render(
-                request,"blog/story_404.html",{"blog_id": blog_slug, "decoy_content": STORY_404_CONTENT},status=404,)
+                request,"blog/story_404.html",{"blog_id": blog_slug, "decoy_content": STORY_404_CONTENT, "suggested_stories": _suggested_stories()},status=404,)
             
         #   A STORY STAFF HAVE EDITED SINCE PUBLISHING TELLS THE READER SO, EVERY
         #   TIME IT IS OPENED. `last_edited` is only ever set by
@@ -452,7 +459,7 @@ class BlogLikeView(View):
         else:
             Blog.objects.filter(pk=blog.pk).update(likes=F("likes") + 1)
             liked_blogs = list(dict.fromkeys([*liked_blogs, blog.id]))
-            liked, detail = True, "Story liked."
+            liked, detail = True, "Story liked. Thank You"
 
         request.session["liked_blogs"] = liked_blogs
         request.session.modified = True

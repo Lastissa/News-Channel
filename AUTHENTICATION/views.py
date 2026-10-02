@@ -9,6 +9,8 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.utils import timezone
 from django.views import View
 from django.contrib import messages
@@ -115,6 +117,17 @@ class LoginView(View):
         if is_ajax:
             return _response({"detail": "Invalid email or password."}, status=401)
         return render(request, "auth/login.html", _auth_context(request, error="Invalid email or password."), status=401)
+
+
+@method_decorator(xframe_options_sameorigin, name="dispatch")
+class GateView(View):
+    """The create account / sign in card shown inside the guest popup
+    (static/home/js/auth-gate.js). It is framed by our own pages only, hence the
+    same-origin frame permission, and it posts to the normal register and login
+    endpoints, which already answer JSON for ajax requests."""
+
+    def get(self, request):
+        return render(request, "auth/gate.html", {"already_signed_in": request.user.is_authenticated})
 
 
 class LogoutView(View):

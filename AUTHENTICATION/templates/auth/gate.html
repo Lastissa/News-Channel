@@ -1,0 +1,239 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Join {{ project_name }}</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('abureport-theme');
+        document.documentElement.setAttribute('data-theme', (stored === 'dark' || stored === 'light') ? stored : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{% static 'home/css/base.css' %}">
+  <style>
+    html, body { margin: 0; background: var(--surface); }
+    .gate { padding: 6px 4px 4px; }
+    .gate-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+    .gate-tab {
+      border: 0; background: transparent; color: var(--slate); font-weight: 700; font-size: 0.92rem;
+      padding: 12px 8px; position: relative; transition: color .2s ease;
+    }
+    .gate-tab::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px;
+      background: var(--brand-deep); transform: scaleX(0); transform-origin: left; transition: transform .28s ease;
+    }
+    .gate-tab[aria-selected="true"] { color: var(--ink); }
+    .gate-tab[aria-selected="true"]::after { transform: scaleX(1); }
+    .gate-panel[hidden] { display: none; }
+    .gate-panel { animation: gateIn .28s ease both; }
+    @keyframes gateIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .gate-form { display: grid; gap: 14px; }
+    .gate-form .field-group label { font-size: 0.86rem; }
+    .gate-error { min-height: 1.2em; margin: 0; color: var(--danger); font-weight: 700; font-size: 0.84rem; }
+    .gate-submit {
+      width: 100%; border: 0; background: var(--ink); color: var(--paper); border-radius: var(--radius-s);
+      padding: 13px 16px; font-size: 0.96rem; font-weight: 700; transition: opacity .2s ease, transform .2s ease;
+    }
+    .gate-submit:hover { opacity: .9; }
+    .gate-submit:disabled { opacity: .6; cursor: not-allowed; }
+    .gate-submit.is-pending::before {
+      content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+      border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: authSpin .7s linear infinite;
+    }
+    .gate-foot { margin: 14px 0 0; text-align: center; color: var(--slate); font-size: 0.86rem; }
+    .gate-foot a, .gate-foot button { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; padding: 0; font-size: inherit; }
+    .gate-done { text-align: center; padding: 28px 8px; color: var(--ink); }
+  </style>
+</head>
+<body>
+  <div class="gate" data-gate data-signed-in="{% if already_signed_in %}true{% else %}false{% endif %}">
+    <div class="gate-tabs" role="tablist" aria-label="Account">
+      <button type="button" class="gate-tab" role="tab" id="tab-register" aria-controls="panel-register" aria-selected="true" data-tab="register">Create account</button>
+      <button type="button" class="gate-tab" role="tab" id="tab-login" aria-controls="panel-login" aria-selected="false" data-tab="login" tabindex="-1">Sign in</button>
+    </div>
+
+    <section class="gate-panel" id="panel-register" role="tabpanel" aria-labelledby="tab-register" data-panel="register">
+      <form class="gate-form" method="post" action="{% url 'auth:register' %}" novalidate data-gate-form="register">
+        {% csrf_token %}
+        <div class="field-group">
+          <label for="reg-email">Email address</label>
+          <input id="reg-email" type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="field-group">
+          <label for="reg-password">Password</label>
+          <div class="password-field">
+            <input id="reg-password" type="password" name="password" placeholder="At least 6 characters" required autocomplete="new-password">
+            <button type="button" class="password-toggle" data-target="reg-password" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"/><path d="M9.09 5.47A10.96 10.96 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-4.42 5.04"/><path d="M6.61 6.61A17.77 17.77 0 0 0 2 12s3.5 7 10 7a11.47 11.47 0 0 0 4.83-1.1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="reg-confirm">Confirm password</label>
+          <div class="password-field">
+            <input id="reg-confirm" type="password" name="password_confirm" placeholder="Repeat your password" required autocomplete="new-password">
+            <button type="button" class="password-toggle" data-target="reg-confirm" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"/><path d="M9.09 5.47A10.96 10.96 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-4.42 5.04"/><path d="M6.61 6.61A17.77 17.77 0 0 0 2 12s3.5 7 10 7a11.47 11.47 0 0 0 4.83-1.1"/></svg>
+            </button>
+          </div>
+        </div>
+        <p class="gate-error" role="alert" data-gate-error></p>
+        <button type="submit" class="gate-submit">Create account</button>
+      </form>
+      <p class="gate-foot">Already have an account? <button type="button" data-switch="login">Sign in</button></p>
+    </section>
+
+    <section class="gate-panel" id="panel-login" role="tabpanel" aria-labelledby="tab-login" data-panel="login" hidden>
+      <form class="gate-form" method="post" action="{% url 'auth:login' %}" novalidate data-gate-form="login">
+        {% csrf_token %}
+        <div class="field-group">
+          <label for="log-email">Email address</label>
+          <input id="log-email" type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="field-group">
+          <label for="log-password">Password</label>
+          <div class="password-field">
+            <input id="log-password" type="password" name="password" placeholder="Your password" required autocomplete="current-password">
+            <button type="button" class="password-toggle" data-target="log-password" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"/><path d="M9.09 5.47A10.96 10.96 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-4.42 5.04"/><path d="M6.61 6.61A17.77 17.77 0 0 0 2 12s3.5 7 10 7a11.47 11.47 0 0 0 4.83-1.1"/></svg>
+            </button>
+          </div>
+        </div>
+        <p class="gate-error" role="alert" data-gate-error></p>
+        <button type="submit" class="gate-submit">Sign in</button>
+      </form>
+      <p class="gate-foot">New here? <button type="button" data-switch="register">Create an account</button></p>
+      <p class="gate-foot"><a href="{% url 'auth:password_reset' %}" target="_top">Forgotten password?</a></p>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      var root = document.querySelector('[data-gate]');
+      var ORIGIN = window.location.origin;
+
+      function send(payload) {
+        payload.source = 'abureport-auth-gate';
+        try { window.parent.postMessage(payload, ORIGIN); } catch (e) {}
+      }
+      function reportHeight() {
+        send({ type: 'height', value: Math.ceil(root.getBoundingClientRect().height) + 12 });
+      }
+
+      function showTab(name, focus) {
+        document.querySelectorAll('[data-tab]').forEach(function (tab) {
+          var on = tab.dataset.tab === name;
+          tab.setAttribute('aria-selected', on ? 'true' : 'false');
+          tab.tabIndex = on ? 0 : -1;
+        });
+        document.querySelectorAll('[data-panel]').forEach(function (panel) {
+          panel.hidden = panel.dataset.panel !== name;
+        });
+        reportHeight();
+        if (focus) {
+          var first = document.querySelector('[data-panel="' + name + '"] input');
+          if (first) first.focus();
+        }
+      }
+      document.querySelectorAll('[data-tab]').forEach(function (tab) {
+        tab.addEventListener('click', function () { showTab(tab.dataset.tab, true); });
+      });
+      document.querySelectorAll('[data-switch]').forEach(function (btn) {
+        btn.addEventListener('click', function () { showTab(btn.dataset.switch, true); });
+      });
+
+      document.querySelectorAll('.password-toggle').forEach(function (toggle) {
+        var target = document.getElementById(toggle.dataset.target);
+        if (!target) return;
+        toggle.addEventListener('click', function () {
+          var hidden = target.type === 'password';
+          target.type = hidden ? 'text' : 'password';
+          toggle.classList.toggle('is-visible', hidden);
+          toggle.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
+          toggle.setAttribute('aria-pressed', String(hidden));
+        });
+      });
+
+      function cookie(name) {
+        var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? decodeURIComponent(m.pop()) : '';
+      }
+
+      document.querySelectorAll('[data-gate-form]').forEach(function (form) {
+        var mode = form.dataset.gateForm;
+        var errorEl = form.querySelector('[data-gate-error]');
+        var btn = form.querySelector('.gate-submit');
+        var label = btn.textContent;
+
+        function fail(message) {
+          errorEl.textContent = message;
+          reportHeight();
+        }
+        function busy(on) {
+          btn.disabled = on;
+          btn.classList.toggle('is-pending', on);
+          btn.textContent = on ? (mode === 'login' ? 'Signing in...' : 'Creating account...') : label;
+        }
+
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (btn.disabled) return;
+          errorEl.textContent = '';
+          var email = form.querySelector('input[name="email"]');
+          var password = form.querySelector('input[name="password"]');
+          var confirm = form.querySelector('input[name="password_confirm"]');
+
+          if (!email.value.trim() || !password.value.trim()) { fail('Enter your email and password.'); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) { fail('Enter a valid email address.'); email.focus(); return; }
+          if (confirm) {
+            if (password.value.length < 6) { fail('Password must be at least 6 characters long.'); password.focus(); return; }
+            if (password.value !== confirm.value) { fail('Passwords do not match.'); confirm.focus(); return; }
+          }
+
+          busy(true);
+          fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': cookie('csrftoken') },
+            credentials: 'same-origin',
+            body: new FormData(form)
+          })
+            .then(function (response) {
+              return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+            })
+            .then(function (result) {
+              var payload = null;
+              try { payload = JSON.parse(result.text || '{}') || {}; } catch (e) {}
+              if (payload === null) {
+                /* Not JSON means the CSRF failure page: the token went stale. A reload mints a fresh pair. */
+                window.location.reload();
+                return;
+              }
+              if (!result.ok) { busy(false); fail(payload.detail || 'Something went wrong. Try again.'); return; }
+              /* The session exists now. Hand over to the page, which closes this popup. */
+              send({ type: 'success', mode: mode });
+            })
+            .catch(function () {
+              busy(false);
+              fail('Connection issue. Please try again.');
+            });
+        });
+      });
+
+      if (root.dataset.signedIn === 'true') {
+        /* Already signed in (for example from another tab): nothing to ask, tell the page. */
+        send({ type: 'success', mode: 'login' });
+      }
+
+      window.addEventListener('load', function () { reportHeight(); send({ type: 'ready' }); });
+    })();
+  </script>
+</body>
+</html>

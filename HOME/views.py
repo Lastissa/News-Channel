@@ -43,10 +43,29 @@ FEATURED_COUNT = 5  #   FEATUREAD
 TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
 
 
+NOTFOUND_SUGGESTION_COUNT = 3  #   HOW MANY LATEST STORIES THE 404 PAGES SUGGEST
+
+
+def latest_stories_for_404(limit=NOTFOUND_SUGGESTION_COUNT):
+    """The newest stories, for the "stories you might be interested in" block
+    on the 404 pages. It must never make a 404 worse, so any database trouble
+    just means an empty list and the block is left out."""
+    try:
+        return list(
+            Blog.objects.exclude(slug__isnull=True)
+            .exclude(slug="")
+            .select_related("author__staffprofile")
+            .order_by("-date_created")[:limit]
+        )
+    except Exception:
+        logger.exception("404 page could not load suggested stories")
+        return []
+
+
 def handler404(request, exception=None):
-    """Site wide 404 page. Kept deliberately minimal but still framed by the
-    regular header and footer."""
-    return render(request, "HOME/404.html", status=404)
+    """Site wide 404 page, framed by the regular header and footer, with the
+    latest stories underneath."""
+    return render(request, "HOME/404.html", {"suggested_stories": latest_stories_for_404()}, status=404)
 
 def handler500(request, exception=None):
     html = f"""<html>

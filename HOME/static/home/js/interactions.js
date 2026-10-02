@@ -71,6 +71,18 @@
     }, atTop ? 8000 : 2600);
   }
 
+  window.AbuToast = toast;
+
+  /* A 401 means the visitor is signed out. Instead of an error toast, open the
+     create account / sign in popup (auth-gate.js). kind picks the wording. */
+  function openAuthGate(kind, fallbackMessage) {
+    if (window.AbuAuthGate) {
+      window.AbuAuthGate.open(kind);
+    } else {
+      toast(fallbackMessage, "error");
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     var messageNodes = document.querySelectorAll(".django-message");
     if (!messageNodes.length) return;
@@ -114,7 +126,7 @@
           setBookmarkVisual(btn, wasSaved);
           if (countNode) countNode.textContent = String(oldCount);
           if (result.status === 401) {
-            toast(extractDetail(result.text, "Sign in to save stories."), "error");
+            openAuthGate("bookmark", extractDetail(result.text, "Sign in to save stories."));
           } else if (result.status === 403) {
             toast(extractDetail(result.text, "Security check failed. Please reload and try again."), "error");
           } else if (result.status >= 500) {
@@ -1232,6 +1244,7 @@
         button.dataset.pending = "false";
         setStoryLikePending(false);
         if (!result.ok) {
+          if (result.status === 401) { openAuthGate("like", extractDetail(result.text, "Sign in to like this story.")); return; }
           toast(extractDetail(result.text, "Could not update your like."), "error");
           return;
         }
@@ -1304,7 +1317,10 @@
         if (!result.ok) {
           syncFollowButtons(wasFollowing);
           var message = extractDetail(result.text, "Could not update the follow.");
-          if (result.status === 401) message = extractDetail(result.text, "You have to log in to follow this author.");
+          if (result.status === 401) {
+            openAuthGate("follow", extractDetail(result.text, "You have to log in to follow this author."));
+            return;
+          }
           toast(message, "error");
           return;
         }
@@ -1366,6 +1382,7 @@
           submitBtn.textContent = submitBtn.dataset.originalText || "Post comment";
         }
         if (!result.ok) {
+          if (result.status === 401) { openAuthGate("comment", extractDetail(result.text, "Please sign in to comment.")); return; }
           var message = extractDetail(result.text, "Could not post comment.");
           toast(message, "error");
           return;
@@ -1425,6 +1442,7 @@
         button.dataset.pending = "false";
         button.disabled = false;
         if (!result.ok) {
+          if (result.status === 401) { openAuthGate("comment-like", extractDetail(result.text, "Please sign in to like this comment.")); return; }
           toast(extractDetail(result.text, "Could not update your like."), "error");
           return;
         }

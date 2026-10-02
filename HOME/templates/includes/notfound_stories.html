@@ -1,0 +1,24 @@
+{% comment %}Latest stories shown under the 404 pages. Needs `suggested_stories`; renders nothing when it is empty. Styles: base.css (.notfound-stories, .nf-card).{% endcomment %}
+{% if suggested_stories %}
+<section class="notfound-stories" aria-labelledby="notfound-stories-title">
+  <h2 class="notfound-stories-title" id="notfound-stories-title">Here are stories you might be interested in</h2>
+  <div class="notfound-grid">
+    {% for post in suggested_stories %}
+    <article class="nf-card" style="--i: {{ forloop.counter0 }};">
+      <a class="nf-card-media" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true">
+        <img src="{{ post.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+      </a>
+      <div class="nf-card-body">
+        <div class="nf-card-meta">
+          <span class="nf-card-tag">{{ post.get_category_display|title }}</span>
+          <span>{{ post.date_created|timesince }} ago</span>
+        </div>
+        <h3 class="nf-card-title"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h3>
+        <p class="nf-card-excerpt">{{ post.content|truncatewords:20 }}</p>
+        {% with name=post.author.staffprofile.full_name %}{% if name %}<span class="nf-card-by">{{ name }}</span>{% endif %}{% endwith %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
