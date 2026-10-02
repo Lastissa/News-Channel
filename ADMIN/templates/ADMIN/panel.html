@@ -13,17 +13,18 @@
 <section class="panel-shell">
   <div class="panel-header-bar">
     <h1>PANEL</h1>
-    <div class="panel-header-actions">
+    <a href="{% url 'home:profile' %}" class="panel-back-link">Profile</a>
+    {% comment %} <div class="panel-header-actions">
       <span class="panel-role-tag">{% if is_superuser %}Superuser{% else %}Admin{% endif %}</span>
-      <a href="{% url 'home:profile' %}" class="panel-back-link">&larr; Profile</a>
-    </div>
+      <a href="{% url 'home:profile' %}" class="panel-back-link">Profile</a>
+    </div> {% endcomment %}
   </div>
 
   <div class="panel-grid">
 
     <section class="panel-card panel-card-wide" id="panel-staff-gallery" aria-label="Staff directory">
       <div class="panel-card-header">
-        <h2>Staff</h2>
+        {% comment %} <h2>Staff</h2> {% endcomment %}
         <div class="panel-card-header-actions">
           <a href="{% url 'control:staff_create' %}" class="panel-ghost-btn">+ Staff</a>
         </div>
@@ -67,7 +68,7 @@
           <form class="panel-form" data-ta-form data-endpoint="{% url 'control:panel_text_awareness_create' %}">
             <div class="panel-field">
               <label for="ta-content">Text <small data-ta-count>0 / 400</small></label>
-              <textarea id="ta-content" name="content" rows="3" maxlength="400" required placeholder="What should scroll across the home page?" data-ta-content></textarea>
+              <textarea id="ta-content" name="content" rows="3" maxlength="400" required placeholder="" data-ta-content></textarea>
             </div>
             <div class="panel-field">
               <label for="ta-url">Link <small>(optional)</small></label>
@@ -87,7 +88,7 @@
         </div>
 
         <div class="ta-feed">
-          <h3 class="ta-subhead">On the bar</h3>
+          <h3 class="ta-subhead">Currently Added</h3>
           <div class="ta-list" data-ta-list
                data-update-endpoint="{% url 'control:panel_text_awareness_update' 0 %}"
                data-delete-endpoint="{% url 'control:panel_text_awareness_delete' 0 %}"></div>

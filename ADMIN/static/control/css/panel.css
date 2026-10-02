@@ -520,7 +520,7 @@ html[data-theme="dark"] {
   }
 
   .panel-header-bar {
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
     gap: 10px;
   }
@@ -549,7 +549,7 @@ html[data-theme="dark"] {
 .ta-list { display: flex; flex-direction: column; gap: 10px; }
 .ta-item {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
-  padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--slate);
+  padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 40px solid var(--slate);
   border-radius: 6px; transition: border-color .2s ease, box-shadow .2s ease;
   animation: taIn .25s ease both;
 }

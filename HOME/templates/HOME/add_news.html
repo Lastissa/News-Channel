@@ -106,45 +106,72 @@
 
           <div class="editor-field">
           <label for="editor-content">Content</label>
+          <div class="editor-insert-bar" role="toolbar" aria-label="Insert formatting" data-insert-bar>
+            <span class="editor-insert-label">Insert</span>
+            <button type="button" class="editor-insert-btn" data-insert="# " data-insert-kind="line" title="Subheading">Heading</button>
+            <button type="button" class="editor-insert-btn" data-insert="## " data-insert-kind="line" title="Smaller subheading">Heading 2</button>
+            <button type="button" class="editor-insert-btn" data-insert="### " data-insert-kind="line" title="Smallest subheading">Heading 3</button>
+            <button type="button" class="editor-insert-btn" data-insert="* " data-insert-kind="line" title="Bullet point">Bullet</button>
+            <button type="button" class="editor-insert-btn" data-insert="1. " data-insert-kind="line" title="Numbered point">Numbered</button>
+            <button type="button" class="editor-insert-btn" data-insert="imgl " data-insert-kind="line" title="Image on the left">imgl</button>
+            <button type="button" class="editor-insert-btn" data-insert="imgr " data-insert-kind="line" title="Image on the right">imgr</button>
+            <button type="button" class="editor-insert-btn" data-insert="imgc " data-insert-kind="line" title="Centered image">imgc</button>
+            <button type="button" class="editor-insert-btn" data-insert="filel " data-insert-kind="line" title="Downloadable file">filel</button>
+          </div>
           <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content..."></textarea>
+          </div>
 
-          <b class="prompt">FORMATTING GUIDE — OPTIONAL</b>
+          <aside class="format-guide" id="formatting-guide" data-format-guide aria-labelledby="format-guide-title">
+            <div class="fg-head">
+              <h2 class="fg-title" id="format-guide-title">Formatting guide</h2>
+              <button type="button" class="fg-copy" data-guide-copy-all>Copy All</button>
+            </div>
+            <p class="fg-intro">None of this is required. A story written as plain paragraphs is fine.</p>
 
-          <small class="editor-convention-hint">
-            You may write the entire content as plain text without using any formatting syntax.
-          </small>
+            <section class="fg-block" data-guide-section="Before you publish">
+              <h3>Before you publish</h3>
+              <ol class="fg-rules">
+                <li data-guide-item="Your first paragraph must not copy the headline. If the two are 90% or more alike, the story will be rejected.">Your first paragraph must not copy the headline. If the two are 90% or more alike, the story will be rejected.</li>
+                <li data-guide-item="Do not begin the content with a # heading that repeats the headline. The headline already appears above the story.">Do not begin the content with a <code>#</code> heading that repeats the headline. The headline already appears above the story.</li>
+                <li data-guide-item="The story needs real content, not just a heading or filler. A very short story may trigger a warning; you can edit it or confirm that it contains enough information to post.">The story needs real content, not just a heading or filler. A very short story may trigger a warning; you can edit it or confirm that it contains enough information to post.</li>
+                <li data-guide-item="Use headings for real sections. Empty ones like # or ## are rejected.">Use headings for real sections. Empty ones like <code>#</code> or <code>##</code> are rejected.</li>
+                <li data-guide-item="Do not use lines of symbols such as ------ or ====== or ******. Leave a blank line instead.">Do not use lines of symbols such as <code>------</code> or <code>======</code> or <code>******</code>. Leave a blank line instead.</li>
+                <li data-guide-item="Start with a normal paragraph where possible. Markdown headings are allowed for real sections, but do not repeat the main headline at the start of the story.">Start with a normal paragraph where possible. Markdown headings are allowed for real sections, but do not repeat the main headline at the start of the story.</li>
+              </ol>
+            </section>
 
-          <small class="editor-convention-hint">
-            The first paragraph should preferably - NOT A MUST - remain plain text, without headings, bullets, numbering, bold, or italic formatting.
-          </small>
+            <section class="fg-block" data-guide-section="Layout">
+              <h3>Layout</h3>
+              <dl class="fg-table">
+                <div class="fg-row" data-guide-item="Blank line = new paragraph"><dt>Blank line</dt><dd>Starts a new paragraph</dd></div>
+                <div class="fg-row" data-guide-item="# Text = subheading"><dt><code>#</code> Text</dt><dd>Subheading</dd></div>
+                <div class="fg-row" data-guide-item="## Text = smaller subheading"><dt><code>##</code> Text</dt><dd>Smaller subheading</dd></div>
+                <div class="fg-row" data-guide-item="### Text = smallest subheading"><dt><code>###</code> Text</dt><dd>Smallest subheading</dd></div>
+                <div class="fg-row" data-guide-item="* Text = bullet point"><dt><code>*</code> Text</dt><dd>Bullet point</dd></div>
+                <div class="fg-row" data-guide-item="1. Text = numbered point, then 2., 3. and so on"><dt><code>1.</code> Text</dt><dd>Numbered point (then 2., 3. and so on)</dd></div>
+              </dl>
+            </section>
 
-          <small class="editor-convention-hint">
-            The First paragraph should not be the same as the heading as this will make the site repetitive and we might be penalized
-          </small>
+            <section class="fg-block" data-guide-section="Text style">
+              <h3>Text style</h3>
+              <dl class="fg-table">
+                <div class="fg-row" data-guide-item="**text** = bold"><dt><code>**text**</code></dt><dd>Bold</dd></div>
+                <div class="fg-row" data-guide-item="__text__ = italic"><dt><code>__text__</code></dt><dd>Italic</dd></div>
+                <div class="fg-row" data-guide-item="https://... = becomes a clickable link by itself"><dt><code>https://...</code></dt><dd>Becomes a clickable link by itself</dd></div>
+              </dl>
+            </section>
 
-          <small class="editor-convention-hint">
-            Leave a blank line between paragraphs.
-          </small>
-
-          <small class="editor-convention-hint"><b>#</b> = subheading.</small>
-          <small class="editor-convention-hint"><b>##</b> = smaller subheading.</small>
-          <small class="editor-convention-hint"><b>###</b> = smaller subheading.</small>
-          <small class="editor-convention-hint"><b>*</b> = bullet point.</small>
-          <small class="editor-convention-hint"><b>1.</b>, <b>2.</b>, etc. = numbered points.</small>
-          <small class="editor-convention-hint"><b>**text**</b> = bold.</small>
-          <small class="editor-convention-hint"><b>__text__</b> = italic.</small>
-          <small class="editor-convention-hint"><b>imgl URL alt text</b> = inline image, floated left, text wraps around it.</small>
-          <small class="editor-convention-hint"><b>imgr URL alt text</b> = inline image, floated right, text wraps around it.</small>
-          <small class="editor-convention-hint"><b>imgc URL alt text</b> = inline image, floated center, text wraps around it.</small>
-          <small class="editor-convention-hint"><b>filel URL alt text</b> = inline downloadable file <svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>, text wraps around it.</small>
-          <small class="editor-convention-hint">
-            For imgl/imgr, alt text is optional; if left out, the image filename from the URL is used instead.
-          </small>
-
-          <small class="editor-convention-hint">
-            Use these formatting rules only when they improve the structure or readability of the content.
-          </small>
-        </div>
+            <section class="fg-block" data-guide-section="Images and files (each on its own line)">
+              <h3>Images and files <span>each on its own line</span></h3>
+              <dl class="fg-table">
+                <div class="fg-row" data-guide-item="imgl URL description = image on the left, text wraps around it"><dt><code>imgl</code> URL description</dt><dd>Image on the left, text wraps around it</dd></div>
+                <div class="fg-row" data-guide-item="imgr URL description = image on the right, text wraps around it"><dt><code>imgr</code> URL description</dt><dd>Image on the right, text wraps around it</dd></div>
+                <div class="fg-row" data-guide-item="imgc URL description = image in the centre on its own line"><dt><code>imgc</code> URL description</dt><dd>Image in the centre on its own line</dd></div>
+                <div class="fg-row" data-guide-item="filel URL link text = download link for a file"><dt><code>filel</code> URL link text</dt><dd>Download link for a file</dd></div>
+              </dl>
+              <p class="fg-note" data-guide-item="The description is optional for images. Without it, the file name from the URL is used.">The description is optional for images. Without it, the file name from the URL is used.</p>
+            </section>
+          </aside>
         </form>
       </div>
     </div>
@@ -153,6 +180,20 @@
       <div class="editor-pane-header">Preview</div>
       <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
     </div> {% endcomment %}
+  </div>
+
+  <div class="editor-modal" data-editor-modal hidden>
+    <div class="editor-modal-backdrop" data-editor-modal-close></div>
+    <div class="editor-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="editor-modal-title" aria-describedby="editor-modal-intro">
+      <h2 class="editor-modal-title" id="editor-modal-title" data-editor-modal-title></h2>
+      <p class="editor-modal-intro" id="editor-modal-intro" data-editor-modal-intro></p>
+      <ul class="editor-modal-list" data-editor-modal-list></ul>
+      <p class="editor-modal-question" data-editor-modal-question></p>
+      <div class="editor-modal-actions">
+        <button type="button" class="editor-modal-btn" data-editor-modal-edit>Go back and edit</button>
+        <button type="button" class="editor-modal-btn editor-modal-btn-primary" data-editor-modal-confirm>Yes, post anyway</button>
+      </div>
+    </div>
   </div>
 </section>
 

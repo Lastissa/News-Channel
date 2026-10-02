@@ -25,6 +25,15 @@
   var publishBtn = shell.querySelector("[data-editor-publish]");
   var uploadBtn = shell.querySelector("[data-editor-upload-btn]");
   var note = shell.querySelector("[data-editor-loading-note]");
+  var modal = shell.querySelector("[data-editor-modal]");
+  var modalCard = modal ? modal.querySelector(".editor-modal-card") : null;
+  var modalTitle = modal ? modal.querySelector("[data-editor-modal-title]") : null;
+  var modalIntro = modal ? modal.querySelector("[data-editor-modal-intro]") : null;
+  var modalList = modal ? modal.querySelector("[data-editor-modal-list]") : null;
+  var modalQuestion = modal ? modal.querySelector("[data-editor-modal-question]") : null;
+  var modalEditBtn = modal ? modal.querySelector("[data-editor-modal-edit]") : null;
+  var modalConfirmBtn = modal ? modal.querySelector("[data-editor-modal-confirm]") : null;
+  var guideCopyBtn = shell.querySelector("[data-guide-copy-all]");
 
   var PREVIEW_KEY = "abu-editor-preview";
   var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -260,6 +269,128 @@
     publishBtn.textContent = pending ? "Publishing..." : "Publish story";
   }
 
+  /* ---------- validation dialog ----------
+     Two modes, both fed by the server's answer (the server is the single
+     source of truth for the writing rules, see SERVICE_INTERNAL/story_validation.py):
+       blocked  (HTTP 400 + errors)             -> explains what to fix, one button
+       warnings (HTTP 409 + needs_confirmation) -> explains, then asks YES / NO
+     "Go back and edit" simply keeps the story unposted. */
+  var modalReturnFocus = null;
+
+  function closeModal() {
+    if (!modal) return;
+    modal.hidden = true;
+    if (modalReturnFocus && modalReturnFocus.focus) modalReturnFocus.focus();
+    modalReturnFocus = null;
+  }
+
+  function openModal(options) {
+    if (!modal) {
+      /* the dialog markup is missing: fall back to a plain message, and never auto post */
+      toast(options.items.map(function (i) { return i.message; }).join(" "), "error");
+      return;
+    }
+    modalReturnFocus = document.activeElement;
+        modalTitle.textContent = options.title;
+    modalIntro.textContent = options.intro;
+    modalList.innerHTML = "";
+    options.items.forEach(function (item) {
+      var li = document.createElement("li");
+      li.textContent = item.message;
+      modalList.appendChild(li);
+    });
+    modalQuestion.textContent = options.askToPost ? "Do you still want to post this story now?" : "";
+    modalConfirmBtn.hidden = !options.askToPost;
+    modalEditBtn.textContent = options.askToPost ? "No, let me edit" : "Back to editing";
+    modal.hidden = false;
+    modalEditBtn.focus();
+  }
+
+  if (modal) {
+    modal.querySelectorAll("[data-editor-modal-close]").forEach(function (el) {
+      el.addEventListener("click", closeModal);
+    });
+    modalEditBtn.addEventListener("click", function () {
+      closeModal();
+      contentInput.focus();
+    });
+    modalConfirmBtn.addEventListener("click", function () {
+      closeModal();
+      submitStory(true);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !modal.hidden) closeModal();
+    });
+  }
+
+  function submitStory(confirmWarnings) {
+    if (pendingPublish) return;
+
+    setPublishPending(true);
+    var data = new FormData(form);
+    if (confirmWarnings) data.set("confirm_warnings", "1");
+
+    fetch(form.dataset.endpoint, {
+      method: "POST",
+      headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+      body: data,
+    })
+      .then(function (response) {
+        return response.text().then(function (text) { return { ok: response.ok, status: response.status, text: text }; });
+      })
+      .then(function (result) {
+        setPublishPending(false);
+        var payload = {};
+        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* ignore */ }
+
+        /* advisory notes: tell the author, then let THEM decide */
+        if (result.status === 409 && payload.needs_confirmation && payload.warnings && payload.warnings.length) {
+          openModal({
+            title: "Check these before posting",
+            intro: "Nothing has been posted yet. These are suggestions, not errors:",
+            items: payload.warnings,
+            askToPost: true
+          });
+          return;
+        }
+
+        /* blocked by a writing rule: say exactly what to correct */
+        if (!result.ok && payload.errors && payload.errors.length) {
+          openModal({
+            title: "This story cannot be submitted yet",
+            intro: payload.errors.length > 1
+              ? "Fix the following " + payload.errors.length + " problems, then publish again:"
+              : "Fix the following problem, then publish again:",
+            items: payload.errors,
+            askToPost: false
+          });
+          return;
+        }
+
+        if (!result.ok) {
+          var detail = extractDetail(result.text, "Could not publish the story.");
+          toast(detail, "error");
+          if (/already/i.test(detail)) {
+            headingInput.classList.add("is-error");
+            headingInput.focus();
+            headingInput.select();
+          }
+          return;
+        }
+
+        if (selectedImageObjectUrl) { URL.revokeObjectURL(selectedImageObjectUrl); selectedImageObjectUrl = null; }
+        toast(payload.detail || "Story published.");
+        if (payload.story_url) {
+          window.setTimeout(function () { window.location.href = payload.story_url; }, 700);
+        }
+      })
+      .catch(function () {
+        setPublishPending(false);
+        toast("Network Error.Unable to publish story.", "error");
+      });
+  }
+
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (pendingPublish) return;
@@ -280,41 +411,94 @@
       return;
     }
 
-    setPublishPending(true);
-    fetch(form.dataset.endpoint, {
-      method: "POST",
-      headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-      credentials: "same-origin",
-      body: new FormData(form),
-    })
-      .then(function (response) {
-        return response.text().then(function (text) { return { ok: response.ok, status: response.status, text: text }; });
-      })
-      .then(function (result) {
-        setPublishPending(false);
-        if (!result.ok) {
-          var detail = extractDetail(result.text, "Could not publish the story.");
-          toast(detail, "error");
-          if (/already/i.test(detail)) {
-            headingInput.classList.add("is-error");
-            headingInput.focus();
-            headingInput.select();
-          }
-          return;
-        }
-        var payload = {};
-        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* ignore */ }
-        if (selectedImageObjectUrl) { URL.revokeObjectURL(selectedImageObjectUrl); selectedImageObjectUrl = null; }
-        toast(payload.detail || "Story published.");
-        if (payload.story_url) {
-          window.setTimeout(function () { window.location.href = payload.story_url; }, 700);
-        }
-      })
-      .catch(function () {
-        setPublishPending(false);
-        toast("Network Error.Unable to publish story.", "error");
-      });
+    submitStory(false);
   });
+
+  /* ---------- insert bar: drop a command at the cursor ----------
+     Only commands that act the moment they are typed live here (line-start
+     markers and img/file tokens). **bold** and __italic__ are left out
+     because they only work once the closing marker is typed.
+     The command always lands at the start of a line, because the parser only
+     recognises these at the start of a line. If text is selected, the marker
+     is put in front of it. */
+  function insertAtCursor(text) {
+    contentInput.focus();
+    var done = false;
+    try { done = document.execCommand("insertText", false, text); } catch (e) { done = false; }
+    if (!done) {
+      var s = contentInput.selectionStart, e2 = contentInput.selectionEnd;
+      contentInput.setRangeText(text, s, e2, "end");
+      contentInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+
+  shell.querySelectorAll("[data-insert]").forEach(function (btn) {
+    btn.addEventListener("mousedown", function (event) { event.preventDefault(); });
+    btn.addEventListener("click", function () {
+      var token = btn.getAttribute("data-insert");
+      var value = contentInput.value;
+      var start = contentInput.selectionStart;
+      var end = contentInput.selectionEnd;
+      var atLineStart = start === 0 || value.charAt(start - 1) === "\n";
+      var selected = value.slice(start, end);
+
+      /* a selection that is already a whole line keeps its text, the marker goes in front */
+      var prefix = atLineStart ? "" : "\n";
+      contentInput.focus();
+      if (selected) {
+        contentInput.setSelectionRange(start, end);
+        insertAtCursor(prefix + token + selected);
+      } else {
+        insertAtCursor(prefix + token);
+      }
+    });
+  });
+
+  /* ---------- formatting guide: Copy All ---------- */
+  function buildGuideText() {
+    var guide = shell.querySelector("[data-format-guide]");
+    if (!guide) return "";
+    var out = ["FORMATTING GUIDE", "None of this is required. A story written as plain paragraphs is fine."];
+    guide.querySelectorAll("[data-guide-section]").forEach(function (section) {
+      out.push("", section.getAttribute("data-guide-section").toUpperCase());
+      section.querySelectorAll("[data-guide-item]").forEach(function (item) {
+        out.push("- " + item.getAttribute("data-guide-item"));
+      });
+    });
+    return out.join("\n");
+  }
+
+  function fallbackCopy(text) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+    document.body.appendChild(area);
+    area.select();
+    var done = false;
+    try { done = document.execCommand("copy"); } catch (e) { done = false; }
+    area.remove();
+    return done;
+  }
+
+  if (guideCopyBtn) {
+    var copyResetTimer = null;
+    guideCopyBtn.addEventListener("click", function () {
+      var text = buildGuideText();
+      function showCopied(ok) {
+        guideCopyBtn.textContent = ok ? "Copied" : "Copy failed";
+                if (copyResetTimer) window.clearTimeout(copyResetTimer);
+        copyResetTimer = window.setTimeout(function () {
+          guideCopyBtn.textContent = "Copy All";
+        }, 1800);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { showCopied(true); }, function () { showCopied(fallbackCopy(text)); });
+      } else {
+        showCopied(fallbackCopy(text));
+      }
+    });
+  }
 
   function getCookie(name) {
     var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");

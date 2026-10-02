@@ -47,6 +47,92 @@ def make_story(author, heading="Original Heading", category="GENERAL", **extra):
 
 
 @mock.patch("HOME.views.ping_indexnow")
+class AddNewsValidationTests(QuietTestCase):
+    def setUp(self):
+        super().setUp()
+        self.author = make_staff()
+        self.client.force_login(self.author)
+        self.url = reverse("home:add_news")
+
+    def post_story(self, heading, content, **extra):
+        payload = {"heading": heading, "category": "GENERAL", "content": content}
+        payload.update(extra)
+        return self.client.post(self.url, payload)
+
+    def test_add_news_page_shows_formatting_guide_and_copy_all(self, _ping):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="formatting-guide"')
+        self.assertContains(response, "Formatting guide")
+        self.assertContains(response, "data-guide-copy-all")
+        self.assertContains(response, "Do not begin the content with a")
+
+    def test_headline_copy_in_first_paragraph_is_blocked_server_side(self, _ping):
+        heading = "UNILORIN Announces New Academic Calendar"
+        content = (
+            f"{heading}. The university released the timetable on Monday. "
+            "Students can check registration and examination dates on the official website."
+        )
+        response = self.post_story(heading, content)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(any(error["code"] == "first_paragraph_matches_heading" for error in response.json()["errors"]))
+        self.assertIn("first paragraph is too similar", response.json()["detail"])
+        self.assertFalse(Blog.objects.filter(author=self.author).exists())
+
+    def test_duplicate_main_markdown_heading_is_blocked(self, _ping):
+        heading = "UNILORIN Announces New Academic Calendar"
+        content = (
+            f"### {heading}\n\nThe university released the timetable on Monday. "
+            "Students can check registration and examination dates on the official website."
+        )
+        response = self.post_story(heading, content)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(any(error["code"] == "body_starts_with_heading_copy" for error in response.json()["errors"]))
+
+    def test_short_meaningful_report_requires_confirmation_not_length_rejection(self, _ping):
+        heading = "UNILORIN postpones examinations"
+        content = "The university postponed examinations until Monday."
+
+        response = self.post_story(heading, content)
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(response.json()["needs_confirmation"])
+        self.assertFalse(Blog.objects.filter(author=self.author).exists())
+
+        confirmed = self.post_story(heading, content, confirm_warnings="yes")
+        self.assertEqual(confirmed.status_code, 201)
+        story = Blog.objects.get(author=self.author)
+        self.assertEqual(story.content, content)
+
+    def test_filler_and_empty_headings_are_blocked(self, _ping):
+        for content, expected_code in [
+            ("##\n\nThe university announced the change yesterday.", "empty_heading"),
+            ("test test test test test test", "meaningless_text"),
+            ("--------------------\n\nThe university announced the change yesterday.", "decorative_separator"),
+        ]:
+            with self.subTest(code=expected_code):
+                response = self.post_story("University announces a change", content)
+                self.assertEqual(response.status_code, 400)
+                self.assertTrue(any(error["code"] == expected_code for error in response.json()["errors"]))
+
+    def test_real_markdown_sections_are_preserved(self, _ping):
+        heading = "University announces a new student transport schedule"
+        content = (
+            "The transport office confirmed that the revised routes begin next Monday. "
+            "Students can review the timetable online before classes resume.\n\n"
+            "### Route information\n\n"
+            "Buses will serve the north and south campuses throughout the day. "
+            "Current fares remain unchanged, and staff will be available to answer questions."
+        )
+        response = self.post_story(heading, content)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Blog.objects.get(author=self.author).content, content)
+
+
+@mock.patch("HOME.views.ping_indexnow")
 class EditNewsViewTests(QuietTestCase):
     def setUp(self):
         super().setUp()

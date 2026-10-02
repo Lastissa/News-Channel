@@ -34,6 +34,7 @@ from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_
 from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
+from SERVICE_INTERNAL.story_validation import first_error_message, validate_story
 from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, StaffProfile
 
 logger = logging.getLogger(__name__)
@@ -402,6 +403,36 @@ class AddNewsView(View):
             return _response({"detail": "Select a valid category."}, status=400)
         if not content:
             return _response({"detail": "The story content cannot be empty."}, status=400)
+
+        #   AUTHOR WRITING RULES (SERVICE_INTERNAL.story_validation). Runs on the
+        #   server, BEFORE any image is sent to cloudinary or anything is saved,
+        #   so a hand built request cannot skip it. `content` is only inspected,
+        #   never changed, so the author's markdown is stored exactly as typed.
+        #     errors   -> hard block (400), the author must fix them
+        #     warnings -> 409 "needs_confirmation": the author is told why and
+        #                 chooses Post anyway (resend with confirm_warnings=1)
+        #                 or Go back and edit
+        validation = validate_story(heading, content)
+        if validation["errors"]:
+            return _response(
+                {
+                    "detail": first_error_message(validation),
+                    "errors": validation["errors"],
+                    "warnings": validation["warnings"],
+                    "blocked": True,
+                },
+                status=400,
+            )
+        confirmed = (request.POST.get("confirm_warnings") or "").strip().lower() in {"1", "true", "yes"}
+        if validation["warnings"] and not confirmed:
+            return _response(
+                {
+                    "detail": "Please review these writing notes before this story is posted.",
+                    "warnings": validation["warnings"],
+                    "needs_confirmation": True,
+                },
+                status=409,
+            )
 
         #   AN UPLOADED FILE ALWAYS WINS OVER A PASTED URL. Nothing is sent
         #   to cloudinary until this line, i.e. not while the staff member
