@@ -19,9 +19,10 @@
       {% if is_admin_user %}
         <a href="{% url 'control:panel' %}" class="profile-add-news-link">PANEL</a>
       {% endif %}
-      {% if show_staff_dashboard %}
+      {% comment %} NOT USEFUL AGAIN SINCE I ALREADY PUT THE LINK IN THE PROFILE DROPDOWN {% endcomment %}
+      {% comment %} {% if show_staff_dashboard %}
         <a href="{% url 'home:add_news' %}" class="profile-add-news-link" data-add-news-link> <b>+</b> NeWs</a>
-      {% endif %}
+      {% endif %} {% endcomment %}
       {% comment %} DELETE ACCOUNT: every account except the superuser. The
           placard overlay is fetched by htmx only once this button is pressed,
           so nothing about the flow ships with the page itself. {% endcomment %}

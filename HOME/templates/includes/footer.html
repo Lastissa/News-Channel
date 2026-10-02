@@ -57,8 +57,46 @@
           <li><a href="#">About us</a></li>
           <li><a href="#">Editorial team</a></li>
           <li><a href="{% url 'home:privacy_policy' %}">Privacy policy</a></li>
-          <li><a href="mailto:@shaefalaap.resend.app">Support Email</a></li>
         </ul>
+      </div>
+
+      {# CONTACTS: every value below is edited from the admin PANEL (Site socials card) #}
+      <div class="footer-col footer-contact">
+        <h3>Contact us</h3>
+        <ul class="footer-contact-list">
+          {% if tech_expert_email and "@" in tech_expert_email %}
+          <li>
+            <span class="footer-contact-label">Glitch noticed?</span>
+            <a href="mailto:{{ tech_expert_email }}?subject=Glitch%20report%20-%20{{ project_name|urlencode }}">Text our tech expert</a>
+            <span class="footer-contact-detail">{{ tech_expert_email }}</span>
+          </li>
+          {% endif %}
+          {% if support_email and "@" in support_email %}
+          <li>
+            <span class="footer-contact-label">Customer care</span>
+            <a href="mailto:{{ support_email }}?subject=Support%20request%20-%20{{ project_name|urlencode }}">Email customer care</a>
+            <span class="footer-contact-detail">{{ support_email }}</span>
+          </li>
+          {% endif %}
+          {% if customer_support_mobile and "http" not in customer_support_mobile %}
+          <li>
+            <span class="footer-contact-label">Call or WhatsApp customer care</span>
+            <a href="tel:{{ customer_support_mobile|cut:' ' }}">{{ customer_support_mobile }}</a>
+            <a href="https://wa.me/{{ customer_support_mobile|cut:'+'|cut:' ' }}" target="_blank" rel="noopener noreferrer" class="footer-contact-detail">Chat on WhatsApp</a>
+          </li>
+          {% endif %}
+          {% if partnership_email and "@" in partnership_email %}
+          <li>
+            <span class="footer-contact-label">Advertising &amp; partnerships</span>
+            <a href="mailto:{{ partnership_email }}?subject=Partnership%20enquiry%20-%20{{ project_name|urlencode }}">{{ partnership_email }}</a>
+          </li>
+          {% endif %}
+        </ul>
+        <div class="footer-contact-socials">
+          {% if whatsapp %}<a href="{{ whatsapp }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on WhatsApp">{% include "staff/partials/social_icon.html" with key="whatsapp" %}</a>{% endif %}
+          {% if facebook %}<a href="{{ facebook }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on Facebook">{% include "staff/partials/social_icon.html" with key="facebook" %}</a>{% endif %}
+          {% if tweeter %}<a href="{{ tweeter }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on X">{% include "staff/partials/social_icon.html" with key="twitter" %}</a>{% endif %}
+        </div>
       </div>
 
 

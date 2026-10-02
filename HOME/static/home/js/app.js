@@ -32,13 +32,60 @@
     });
   }
 
-  /* Mobile nav toggle */
+  /* Mobile nav drawer: slide-in panel + backdrop, scroll lock, swipe right
+     to close, closes on link tap / Escape / backdrop / resize to desktop. */
   var navToggle = document.getElementById("nav-toggle");
+  var navPanel = document.getElementById("primary-nav-mobile");
+  var navBackdrop = document.querySelector("[data-nav-backdrop]");
+
+  function setNav(open, restoreFocus) {
+    if (!header) return;
+    var wasOpen = header.classList.contains("nav-open");
+    header.classList.toggle("nav-open", open);
+    root.classList.toggle("nav-locked", open);
+    if (navToggle) navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      header.classList.remove("search-open");
+      var closeBtn = navPanel && navPanel.querySelector("[data-nav-close]");
+      if (closeBtn) setTimeout(function () { closeBtn.focus({ preventScroll: true }); }, 80);
+    } else {
+      closeDropdowns();
+      if (wasOpen && restoreFocus && navToggle) navToggle.focus({ preventScroll: true });
+    }
+  }
+
   if (navToggle && header) {
     navToggle.addEventListener("click", function () {
-      var open = header.classList.toggle("nav-open");
-      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      setNav(!header.classList.contains("nav-open"), false);
     });
+  }
+  if (navBackdrop) navBackdrop.addEventListener("click", function () { setNav(false, true); });
+  if (navPanel) {
+    var closeButton = navPanel.querySelector("[data-nav-close]");
+    if (closeButton) closeButton.addEventListener("click", function () { setNav(false, true); });
+
+    navPanel.addEventListener("click", function (event) {
+      var link = event.target.closest("a[href]");
+      if (link && link.getAttribute("href") !== "#") setNav(false, false);
+    });
+
+    var touchX = null, touchY = null;
+    navPanel.addEventListener("touchstart", function (event) {
+      touchX = event.touches[0].clientX; touchY = event.touches[0].clientY;
+    }, { passive: true });
+    navPanel.addEventListener("touchend", function (event) {
+      if (touchX === null) return;
+      var dx = event.changedTouches[0].clientX - touchX;
+      var dy = event.changedTouches[0].clientY - touchY;
+      touchX = touchY = null;
+      if (dx > 70 && Math.abs(dy) < 60) setNav(false, true);
+    }, { passive: true });
+  }
+  if (window.matchMedia) {
+    var desktopQuery = window.matchMedia("(min-width: 900px)");
+    var onDesktop = function (e) { if (e.matches) setNav(false, false); };
+    if (desktopQuery.addEventListener) desktopQuery.addEventListener("change", onDesktop);
+    else if (desktopQuery.addListener) desktopQuery.addListener(onDesktop);
   }
 
   /* Search toggle (mobile) */
@@ -94,7 +141,7 @@
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
       closeDropdowns();
-      if (header) { header.classList.remove("nav-open", "search-open"); }
+      if (header) { header.classList.remove("search-open"); setNav(false, true); }
     }
   });
 

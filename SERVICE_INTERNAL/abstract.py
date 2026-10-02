@@ -67,16 +67,21 @@ def is_bot_request(request) -> bool:
     return any(marker in user_agent for marker in BOT_USER_AGENT_MARKERS)
 
 
-def is_rate_limited(request, timeout_window=60, max_requests=10, reset_timeout = False):
+def is_rate_limited(request, timeout_window=60, max_requests=10, reset_timeout = False, scope=""):
     """
     ### Rate limit the user after the max request so if max is 4 , the 4th getd blocked
     RETURN remaining_time, bool = True => bloc am , false ; leave am
+
+    scope: optional label that gives an endpoint its own counter per IP. Without it every
+    caller shares one counter per IP (login attempts would eat into password reset ones).
     """
     if request is None:
         return None, False
     
     #   kwy for the cache
     key = get_client_ip(request)
+    if scope:
+        key = f"{scope}:{key}"
     
     #   Value of the cache
     value = cache.get(key) or []

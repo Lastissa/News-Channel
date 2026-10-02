@@ -1,4 +1,6 @@
 {% load static %}
+{% url 'home:home' as home_url %}
+{% url 'archive:gallery' as archive_url %}
 <header class="site-header" id="site-header">
   <div class="header-bar">
     <a href="{% url 'home:home' %}" class="brand">
@@ -9,14 +11,14 @@
 
     <nav class="primary-nav" id="primary-nav-mobile" aria-label="Primary">
       <ul>
-        <li><a href="{% url 'home:home' %}">Home</a></li>
-        <li><a href="{% url 'archive:gallery' %}">Archive</a></li>
+        <li><a href="{{ home_url }}"{% if request.path == home_url %} class="is-current" aria-current="page"{% endif %}>Home</a></li>
+        <li><a href="{{ archive_url }}"{% if request.path == archive_url %} class="is-current" aria-current="page"{% endif %}>Archive</a></li>
         <li><a href="#" class="soon" >Editorial team</a></li>
         <li class="has-dropdown">
           <button type="button" class="dropdown-toggle" aria-expanded="false" aria-haspopup="true">News category
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <ul class="dropdown-menu">
+          <ul class="dropdown-menu category-menu">
             <li class="category-filter">
               {% comment %} <label class="visually-hidden" for="category-filter">Filter news categories</label> {% endcomment %}
               <input id="category-filter" type="search" placeholder="Filter categories" autocomplete="off" data-category-filter>
@@ -33,6 +35,7 @@
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <ul class="dropdown-menu">
+            {% if request.user.is_staff %}<li><a href="{% url 'home:add_news' %}"><b>+ News</b></a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
             <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
             <li><a href="{% url 'home:profile' %}#reading-history">Stories history</a></li>
@@ -46,13 +49,16 @@
           </form>
         </li>
         {% else %}
-        <li><a href="{% url 'auth:register' %}?to={{ request.get_full_path|urlencode }}">Sign up</a></li>
-        <li><a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}">Log in</a></li>
+        <li class="nav-auth">
+          <a href="{% url 'auth:register' %}?to={{ request.get_full_path|urlencode }}" class="nav-auth-signup">Sign up</a>
+          <a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}" class="nav-auth-login">Log in</a>
+        </li>
         {% endif %}
         {% if request.user.is_authenticated and request.user.is_staff == True %}
         {% endif %}
       </ul>
     </nav>
+    <div class="nav-backdrop" data-nav-backdrop aria-hidden="true"></div>
 
     <div class="header-actions">
       <form class="search-form" action="{% url 'home:home' %}" method="get" role="search">
