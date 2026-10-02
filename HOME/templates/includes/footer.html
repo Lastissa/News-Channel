@@ -93,9 +93,9 @@
           {% endif %}
         </ul>
         <div class="footer-contact-socials">
-          {% if whatsapp %}<a href="{{ whatsapp }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on WhatsApp">{% include "staff/partials/social_icon.html" with key="whatsapp" %}</a>{% endif %}
+          {% comment %} {% if whatsapp %}<a href="{{ whatsapp }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on WhatsApp">{% include "staff/partials/social_icon.html" with key="whatsapp" %}</a>{% endif %}
           {% if facebook %}<a href="{{ facebook }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on Facebook">{% include "staff/partials/social_icon.html" with key="facebook" %}</a>{% endif %}
-          {% if tweeter %}<a href="{{ tweeter }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on X">{% include "staff/partials/social_icon.html" with key="twitter" %}</a>{% endif %}
+          {% if tweeter %}<a href="{{ tweeter }}" target="_blank" rel="noopener noreferrer" aria-label="{{ project_name }} on X">{% include "staff/partials/social_icon.html" with key="twitter" %}</a>{% endif %} {% endcomment %}
         </div>
       </div>
 

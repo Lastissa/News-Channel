@@ -136,20 +136,23 @@
 
   {# ---------- KEY NUMBERS: six totals plus two milestones ---------- #}
   <dl class="portfolio-stats-strip" aria-label="Editorial statistics">
-    <div>
+    {% comment %} <div>
       <dt>Total story views</dt>
       <dd>{{ stats.total_views|floatformat:"0g" }}</dd>
       <small>All published work</small>
-    </div>
+    </div> {% endcomment %}
     <div>
       <dt>Total likes</dt>
       <dd>{{ stats.total_likes|floatformat:"0g" }}</dd>
       <small>Reader reactions</small>
     </div>
     <div>
-      <dt>Published stories</dt>
-      <dd>{{ stats.story_count }}</dd>
-      <small>Editorial output</small>
+      <dt> Following </dt>
+      <dd> {{ following_count|default:"0" }} </dd>
+      <small>Author is Following</small>
+      {% comment %} <dt>Published stories</dt> {% endcomment %}
+      {% comment %} <dd>{{ stats.story_count }}</dd> {% endcomment %}
+      {% comment %} <small>Editorial output</small> {% endcomment %}
     </div>
     <div>
       <dt>Followers</dt>
