@@ -1,0 +1,26 @@
+{% comment %} Body of #profile-following-list. Rendered on first paint by profile.html and re-rendered by home:profile_following for search, paging and after an unfollow. {% endcomment %}
+<span hidden data-following-page="{{ following_page_obj.number }}"></span>
+{% if oob %}<span class="panel-tag" id="following-count-tag" hx-swap-oob="true">{{ following_page_obj.paginator.count }} total</span>{% endif %}
+{% if following_items %}
+<ul class="profile-list">
+  {% for item in following_items %}
+  <li data-following-item>
+    <div>
+      <strong>{% if item.portfolio_url %}<a href="{{ item.portfolio_url }}" class="profile-person-link">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}</strong>
+      <small>Following since {{ item.since|date:"M d, Y" }}</small>
+    </div>
+    <form method="post" action="{{ item.unfollow_url }}" class="profile-unfollow-form" data-unfollow-form data-endpoint="{{ item.unfollow_url }}">
+      {% csrf_token %}
+      <button type="submit" class="profile-unfollow-btn" aria-label="Unfollow {{ item.name }}">Unfollow</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% elif search_query %}
+<p class="empty-copy">No followed author matches &quot;{{ search_query }}&quot;.</p>
+{% else %}
+<p class="empty-copy">You are not following any author yet. Use the Follow button on a story or an author page.</p>
+{% endif %}
+
+{% url 'home:profile_following' as following_endpoint %}
+{% include "HOME/partials/profile_list_pagination.html" with page_obj=following_page_obj page_range=following_page_range endpoint=following_endpoint target_id="profile-following-list" search_id="following-search" label="Following" %}

@@ -34,7 +34,7 @@ from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_
 from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
-from STAFF.models import GENDER_CHOICES, FollowRelationship, StaffProfile
+from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, StaffProfile
 
 logger = logging.getLogger(__name__)
 
@@ -868,6 +868,57 @@ class ProfileImageUpdateView(View):
         return JsonResponse({"detail": "Profile image updated.", "valid": True, "image_url": image_url}, status=200)
 
 
+def _mask_email(email):
+    """Partial email for the followers list: keep the first two letters of the
+    name and the whole domain, hide the rest (ab***@gmail.com)."""
+    local, _, domain = (email or "").lower().partition("@")
+    if not domain:
+        return "***"
+    return f"{local[:2]}***@{domain}" if len(local) > 2 else f"{local[:1]}***@{domain}"
+
+
+def _author_label(auth, names):
+    """Full name when the account has one, else the part of the email before @."""
+    return (names.get(auth.pk) or "").strip() or auth.email.partition("@")[0]
+
+
+def _following_page(user, search_query, page_number):
+    """Authors `user` follows, newest follow first (5 per page). Returns the
+    paginator page plus display rows for the template."""
+    qs = AuthorFollow.objects.filter(follower=user).select_related("author").order_by("-created_at", "-id")
+    if search_query:
+        qs = qs.filter(Q(author__email__icontains=search_query) | Q(author__staffprofile__full_name__icontains=search_query))
+    paginator = Paginator(qs, 5)
+    page = paginator.get_page(page_number)
+    rows = list(page.object_list)
+    profiles = {
+        sp.auth_id: sp
+        for sp in StaffProfile.objects.filter(auth_id__in=[row.author_id for row in rows]).only("auth_id", "full_name", "slug")
+    }
+    items = []
+    for row in rows:
+        sp = profiles.get(row.author_id)
+        items.append(
+            {
+                "author_id": row.author_id,
+                "name": _author_label(row.author, {row.author_id: sp.full_name if sp else ""}),
+                "portfolio_url": reverse("staff:portfolio", args=[sp.slug]) if sp and sp.slug else "",
+                "since": row.created_at,
+                "unfollow_url": reverse("home:profile_unfollow", args=[row.author_id]),
+            }
+        )
+    return page, paginator, items
+
+
+def _followers_page(user, page_number):
+    """Accounts following `user` (an author), newest first, emails masked."""
+    qs = AuthorFollow.objects.filter(author=user).select_related("follower").order_by("-created_at", "-id")
+    paginator = Paginator(qs, 5)
+    page = paginator.get_page(page_number)
+    items = [{"email": _mask_email(row.follower.email), "since": row.created_at} for row in page.object_list]
+    return page, paginator, items
+
+
 class ProfileBookmarksView(View):
     """Render the bookmarks list partial for the profile page.
 
@@ -929,6 +980,61 @@ class ProfileHistoryView(View):
                 "history_page_obj": page,
                 "history_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
                 "search_query": search_query,
+            },
+        )
+
+
+class ProfileFollowingView(View):
+    """HTML partial: the authors the signed in account follows (HTMX paging and search)."""
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Please sign in to view who you follow."}, status=401)
+        search_query = (request.GET.get("q") or "").strip()[:100]
+        page, paginator, items = _following_page(request.user, search_query, _resolve_page_number(request.GET.get("page"), default=1))
+        return render(
+            request,
+            "HOME/partials/profile_following_list.html",
+            {
+                "following_items": items,
+                "following_page_obj": page,
+                "following_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "search_query": search_query,
+                "oob": True,
+            },
+        )
+
+
+class ProfileUnfollowView(View):
+    """Unfollow only (never toggles), so a stale tab can not follow again by accident."""
+
+    def post(self, request, author_id):
+        remaining_time, is_limited = is_rate_limited(request, 10, 10, scope="profile_unfollow")
+        if is_limited:
+            return JsonResponse({"detail": f"Too frequent requests. Wait {remaining_time} seconds."}, status=429)
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Please sign in."}, status=401)
+        deleted, _ = AuthorFollow.objects.filter(follower=request.user, author_id=author_id).delete()
+        if not deleted:
+            return JsonResponse({"detail": "You were not following this author.", "following": False}, status=200)
+        return JsonResponse({"detail": "Unfollowed.", "following": False}, status=200)
+
+
+class ProfileFollowersView(View):
+    """HTML partial: who follows this author. Staff level accounts only; emails are masked."""
+
+    def get(self, request):
+        if not staff_only(request.user):
+            return JsonResponse({"detail": "Only authors have followers."}, status=403)
+        page, paginator, items = _followers_page(request.user, _resolve_page_number(request.GET.get("page"), default=1))
+        return render(
+            request,
+            "HOME/partials/profile_followers_list.html",
+            {
+                "followers_items": items,
+                "followers_page_obj": page,
+                "followers_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "oob": True,
             },
         )
 
@@ -1132,6 +1238,16 @@ class ProfileView(View):
             raise Http404("Page not found.")
         stories_page = stories_paginator.get_page(stories_page_number)
 
+        following_page, following_paginator, following_items = _following_page(
+            request.user, "", _resolve_page_number(request.GET.get("following_page"), default=1)
+        )
+        followers_page = followers_paginator = None
+        followers_items = []
+        if staff_only(request.user):
+            followers_page, followers_paginator, followers_items = _followers_page(
+                request.user, _resolve_page_number(request.GET.get("followers_page"), default=1)
+            )
+
         #   ADMIN AUTHORITY PANEL: the staff directory, mass email, active
         #   sessions, site socials, speciality search and analytics all moved
         #   to ADMIN.views.PanelView / templates/ADMIN/panel.html, reachable
@@ -1163,6 +1279,13 @@ class ProfileView(View):
             "published_stories": stories_page.object_list,
             "stories_page_obj": stories_page,
             "stories_page_range": list(stories_paginator.get_elided_page_range(stories_page.number, on_each_side=1, on_ends=1)),
+
+            "following_items": following_items,
+            "following_page_obj": following_page,
+            "following_page_range": list(following_paginator.get_elided_page_range(following_page.number, on_each_side=1, on_ends=1)),
+            "followers_items": followers_items,
+            "followers_page_obj": followers_page,
+            "followers_page_range": list(followers_paginator.get_elided_page_range(followers_page.number, on_each_side=1, on_ends=1)) if followers_paginator else [],
 
             "is_staff_user": staff_only(request.user),
             "is_admin_user": is_admin,

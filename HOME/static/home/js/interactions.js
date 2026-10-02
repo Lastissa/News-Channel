@@ -856,6 +856,58 @@
     return html + "</ul>";
   }
 
+  /* ---------- profile: unfollow an author ----------
+     Posts to the unfollow only endpoint, fades the row out, then reloads the
+     current page of the list (keeping the search text) so paging and the
+     total stay right. ---------- */
+  document.addEventListener("submit", function (event) {
+    var form = event.target.closest("[data-unfollow-form]");
+    if (!form) return;
+    event.preventDefault();
+
+    var button = form.querySelector("button[type='submit']");
+    if (!button || button.dataset.pending === "true") return;
+    button.dataset.pending = "true";
+    button.disabled = true;
+
+    fetch(form.dataset.endpoint || form.action, {
+      method: "POST",
+      headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    })
+      .then(function (response) {
+        return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          button.dataset.pending = "false";
+          button.disabled = false;
+          toast(extractDetail(result.text, "Could not unfollow this author."), "error");
+          return;
+        }
+        var row = form.closest("[data-following-item]");
+        if (row) row.classList.add("is-removing");
+        var list = document.getElementById("profile-following-list");
+        var search = document.getElementById("following-search");
+        var pageNode = list && list.querySelector("[data-following-page]");
+        var page = pageNode ? pageNode.getAttribute("data-following-page") : "1";
+        var query = search ? search.value.trim() : "";
+        toast("Unfollowed.");
+        setTimeout(function () {
+          if (list && window.htmx && list.dataset.followingEndpoint) {
+            window.htmx.ajax("GET", list.dataset.followingEndpoint + "?page=" + encodeURIComponent(page) + "&q=" + encodeURIComponent(query), { target: "#profile-following-list", swap: "innerHTML" });
+          } else if (row) {
+            row.remove();
+          }
+        }, 220);
+      })
+      .catch(function () {
+        button.dataset.pending = "false";
+        button.disabled = false;
+        toast("Connection issue. Please try again.", "error");
+      });
+  });
+
   /* ---------- published story deletion ---------- */
   document.addEventListener("submit", function (event) {
     var form = event.target.closest("[data-published-story-delete-form]");
@@ -1115,6 +1167,49 @@
     }
   }
 
+  /* ---------- story like: ONE handler for the top heart and the "Like article"
+     button. The server toggles and answers { liked, likes }, so nothing is
+     guessed on the page: while the request is in flight both buttons just show
+     a pending state, then both are set from the server's answer. A second press
+     can therefore never show +1 before dropping back. ---------- */
+  function setStoryLikeVisual(liked, likes) {
+    var main = document.querySelector("[data-story-like-btn]");
+    var top = document.querySelector("[data-story-like-metric]");
+    var state = liked ? "true" : "false";
+    if (main) {
+      main.dataset.liked = state;
+      main.setAttribute("aria-pressed", state);
+      var label = main.querySelector("[data-story-like-label]");
+      if (label) label.textContent = liked ? "Unlike article" : "Like article";
+    }
+    if (top) {
+      top.dataset.liked = state;
+      top.setAttribute("aria-pressed", state);
+      top.setAttribute("aria-label", (liked ? "Unlike this story" : "Like this story") + ", " + likes + " likes");
+    }
+    document.querySelectorAll("[data-story-like-count], [data-story-like-metric-count]").forEach(function (node) {
+      node.textContent = String(likes);
+    });
+  }
+
+  function setStoryLikePending(pending) {
+    document.querySelectorAll("[data-story-like-btn], [data-story-like-metric]").forEach(function (btn) {
+      btn.disabled = pending;
+      btn.classList.toggle("is-pending", pending);
+    });
+  }
+
+  /* the top heart does exactly what the bottom button does: submit the same form */
+  document.addEventListener("click", function (event) {
+    var topBtn = event.target.closest("[data-story-like-metric]");
+    if (!topBtn) return;
+    var form = document.querySelector("[data-story-like-form]");
+    if (!form) return;
+    event.preventDefault();
+    if (typeof form.requestSubmit === "function") form.requestSubmit();
+    else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  });
+
   document.addEventListener("submit", function (event) {
     var storyForm = event.target.closest("[data-story-like-form]");
     if (!storyForm) return;
@@ -1122,14 +1217,8 @@
 
     var button = storyForm.querySelector("[data-story-like-btn]");
     if (!button || button.dataset.pending === "true") return;
-
-    var countNode = document.querySelector("[data-story-like-count]");
-    var oldValue = countNode ? Number(countNode.textContent.trim()) || 0 : 0;
-    var previousText = button.innerHTML;
     button.dataset.pending = "true";
-    button.disabled = true;
-    button.classList.add("is-pending");
-    if (countNode) countNode.textContent = oldValue + 1;
+    setStoryLikePending(true);
 
     fetch(storyForm.dataset.endpoint, {
       method: "POST",
@@ -1141,25 +1230,22 @@
       })
       .then(function (result) {
         button.dataset.pending = "false";
-        button.disabled = false;
-        button.classList.remove("is-pending");
+        setStoryLikePending(false);
         if (!result.ok) {
-          if (countNode) countNode.textContent = String(oldValue);
-          button.innerHTML = previousText;
-          toast(extractDetail(result.text, "Could not like this story."), "error");
+          toast(extractDetail(result.text, "Could not update your like."), "error");
           return;
         }
-        var payload = result.text ? JSON.parse(result.text) : {};
-        if (countNode) countNode.textContent = String(payload.likes || oldValue);
-        toast(payload.detail || "Story liked.");
+        var payload = {};
+        try { payload = result.text ? JSON.parse(result.text) : {}; } catch (e) { payload = {}; }
+        var liked = typeof payload.liked === "boolean" ? payload.liked : button.dataset.liked !== "true";
+        var likes = typeof payload.likes === "number" ? payload.likes : Number((document.querySelector("[data-story-like-count]") || {}).textContent) || 0;
+        setStoryLikeVisual(liked, likes);
+        toast(payload.detail || (liked ? "Story liked." : "Like removed."));
       })
       .catch(function () {
         button.dataset.pending = "false";
-        button.disabled = false;
-        button.classList.remove("is-pending");
-        if (countNode) countNode.textContent = String(oldValue);
-        button.innerHTML = previousText;
-        toast("Connection issue. The like was not saved.", "error");
+        setStoryLikePending(false);
+        toast("Connection issue. Your like was not saved.", "error");
       });
   });
 
@@ -1297,7 +1383,7 @@
         article.setAttribute("data-comment-id", String(payload.comment_id || ""));
         article.innerHTML = '<div class="comment-header">' +
           '<div class="comment-author-block"><span class="comment-avatar">Y</span><strong>Me</strong></div>' +
-          '<div class="comment-toolbar"><form method="post" action="/story/comment/' + (payload.comment_id || "") + '/like/" class="comment-like-form" data-comment-like-form data-endpoint="/story/comment/' + (payload.comment_id || "") + '/like/"><input type="hidden" name="csrfmiddlewaretoken" value="' + getCookie("csrftoken") + '"><button type="submit" class="comment-like-btn" data-comment-like-btn><span aria-hidden="true">❤</span> Like <span class="comment-like-count" data-comment-like-count>0</span></button></form></div></div>' +
+          '<div class="comment-toolbar"><form method="post" action="/story/comment/' + (payload.comment_id || "") + '/like/" class="comment-like-form" data-comment-like-form data-endpoint="/story/comment/' + (payload.comment_id || "") + '/like/"><input type="hidden" name="csrfmiddlewaretoken" value="' + getCookie("csrftoken") + '"><button type="submit" class="comment-like-btn" data-comment-like-btn data-liked="false" aria-pressed="false" title="Like"><svg viewBox=\"0 0 20 20\" class=\"comment-like-icon\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M10 17s-6.5-4-8-8.2C1 5.8 2.6 3.5 5.2 3.3c1.5-.1 2.9.8 3.6 2 .7-1.2 2.1-2.1 3.6-2 2.6.2 4.2 2.5 3.2 5.5-1.5 4.2-8 8.2-8 8.2z\" stroke-linejoin=\"round\"/></svg><span class="comment-like-count" data-comment-like-count>0</span></button></form></div></div>' +
           '<p>' + (payload.content || value) + '</p>' +
           '<small data-comment-like-summary>0 likes</small>';
         list.prepend(article);
@@ -1326,7 +1412,6 @@
     var oldValue = countNode ? Number(countNode.textContent.trim()) || 0 : 0;
     button.dataset.pending = "true";
     button.disabled = true;
-    if (countNode) countNode.textContent = String(oldValue + 1);
 
     fetch(likeForm.dataset.endpoint, {
       method: "POST",
@@ -1340,21 +1425,25 @@
         button.dataset.pending = "false";
         button.disabled = false;
         if (!result.ok) {
-          if (countNode) countNode.textContent = String(oldValue);
-          toast(extractDetail(result.text, "Could not like the comment."), "error");
+          toast(extractDetail(result.text, "Could not update your like."), "error");
           return;
         }
-        var payload = JSON.parse(result.text || "{}");
-        if (countNode) countNode.textContent = String(payload.likes || oldValue);
+        var payload = {};
+        try { payload = JSON.parse(result.text || "{}"); } catch (e) { payload = {}; }
+        var likes = typeof payload.likes === "number" ? payload.likes : oldValue;
+        var liked = typeof payload.liked === "boolean" ? payload.liked : button.dataset.liked !== "true";
+        button.dataset.liked = liked ? "true" : "false";
+        button.setAttribute("aria-pressed", liked ? "true" : "false");
+        button.title = liked ? "Unlike" : "Like";
+        if (countNode) countNode.textContent = String(likes);
         var summaryNode = likeForm.closest("[data-comment-item]")?.querySelector("[data-comment-like-summary]");
-        if (summaryNode) summaryNode.textContent = (payload.likes || oldValue) + " like" + ((payload.likes || oldValue) === 1 ? "" : "s");
-        toast(payload.detail || "Comment liked.");
+        if (summaryNode) summaryNode.textContent = likes + " like" + (likes === 1 ? "" : "s");
+        toast(payload.detail || (liked ? "Comment liked." : "Like removed."));
       })
       .catch(function () {
         button.dataset.pending = "false";
         button.disabled = false;
-        if (countNode) countNode.textContent = String(oldValue);
-        toast("Connection issue. The comment like was not saved.", "error");
+        toast("Connection issue. Your like was not saved.", "error");
       });
   });
 

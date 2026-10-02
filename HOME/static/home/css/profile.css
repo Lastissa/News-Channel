@@ -1432,3 +1432,17 @@ html.avatar-crop-open {
   .social-icon-btn.has-value::after { border-color: var(--paper-dim); }
   .social-panel-inner input { background: var(--surface); }
 }
+
+/* ---------- Following / Followers ---------- */
+.profile-list .profile-person-link { color: inherit; white-space: normal; }
+.profile-list .profile-person-link:hover { text-decoration: underline; text-decoration-color: var(--amber-alt-deep); text-underline-offset: 3px; }
+.profile-unfollow-form { margin: 0; flex-shrink: 0; display: flex; }
+.profile-unfollow-btn {
+  height: 34px; padding: 0 14px; border: 1px solid #b42318; border-radius: 6px; background: transparent;
+  color: #b42318; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.profile-unfollow-btn:hover, .profile-unfollow-btn:focus-visible { background: rgba(180, 35, 24, 0.1); }
+.profile-unfollow-btn:disabled { opacity: 0.6; cursor: wait; }
+.profile-list li[data-following-item] { transition: opacity 0.2s ease, transform 0.2s ease; }
+.profile-list li[data-following-item].is-removing { opacity: 0; transform: translateX(14px); }

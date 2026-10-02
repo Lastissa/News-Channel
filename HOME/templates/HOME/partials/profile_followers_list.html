@@ -1,0 +1,19 @@
+{% comment %} Body of #profile-followers-list (authors only). Emails are masked by home.views._mask_email. {% endcomment %}
+{% if oob %}<span class="panel-tag" id="followers-count-tag" hx-swap-oob="true">{{ followers_page_obj.paginator.count }} total</span>{% endif %}
+{% if followers_items %}
+<ul class="profile-list">
+  {% for item in followers_items %}
+  <li>
+    <div>
+      <strong>{{ item.email }}</strong>
+      <small>Followed you on {{ item.since|date:"M d, Y" }}</small>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty-copy">No followers yet. Readers who follow you appear here.</p>
+{% endif %}
+
+{% url 'home:profile_followers' as followers_endpoint %}
+{% include "HOME/partials/profile_list_pagination.html" with page_obj=followers_page_obj page_range=followers_page_range endpoint=followers_endpoint target_id="profile-followers-list" search_id="followers-none" label="Followers" %}

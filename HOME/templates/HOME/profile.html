@@ -335,6 +335,36 @@
         </div>
       </section>
 
+      <section class="profile-card profile-panel" id="following">
+        <div class="panel-header">
+          <h3>Following</h3>
+          <span class="panel-tag" id="following-count-tag">{{ following_page_obj.paginator.count }} total</span>
+        </div>
+        <p>These are the authors you currently follow and receive their newsletter.</p>
+        <div class="profile-search">
+          <label for="following-search">Search followed authors</label>
+          <input type="search" id="following-search" name="q" placeholder="Search followed authors" maxlength="100" autocomplete="off"
+                 hx-get="{% url 'home:profile_following' %}" hx-trigger="input changed delay:300ms, search"
+                 hx-target="#profile-following-list" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#profile-following-list">
+        </div>
+        <div id="profile-following-list" class="profile-bookmark-shell" data-following-endpoint="{% url 'home:profile_following' %}">
+          {% include "HOME/partials/profile_following_list.html" %}
+        </div>
+      </section>
+
+      {% if show_staff_dashboard %}
+      <section class="profile-card profile-panel" id="followers">
+        <div class="panel-header">
+          <h3>Followers</h3>
+          <span class="panel-tag" id="followers-count-tag">{{ followers_page_obj.paginator.count }} total</span>
+        </div>
+        <p>These accounts follow you. Their emails are partly hidden.</p>
+        <div id="profile-followers-list" class="profile-bookmark-shell">
+          {% include "HOME/partials/profile_followers_list.html" %}
+        </div>
+      </section>
+      {% endif %}
+
       <section class="profile-card profile-panel" id="recent-comments">
         <div class="panel-header">
           <h3>Recent comments</h3>

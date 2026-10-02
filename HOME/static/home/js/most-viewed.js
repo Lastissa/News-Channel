@@ -47,6 +47,21 @@
     );
   }
 
+  /* Phones only (the CSS ignores .is-inview at 900px and up): the rows slide in
+     one after another each time the list scrolls into view. The class is taken
+     off again once the list has fully left the screen, so it replays on the way
+     back instead of playing once. */
+  function watchInView(list) {
+    if (!("IntersectionObserver" in window)) { list.classList.add("is-inview"); return; }
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.2) list.classList.add("is-inview");
+        else if (!entry.isIntersecting) list.classList.remove("is-inview");
+      });
+    }, { threshold: [0, 0.2] });
+    observer.observe(list);
+  }
+
   function init() {
     var section = document.getElementById("trending-section");
     var list = document.getElementById("trending-list");
@@ -65,6 +80,7 @@
         if (!results.length) return; /* stays hidden, no empty box shown */
         list.innerHTML = results.map(renderItem).join("");
         section.hidden = false;
+        watchInView(list);
       })
       .catch(function () {
         /* network hiccup or nothing published yet: leave it hidden */
