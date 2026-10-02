@@ -197,7 +197,7 @@
   margin: 0;
   font-size: clamp(1.2rem, 2.5vw, 1.8rem);
   line-height: 1.2;
-  overflow-x: auto;
+  overflow-x: scroll;
 }
 
 .profile-role {
@@ -1346,3 +1346,89 @@ html.avatar-crop-open {
 
 /* htmx puts .htmx-request on the list while its search / page request is in flight */
 .profile-bookmark-shell.htmx-request { opacity: 0.55; }
+
+/* =====================================================================
+   PANEL HEADINGS: clearly a level above the list items beneath them
+   ===================================================================== */
+.profile-panel .panel-header {
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 2px solid var(--ink);
+}
+.profile-panel .panel-header h3 {
+  position: relative;
+  padding-left: 14px;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 1.1rem + 1.2vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.profile-panel .panel-header h3::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0.12em; bottom: 0.12em;
+  width: 5px;
+  border-radius: 3px;
+  background: var(--amber-alt);
+}
+
+/* =====================================================================
+   SOCIAL LINKS: icons only, the URL field slides in under the tapped icon
+   ===================================================================== */
+.staff-socials { align-items: center; gap: 10px; }
+.staff-socials-title {
+  font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
+}
+.staff-socials-icons { display: flex; justify-content: center; gap: 14px; }
+.social-icon-btn {
+  position: relative; display: grid; place-items: center; width: 48px; height: 48px; padding: 0;
+  border-radius: 50%; border: 1.5px solid var(--line); background: var(--paper-dim); color: var(--ink);
+  cursor: pointer; transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.social-icon-btn svg { width: 22px; height: 22px; }
+.social-icon-btn:hover { transform: translateY(-2px); border-color: var(--amber); }
+.social-icon-btn:focus-visible { outline: 2px solid var(--amber-alt-deep); outline-offset: 2px; }
+.social-icon-btn.is-active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.social-icon-btn.has-value::after {
+  content: ""; position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--success); border: 2px solid var(--surface);
+}
+
+.social-panels { width: 100%; }
+.social-panel {
+  display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
+  transition: grid-template-rows 0.28s ease, opacity 0.22s ease, visibility 0s linear 0.28s;
+}
+.social-panel.is-open {
+  grid-template-rows: 1fr; opacity: 1; visibility: visible;
+  transition: grid-template-rows 0.28s ease, opacity 0.22s ease 0.06s, visibility 0s;
+}
+.social-panel-inner { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+.social-panel.is-open .social-panel-inner { padding-top: 6px; overflow: visible; }
+@media (prefers-reduced-motion: reduce) {
+  .social-panel, .social-panel.is-open { transition-duration: 0.01ms; }
+}
+
+/* Socials on MOBILE: a tinted card, icons spread edge to edge as big tap
+   targets, full width field underneath. Desktop keeps the plain look above. */
+@media (max-width: 719px) {
+  .staff-socials {
+    padding: 14px 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper-dim);
+    box-shadow: var(--shadow-card);
+    gap: 12px;
+  }
+  .staff-socials-title { align-self: flex-start; }
+  .staff-socials-icons { width: 100%; justify-content: space-between; gap: 10px; }
+  .social-icon-btn {
+    flex: 1 1 0; width: auto; height: 54px; border-radius: 14px;
+    background: var(--surface);
+  }
+  .social-icon-btn svg { width: 24px; height: 24px; }
+  .social-icon-btn.has-value::after { border-color: var(--paper-dim); }
+  .social-panel-inner input { background: var(--surface); }
+}

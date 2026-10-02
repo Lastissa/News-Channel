@@ -35,13 +35,13 @@
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <ul class="dropdown-menu">
-            {% if request.user.is_staff %}<li><a href="{% url 'home:add_news' %}"><b>+ News</b></a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
             <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
             <li><a href="{% url 'home:profile' %}#reading-history">Stories history</a></li>
             <li><a href="{% url 'home:profile' %}#recent-comments">Comment history</a></li>
           </ul>
         </li>
+        {% if request.user.is_staff %}<li><a href="{% url 'home:add_news' %}"><b>+ News</b></a></li>{% endif %}
         <li class="nav-logout-item">
           <form method="post" action="{% url 'auth:logout' %}" class="nav-logout-form" data-logout-form>
             {% csrf_token %}

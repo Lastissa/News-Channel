@@ -19,10 +19,8 @@
       {% if is_admin_user %}
         <a href="{% url 'control:panel' %}" class="profile-add-news-link">PANEL</a>
       {% endif %}
-      {% comment %} NOT USEFUL AGAIN SINCE I ALREADY PUT THE LINK IN THE PROFILE DROPDOWN {% endcomment %}
-      {% comment %} {% if show_staff_dashboard %}
-        <a href="{% url 'home:add_news' %}" class="profile-add-news-link" data-add-news-link> <b>+</b> NeWs</a>
-      {% endif %} {% endcomment %}
+      {% comment %} REMOVED SINCE ITS ALREADY IN THE NAV {% endcomment %}
+      {% comment %} {% if show_staff_dashboard %}<a href="{% url 'home:add_news' %}" class="profile-add-news-link" data-add-news-link> <b>+</b> NeWs</a>{% endif %} {% endcomment %}
       {% comment %} DELETE ACCOUNT: every account except the superuser. The
           placard overlay is fetched by htmx only once this button is pressed,
           so nothing about the flow ships with the page itself. {% endcomment %}
@@ -240,19 +238,34 @@
             </div>
             {% endif %}
 
-            <div class="staff-field">
-              <label for="staff-twitter">X (Twitter) URL</label>
-              <input id="staff-twitter" type="url" name="twitter_handle" value="{{ profile.twitter_handle|default:'' }}" placeholder="https://x.com/handle">
-            </div>
-
-            <div class="staff-field">
-              <label for="staff-facebook">Facebook URL</label>
-              <input id="staff-facebook" type="url" name="facebook_handle" value="{{ profile.facebook_handle|default:'' }}" placeholder="https://facebook.com/page">
-            </div>
-
-            <div class="staff-field">
-              <label for="staff-whatsapp">WhatsApp URL</label>
-              <input id="staff-whatsapp" type="url" name="whatsapp_handle" value="{{ profile.whatsapp_handle|default:'' }}" placeholder="https://wa.me/234...">
+            {# SOCIALS: three icons; tapping one slides its URL field open underneath (inputs stay in the form, so they always submit) #}
+            <div class="staff-field staff-field-wide staff-socials" data-socials>
+              <span class="staff-socials-title">Social links</span>
+              <div class="staff-socials-icons" role="group" aria-label="Social links">
+                <button type="button" class="social-icon-btn{% if profile.twitter_handle %} has-value{% endif %}" data-social-btn="staff-twitter" aria-expanded="false" aria-controls="social-panel-staff-twitter" aria-label="X (Twitter)" title="X (Twitter)">{% include "staff/partials/social_icon.html" with key="twitter" %}</button>
+                <button type="button" class="social-icon-btn{% if profile.facebook_handle %} has-value{% endif %}" data-social-btn="staff-facebook" aria-expanded="false" aria-controls="social-panel-staff-facebook" aria-label="Facebook" title="Facebook">{% include "staff/partials/social_icon.html" with key="facebook" %}</button>
+                <button type="button" class="social-icon-btn{% if profile.whatsapp_handle %} has-value{% endif %}" data-social-btn="staff-whatsapp" aria-expanded="false" aria-controls="social-panel-staff-whatsapp" aria-label="WhatsApp" title="WhatsApp">{% include "staff/partials/social_icon.html" with key="whatsapp" %}</button>
+              </div>
+              <div class="social-panels">
+                <div class="social-panel" id="social-panel-staff-twitter" data-social-panel="staff-twitter">
+                  <div class="social-panel-inner">
+                    <label for="staff-twitter">X (Twitter) URL</label>
+                    <input id="staff-twitter" type="url" name="twitter_handle" value="{{ profile.twitter_handle|default:'' }}" placeholder="https://x.com/handle">
+                  </div>
+                </div>
+                <div class="social-panel" id="social-panel-staff-facebook" data-social-panel="staff-facebook">
+                  <div class="social-panel-inner">
+                    <label for="staff-facebook">Facebook URL</label>
+                    <input id="staff-facebook" type="url" name="facebook_handle" value="{{ profile.facebook_handle|default:'' }}" placeholder="https://facebook.com/page">
+                  </div>
+                </div>
+                <div class="social-panel" id="social-panel-staff-whatsapp" data-social-panel="staff-whatsapp">
+                  <div class="social-panel-inner">
+                    <label for="staff-whatsapp">WhatsApp URL</label>
+                    <input id="staff-whatsapp" type="url" name="whatsapp_handle" value="{{ profile.whatsapp_handle|default:'' }}" placeholder="https://wa.me/234...">
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="staff-field">
@@ -421,6 +434,41 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+  <script>
+    (function () {
+      /*  SOCIAL ICONS: one field open at a time; tapping the open icon closes it. */
+      var box = document.querySelector("[data-socials]");
+      if (!box) return;
+      var buttons = box.querySelectorAll("[data-social-btn]");
+      function panelFor(id) { return box.querySelector('[data-social-panel="' + id + '"]'); }
+      function closeAll(except) {
+        buttons.forEach(function (b) {
+          if (b === except) return;
+          b.setAttribute("aria-expanded", "false");
+          b.classList.remove("is-active");
+          var p = panelFor(b.dataset.socialBtn);
+          if (p) p.classList.remove("is-open");
+        });
+      }
+      buttons.forEach(function (btn) {
+        var id = btn.dataset.socialBtn;
+        var input = document.getElementById(id);
+        btn.addEventListener("click", function () {
+          var panel = panelFor(id);
+          if (!panel) return;
+          var open = !panel.classList.contains("is-open");
+          closeAll(btn);
+          panel.classList.toggle("is-open", open);
+          btn.classList.toggle("is-active", open);
+          btn.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open && input) setTimeout(function () { input.focus({ preventScroll: true }); }, 220);
+        });
+        if (input) input.addEventListener("input", function () {
+          btn.classList.toggle("has-value", input.value.trim() !== "");
+        });
+      });
+    })();
+  </script>
   <script>
     (function () {
       /*  DELETE ACCOUNT PLEASE WAIT: while the placard is being fetched the
