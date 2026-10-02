@@ -12,7 +12,8 @@
     <link rel="canonical" href="{{ site_domain }}{{ request.path }}">
     <meta property="og:url" content="{{ site_domain }}{{ request.path }}">
     <meta property="og:locale" content="en_NG">
-    {% if twitter_username %}<meta name="twitter:site" content="@{{ twitter_username }}">{% endif %}
+    {% comment %} ONCE WE HAVE AN OFFICAL X HANDLE, I WILL ATTACH IT HERE {% endcomment %}
+    {% comment %} {% if twitter_username %}<meta name="twitter:site" content="@lastissa">{% endif %} {% endcomment %}
     <link rel="icon" type="image/jpeg" href="{% static "logo.jpg" %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,7 +49,10 @@
     {% comment %} TITLE AND DESCRIPTION ALREADY TAKEN CARE OF BY NoRMAL TITLE AND DESCRPTION META TAG AS THEY ARE ALWAYS PRESENT {% endcomment %}
     {% comment %} <meta property="og:title" content="{{project_name}}">
     <meta property="og:description" content="{{project_cachphrase}}"> {% endcomment %}
-    <meta property="og:image" content="{% if page_og_image %}{{ page_og_image }}{% else %}{{ site_domain }}{% static 'logo.jpg' %}{% endif %}">
+    {% block og_image %}
+    <meta property="og:image" content="{{ site_domain }}{% static 'logo.jpg' %}">
+    {% endblock og_image %}
+    
     {% endblock %}
     {% if social_links %}
     <script type="application/ld+json">
@@ -58,7 +62,13 @@
       "name": "{{ project_name|escapejs }}",
       "url": "{{ site_domain }}/",
       "logo": "{{ site_domain }}{% static 'logo.jpg' %}",
-      "sameAs": [{% for link in social_links %}"{{ link|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]
+      {% for link  in social_links%}
+
+      /*
+      comment out cos the link breaks when the link is not a valid url, so ignore this until we have an oficial site
+        "sameAs": [{% for link in social_links %}"{{ link|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]
+      */
+      {% endfor %}
     }
     </script>
     {% endif %}

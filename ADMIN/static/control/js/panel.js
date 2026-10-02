@@ -538,13 +538,13 @@
     }
 
     function buildRow(item) {
-      var row = el("div", "panel-row ta-row");
+      var row = el("div", "ta-item ta-item-" + item.status);
       row.dataset.taRow = "";
       row.dataset.id = item.id;
 
-      var main = el("span", "panel-row-main");
+      var main = el("span", "ta-main");
       main.appendChild(el("span", "ta-text", item.content));
-      var sub = el("span", "panel-row-sub");
+      var sub = el("span", "ta-meta");
       sub.appendChild(el("span", "ta-status ta-status-" + item.status, STATUS_LABEL[item.status] || item.status));
       sub.appendChild(document.createTextNode(" Ends " + item.expiry_label + (item.url ? " \u00b7 has link" : "") + (item.added_by ? " \u00b7 by " + item.added_by : "")));
       main.appendChild(sub);
@@ -565,7 +565,7 @@
     }
 
     function buildEditor(item) {
-      var row = el("form", "panel-form ta-editor");
+      var row = el("form", "ta-item ta-editor");
       row.dataset.taEditor = "";
       row.dataset.id = item.id;
       row.noValidate = false;
@@ -579,8 +579,10 @@
 
       var key = "ta-" + item.id + "-";
       row.appendChild(field("Text", content, key + "c"));
-      row.appendChild(field("Link (optional)", url, key + "u"));
-      row.appendChild(field("Stops showing on", expiry, key + "e"));
+      var pair = el("div", "ta-pair");
+      pair.appendChild(field("Link (optional)", url, key + "u"));
+      pair.appendChild(field("Stops showing on", expiry, key + "e"));
+      row.appendChild(pair);
 
       var activeWrap = el("label", "ta-check");
       var active = el("input");
@@ -589,7 +591,7 @@
       activeWrap.appendChild(document.createTextNode(" Show on the home page"));
       row.appendChild(activeWrap);
 
-      var footer = el("div", "panel-form-footer");
+      var footer = el("div", "ta-editor-actions");
       var cancel = el("button", "panel-ghost-btn", "Cancel");
       cancel.type = "button"; cancel.dataset.taCancel = "";
       var save = el("button", "panel-primary-btn", "Save");
@@ -603,7 +605,7 @@
     function render() {
       list.textContent = "";
       items.forEach(function (item) { list.appendChild(buildRow(item)); });
-      if (!items.length) list.appendChild(el("p", "empty-copy", "No text yet. Readers will see the default placeholder until you add one."));
+      if (!items.length) list.appendChild(el("p", "ta-empty", "No text yet. Readers see the default placeholder until you add one."));
       if (total) {
         var live = items.filter(function (item) { return item.status === "live"; }).length;
         total.textContent = live + " live";
@@ -614,6 +616,17 @@
       for (var i = 0; i < items.length; i += 1) if (String(items[i].id) === String(id)) return i;
       return -1;
     }
+
+    var contentBox = form.querySelector("[data-ta-content]");
+    var counter = form.querySelector("[data-ta-count]");
+    var preview = form.querySelector("[data-ta-preview]");
+    function syncCompose() {
+      var value = contentBox ? contentBox.value : "";
+      if (counter) counter.textContent = value.length + " / 400";
+      if (preview) preview.textContent = value.trim() || "Your text appears here";
+    }
+    if (contentBox) contentBox.addEventListener("input", syncCompose);
+    form.addEventListener("reset", function () { window.setTimeout(syncCompose, 0); });
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
