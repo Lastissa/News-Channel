@@ -18,6 +18,7 @@ urlpatterns = [
     path("profile/settings/login-alert-toggle/", views.ProfileLoginAlert.as_view(), name="profile_login_alert_toggle"),
     path("profile/settings/send-newsletter/", views.ProfileSendNewsletterToggleView.as_view(), name="profile_send_newsletter_toggle"),
     path("profile/settings/blog-notification/", views.ProfileBlogNotificationToggleView.as_view(), name="profile_blog_notification_toggle"),
+    path("profile/settings/follower-notification/", views.ProfileFollowerNotificationToggleView.as_view(), name="profile_follower_notification_toggle"),
     path("profile/settings/logout-all/", views.ProfileLogoutAllSessionsView.as_view(), name="profile_logout_all"),
     path("profile/settings/image/", views.ProfileImageUpdateView.as_view(), name="profile_image_update"),
     path("profile/staff/update/", views.ProfileStaffUpdateView.as_view(), name="profile_staff_update"),

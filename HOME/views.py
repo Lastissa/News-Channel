@@ -26,9 +26,9 @@ from SERVICE_INTERNAL.abstract import (
     get_cache,
     info_logger,
     is_rate_limited,
-    notify_admins_account_deleted,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig
+from SERVICE_INTERNAL.email_batch import _try_send_account_deleted_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
 from SERVICE_INTERNAL.indexnow import ping_indexnow
@@ -759,6 +759,34 @@ class ProfileBlogNotificationToggleView(View):
         )
 
 
+class ProfileFollowerNotificationToggleView(View):
+    """Toggle the new follower email for an author (StaffProfile.get_follower_notification)."""
+
+    def post(self, request):
+        if not staff_only(request.user):
+            return JsonResponse({"detail": "Staff access is required.", "enabled": False}, status=403)
+
+        profile = StaffProfile.objects.filter(auth=request.user).first()
+        if profile is None:
+            return JsonResponse(
+                {"detail": "No staff profile on this account yet. Save your staff profile first.", "enabled": False},
+                status=409,
+            )
+
+        new_state = not profile.get_follower_notification
+        profile.get_follower_notification = new_state
+        profile.save(update_fields=["get_follower_notification"])
+
+        return JsonResponse(
+            {
+                "detail": "New follower alerts enabled." if new_state else "New follower alerts disabled.",
+                "enabled": new_state,
+                "status": "on" if new_state else "off",
+            },
+            status=200,
+        )
+
+
 class ProfileLogoutAllSessionsView(View):
     """End every session the signed in user holds, the current one included.
 
@@ -841,82 +869,67 @@ class ProfileImageUpdateView(View):
 
 
 class ProfileBookmarksView(View):
-    """Return a paginated bookmark payload for the profile page."""
+    """Render the bookmarks list partial for the profile page.
+
+    The profile template pages and searches this list with HTMX
+    (profile_list_pagination.html + the search box), so the response has to
+    be the HTML partial, never JSON.
+    """
 
     def get(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in to view bookmarks."}, status=401)
 
+        search_query = (request.GET.get("q") or "").strip()[:100]
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
         bookmarks_qs = Bookmark.objects.filter(user=request.user).select_related("blog").order_by("-created_at")
+        if search_query:
+            bookmarks_qs = bookmarks_qs.filter(blog__heading__icontains=search_query)
+
         paginator = Paginator(bookmarks_qs, 5)
-        if page_number > paginator.num_pages and paginator.num_pages:
-            raise Http404("Page not found.")
-
         page = paginator.get_page(page_number)
-        items = [
-            {
-                "id": bookmark.id,
-                "blog_id": bookmark.blog_id,
-                "heading": bookmark.blog.heading,
-                "created_at": bookmark.created_at.isoformat(),
-                "url": reverse("blog:story_detail", args=[bookmark.blog.slug]),
-            }
-            for bookmark in page.object_list
-        ]
 
-        return JsonResponse(
+        return render(
+            request,
+            "HOME/partials/profile_bookmarks_list.html",
             {
-                "items": items,
-                "page": page.number,
-                "num_pages": paginator.num_pages,
-                "has_previous": page.has_previous(),
-                "has_next": page.has_next(),
-                "next_page": page.next_page_number() if page.has_next() else None,
-                "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
-                "count": paginator.count,
+                "recent_bookmarks": page.object_list,
+                "bookmark_page_obj": page,
+                "bookmark_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "search_query": search_query,
             },
-            status=200,
         )
 
 
 class ProfileHistoryView(View):
-    """Return a paginated reading-history payload for the profile page."""
+    """Render the reading-history list partial for the profile page.
+
+    The profile template pages and searches this list with HTMX, so the
+    response has to be the HTML partial, never JSON.
+    """
 
     def get(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in to view history."}, status=401)
 
+        search_query = (request.GET.get("q") or "").strip()[:100]
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
         history_qs = Blog.objects.filter(non_anonymous_viewer=request.user).order_by("-date_created")
+        if search_query:
+            history_qs = history_qs.filter(heading__icontains=search_query)
+
         paginator = Paginator(history_qs, 5)
-        if page_number > paginator.num_pages and paginator.num_pages:
-            raise Http404("Page not found.")
-
         page = paginator.get_page(page_number)
-        items = [
-            {
-                "id": blog.id,
-                "blog_id": blog.id,
-                "heading": blog.heading,
-                "date_created": blog.date_created.isoformat(),
-                "url": reverse("blog:story_detail", args=[blog.slug]),
-            }
-            for blog in page.object_list
-        ]
 
-        return JsonResponse(
+        return render(
+            request,
+            "HOME/partials/profile_history_list.html",
             {
-                "items": items,
-                "page": page.number,
-                "num_pages": paginator.num_pages,
-                "has_previous": page.has_previous(),
-                "has_next": page.has_next(),
-                "next_page": page.next_page_number() if page.has_next() else None,
-                "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
-                "count": paginator.count,
+                "reading_history": page.object_list,
+                "history_page_obj": page,
+                "history_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "search_query": search_query,
             },
-            status=200,
         )
 
 
@@ -1035,44 +1048,34 @@ class ProfileStaffUpdateView(View):
 
 
 class ProfilePublishedView(View):
-    """Return a paginated published-stories payload for the staff profile."""
+    """Render the published-stories list partial for the staff profile.
+
+    The profile template pages and searches this list with HTMX, so the
+    response has to be the HTML partial, never JSON.
+    """
 
     def get(self, request):
         if not staff_only(request.user):
             return JsonResponse({"detail": "Staff access is required to view published stories!. Refresh Page"}, status=401)
 
+        search_query = (request.GET.get("q") or "").strip()[:100]
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
         published_qs = Blog.objects.filter(author=request.user).order_by("-date_created")
+        if search_query:
+            published_qs = published_qs.filter(heading__icontains=search_query)
+
         paginator = Paginator(published_qs, 5)
-        if page_number > paginator.num_pages and paginator.num_pages:
-            raise Http404("Page not found.")
-
         page = paginator.get_page(page_number)
-        items = [
-            {
-                "id": blog.id,
-                "blog_id": blog.id,
-                "heading": blog.heading,
-                "views": blog.views,
-                "date_created": blog.date_created.isoformat(),
-                "url": reverse("blog:story_detail", args=[blog.slug]),
-                "edit_url": reverse("home:edit_news", args=[blog.id]),
-            }
-            for blog in page.object_list
-        ]
 
-        return JsonResponse(
+        return render(
+            request,
+            "HOME/partials/profile_published_list.html",
             {
-                "items": items,
-                "page": page.number,
-                "num_pages": paginator.num_pages,
-                "has_previous": page.has_previous(),
-                "has_next": page.has_next(),
-                "next_page": page.next_page_number() if page.has_next() else None,
-                "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
-                "count": paginator.count,
+                "published_stories": page.object_list,
+                "stories_page_obj": page,
+                "stories_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "search_query": search_query,
             },
-            status=200,
         )
 
 
@@ -1233,7 +1236,7 @@ class ProfileDeleteAccountView(View):
     signed in account before anything is deleted. Deletion cascades through
     every table the account touches (stories, comments, bookmarks, staff
     profile, follow relationships, reset keys), every session is dropped,
-    all admins get the dummy terminal email alert, and the visitor lands on
+    all active admins get a batch email alert, and the visitor lands on
     the home page with a django message.
     """
 
@@ -1277,12 +1280,19 @@ class ProfileDeleteAccountView(View):
         else:
             deleted_account_type = "Member"
 
+        #   THE STAFF PROFILE DIES WITH THE ACCOUNT, SO THE FULL NAME HAS TO BE READ FIRST
+        deleted_full_name = ""
+        if staff_only(account):
+            deleted_profile = StaffProfile.objects.filter(auth=account).only("full_name").first()
+            deleted_full_name = deleted_profile.full_name.strip() if deleted_profile else ""
+        deleted_at = timezone.now()
+
         dropped = drop_sessions_for(account)
         with transaction.atomic():
             account.delete()
 
-        #   EVERY ADMIN GETS THE DUMMY TERMINAL ALERT
-        notify_admins_account_deleted(deleted_email, deleted_account_type)
+        #   EVERY ACTIVE ADMIN GETS THE BATCH MAIL (ACCOUNT TYPE, EMAIL, STAFF FULL NAME, DATETIME)
+        _try_send_account_deleted_batch_email(deleted_email, deleted_account_type, deleted_full_name, deleted_at)
         info_logger(
             msg=f"ACCOUNT DELETED: {deleted_email} ({deleted_account_type}) deleted their own account, {dropped} session(s) ended"
         )

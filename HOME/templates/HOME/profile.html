@@ -99,6 +99,27 @@
           </div>
         </div>
       </div>
+
+      <div class="profile-setting-block">
+        <div class="setting-row">
+          <div class="setting-copy">
+            <span class="setting-label">New follower alert</span>
+          </div>
+          <div class="newsletter-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-switch {% if profile.get_follower_notification %}is-on{% endif %}"
+              aria-pressed="{{ profile.get_follower_notification|yesno:'true,false' }}"
+              data-newsletter-toggle
+              data-enable-url="{% url 'home:profile_follower_notification_toggle' %}"
+              data-enabled="{{ profile.get_follower_notification|yesno:'true,false' }}"
+              data-on-text="Receiving new follower alerts"
+              data-off-text="Not receiving new follower alerts">
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
       {% endif %}
 
       <div class="profile-setting-block">
