@@ -17,6 +17,7 @@ from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark
 from SERVICE_INTERNAL.abstract import _optimization, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
+from SERVICE_INTERNAL.email_single import _try_send_new_follower_email
 from SERVICE_INTERNAL.permissions import is_authenticated
 from STAFF.models import AuthorFollow, StaffProfile
 
@@ -403,11 +404,29 @@ class AuthorFollowToggleView(View):
             detail = f"Following {self._display_name_for(author)}."
 
         follower_count = AuthorFollow.objects.filter(author=author).count()
+        if following:
+            self._notify_author_of_new_follower(author, request.user, follower_count)
         logger.info("AUTHOR FOLLOW: %s %s %s", request.user.email, "followed" if following else "unfollowed", author.email)
         return JsonResponse(
             {"detail": detail, "following": following, "follower_count": follower_count},
             status=200,
         )
+
+    @staticmethod
+    def _notify_author_of_new_follower(author, follower, follower_count):
+        """Email the author unless they switched new follower alerts off in
+        their profile. An author without a staff profile has no toggle to
+        opt out with, so they are skipped too."""
+        author_profile = StaffProfile.objects.filter(auth=author).only("get_follower_notification").first()
+        if author_profile is None or not author_profile.get_follower_notification:
+            return
+        follower_profile = StaffProfile.objects.filter(auth=follower).only("full_name").first()
+        if follower_profile and follower_profile.full_name.strip():
+            follower_label = follower_profile.full_name.strip()
+        else:
+            local, _, domain = follower.email.partition("@")
+            follower_label = f"{local[:1]}***@{domain}" if domain else "A reader"
+        _try_send_new_follower_email(author, follower_label, follower_count)
 
     @staticmethod
     def _display_name_for(author):

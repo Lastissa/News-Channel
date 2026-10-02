@@ -154,21 +154,6 @@ def _optimization(debug = debug_base):
         print('debug mode is off')
 
 
-def notify_admins_account_deleted(deleted_email, deleted_account_type="Staff"):
-    """
-    ----------------------------------------------------------------------
-    ##   DUMMY ADMIN ALERT: ACCOUNT DELETED
-    deleted_email: required, the email of the account that was deleted
-    deleted_account_type: "Staff" | "Admin" | "Member"
-
-    NO EXTERNAL MAIL PLATFORM IS WIRED YET, so every admin notification is
-    just printed to the terminal as a fake email. When a real mail platform
-    arrives, only the print block below needs to swap for a real send.
-    """
-    return 0
-    
-
-
 def set_cache(key, value, timeout = None):
     info_logger(msg=f"CACHE-SET: Set Cache for {key} to a timeout of {timeout}")
     cache.set(key, value, timeout)

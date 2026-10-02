@@ -180,8 +180,6 @@ button { font-family: inherit; cursor: pointer; }
 .header-bar {
   max-width: 1180px; margin: 0 auto; padding: 0 20px;
   height: var(--header-h);
-  overflow-x: auto;
-  overflow-y: hidden;
   display: flex;
   align-items: center; gap: 16px;
 }
@@ -267,13 +265,30 @@ html[data-theme="dark"] .icon-moon { display: block; }
 .nav-toggle { display: inline-flex; }
 
 @media (min-width: 900px) {
-  .primary-nav { display: flex; }
+  /* min-width:0 lets the flex children shrink instead of pushing the search
+     bar and theme toggle past the right edge of the header bar. */
+  .header-bar { gap: clamp(8px, 1.4vw, 16px); }
+  .primary-nav { display: flex; min-width: 0; }
+  .primary-nav ul { gap: clamp(8px, 1.5vw, 24px); flex-wrap: nowrap; white-space: nowrap; min-width: 0; }
+  .primary-nav > ul > li > a,
+  .primary-nav .dropdown-toggle { font-size: clamp(0.8rem, 0.9vw + 0.2rem, 0.94rem); }
+  .nav-logout-form { width: auto; }
+  .nav-logout-btn { width: auto; padding: 7px 12px; }
   .nav-toggle { display: none; }
-  .search-form { position: static; padding: 0; background: none; border: none; display: block; width: 220px; }
+  .header-actions { flex-shrink: 0; }
+  .search-form { position: static; padding: 0; background: none; border: none; display: block; width: clamp(130px, 15vw, 220px); min-width: 0; flex-shrink: 1; }
   .site-header.search-open .search-form,
   .search-form { display: block; }
-  .search-form input { background: #88888833; border: 1px solid var(--nav-fg-light); padding: 7px 12px; font-size: 0.88rem; }
+  .search-form input { background: #88888833; border: 1px solid var(--nav-fg-light); padding: 7px 12px; font-size: 0.88rem; width: 100%; box-sizing: border-box; }
   #search-toggle { display: none; }
+}
+
+/* Narrow desktops (900px to 1099px): the full link row plus the search bar
+   no longer fit beside the brand name, so the wordmark steps aside and the
+   logo mark alone keeps the brand link. */
+@media (min-width: 900px) and (max-width: 1099.98px) {
+  .brand-word { display: none; }
+  .header-bar { padding: 0 14px; }
 }
 
 

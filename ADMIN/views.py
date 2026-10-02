@@ -23,7 +23,7 @@ from BLOG.models import Blog, Category
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
-from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email
+from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
@@ -597,6 +597,8 @@ class StaffCreateView(View):
             StaffProfile.objects.create(auth=account, gender=gender, full_name=full_name, role=role)
             
         _try_send_staff_welcome_email(account, password, full_name)
+        role_label = dict(StaffConfig.role_choices()).get(role, role)
+        _try_send_staff_created_batch_email(account, full_name, role_label, request.user.email)
         info_logger(msg=f"STAFF CREATED: {account.email} (grant_admin={grant_admin}) by {request.user.email} with password set as : {password}")
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":

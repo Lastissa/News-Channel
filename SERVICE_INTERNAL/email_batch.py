@@ -14,11 +14,13 @@ from urllib.parse import quote
 import resend
 from django.conf import settings
 from django.db.models import Q
+from django.utils import timezone
+from django.utils.html import escape
 
 from AUTHENTICATION.models import Auth
 from SERVICE_INTERNAL.abstract import info_logger, error_logger
 from SERVICE_INTERNAL.config import About
-from SERVICE_INTERNAL.email_single import _build_email_html
+from SERVICE_INTERNAL.email_single import _EMAIL_EXECUTOR, _build_email_html
 from STAFF.models import AuthorFollow
 
 BATCH_CHUNK_SIZE = 100  # Resend's hard limit per batch API call
@@ -166,3 +168,99 @@ def _try_send_panel_mass_email(sender_full_name, subject, body_html, recipients,
 
     info_logger(msg=f"PANEL MASS EMAIL: dispatched {sent_total}/{len(recipients)} total, subject={subject}, sent_by={sent_by_email}")
     return sent_total
+
+
+def _active_admin_emails(exclude_pk=None):
+    """Email of every admin / superuser account with is_active=True."""
+    admins = Auth.objects.filter(Q(is_admin=True) | Q(is_superuser=True), is_active=True)
+    if exclude_pk:
+        admins = admins.exclude(pk=exclude_pk)
+    return list(admins.values_list("email", flat=True).distinct())
+
+
+def _format_mail_datetime(moment):
+    """'02 Oct 2026, 03:15 PM WAT' in the project timezone."""
+    return timezone.localtime(moment).strftime("%d %b %Y, %I:%M %p %Z")
+
+
+def _try_send_account_deleted_batch_email(deleted_email, deleted_account_type, deleted_full_name="", deleted_at=None):
+    """
+    Fired after a user deletes their own account (HOME.views.ProfileDeleteAccountView).
+    One batch mail to every active admin / superuser carrying the account
+    type, the deleted account email, the staff full name (only passed for
+    Staff / Admin / S-Admin accounts) and the date and time of deletion.
+
+    The caller must capture `deleted_full_name` BEFORE deleting, because the
+    StaffProfile row is gone the moment the account is. The dispatch runs on
+    the shared email pool so the delete request never waits on Resend.
+    """
+    deleted_at = deleted_at or timezone.now()
+    recipients = _active_admin_emails()
+    if not recipients:
+        info_logger(msg=f"BATCH EMAIL: no active admins to notify about deleted account {deleted_email}")
+        return
+
+    subject = f"{deleted_account_type} account deleted on {About.project_name}"
+    detail_rows = f"<li>Account type: <strong>{escape(deleted_account_type)}</strong></li>"
+    detail_rows += f"<li>Email: <strong>{escape(deleted_email)}</strong></li>"
+    if deleted_full_name:
+        detail_rows += f"<li>Full name: <strong>{escape(deleted_full_name)}</strong></li>"
+    detail_rows += f"<li>Deleted on: <strong>{escape(_format_mail_datetime(deleted_at))}</strong></li>"
+
+    main_content = (
+        "<p>Hi,</p>"
+        "<p>An account was just deleted by its owner from their profile page.</p>"
+        f"<ul>{detail_rows}</ul>"
+    )
+
+    def build_html_for(email):
+        return _build_email_html(
+            title="Account Deleted",
+            main_content=main_content,
+            end_note=f"{About.project_name} Team",
+            unsubscribe_query="",
+            preference_note="You receive this because you are an admin on this site.",
+        )
+
+    _EMAIL_EXECUTOR.submit(_dispatch_batch_email, recipients, subject, build_html_for)
+    info_logger(msg=f"BATCH EMAIL: account deleted alert queued for {len(recipients)} admins (deleted={deleted_email})")
+
+
+def _try_send_staff_created_batch_email(new_account, full_name, role_label, created_by_email):
+    """
+    Fired right after an admin adds a staff account (ADMIN.views.StaffCreateView).
+    One batch mail to every admin / superuser with is_active=True, the new
+    account itself excluded since it already gets the welcome credentials mail.
+    """
+    recipients = _active_admin_emails(exclude_pk=new_account.pk)
+    if not recipients:
+        info_logger(msg=f"BATCH EMAIL: no active admins to notify about new staff {new_account.email}")
+        return
+
+    account_type = "Admin" if new_account.is_admin else "Staff"
+    subject = f"New {account_type.lower()} account added on {About.project_name}"
+    detail_rows = (
+        f"<li>Account type: <strong>{account_type}</strong></li>"
+        f"<li>Full name: <strong>{escape(full_name)}</strong></li>"
+        f"<li>Email: <strong>{escape(new_account.email)}</strong></li>"
+        f"<li>Role: <strong>{escape(role_label)}</strong></li>"
+        f"<li>Added by: <strong>{escape(created_by_email)}</strong></li>"
+        f"<li>Added on: <strong>{escape(_format_mail_datetime(timezone.now()))}</strong></li>"
+    )
+    main_content = (
+        "<p>Hi,</p>"
+        "<p>A new team account was just created from the add staff page.</p>"
+        f"<ul>{detail_rows}</ul>"
+    )
+
+    def build_html_for(email):
+        return _build_email_html(
+            title="New Staff Account",
+            main_content=main_content,
+            end_note=f"{About.project_name} Team",
+            unsubscribe_query="",
+            preference_note="You receive this because you are an admin on this site.",
+        )
+
+    _EMAIL_EXECUTOR.submit(_dispatch_batch_email, recipients, subject, build_html_for)
+    info_logger(msg=f"BATCH EMAIL: new staff alert queued for {len(recipients)} admins (new={new_account.email})")

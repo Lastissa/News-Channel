@@ -309,3 +309,31 @@ def _try_send_staff_direct_email(sender_full_name, recipient_email, subject, bod
     if sent:
         info_logger(msg=f"EMAIL: direct staff message from {sender_full_name} sent to {recipient_email}")
     return sent
+
+
+def _try_send_new_follower_email(author: object, follower_label: str, follower_count: int):
+    """
+    Tells an author someone just started following them. The caller
+    (STAFF.views.AuthorFollowToggleView) checks the StaffProfile
+    'get_follower_notification' preference before calling this, so this
+    function only builds and sends. `follower_label` is the follower's full
+    name when they have a staff profile, otherwise a masked email, so a
+    reader's address is never handed out in full.
+    """
+    subject = f"You have a new follower on {About.project_name}"
+    main_content = (
+        "<p>Hi,</p>"
+        f"<p><strong>{escape(follower_label)}</strong> just started following you on {About.project_name}.</p>"
+        f"<p>You now have <strong>{follower_count}</strong> follower{'' if follower_count == 1 else 's'}. "
+        "They will get your new stories in their inbox.</p>"
+        f'<p><a href="{About.domain}/profile/">Open your profile</a></p>'
+    )
+    html_message = _build_email_html(
+        title="New Follower",
+        main_content=main_content,
+        end_note=f"Keep up the great work,<br>{About.project_name} Team",
+        unsubscribe_query=f"type=new_follower_alert&email={quote(author.email)}",
+        preference_note="You can turn new follower alerts off from your profile settings at any time.",
+    )
+    _dispatch_email(author.email, subject, html_message)
+    info_logger(msg=f"EMAIL: new follower alert sent to {author.email} (followers={follower_count})")
