@@ -30,7 +30,7 @@
 
 .editor-preview-scroll {
   background: var(--nav-bg);
-  padding: 18px;
+  padding: 10px;
 }
 
 .editor-form {
@@ -93,7 +93,7 @@
 }
 
 .editor-upload-btn {
-  border: 1px dashed var(--line);
+  border: 1px  solid var(--line);
   border-radius: var(--radius-m);
   background: transparent;
   color: var(--ink-soft);
@@ -105,13 +105,8 @@
 }
 
 .editor-upload-btn:hover {
-  border-color: var(--amber-deep);
-  color: var(--amber-deep);
-}
-
-.editor-image-actions small {
-  color: var(--slate);
-  font-size: 0.75rem;
+  border-color: var(--amber-alt-deep);
+  color: var(--amber-alt-deep);
 }
 
 .editor-image-filename {
@@ -207,7 +202,7 @@
 
 
 .second-tab{
-      background-color:red;
+      background-color:var(--paper);
       padding:0;
       width:100%;
       margin:0;

@@ -26,7 +26,7 @@
     .editor-publish-btn { background: var(--amber-alt); }
     .editor-workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
     .editor-pane {
-      border: 1px solid var(--line); border-radius: var(--radius-l); background: var(--surface);
+      border: 1px solid var(--line); border-radius: none; background: var(--surface);
       height: calc(100vh - 150px); min-height: 420px; display: flex; flex-direction: column; overflow: hidden;
     }
     .editor-shell.preview-off .editor-preview-pane { display: none; }
@@ -45,7 +45,7 @@
          data-heavy-css="{% static 'home/css/add-news.css' %}"
          data-heavy-js="{% static 'home/js/add-news-editor.js' %}">
   <div class="editor-toolbar">
-    <h1>+ news</h1>
+    <h1>+ News</h1>
     <div class="editor-actions">
       <span class="editor-loading-note" data-editor-loading-note>Preparing editor...</span>
       <button type="button" class="editor-preview-toggle" data-editor-preview-toggle hidden>Hide preview</button>
@@ -77,11 +77,10 @@
               <span class="editor-image-filename" data-editor-image-filename hidden></span>
               <button type="button" class="editor-upload-btn editor-image-clear-btn" data-editor-image-clear hidden>Remove File</button>
             </div>
-              <small class="editor-convention-hint">The preview below is only on your device until you publish post then it will be uplaoded to the server.</small>
           </div>
 
           <div class="editor-field" data-editor-image-quality-field hidden>
-            <label for="editor-image-quality">Image quality <small>(applies to uploaded file only)</small></label>
+            <label for="editor-image-quality">Image quality <small>(uploaded image only)</small></label>
             <select id="editor-image-quality" name="image_quality" data-editor-image-quality>
               <option value="low">Low - smallest file, fastest story loading time</option>
               <option value="medium" selected>Medium - balanced</option>
@@ -123,10 +122,10 @@
 
           <aside class="format-guide" id="formatting-guide" data-format-guide aria-labelledby="format-guide-title">
             <div class="fg-head">
-              <h2 class="fg-title" id="format-guide-title">Formatting guide</h2>
-              <button type="button" class="fg-copy" data-guide-copy-all>Copy All</button>
+              <h2 class="fg-title" id="format-guide-title">formatting guide</h2>
+              <button type="button" class="fg-copy" data-guide-copy-all>Copy Instruction</button>
             </div>
-            <p class="fg-intro">None of this is required. A story written as plain paragraphs is fine.</p>
+            <p class="fg-intro">None of this is required But they help segment article and boost bots reachavility for better indexing. A story written as plain paragraphs is fine but not advisable.</p>
 
             <section class="fg-block" data-guide-section="Before you publish">
               <h3>Before you publish</h3>
