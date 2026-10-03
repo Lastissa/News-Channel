@@ -60,7 +60,7 @@ class QueryCountMiddleware:
         if hasattr(response, "render") and callable(response.render):
             response.render()
         print(f"[{request.path}] queries: {len(connection.queries)}")
-        if 1==1:
+        if 1!=1:
             for i in connection.queries:
                 print(i['sql'])
                 print(" ")

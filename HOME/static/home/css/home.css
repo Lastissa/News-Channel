@@ -425,7 +425,7 @@ html:not(.hp-js) .hp-hero .swiper-slide:not(:first-child) { display: none; }
 
 .hp-more-track { width: min(460px, 100%); height: 3px; background: var(--line); overflow: hidden; }
 .hp-more-track span { display: block; height: 100%; width: var(--w, 0%); background: var(--brand-deep); transition: width 0.5s ease; }
-.hp-more-status { min-height: 1.3em; margin: 0; font-size: 0.86rem; color: var(--slate); text-align: center; }
+.hp-more-status { min-height: 18px; margin: 0; font-size: 0.86rem; color: var(--slate); text-align: center; }
 .hp-more-status.is-error { color: var(--danger); }
 .hp-more.is-done .hp-key { display: none; }
 .hp-more.is-done { perspective: none; }

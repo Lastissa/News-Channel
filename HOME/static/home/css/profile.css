@@ -721,7 +721,7 @@
 }
 
 .staff-record-feedback {
-  min-height: 1.1em;
+  min-height: 18px;
   font-size: 0.85rem;
   color: var(--slate);
 }
@@ -870,7 +870,7 @@
 }
 
 .staff-create-form .staff-record-feedback {
-  min-height: 1.1em;
+  min-height: 18px;
 }
 
 @media (max-width: 719px) {
@@ -1368,7 +1368,7 @@ html.avatar-crop-open {
 .profile-panel .panel-header h3::before {
   content: "";
   position: absolute;
-  left: 0; top: 0.12em; bottom: 0.12em;
+  left: 0; top: 2px; bottom: 2px;
   width: 5px;
   border-radius: 3px;
   background: var(--amber-alt);

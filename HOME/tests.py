@@ -46,6 +46,34 @@ def make_story(author, heading="Original Heading", category="GENERAL", **extra):
     return Blog.objects.create(**data)
 
 
+class HomeHeadingSemanticsTests(QuietTestCase):
+    def setUp(self):
+        super().setUp()
+        self.author = make_staff()
+
+    def test_home_carousel_has_one_h1_for_its_lead_story(self):
+        make_story(self.author, heading="Lead story headline")
+        make_story(self.author, heading="Second featured headline")
+
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.count(b"<h1"), 1)
+        lead_heading = Blog.objects.order_by("-date_created").first().heading
+        h1_text = response.content.decode().split("<h1", 1)[1].split("</h1>", 1)[0]
+        self.assertIn(lead_heading, h1_text)
+
+    def test_filtered_results_have_one_h1_for_the_results_title(self):
+        make_story(self.author, heading="UNILORIN admission update")
+
+        response = self.client.get(reverse("home:home"), {"q": "UNILORIN"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.count(b"<h1"), 1)
+        self.assertContains(response, 'id="headline"')
+        self.assertContains(response, 'Results for "UNILORIN"')
+
+
 @mock.patch("HOME.views.ping_indexnow")
 class AddNewsValidationTests(QuietTestCase):
     def setUp(self):
@@ -64,7 +92,7 @@ class AddNewsValidationTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="formatting-guide"')
-        self.assertContains(response, "Formatting guide")
+        self.assertContains(response, "formatting guide")
         self.assertContains(response, "data-guide-copy-all")
         self.assertContains(response, "Do not begin the content with a")
 

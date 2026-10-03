@@ -53,7 +53,11 @@
       <a class="hero-slide-link" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true"></a>
       <div class="hero-content">
         <p class="hero-label"><span class="dot"></span>Latest Story</p>
+        {% if forloop.first %}
         <h1 class="hero-headline"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h1>
+        {% else %}
+        <h2 class="hero-headline"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h2>
+        {% endif %}
         {% comment %} i comment it out bcos its good for only by email@domain.com  not staff full name {% endcomment %}
           <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }} </p>
         <div class="hero-actions">
@@ -156,13 +160,15 @@ official website at https://www.abureport.com.ng
 
 <section class="story-grid-section">
   <div class="section-heading">
-    <h2 id="headline">
-      {% if is_filtered %}
+    {% if is_filtered %}
+    <h1 id="headline">
         {% if query %}Results for "{{ query }}"{% elif active_category %} Latest On {{ active_category|title }}{% endif %}
-      {% else %}
-        Headlines
-      {% endif %}
+    </h1>
+    {% else %}
+    <h2 id="headline">
+      Headlines
     </h2>
+    {% endif %}
     {% if headline_ticker_text %}
     <div class="headline-ticker" aria-hidden="true">
       <div class="headline-ticker-track" data-ticker-track data-ticker-speed="35">
