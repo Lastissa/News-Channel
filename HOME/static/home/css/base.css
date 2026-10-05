@@ -1233,7 +1233,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   width: 100%;
   padding: 12px 12px 12px 14px;
   border: 1px solid var(--line);
-  border-left: 4px solid var(--success);
+  border-left: 12px solid var(--success);
   border-radius: 12px;
   background: var(--toast-bg);
   color: var(--toast-fg);

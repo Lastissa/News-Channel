@@ -172,8 +172,55 @@ official website at https://www.abureport.com.ng
         {% endif %}
       </figure>
 
-    <div class="story-body">
-      {{ blog_content_html|safe }}
+    <div class="story-reading-layout">
+      {% if author_recent_stories %}
+        <aside class="story-rail story-rail-author" aria-label="More stories from {{ blog.author_name }}">
+          <section class="author-more-stories" aria-labelledby="author-more-title">
+            <h2 id="author-more-title">Also from {{ blog.author_name }}</h2>
+            <div class="story-grid">
+              {% for story in author_recent_stories %}
+                <article class="story-card">
+                  <a class="story-card-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1">
+                    <img src="{{ story.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+                  </a>
+                  <div class="story-card-body">
+                    <div class="story-card-meta">
+                      <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
+                      <span class="meta-divider" aria-hidden="true"></span>
+                      <span class="meta-time">{{ story.date_created|timesince }} ago</span>
+                    </div>
+                    <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
+                    <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        </aside>
+      {% endif %}
+
+      <div class="story-reading-column">
+        <div class="story-body" data-story-body>
+          {{ blog_content_html|safe }}
+        </div>
+        <section class="read-also-panel" data-read-also
+                 data-endpoint="{% url 'blog:category_recommendations' blog.slug %}"
+                 aria-labelledby="read-also-title" aria-busy="true">
+          <h2 id="read-also-title">Read also in {{ blog.get_category_display|title }}</h2>
+          <div class="read-also-list" data-read-also-list aria-live="polite">
+            {% for item in "123" %}
+              <div class="read-also-skeleton" aria-hidden="true">
+                <span class="read-also-skeleton-image"></span>
+                <span class="read-also-skeleton-copy">
+                  <span class="read-also-skeleton-line"></span>
+                  <span class="read-also-skeleton-line read-also-skeleton-line-short"></span>
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+      <aside class="story-rail story-rail-related" data-related-rail aria-label="Related stories"></aside>
     </div>
 
     {% if support_email and "@" in support_email %}
@@ -269,30 +316,6 @@ official website at https://www.abureport.com.ng
       </div>
     </aside>
 
-    {% if author_recent_stories %}
-      <section class="author-more-stories" aria-labelledby="author-more-title">
-        <h2 id="author-more-title">More recent stories from {{ blog.author_name }}</h2>
-        <div class="story-grid">
-          {% for story in author_recent_stories %}
-            <article class="story-card">
-              <a class="story-card-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1">
-                <img src="{{ story.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
-              </a>
-              <div class="story-card-body">
-                <div class="story-card-meta">
-                  <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
-                  <span class="meta-divider" aria-hidden="true"></span>
-                  <span class="meta-time">{{ story.date_created|timesince }} ago</span>
-                </div>
-                <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
-                <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
-              </div>
-            </article>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
-
     <section class="comment-panel" aria-labelledby="comments-title">
       <div class="comment-panel-header">
         <h2 id="comments-title">Comments</h2>
@@ -362,6 +385,7 @@ official website at https://www.abureport.com.ng
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'blog/js/story-ticker.js' %}" defer></script>
+  <script src="{% static 'blog/js/category-recommendations.js' %}" defer></script>
 {% endblock %}
 
 {% block newsletter_popup %}

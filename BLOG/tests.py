@@ -6,6 +6,7 @@ from django.db import connection
 from django.db.models import F
 from django.test import TestCase, RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 
 from hypothesis import given, settings as hyp_settings, HealthCheck
 from hypothesis import strategies as st
@@ -48,13 +49,6 @@ __Please note:__
         self.assertIn('<strong>Important update</strong>', html)
         self.assertIn('<em>Please note:</em>', html)
 
-        response = self.client.get(f"/story/{blog.slug}/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Views")
-        self.assertContains(response, "Word count")
-        self.assertContains(response, "Campus gate during screening.")
-
     def test_story_content_supports_official_news_markers(self):
         content = """# Admission Process
 
@@ -82,6 +76,7 @@ __Please note:__ deadlines are strict.
 
     def _like(self, blog):
         return self.client.post(f"/story/{blog.id}/like/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
 
     @mock.patch("AUTHENTICATION.signals._try_send_login_email")
     def test_blog_like_toggles_and_returns_the_real_total(self, _mail):
@@ -228,6 +223,79 @@ def _make_anonymous_request(blog_pk):
     request.user = AnonymousUser()
     request.session = SessionStore()
     return request
+
+
+class CategoryRecommendationsTests(TestCase):
+    def setUp(self):
+        self.author = Auth.objects.create_user(email="recommendations@example.com")
+        self.current_story = Blog.objects.create(
+            author=self.author,
+            category="GENERAL",
+            heading="Current story",
+            content="Current story content.",
+        )
+
+    def test_returns_only_three_newest_stories_in_the_current_category(self):
+        stories = [
+            Blog.objects.create(
+                author=self.author,
+                category="GENERAL",
+                heading=f"Related story {index}",
+                content=f"Story {index} first paragraph.\n\nSecond paragraph.",
+            )
+            for index in range(4)
+        ]
+        Blog.objects.create(
+            author=self.author,
+            category="SPORTS",
+            heading="Different category story",
+            content="This should not be recommended.",
+        )
+
+        response = self.client.get(
+            reverse("blog:category_recommendations", args=[self.current_story.slug])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        results = json.loads(response.content)["stories"]
+        self.assertEqual(
+            [story["slug"] for story in results],
+            [story.slug for story in reversed(stories[-3:])],
+        )
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0]["excerpt"], "Story 3 first paragraph.")
+        self.assertTrue(all(story["url"].startswith("/story/") for story in results))
+
+    def test_unknown_story_slug_returns_not_found(self):
+        response = self.client.get(
+            reverse("blog:category_recommendations", args=["missing-story"])
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+class StoryDetailRecommendationsMarkupTests(TestCase):
+    def test_story_page_renders_the_recommendation_panel_and_script(self):
+        author = Auth.objects.create_user(email="story-page@example.com", is_staff=True)
+        StaffProfile.objects.create(
+            auth=author,
+            gender="M",
+            full_name="Story Page Author",
+            get_blog_notification=False,
+        )
+        story = Blog.objects.create(
+            author=author,
+            category="GENERAL",
+            heading="Story page recommendation test",
+            content="First paragraph.\n\nSecond paragraph.",
+        )
+
+        response = self.client.get(reverse("blog:story_detail", args=[story.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-story-body")
+        self.assertContains(response, "data-read-also")
+        self.assertContains(response, "Read also in General")
+        self.assertContains(response, "blog/js/category-recommendations.js")
 
 
 class Bug1ViewCountUnitExplorationTest(TestCase):

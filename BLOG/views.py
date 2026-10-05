@@ -408,6 +408,34 @@ class StoryDetailView(View):
         return render(request, "blog/story_detail.html", context)
 
 
+class CategoryRecommendationsView(View):
+    """Return the three newest stories in the current story's category."""
+
+    def get(self, request, blog_slug):
+        blog = get_object_or_404(Blog, slug=blog_slug)
+        stories = (
+            Blog.objects.filter(category=blog.category)
+            .exclude(pk=blog.pk)
+            .order_by("-date_created", "-pk")[:3]
+        )
+        recommendations = []
+        for story in stories:
+            first_block = re.split(r"\n\s*\n", story.content.strip(), maxsplit=1)[0]
+            excerpt = " ".join(_clean_content_block(first_block).split())
+            recommendations.append(
+                {
+                    "slug": story.slug,
+                    "url": reverse("blog:story_detail", args=[story.slug]),
+                    "heading": story.heading,
+                    "image": story.image_1 or "",
+                    "category": story.get_category_display(),
+                    "date_created": story.date_created.isoformat(),
+                    "excerpt": excerpt[:180],
+                }
+            )
+        return JsonResponse({"stories": recommendations})
+
+
 def _is_ajax(request):
     return request.headers.get("x-requested-with") == "XMLHttpRequest"
 
