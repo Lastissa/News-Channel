@@ -50,6 +50,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'AUTHENTICATION.middleware.AuthEndpointThrottleMiddleware',
     'AUTHENTICATION.middleware.QueryCountMiddleware',
+    'AUTHENTICATION.middleware.AdminMaxPeriod',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 

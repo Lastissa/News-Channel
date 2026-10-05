@@ -1,8 +1,8 @@
 import time
 
 from django.core.cache import cache
-from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.contrib.auth import logout
 
 
 class AuthEndpointThrottleMiddleware:
@@ -60,9 +60,25 @@ class QueryCountMiddleware:
         if hasattr(response, "render") and callable(response.render):
             response.render()
         print(f"[{request.path}] queries: {len(connection.queries)}")
-        if 1!=1:
+        if 1==1:
             for i in connection.queries:
                 print(i['sql'])
                 print(" ")
         return response
 
+
+class AdminMaxPeriod:
+    def __init__(self, get_response):
+        self.get_response = get_response
+        
+    def __call__(self, request):
+        if request.user.is_authenticated and request.user.is_admin:
+            tracker = request.session.get('last_activity')
+            if not tracker:
+                request.session['last_activity'] = time.time()
+            if tracker and time.time() - tracker > 5:  # 1 hour
+                logout(request)
+                from django.contrib import messages
+                messages.error(request, "ADMIN INACTIVE FOR TOO LONG. (logged out).!")
+            
+        return self.get_response(request)

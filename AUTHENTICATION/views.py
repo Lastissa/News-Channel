@@ -108,7 +108,7 @@ class LoginView(View):
             login(request, user)
             return_to = _return_to(request)
             if is_ajax:
-                return _response({"detail": "Login successful.", "redirect_to": return_to}, status=200)
+                return _response({"detail": "success.", "redirect_to": return_to}, status=200)
             return redirect(return_to)
         if user is not None and not user.is_active:
             if is_ajax:

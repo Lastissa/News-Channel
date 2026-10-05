@@ -39,7 +39,7 @@ from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, Staff
 
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE = 10  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
+PAGE_SIZE = 20  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
 TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
 
@@ -272,7 +272,8 @@ class HomeView(View):
         category = request.GET.get("category", "").strip().upper()
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
 
-        base_qs = Blog.objects.select_related("author__staffprofile").order_by("-date_created")
+        # once new stories have been made, this should be invalidated
+        base_qs = cache_or_run("home_page_blogs", fn= lambda: Blog.objects.select_related("author__staffprofile").order_by("-date_created"), timeout=60)
 
         if query:
             base_qs = base_qs.filter(heading__icontains=query)

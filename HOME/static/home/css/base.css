@@ -8,7 +8,7 @@
   --ink-soft: #1F2A37;
   --paper-very-transparent:#fbf6ea;
   --paper: white;/*#fffcf7;*/
-  --paper-dim: #fefbf4;
+  --paper-dim: #fefbff;
   --surface: #FFFFFF;
   --input-fill: rgb(249, 249, 250);
   --amber: #e8a324;
@@ -1427,8 +1427,8 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   width: 100%;
   max-width: 520px;
   background: var(--surface);
-  border: 4px double red;
-  border-radius: var(--radius-l) var(--radius-l) 0 0;
+  border-top: 4px double red;
+  /* border-radius: var(--radius-l) var(--radius-l) 0 0; */
   box-shadow: var(--shadow-raised);
   padding: 18px 18px calc(16px + env(safe-area-inset-bottom, 0px));
   position: relative;

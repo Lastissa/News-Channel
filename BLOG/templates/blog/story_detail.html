@@ -164,7 +164,7 @@ official website at https://www.abureport.com.ng
     </header>
 
       <figure class="story-hero-figure">
-        <img src="{{ blog.image_1 }}" alt="{{ blog.heading }}" loading="eager" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+        <img src="{{ blog.image_1 }}" alt="{{ blog.heading }}" loading="eager">
         {% if blog.image_info %}
           <figcaption>{{ blog.image_info }}</figcaption>
         {% else %}
