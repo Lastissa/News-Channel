@@ -55,7 +55,11 @@
       var form = document.querySelector('[data-auth-form]');
       if (!form) return;
 
-      function showAuthToast(message) {
+      function showAuthToast(message, tone) {
+        if (typeof window.AbuToast === 'function') {
+          window.AbuToast(message, tone || 'error');
+          return;
+        }
         var host = document.getElementById('auth-toast');
         if (!host) {
           host = document.createElement('div');
@@ -65,6 +69,7 @@
           document.body.appendChild(host);
         }
         host.textContent = message;
+        host.dataset.tone = tone || 'error';
         host.classList.add('is-visible');
         window.clearTimeout(host._timer);
         host._timer = window.setTimeout(function () {
@@ -171,18 +176,18 @@
               armRedirectWatchdog();
               return;
             }
-            showAuthToast(payload.detail || (result.ok ? 'Login successful. Redirecting' : 'Could not sign in.'));
+            showAuthToast(payload.detail || (result.ok ? 'Signed in. Redirecting...' : 'Could not sign in.'), result.ok ? 'success' : 'error');
             if (!result.ok) {
               setSubmitBusy(false);
               return;
             }
-            window.setTimeout(function () { window.location.assign(payload.redirect_to || '/'); }, 600);
+            window.setTimeout(function () { window.location.assign(payload.redirect_to || '/'); }, 900);
             armRedirectWatchdog();
           })
           .catch(function () {
             window.clearTimeout(requestTimeout);
             setSubmitBusy(false);
-            showAuthToast('Connection issue. Please try again.');
+            showAuthToast('Connection issue. Please try again.', 'error');
           });
       });
 

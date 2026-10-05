@@ -19,7 +19,7 @@
 
 {% block meta_description %}
 {% spaceless %}
-{% if is_filtered %}{% if query %}Results for {{ query|truncatechars:50 }} - ABUREPORT{% elif active_category %}Latest On {{ active_category|title }} - ABUREPORT{% endif %}{% else %}{{block.super}} {% endif %}
+{% if is_filtered %}{% if query %}Results for {{ query|truncatechars:50 }} - ABUREPORT{% elif active_category %}Latest On {{ active_category|title }} - ABUREPORT{% endif %}{% else %}{{project_name}} is a Nigerian digital news platform providing reliable, timely and relevant news, updates, educational related services and stories for readers in Nigeria and beyond.{% endif %}
 {% endspaceless %}
 {% endblock meta_description %}
 

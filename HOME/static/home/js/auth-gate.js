@@ -136,7 +136,7 @@
 
     var verb = (current || FALLBACK).verb;
     var message = (data.mode === "register" ? "Account created. " : "Signed in. ") +
-      (verb === "continue" ? "You can carry on now." : "Go ahead and " + verb + ".");
+      (verb === "continue" ? "You can continue where you left off." : "You can now " + verb + ".");
 
     /* A comment typed before the popup would vanish in the reload, so keep it. */
     try {

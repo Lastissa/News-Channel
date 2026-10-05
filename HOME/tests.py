@@ -65,6 +65,11 @@ class HomeHeadingSemanticsTests(QuietTestCase):
         response = self.client.get(reverse("home:home"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'content="AbuReport shares timely Nigerian education news, university and polytechnic updates, '
+            'JAMB, WAEC, NECO and Post-UTME news, scholarships, and technology stories."',
+        )
         self.assertEqual(response.content.count(b"<h1"), 1)
         lead_heading = Blog.objects.order_by("-date_created").first().heading
         h1_text = response.content.decode().split("<h1", 1)[1].split("</h1>", 1)[0]

@@ -40,6 +40,10 @@
   var selectedImageObjectUrl = null;
 
   function toast(message, tone) {
+    if (typeof window.AbuToast === "function") {
+      window.AbuToast(message, tone);
+      return;
+    }
     if (window.editorToast) {
       window.editorToast(message, tone);
       return;

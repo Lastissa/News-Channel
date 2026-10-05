@@ -22,53 +22,58 @@
   }
 
   var toastHost = null;
-  var topToastHost = null;
 
   function dismissToast(node) {
     if (!node || node.dataset.dismissed === "true") return;
     node.dataset.dismissed = "true";
     node.style.opacity = "0";
-    node.style.transform = node.dataset.placement === "top" ? "translateY(-6px)" : "translateY(6px)";
+    node.style.transform = "translateY(-6px)";
     window.setTimeout(function () { node.remove(); }, 200);
   }
 
-  /* placement "top" is a notice that sits just under the sticky header (used
-     for the "this post was last updated ..." story notice, a django message
-     tagged "story-edited"). It stays long enough to be read and closes on
-     click. Anything else is the usual short-lived toast at the bottom. */
+  /* All site notices use the same high-visibility, dismissible toast stack. */
   function toast(message, tone, placement) {
-    var atTop = placement === "top";
-    var host = atTop ? topToastHost : toastHost;
-    if (!host) {
-      host = document.createElement("div");
-      host.setAttribute("aria-live", "polite");
-      host.style.cssText = atTop
-        ? "position:fixed;left:50%;top:calc(var(--header-h, 64px) + 10px);transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;"
-        : "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;";
-      document.body.appendChild(host);
-      if (atTop) { topToastHost = host; } else { toastHost = host; }
+    if (!toastHost) {
+      toastHost = document.createElement("div");
+      toastHost.className = "site-toast-stack";
+      toastHost.setAttribute("aria-live", "polite");
+      toastHost.setAttribute("aria-relevant", "additions");
+      toastHost.setAttribute("aria-atomic", "false");
+      toastHost.setAttribute("role", "region");
+      toastHost.setAttribute("aria-label", "Notifications");
+      document.body.appendChild(toastHost);
     }
 
     var node = document.createElement("div");
-    node.textContent = message;
-    node.dataset.placement = atTop ? "top" : "bottom";
-    node.style.cssText =
-      "font-family:var(--font-body);font-size:0.86rem;padding:10px 16px;border-radius:8px;color:var(--toast-fg);text-align:center;max-width:min(92vw,480px);" +
-      "background:" + (tone === "error" ? "var(--toast-bg-error)" : "var(--toast-bg)") + ";box-shadow:0 8px 20px rgba(0,0,0,0.25);" +
-      "opacity:0;transform:translateY(" + (atTop ? "-6px" : "6px") + ");transition:opacity .18s ease, transform .18s ease;" +
-      (atTop ? "cursor:pointer;" : "");
-    if (atTop) {
-      node.setAttribute("role", "status");
-      node.addEventListener("click", function () { dismissToast(node); });
-    }
-    host.appendChild(node);
+    var isError = tone === "error";
+    var isPersistentNotice = placement === "top";
+    node.className = "site-toast" + (isError ? " site-toast--error" : "");
+    node.setAttribute("role", isError ? "alert" : "status");
+    node.innerHTML =
+      '<span class="site-toast__icon" aria-hidden="true">' +
+        (isError
+          ? '<svg viewBox="0 0 20 20"><path d="M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Zm0 4v4m0 2.5h.01" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+          : '<svg viewBox="0 0 20 20"><path d="m4.5 10.2 3.6 3.5 7.4-7.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>') +
+      '</span><span class="site-toast__message"></span>' +
+      '<button type="button" class="site-toast__close" aria-label="Dismiss notification">' +
+        '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>' +
+      '</button>';
+    node.querySelector(".site-toast__message").textContent = message;
+    node.dataset.dismissed = "false";
+    node.style.opacity = "0";
+    node.style.transform = "translateY(-6px)";
+    node.style.transition = "opacity .18s ease, transform .18s ease";
+    node.querySelector(".site-toast__close").addEventListener("click", function () {
+      dismissToast(node);
+    });
+    toastHost.appendChild(node);
     requestAnimationFrame(function () {
       node.style.opacity = "1";
       node.style.transform = "translateY(0)";
     });
     window.setTimeout(function () {
       dismissToast(node);
-    }, atTop ? 8000 : 2600);
+    }, isPersistentNotice ? 8000 : 5000);
   }
 
   window.AbuToast = toast;

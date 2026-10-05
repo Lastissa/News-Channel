@@ -74,11 +74,7 @@ class LoginView(View):
     def get(self, request): 
 
         if request.user.is_authenticated:
-            messages.info(request, message=f"Hello {request.user.email}, welcome back.".upper())
             return redirect(_return_to(request))
-        #i noticed that if the password is visible, the login btn will not click; dont know if its a feature of a bug but currenlty, i am taking it as a feature
-        # "SHow the information below to users for them to know the login btn is not broken but image is not showing in the ui, need fixing"
-        messages.info(request, "Hide password to enable login.")
         return render(request, "auth/login.html", _auth_context(request))
     
     def post(self, request):
@@ -108,7 +104,7 @@ class LoginView(View):
             login(request, user)
             return_to = _return_to(request)
             if is_ajax:
-                return _response({"detail": "success.", "redirect_to": return_to}, status=200)
+                return _response({"detail": "Signed in.", "redirect_to": return_to}, status=200)
             return redirect(return_to)
         if user is not None and not user.is_active:
             if is_ajax:
@@ -141,7 +137,6 @@ class LogoutView(View):
 class RegisterView(View):
     def get(self, request):
         if request.user.is_authenticated:
-            messages.info(request, message=f"Hello {request.user.email}, welcome back.".upper())
             return redirect(_return_to(request))
         return render(request, "auth/register.html", _auth_context(request))
 
