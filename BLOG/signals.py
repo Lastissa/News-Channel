@@ -12,8 +12,9 @@ straight away, so the cache is current as soon as save()/delete() returns.
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+from django.core.cache import cache
 
-from .models import Category, refresh_category_cache
+from .models import Blog, Category, refresh_category_cache
 
 
 @receiver(post_save, sender=Category, dispatch_uid="blog.category.saved.refresh_cache")
@@ -22,3 +23,9 @@ def category_changed(sender, **kwargs):
     #   robust=True: a failing cache backend is logged instead of turning an
     #   already committed admin change into a 500
     transaction.on_commit(refresh_category_cache, robust=True)
+
+
+@receiver(post_save, sender=Blog, dispatch_uid="blog.story.saved.invalidate_home_cache")
+@receiver(post_delete, sender=Blog, dispatch_uid="blog.story.deleted.invalidate_home_cache")
+def story_changed(sender, **kwargs):
+    transaction.on_commit(lambda: cache.delete("home_page_blogs_v2"), robust=True)

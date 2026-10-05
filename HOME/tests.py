@@ -3,12 +3,17 @@ from datetime import timedelta
 from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.core.cache import cache
+from django.db import connection
+from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog
+from SERVICE_INTERNAL.config import custom_context_processors
 from STAFF.models import StaffProfile
 
 
@@ -22,6 +27,8 @@ class QuietTestCase(TestCase):
 
     def setUp(self):
         super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
         patcher = mock.patch("AUTHENTICATION.signals._try_send_login_email")
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -72,6 +79,73 @@ class HomeHeadingSemanticsTests(QuietTestCase):
         self.assertEqual(response.content.count(b"<h1"), 1)
         self.assertContains(response, 'id="headline"')
         self.assertContains(response, 'Results for "UNILORIN"')
+
+    def test_home_cache_is_invalidated_when_a_story_is_edited(self):
+        story = make_story(self.author, heading="Cached headline")
+        response = self.client.get(reverse("home:home"))
+        self.assertContains(response, "Cached headline")
+        self.assertIsNotNone(cache.get("home_page_blogs_v2"))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            make_story(self.author, heading="Uploaded headline")
+
+        self.assertIsNone(cache.get("home_page_blogs_v2"))
+        response = self.client.get(reverse("home:home"))
+        self.assertContains(response, "Uploaded headline")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            story.heading = "Updated headline"
+            story.save(update_fields=["heading"])
+
+        self.assertIsNone(cache.get("home_page_blogs_v2"))
+        response = self.client.get(reverse("home:home"))
+        self.assertContains(response, "Updated headline")
+
+    def test_home_story_query_only_prefetches_staff_full_name(self):
+        make_story(self.author)
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        profile_queries = [
+            query["sql"]
+            for query in captured
+            if "STAFF_staffprofile" in query["sql"]
+        ]
+        self.assertEqual(len(profile_queries), 1)
+        self.assertIn("full_name", profile_queries[0])
+        self.assertNotIn("gender", profile_queries[0])
+
+        with CaptureQueriesContext(connection) as cached_queries:
+            cached_response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(cached_response.status_code, 200)
+        self.assertFalse(any("STAFF_staffprofile" in query["sql"] for query in cached_queries))
+
+
+class SiteSocialCacheTests(QuietTestCase):
+    def test_social_settings_are_cached_until_the_settings_row_changes(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            settings_row = SiteSettings.objects.create(
+                pk=1,
+                twitter_handle="https://x.com/first",
+            )
+
+        request = RequestFactory().get("/")
+        first_context = custom_context_processors(request)
+        self.assertEqual(first_context["tweeter"], "https://x.com/first")
+        self.assertIsNotNone(cache.get("site_settings_socials"))
+        cache.set("home_page_blogs_v2", {"posts": []})
+
+        with self.captureOnCommitCallbacks(execute=True):
+            settings_row.twitter_handle = "https://x.com/updated"
+            settings_row.save()
+
+        self.assertIsNone(cache.get("site_settings_socials"))
+        self.assertIsNone(cache.get("home_page_blogs_v2"))
+        updated_context = custom_context_processors(request)
+        self.assertEqual(updated_context["tweeter"], "https://x.com/updated")
 
 
 @mock.patch("HOME.views.ping_indexnow")

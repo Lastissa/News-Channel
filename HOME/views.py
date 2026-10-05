@@ -8,7 +8,7 @@ from django.core.exceptions import BadRequest, ValidationError
 from django.core.paginator import Paginator
 from django.core.validators import URLValidator
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Prefetch
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -39,7 +39,7 @@ from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, Staff
 
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE = 20  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
+PAGE_SIZE = 25  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
 TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
 
@@ -262,6 +262,30 @@ def _ad_center_items():
         return [{'text': 'Do You Know You Can Boost Your Bussiness Online Presence By Clicking HERE', 'url': 'https:localhost:8000/missing/'}]
 
 
+def _home_blog_queryset():
+    return (
+        Blog.objects.select_related("author")
+        .prefetch_related(
+            Prefetch(
+                "author__staffprofile",
+                queryset=StaffProfile.objects.only("auth_id", "full_name"),
+            )
+        )
+        .only(
+            "id",
+            "image_1",
+            "image_info",
+            "author_id",
+            "category",
+            "slug",
+            "date_created",
+            "heading",
+            "content",
+        )
+        .order_by("-date_created")
+    )
+
+
 class HomeView(View):
     """Landing page: hero carousel of featured stories and paginated story grid."""
 
@@ -271,22 +295,26 @@ class HomeView(View):
         query = request.GET.get("q", "").strip()
         category = request.GET.get("category", "").strip().upper()
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
-
-        # once new stories have been made, this should be invalidated
-        base_qs = cache_or_run("home_page_blogs", fn= lambda: Blog.objects.select_related("author__staffprofile").order_by("-date_created"), timeout=60)
-
-        if query:
-            base_qs = base_qs.filter(heading__icontains=query)
-        if category:
-            base_qs = base_qs.filter(category=category)
-
         is_filtered = bool(query or category)
 
-        featured = [] if is_filtered else list(base_qs[:FEATURED_COUNT])
-        featured_ids = [post.id for post in featured]
-
-        grid_qs = base_qs.exclude(id__in=featured_ids)
-        paginator = Paginator(grid_qs, PAGE_SIZE)
+        if is_filtered:
+            base_qs = _home_blog_queryset()
+            if query:
+                base_qs = base_qs.filter(heading__icontains=query)
+            if category:
+                base_qs = base_qs.filter(category=category)
+            featured = []
+            paginator = Paginator(base_qs, PAGE_SIZE)
+        else:
+            home_posts = cache_or_run(
+                "home_page_blogs_v2",
+                fn=lambda: {"posts": list(_home_blog_queryset())},
+                timeout=None,
+            )["posts"]
+            featured = home_posts[:FEATURED_COUNT]
+            featured_ids = {post.id for post in featured}
+            grid_posts = [post for post in home_posts if post.id not in featured_ids]
+            paginator = Paginator(grid_posts, PAGE_SIZE)
         if page_number > paginator.num_pages and paginator.num_pages:
             raise Http404("Page not found.")
         page = paginator.get_page(page_number)
@@ -325,15 +353,22 @@ class LoadMoreView(View):
         category = request.GET.get("category", "").strip().upper()
         page_number = _resolve_page_number(request.GET.get("page"), default=2)
 
-        base_qs = Blog.objects.select_related("author").order_by("-date_created")
-        if query:
-            base_qs = base_qs.filter(heading__icontains=query)
-        if category:
-            base_qs = base_qs.filter(category=category)
-
         is_filtered = bool(query or category)
-        featured_ids = [] if is_filtered else list(base_qs[:FEATURED_COUNT].values_list("id", flat=True))
-        grid_qs = base_qs.exclude(id__in=featured_ids)
+        if is_filtered:
+            base_qs = _home_blog_queryset()
+            if query:
+                base_qs = base_qs.filter(heading__icontains=query)
+            if category:
+                base_qs = base_qs.filter(category=category)
+            grid_qs = base_qs
+        else:
+            home_posts = cache_or_run(
+                "home_page_blogs_v2",
+                fn=lambda: {"posts": list(_home_blog_queryset())},
+                timeout=None,
+            )["posts"]
+            featured_ids = {post.id for post in home_posts[:FEATURED_COUNT]}
+            grid_qs = [post for post in home_posts if post.id not in featured_ids]
 
         paginator = Paginator(grid_qs, PAGE_SIZE)
         if page_number > paginator.num_pages and paginator.num_pages:

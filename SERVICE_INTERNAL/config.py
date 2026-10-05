@@ -3,6 +3,8 @@ PROJECT CUSTOM CONFIGURATION FILE
 """
 from django.conf import settings
 
+from SERVICE_INTERNAL.abstract import cache_or_run
+
 class About:
     project_name = "AbuReport"
     project_cachphrase = "Reliable Source, Trusted News."
@@ -80,7 +82,11 @@ def custom_context_processors(request):
     try:
         from ADMIN.models import SiteSettings
 
-        site_settings = SiteSettings.get_solo()
+        site_settings = cache_or_run(
+            "site_settings_socials",
+            SiteSettings.get_solo,
+            timeout=None,
+        )
     except Exception:
         site_settings = None
 

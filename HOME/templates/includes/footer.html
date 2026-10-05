@@ -20,7 +20,7 @@
       <p class="newsletter-status" id="newsletter-status" role="status" aria-live="polite"></p>
     </div>
   </div>
-    <div class="footer-promote">
+    {% comment %} <div class="footer-promote">
       <a href="{% url 'home:promote' %}" class="footer-promote-link" aria-label="Promote your business with us">
         <div class="footer-promote-copy">
           <p class="footer-promote-kicker">Grow smarter</p>
@@ -32,7 +32,7 @@
           <img src="{% static 'promote.jpg' %}" alt="Business promotion illustration" loading="lazy">
         </div>
       </a>
-    </div>
+    </div> {% endcomment %}
     
   <div class="footer-main">
     {% if not request.user.is_authenticated %}
