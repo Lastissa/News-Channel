@@ -47,18 +47,21 @@
 
     var node = document.createElement("div");
     var isError = tone === "error";
+    var isInfo = tone === "info";
     var isPersistentNotice = placement === "top";
     var duration = isPersistentNotice ? 8000 : (isError ? 7000 : 5000);
     var remaining = duration;
     var timerStartedAt = 0;
     var paused = false;
-    node.className = "site-toast site-toast--" + (isError ? "error" : "success") + " is-entering";
+    node.className = "site-toast site-toast--" + (isError ? "error" : (isInfo ? "info" : "success")) + " is-entering";
     node.setAttribute("role", isError ? "alert" : "status");
     node.innerHTML =
       '<span class="site-toast__icon" aria-hidden="true">' +
         (isError
           ? '<svg viewBox="0 0 20 20"><path d="M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Zm0 4v4m0 2.5h.01" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
-          : '<svg viewBox="0 0 20 20"><path d="m4.5 10.2 3.6 3.5 7.4-7.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>') +
+          : (isInfo
+            ? '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="32 12"/></svg>'
+            : '<svg viewBox="0 0 20 20"><path d="m4.5 10.2 3.6 3.5 7.4-7.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>')) +
       '</span><span class="site-toast__message"></span>' +
       '<button type="button" class="site-toast__close" aria-label="Dismiss notification">' +
         '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>' +

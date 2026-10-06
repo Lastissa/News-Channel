@@ -134,6 +134,52 @@
     </div>
   </header>
 
+  <section class="portfolio-feed" id="portfolio-feed"
+           data-feed-url="{% url 'staff:portfolio_stories' staff_profile.slug %}"
+           data-next-page="{% if stories_page.has_next %}{{ stories_page.next_page_number }}{% endif %}"
+           aria-labelledby="portfolio-feed-title">
+    <header class="portfolio-feed-head">
+      <div>
+        <p class="portfolio-feed-eyebrow">Latest updates</p>
+        <h2 id="portfolio-feed-title">Posts by {{ display_name }}</h2>
+      </div>
+      <span class="portfolio-feed-count">{{ stats.story_count }} stor{{ stats.story_count|pluralize:"y,ies" }}</span>
+    </header>
+
+    {% if stories %}
+      <div class="portfolio-feed-items" data-feed-items>
+        {% include "staff/partials/portfolio_feed_items.html" %}
+      </div>
+      <div class="portfolio-feed-skeleton" data-feed-skeleton hidden aria-hidden="true">
+        <article class="portfolio-feed-card portfolio-feed-skeleton-card">
+          <span class="portfolio-skeleton-line portfolio-skeleton-line--short"></span>
+          <span class="portfolio-skeleton-line portfolio-skeleton-line--title"></span>
+          <span class="portfolio-skeleton-media"></span>
+          <span class="portfolio-skeleton-line"></span>
+          <span class="portfolio-skeleton-line portfolio-skeleton-line--medium"></span>
+        </article>
+        <article class="portfolio-feed-card portfolio-feed-skeleton-card">
+          <span class="portfolio-skeleton-line portfolio-skeleton-line--short"></span>
+          <span class="portfolio-skeleton-line portfolio-skeleton-line--title"></span>
+          <span class="portfolio-skeleton-media"></span>
+          <span class="portfolio-skeleton-line"></span>
+          <span class="portfolio-skeleton-line portfolio-skeleton-line--medium"></span>
+        </article>
+      </div>
+      <div class="portfolio-feed-sentinel" data-feed-sentinel
+           {% if not stories_page.has_next %}hidden{% endif %} aria-hidden="true"></div>
+      <p class="portfolio-feed-end" data-feed-end {% if stories_page.has_next %}hidden{% endif %}>
+        You're all caught up.
+      </p>
+      <p class="sr-only" data-feed-status aria-live="polite"></p>
+    {% else %}
+      <p class="portfolio-feed-empty">No stories published yet.</p>
+    {% endif %}
+  </section>
+</section>
+
+{% if False %}
+  Previous analytics dashboard retired in favor of the author post feed.
   {# ---------- KEY NUMBERS: six totals plus two milestones ---------- #}
   <dl class="portfolio-stats-strip" aria-label="Editorial statistics">
     {% comment %} <div>
@@ -383,5 +429,10 @@
       </section>
     {% endif %}
   </div>
-</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ block.super }}
+  <script src="{% static 'staff/js/portfolio-feed.js' %}" defer></script>
 {% endblock %}

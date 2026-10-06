@@ -2,8 +2,10 @@
 
 import json
 import logging
+import re
 from datetime import date, datetime, time
 
+from django.core.paginator import EmptyPage, Paginator
 from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.http import Http404, JsonResponse
@@ -24,6 +26,18 @@ from STAFF.models import AuthorFollow, StaffProfile
 logger = logging.getLogger(__name__)
 
 PORTFOLIO_STORY_LIMIT = 6
+PORTFOLIO_FEED_FIELDS = (
+    "id",
+    "slug",
+    "heading",
+    "category",
+    "content",
+    "image_1",
+    "image_info",
+    "views",
+    "likes",
+    "date_created",
+)
 RHYTHM_MONTHS = 6            #   COLUMNS IN THE PUBLISHING RHYTHM CHART
 RANK_BARS = 8                #   MOST BARS IN THE AUTHOR RANK MINI CHART
 READERSHIP_SLICES = 5        #   NAMED SLICES IN THE DONUT, THE REST FOLD INTO "OTHER"
@@ -35,6 +49,25 @@ SOCIAL_LINKS = (
     ("twitter", "X (Twitter)", "twitter_handle", "Follow {name} on X"),
     ("facebook", "Facebook", "facebook_handle", "Visit {name} on Facebook"),
 )
+
+
+def _portfolio_story_paginator(author):
+    return Paginator(
+        Blog.objects.filter(author=author)
+        .only(*PORTFOLIO_FEED_FIELDS)
+        .order_by("-date_created", "-pk"),
+        PORTFOLIO_STORY_LIMIT,
+    )
+
+
+def _prepare_portfolio_stories(stories):
+    from BLOG.views import _clean_content_block
+
+    for story in stories:
+        content = story.content.strip()
+        first_block = re.split(r"\n\s*\n", content, maxsplit=1)[0] if content else ""
+        story.feed_excerpt = _clean_content_block(first_block)
+    return stories
 
 
 def _portfolio_author_or_404(author_id):
@@ -272,6 +305,10 @@ class PortfolioView(View):
         stats = _portfolio_stats(author)
         story_count = stats["story_count"]
 
+        coverage = []
+        if story_count:
+            coverage, _readership = _coverage_and_readership(author, story_count, stats["total_views"])
+
         follower_count = AuthorFollow.objects.filter(author=author).count()
         following_count = AuthorFollow.objects.filter(follower=author).count()
         is_following = bool(
@@ -286,24 +323,8 @@ class PortfolioView(View):
 
         description_source = bio or f"{display_name}, {role_label} at {self._project_name()}."
 
-        stories = list(
-            Blog.objects.filter(author=author)
-            .only("id", "slug", "heading", "category", "views", "likes", "date_created")
-            .order_by("-date_created")[:PORTFOLIO_STORY_LIMIT]
-        )
-        highest_recent_views = max((story.views for story in stories), default=0)
-        for story in stories:
-            story.reach_share = round(story.views * 100 / highest_recent_views) if highest_recent_views else 0
-
-        top_story = None
-        coverage, readership = [], []
-        rhythm = {"columns": [], "window_total": 0, "peak": 0}
-        reader_response = []
-        if story_count:
-            top_story = Blog.objects.filter(author=author).only("id", "slug", "heading", "views").order_by("-views", "-date_created").first()
-            coverage, readership = _coverage_and_readership(author, story_count, stats["total_views"])
-            rhythm = _publishing_rhythm(author)
-            reader_response = _reader_response(author, stats["total_views"], stats["total_likes"])
+        stories_page = _portfolio_story_paginator(author).get_page(1)
+        stories = _prepare_portfolio_stories(stories_page.object_list)
 
         context = {
             "author": author,
@@ -317,15 +338,9 @@ class PortfolioView(View):
             "speciality": speciality,
             "tribute": tribute,
             "stats": stats,
-            "ranking": _author_ranking(author, story_count),
-            "top_story": top_story,
             "top_category": coverage[0]["label"] if coverage else "",
             "stories": stories,
-            "coverage": coverage,
-            "readership": readership,
-            "rhythm": rhythm,
-            "rhythm_months": RHYTHM_MONTHS,
-            "reader_response": reader_response,
+            "stories_page": stories_page,
             "follower_count": follower_count,
             "following_count": following_count,
             "is_following": is_following,
@@ -373,6 +388,41 @@ class PortfolioView(View):
             schema["sameAs"] = same_as
         #   Encode < so a bio can never close the script tag early.
         return json.dumps(schema, ensure_ascii=False).replace("<", "\\u003c")
+
+
+class PortfolioStoriesView(View):
+    """Returns the next slice of one author's published work for the feed."""
+
+    def get(self, request, author_slug):
+        profile = _portfolio_profile_or_404(author_slug)
+        raw_page = request.GET.get("page", "")
+        try:
+            page_number = int(raw_page)
+        except (TypeError, ValueError):
+            return JsonResponse({"detail": "Invalid story page."}, status=400)
+        if page_number < 2:
+            return JsonResponse({"detail": "Invalid story page."}, status=400)
+
+        paginator = _portfolio_story_paginator(profile.auth)
+        try:
+            page = paginator.page(page_number)
+        except EmptyPage as exc:
+            raise Http404("Story page not found.") from exc
+
+        response = render(
+            request,
+            "staff/partials/portfolio_feed_items.html",
+            {
+                "stories": _prepare_portfolio_stories(page.object_list),
+                "staff_profile": profile,
+                "staff_image": profile.auth.profile_img or None,
+                "display_name": _display_name(profile, profile.auth),
+            },
+        )
+        response["X-Portfolio-Has-Next"] = "true" if page.has_next() else "false"
+        if page.has_next():
+            response["X-Portfolio-Next-Page"] = str(page.next_page_number())
+        return response
 
 
 class AuthorFollowToggleView(View):

@@ -1,0 +1,34 @@
+{% load archive_extras %}
+{% for story in stories %}
+  <article class="portfolio-feed-card" data-feed-story>
+    <header class="portfolio-feed-card-head">
+      <a class="portfolio-feed-author" href="{% url 'staff:portfolio' staff_profile.slug %}">
+        {% if staff_image %}
+          <img src="{{ staff_image }}" alt="" loading="lazy">
+        {% else %}
+          <span aria-hidden="true">{{ display_name|slice:":1"|upper }}</span>
+        {% endif %}
+        <span>
+          <strong>{{ display_name }}</strong>
+          <time datetime="{{ story.date_created|date:'c' }}">{{ story.date_created|date:"M j, Y · g:i A" }}</time>
+        </span>
+      </a>
+      <span class="tag portfolio-feed-category">{{ story.get_category_display|title }}</span>
+    </header>
+
+    <h3><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
+
+    {% if story.image_1 %}
+      <a class="portfolio-feed-image" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1" aria-hidden="true">
+        <img src="{{ story.image_1|cloudinary_proxy }}" alt="{{ story.image_info }}" loading="lazy">
+      </a>
+    {% endif %}
+
+    {% if story.feed_excerpt %}<p class="portfolio-feed-excerpt">{{ story.feed_excerpt|truncatewords:46 }}</p>{% endif %}
+    <footer class="portfolio-feed-card-foot">
+      <span>{{ story.views|floatformat:"0g" }} view{{ story.views|pluralize }}</span>
+      <span>{{ story.likes|floatformat:"0g" }} like{{ story.likes|pluralize }}</span>
+      <a href="{% url 'blog:story_detail' story.slug %}">Read story</a>
+    </footer>
+  </article>
+{% endfor %}

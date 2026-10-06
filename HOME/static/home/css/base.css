@@ -1249,6 +1249,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   border-left-color: var(--toast-accent-error);
   background: var(--toast-bg-error);
 }
+.site-toast--info .site-toast__icon svg { animation: site-toast-spin 1s linear infinite; }
 .site-toast.is-entering { opacity: 0; transform: translate3d(18px, -8px, 0) scale(.98); }
 .site-toast.is-visible { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 .site-toast.is-leaving { opacity: 0; transform: translate3d(14px, -4px, 0) scale(.98); }
@@ -1279,6 +1280,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .site-toast--error .site-toast__progress { background: var(--toast-accent-error); }
 .site-toast.is-paused .site-toast__progress { animation-play-state: paused; }
 @keyframes site-toast-progress { to { transform: scaleX(0); } }
+@keyframes site-toast-spin { to { transform: rotate(360deg); } }
 @media (max-width: 560px) {
   .site-toast-stack { right: 12px; left: 12px; width: auto; align-items: stretch; }
   .site-toast { gap: 10px; padding: 12px 11px 15px; }
@@ -1286,6 +1288,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 @media (prefers-reduced-motion: reduce) {
   .site-toast { transition: none; }
   .site-toast__progress { animation: none; }
+  .site-toast--info .site-toast__icon svg { animation: none; }
 }
 
 /* ---------- Auth forms ---------- */
