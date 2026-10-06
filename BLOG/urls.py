@@ -10,6 +10,7 @@ urlpatterns = [
     path('', views.StoryHome.as_view(), name="story_home"), # redirect to the latest story, not meant to exist but for SEO purposes
     path("category-recommendations/<slug:blog_slug>/", views.CategoryRecommendationsView.as_view(), name="category_recommendations"),
     path("<slug:blog_slug>/", views.StoryDetailView.as_view(), name="story_detail"),
+    path("<int:blog_id>/report/", views.StoryReportView.as_view(), name="story_report"),
     path("<int:blog_id>/like/", views.BlogLikeView.as_view(), name="blog_like"),
     path("bookmark-not-found/", views.BookmarkNotFoundView.as_view(), name="bookmark_not_found"),
     path("<int:blog_id>/comment/", views.CommentCreateView.as_view(), name="comment_create"),

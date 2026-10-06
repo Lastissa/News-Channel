@@ -52,7 +52,7 @@
     "wordCount": {{ blog.word_count }}
   }
   </script>
-  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261006-3">
+  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261006-4">
 {% endblock %}
 
 {% block content %}
@@ -179,10 +179,17 @@ official website at https://www.abureport.com.ng
       </div>
 
     {% if support_email and "@" in support_email %}
-    <p class="story-report-note">
-      Noticed any missing or inappropriate content in this story?
-      <a href="mailto:{{ support_email }}?subject=Story%20report%20-%20{{ blog.heading|urlencode }}&amp;body=Story%3A%20{{ site_domain|urlencode:'' }}{{ request.path|urlencode:'' }}%0A%0AWhat%20I%20noticed%3A%0A">Click here to draft us a mail</a>.
-    </p>
+    <details class="story-report-note">
+      <summary>Noticed any missing or inappropriate content? Click here to inform us.</summary>
+      <p>Your report will be sent to our support team. {% if request.user.is_authenticated %}Your account email will be included.{% else %}You will be listed as Anonymous.{% endif %}</p>
+      <form method="post" action="{% url 'blog:story_report' blog.id %}" data-story-report-form>
+        {% csrf_token %}
+        <label for="story-report-content">What should we know?</label>
+        <textarea id="story-report-content" name="content" rows="5" maxlength="5000" required></textarea>
+        <button type="submit">Send report</button>
+        <p class="story-report-status" data-story-report-status role="status" aria-live="polite" hidden></p>
+      </form>
+    </details>
     {% endif %}
 
     <div class="article-actions">

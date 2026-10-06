@@ -44,7 +44,7 @@
     
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
-<link rel="stylesheet" href="{% static 'home/css/base.css' %}">
+<link rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261006-4">
     {% block extra_head %}
     {% comment %} TITLE AND DESCRIPTION ALREADY TAKEN CARE OF BY NoRMAL TITLE AND DESCRPTION META TAG AS THEY ARE ALWAYS PRESENT {% endcomment %}
     {% comment %} <meta property="og:title" content="{{project_name}}">
@@ -88,7 +88,7 @@
     <script src="{% static 'home/js/app.js' %}" defer></script>
     <script src="{% static 'home/js/carousel.js' %}" defer></script>
     <script src="{% static 'home/js/hero-teaser.js' %}" defer></script>
-    <script src="{% static 'home/js/interactions.js' %}" defer></script>
+    <script src="{% static 'home/js/interactions.js' %}?v=20261006-4" defer></script>
     <script src="{% static 'home/js/auth-gate.js' %}" defer></script>
     {% block extra_scripts %}{% endblock %}
 </body>

@@ -1,6 +1,8 @@
 import json
 from unittest import mock
 
+from django.apps import apps
+from django.contrib import admin
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import F
@@ -12,8 +14,9 @@ from hypothesis import given, settings as hyp_settings, HealthCheck
 from hypothesis import strategies as st
 from hypothesis.extra.django import TestCase as HypothesisTestCase
 
+from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
-from BLOG.models import Blog, Comment
+from BLOG.models import Blog, BlogLike, Comment
 from BLOG.views import parse_story_content, StoryDetailView
 from STAFF.models import StaffProfile
 
@@ -128,6 +131,31 @@ __Please note:__ deadlines are strict.
         self.assertFalse(json.loads(response.content)["liked"])
 
     @mock.patch("AUTHENTICATION.signals._try_send_login_email")
+    def test_story_like_state_survives_logout_and_login(self, _mail):
+        blog = Blog.objects.create(
+            author=self.author,
+            category="GENERAL",
+            heading="A like that persists",
+            content="A short update.",
+        )
+        self.client.force_login(self.author)
+
+        first = json.loads(self._like(blog).content)
+        self.assertEqual((first["likes"], first["liked"]), (1, True))
+        self.assertTrue(BlogLike.objects.filter(user=self.author, blog=blog).exists())
+
+        self.client.logout()
+        self.client.force_login(self.author)
+        StaffProfile.objects.create(auth=self.author, gender="M", full_name="Like Reader")
+        page = self.client.get(reverse("blog:story_detail", kwargs={"blog_slug": blog.slug}))
+        self.assertContains(page, 'data-story-like-btn data-liked="true"')
+
+        second = json.loads(self._like(blog).content)
+
+        self.assertEqual((second["likes"], second["liked"]), (0, False))
+        self.assertFalse(BlogLike.objects.filter(user=self.author, blog=blog).exists())
+
+    @mock.patch("AUTHENTICATION.signals._try_send_login_email")
     def test_comment_like_toggles_and_returns_the_real_total(self, _mail):
         blog = Blog.objects.create(author=self.author, category="GENERAL", heading="Commented story", content="Body.")
         comment = Comment.objects.create(blog=blog, author=self.author, content="Nice one")
@@ -176,6 +204,79 @@ __Please note:__ deadlines are strict.
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 400)
         self.assertEqual(Comment.objects.filter(blog=blog, author=self.author).count(), 1)
+
+
+class StoryReportTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.author = Auth.objects.create_user(email="report-story-author@example.com")
+        self.blog = Blog.objects.create(
+            author=self.author,
+            category="GENERAL",
+            heading="A reportable story",
+            content="The story text.",
+        )
+        StaffProfile.objects.create(auth=self.author, gender="M", full_name="Report Author")
+        SiteSettings.objects.create(pk=1, support_email="support@example.com")
+        self.url = reverse("blog:story_report", args=[self.blog.pk])
+
+    def _submit_report(self, content="The image caption does not match the story."):
+        return self.client.post(
+            self.url,
+            {"content": content},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+    @mock.patch("BLOG.views._dispatch_email", return_value=True)
+    def test_anonymous_report_is_sent_as_anonymous(self, send_report):
+        response = self._submit_report()
+
+        self.assertEqual(response.status_code, 200)
+        args, kwargs = send_report.call_args
+        self.assertEqual(args[0], "support@example.com")
+        self.assertIn("Reporter:</strong> Anonymous", args[2])
+        self.assertNotIn(self.author.email, args[2])
+        self.assertIn(self.blog.heading, args[2])
+        self.assertTrue(kwargs["no_async"])
+
+    @mock.patch("BLOG.views._dispatch_email", return_value=True)
+    @mock.patch("AUTHENTICATION.signals._try_send_login_email")
+    def test_authenticated_report_includes_the_account_email(self, _mail, send_report):
+        self.client.force_login(self.author)
+        page = self.client.get(
+            reverse("blog:story_detail", kwargs={"blog_slug": self.blog.slug})
+        )
+        self.assertContains(page, "data-story-report-form")
+        self.assertContains(page, "Your account email will be included.")
+
+        response = self._submit_report()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f"Reporter:</strong> {self.author.email}", send_report.call_args.args[2])
+
+    def test_empty_report_is_rejected_without_sending_email(self):
+        response = self._submit_report("   ")
+
+        self.assertEqual(response.status_code, 400)
+
+    @mock.patch("BLOG.views._dispatch_email", return_value=False)
+    def test_mail_delivery_failure_is_reported(self, _send_mail):
+        response = self._submit_report()
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("could not send", json.loads(response.content)["detail"])
+
+
+class ProjectAdminRegistrationTests(TestCase):
+    def test_all_project_models_are_registered_in_django_admin(self):
+        project_apps = {"ADMIN", "ARCHIVE", "AUTHENTICATION", "BLOG", "HOME", "Partner", "STAFF"}
+        unregistered = [
+            model._meta.label
+            for model in apps.get_models()
+            if model._meta.app_label in project_apps and model not in admin.site._registry
+        ]
+
+        self.assertEqual(unregistered, [])
 
 
 # ---------------------------------------------------------------------------

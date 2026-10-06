@@ -252,6 +252,34 @@ class Blog(models.Model):
 
     def __str__(self):
         return f"{self.author.email.split("@")[0]}. {self.views} Views. {self.heading[:20]}"
+
+
+class BlogLike(models.Model):
+    """A persistent like by one signed-in user on one story."""
+
+    user = models.ForeignKey(
+        "AUTHENTICATION.Auth",
+        on_delete=models.CASCADE,
+        related_name="story_likes",
+    )
+    blog = models.ForeignKey(
+        Blog,
+        on_delete=models.CASCADE,
+        related_name="user_likes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "blog"],
+                name="unique_user_blog_like",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} liked {self.blog.heading}"
     
 class Comment(models.Model):
     """Comment / Feedback under the blog post"""

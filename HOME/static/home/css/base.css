@@ -38,13 +38,12 @@
   --brand: #22D3EE; 
   --brand-deep: #0B6E8A;
   --red-linar-grad: linear-gradient(180deg, #ff6b8b 0%, #e02447 100%);
-  /* Toast popup colours -- edit these two to restyle every toast across the
-     site (panel.js, interactions.js, archive.js all read them). Kept
-     separate per theme because a colour that reads fine on the light page
-     background can disappear against the dark one. */
+  /* Toast surfaces use the site's teal brand and danger-red accents. */
   --toast-bg: #ffffff;
-  --toast-bg-error: #fb4646;
+  --toast-bg-error: #fff4f1;
   --toast-fg: #0E1B2C;
+  --toast-accent: #0B6E8A;
+  --toast-accent-error: #B3402A;
   color-scheme: light;
 }
 
@@ -75,12 +74,12 @@ html[data-theme="dark"] {
   --brand: #0B6E8A;
   --brand-deep: #22D3EE;
   --red-linar-grad: linear-gradient(180deg, #d04664 0%, #9d243a 100%);
-  /* Dark-mode toast colours -- the light-mode --toast-bg (dark navy) reads
-     fine on the light page but disappears against the already-dark page
-     background, so it needs its own, lighter value here. */
+  /* Keep toast surfaces distinct from dark page backgrounds. */
   --toast-bg: #121F30;
-  --toast-bg-error: #121F30;
+  --toast-bg-error: #321F23;
   --toast-fg: #F3EFE6;
+  --toast-accent: #22D3EE;
+  --toast-accent-error: #FF8876;
   color-scheme: dark;
 }
 
@@ -1215,39 +1214,55 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 /* ---------- Shared, accessible toast notifications ---------- */
 .site-toast-stack {
   position: fixed;
-  z-index: 3000;
-  top: calc(var(--header-h) + 12px + env(safe-area-inset-top, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
+  z-index: 10000;
+  top: calc(var(--header-h) + 16px + env(safe-area-inset-top, 0px));
+  right: max(18px, env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
-  width: min(420px, calc(100vw - 32px));
+  gap: 12px;
+  width: min(440px, calc(100vw - 36px));
   pointer-events: none;
 }
 .site-toast {
+  position: relative;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 30px;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 12px;
-  /* border: 1px solid var(--line); */
-  border-left: 12px solid var(--success);
-  /* border-radius: 12px; */
+  overflow: hidden;
+  padding: 14px 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--toast-accent);
+  border-radius: 14px;
   background: var(--toast-bg);
   color: var(--toast-fg);
-  box-shadow: 0 12px 30px rgba(14, 27, 44, 0.2);
+  box-shadow: 0 16px 42px rgba(14, 27, 44, 0.2), 0 3px 9px rgba(14, 27, 44, 0.08);
   font-size: 0.9rem;
-  line-height: 1.2;
+  line-height: 1.4;
   text-align: left;
   pointer-events: auto;
+  transition: opacity 240ms ease, transform 300ms cubic-bezier(.2,.8,.2,1);
 }
-.site-toast--error { border-left-color: var(--danger); }
-.site-toast__icon { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; color: var(--success); }
-.site-toast--error .site-toast__icon { color: var(--danger); }
-.site-toast__icon svg { display: block; width: 20px; height: 20px; }
-.site-toast__message { min-width: 0; overflow-wrap: anywhere; font-weight:600;}
+.site-toast--error {
+  border-left-color: var(--toast-accent-error);
+  background: var(--toast-bg-error);
+}
+.site-toast.is-entering { opacity: 0; transform: translate3d(18px, -8px, 0) scale(.98); }
+.site-toast.is-visible { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+.site-toast.is-leaving { opacity: 0; transform: translate3d(14px, -4px, 0) scale(.98); }
+.site-toast__icon {
+  display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center;
+  border-radius: 50%; background: color-mix(in srgb, var(--toast-accent) 12%, transparent);
+  color: var(--toast-accent);
+}
+.site-toast--error .site-toast__icon {
+  background: color-mix(in srgb, var(--toast-accent-error) 13%, transparent);
+  color: var(--toast-accent-error);
+}
+.site-toast__icon svg { display: block; width: 18px; height: 18px; }
+.site-toast__message { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
 .site-toast__close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px;
@@ -1255,6 +1270,23 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .site-toast__close:hover, .site-toast__close:focus-visible { background: var(--line); opacity: 1; }
 .site-toast__close svg { width: 17px; height: 17px; }
+.site-toast__progress {
+  position: absolute; right: 0; bottom: 0; left: 0; height: 3px;
+  background: var(--toast-accent);
+  transform-origin: left center;
+  animation: site-toast-progress var(--toast-duration, 5000ms) linear forwards;
+}
+.site-toast--error .site-toast__progress { background: var(--toast-accent-error); }
+.site-toast.is-paused .site-toast__progress { animation-play-state: paused; }
+@keyframes site-toast-progress { to { transform: scaleX(0); } }
+@media (max-width: 560px) {
+  .site-toast-stack { right: 12px; left: 12px; width: auto; align-items: stretch; }
+  .site-toast { gap: 10px; padding: 12px 11px 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-toast { transition: none; }
+  .site-toast__progress { animation: none; }
+}
 
 /* ---------- Auth forms ---------- */
 #auth-toast {

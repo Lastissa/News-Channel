@@ -1,21 +1,27 @@
 import html
+import logging
 import re
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import F, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.html import escape, linebreaks
 from django.views import View
 
+from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from ARCHIVE.models import ArchiveImage
 from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
-from SERVICE_INTERNAL.email_single import _try_send_story_views_alert_email
+from SERVICE_INTERNAL.email_single import _build_email_html, _dispatch_email, _try_send_story_views_alert_email
 from STAFF.models import AuthorFollow, StaffProfile
-from .models import Blog, Comment
+from .models import Blog, BlogLike, Comment
+
+logger = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 
@@ -304,7 +310,13 @@ class StoryDetailView(View):
         #   STALE. Other readers may have liked/unliked meanwhile, so the
         #   counter is always re-read from the database before rendering.
         blog.refresh_from_db(fields=["likes"])
-        is_liked = request.user.is_authenticated and blog.id in request.session.get("liked_blogs", [])
+        is_liked = (
+            request.user.is_authenticated
+            and (
+                BlogLike.objects.filter(blog=blog, user=request.user).exists()
+                or blog.id in request.session.get("liked_blogs", [])
+            )
+        )
 
         blog_content = parse_story_content(blog.content)
         ticker_text = build_ticker_text(blog.content)
@@ -464,36 +476,127 @@ class BookmarkNotFoundView(View):
 
 
 class BlogLikeView(View):
-    """Toggle. A story the reader already liked is unliked (counter -1), any
-    other story is liked (counter +1). The counter is moved with an atomic
-    F() update and then READ BACK from the database, so the number returned is
-    the real total (other readers may have liked meanwhile), never a guessed
-    +1 / -1."""
+    """Toggle a persistent user/story like and keep the displayed total current."""
 
     def post(self, request, blog_id):
-        blog = get_object_or_404(Blog, pk=blog_id)
         user = _authenticated_user(request)
         if not user:
             if _is_ajax(request):
                 return JsonResponse({"detail": "Please sign in to like this story."}, status=401)
             return redirect("auth:login")
 
-        liked_blogs = request.session.get("liked_blogs", [])
-        if blog.id in liked_blogs:
-            #   `likes__gt=0` keeps the PositiveIntegerField from going below 0.
-            Blog.objects.filter(pk=blog.pk, likes__gt=0).update(likes=F("likes") - 1)
-            liked_blogs = [liked_id for liked_id in liked_blogs if liked_id != blog.id]
-            liked, detail = False, "Like removed."
-        else:
-            Blog.objects.filter(pk=blog.pk).update(likes=F("likes") + 1)
-            liked_blogs = list(dict.fromkeys([*liked_blogs, blog.id]))
-            liked, detail = True, "Story liked. Thank You"
+        with transaction.atomic():
+            blog = get_object_or_404(Blog.objects.select_for_update(), pk=blog_id)
+            existing_like = BlogLike.objects.filter(blog=blog, user=user).first()
+            legacy_likes = request.session.get("liked_blogs", [])
+            had_legacy_like = blog.id in legacy_likes
 
-        request.session["liked_blogs"] = liked_blogs
-        request.session.modified = True
+            if existing_like:
+                existing_like.delete()
+                Blog.objects.filter(pk=blog.pk, likes__gt=0).update(likes=F("likes") - 1)
+                liked, detail = False, "Like removed."
+            elif had_legacy_like:
+                # Preserve the toggle behavior for sessions created before likes
+                # were persisted; those existing counts already include this like.
+                Blog.objects.filter(pk=blog.pk, likes__gt=0).update(likes=F("likes") - 1)
+                liked, detail = False, "Like removed."
+            else:
+                BlogLike.objects.create(blog=blog, user=user)
+                Blog.objects.filter(pk=blog.pk).update(likes=F("likes") + 1)
+                liked, detail = True, "Story liked. Thank You"
+
+            if had_legacy_like:
+                request.session["liked_blogs"] = [
+                    liked_id for liked_id in legacy_likes if liked_id != blog.id
+                ]
+                request.session.modified = True
 
         likes = Blog.objects.values_list("likes", flat=True).get(pk=blog.pk)
         return JsonResponse({"detail": detail, "likes": likes, "liked": liked}, status=200)
+
+
+class StoryReportView(View):
+    """Email a reader's story report to the configured support address."""
+
+    max_content_length = 5000
+
+    def post(self, request, blog_id):
+        blog = get_object_or_404(Blog, pk=blog_id)
+        content = (request.POST.get("content") or "").strip()
+        if not content:
+            return self._failure(request, blog, "Please enter a report before sending.", 400)
+        if len(content) > self.max_content_length:
+            return self._failure(request, blog, "Reports must be 5,000 characters or fewer.", 400)
+
+        remaining_time, limited = is_rate_limited(
+            request,
+            timeout_window=3600,
+            max_requests=5,
+            scope="story-report",
+        )
+        if limited:
+            return self._failure(
+                request,
+                blog,
+                f"Too many reports were sent. Please try again in {remaining_time} seconds.",
+                429,
+            )
+
+        recipient = SiteSettings.get_solo().support_email.strip()
+        if not recipient:
+            logger.error("Could not send story report for blog %s: support email is not configured.", blog.pk)
+            return self._failure(
+                request,
+                blog,
+                "We could not send this report because the support email is not configured.",
+                503,
+            )
+
+        user = _authenticated_user(request)
+        reporter = user.email if user else "Anonymous"
+        story_url = request.build_absolute_uri(
+            reverse("blog:story_detail", kwargs={"blog_slug": blog.slug})
+        )
+        safe_heading = " ".join(blog.heading.splitlines())
+        subject = f"Story report: {safe_heading}"
+        body = (
+            f"<p><strong>Reporter:</strong> {escape(reporter)}</p>"
+            f"<p><strong>Story:</strong> {escape(blog.heading)}</p>"
+            f'<p><strong>Story URL:</strong> <a href="{escape(story_url)}">{escape(story_url)}</a></p>'
+            f"<h3>Report</h3>{linebreaks(escape(content), autoescape=False)}"
+        )
+        email_html = _build_email_html(
+            title="Story report received",
+            main_content=body,
+            end_note="This report was sent by a reader using the story report form.",
+        )
+        sent = _dispatch_email(
+            recipient,
+            subject,
+            email_html,
+            no_async=True,
+        )
+        if not sent:
+            logger.error("Email backend did not send story report for blog %s.", blog.pk)
+            return self._failure(
+                request,
+                blog,
+                "We could not send your report right now. Please try again later.",
+                502,
+            )
+
+        detail = "Your report has been sent. Thank you for helping us improve this story."
+        if _is_ajax(request):
+            return JsonResponse({"detail": detail}, status=200)
+        messages.success(request, detail)
+        return redirect("blog:story_detail", blog_slug=blog.slug)
+
+    def _failure(self, request, blog, detail, status):
+        if _is_ajax(request):
+            return JsonResponse({"detail": detail}, status=status)
+        messages.error(request, detail)
+        return redirect("blog:story_detail", blog_slug=blog.slug)
+
 
 class CommentCreateView(View):
     def post(self, request, blog_id):

@@ -646,7 +646,7 @@
         form.reset();
         render();
         toast(extractDetail(result.text, "Text added."));
-      }).catch(function () { btn.disabled = false; toast("Connection issue. Nothing was added.", "error"); });
+      }).catch(function () { btn.disabled = false; toast("Network Error. Nothing was added.", "error"); });
     });
 
     list.addEventListener("click", function (event) {

@@ -26,12 +26,13 @@
   function dismissToast(node) {
     if (!node || node.dataset.dismissed === "true") return;
     node.dataset.dismissed = "true";
-    node.style.opacity = "0";
-    node.style.transform = "translateY(-6px)";
-    window.setTimeout(function () { node.remove(); }, 200);
+    window.clearTimeout(node._dismissTimer);
+    node.classList.remove("is-visible");
+    node.classList.add("is-leaving");
+    window.setTimeout(function () { node.remove(); }, 260);
   }
 
-  /* All site notices use the same high-visibility, dismissible toast stack. */
+  /* All site notices use the same accessible, dismissible toast stack. */
   function toast(message, tone, placement) {
     if (!toastHost) {
       toastHost = document.createElement("div");
@@ -47,7 +48,11 @@
     var node = document.createElement("div");
     var isError = tone === "error";
     var isPersistentNotice = placement === "top";
-    node.className = "site-toast" + (isError ? " site-toast--error" : "");
+    var duration = isPersistentNotice ? 8000 : (isError ? 7000 : 5000);
+    var remaining = duration;
+    var timerStartedAt = 0;
+    var paused = false;
+    node.className = "site-toast site-toast--" + (isError ? "error" : "success") + " is-entering";
     node.setAttribute("role", isError ? "alert" : "status");
     node.innerHTML =
       '<span class="site-toast__icon" aria-hidden="true">' +
@@ -57,23 +62,44 @@
       '</span><span class="site-toast__message"></span>' +
       '<button type="button" class="site-toast__close" aria-label="Dismiss notification">' +
         '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>' +
-      '</button>';
+      '</button><span class="site-toast__progress" aria-hidden="true"></span>';
     node.querySelector(".site-toast__message").textContent = message;
     node.dataset.dismissed = "false";
-    node.style.opacity = "0";
-    node.style.transform = "translateY(-6px)";
-    node.style.transition = "opacity .18s ease, transform .18s ease";
+    node.style.setProperty("--toast-duration", duration + "ms");
     node.querySelector(".site-toast__close").addEventListener("click", function () {
       dismissToast(node);
     });
+    function scheduleDismissal() {
+      timerStartedAt = Date.now();
+      node._dismissTimer = window.setTimeout(function () {
+        dismissToast(node);
+      }, remaining);
+    }
+    function pauseDismissal() {
+      if (paused || node.dataset.dismissed === "true") return;
+      paused = true;
+      window.clearTimeout(node._dismissTimer);
+      remaining = Math.max(0, remaining - (Date.now() - timerStartedAt));
+      node.classList.add("is-paused");
+    }
+    function resumeDismissal() {
+      if (!paused || node.matches(":hover") || node.contains(document.activeElement)) return;
+      paused = false;
+      node.classList.remove("is-paused");
+      scheduleDismissal();
+    }
+    node.addEventListener("mouseenter", pauseDismissal);
+    node.addEventListener("mouseleave", resumeDismissal);
+    node.addEventListener("focusin", pauseDismissal);
+    node.addEventListener("focusout", function () {
+      window.setTimeout(resumeDismissal, 0);
+    });
     toastHost.appendChild(node);
     requestAnimationFrame(function () {
-      node.style.opacity = "1";
-      node.style.transform = "translateY(0)";
+      node.classList.remove("is-entering");
+      node.classList.add("is-visible");
     });
-    window.setTimeout(function () {
-      dismissToast(node);
-    }, isPersistentNotice ? 8000 : 5000);
+    scheduleDismissal();
   }
 
   window.AbuToast = toast;
@@ -99,6 +125,71 @@
       var tone = classes.indexOf("error") !== -1 || classes.indexOf("danger") !== -1 ? "error" : "success";
       toast(text, tone, classes.indexOf("story-edited") !== -1 ? "top" : "bottom");
     });
+  });
+
+  document.addEventListener("submit", function (event) {
+    var form = event.target.closest("[data-story-report-form]");
+    if (!form || form.dataset.pending === "true") return;
+    event.preventDefault();
+
+    var submitButton = form.querySelector('button[type="submit"]');
+    var status = form.querySelector("[data-story-report-status]");
+    var originalLabel = submitButton ? submitButton.textContent : "";
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Sending...";
+    }
+    form.dataset.pending = "true";
+
+    fetch(form.action, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": form.querySelector('[name="csrfmiddlewaretoken"]').value,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: new FormData(form),
+      credentials: "same-origin",
+    })
+      .then(function (response) {
+        return response.text().then(function (text) {
+          return {
+            ok: response.ok,
+            status: response.status,
+            detail: extractDetail(text, "We could not send your report. Please try again."),
+          };
+        });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          if (status) {
+            status.textContent = result.detail;
+            status.hidden = false;
+          }
+          toast(result.detail, "error");
+          return;
+        }
+        form.reset();
+        if (status) {
+          status.textContent = result.detail;
+          status.hidden = false;
+        }
+        toast(result.detail, "success");
+      })
+      .catch(function () {
+        var detail = "We could not send your report because of a connection issue. Please try again.";
+        if (status) {
+          status.textContent = detail;
+          status.hidden = false;
+        }
+        toast(detail, "error");
+      })
+      .finally(function () {
+        form.dataset.pending = "false";
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = originalLabel;
+        }
+      });
   });
 
   /* ---------- bookmark: optimistic toggle, revert on failure ---------- */

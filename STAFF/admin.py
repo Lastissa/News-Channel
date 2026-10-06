@@ -1,5 +1,5 @@
 from django.contrib import admin
 
-from STAFF.models import FollowRelationship, StaffProfile
+from STAFF.models import AuthorFollow, FollowRelationship, StaffProfile
 
-admin.site.register([StaffProfile, FollowRelationship])
+admin.site.register([StaffProfile, FollowRelationship, AuthorFollow])
