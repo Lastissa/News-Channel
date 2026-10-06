@@ -252,7 +252,7 @@ class ArchiveUploadModalView(View):
 
     def get(self, request):
         if not is_authenticated(request.user):
-            return JsonResponse({"detail": "Please sign in to add an image or file."}, status=401)
+            return JsonResponse({"detail": "You are not logged in.Sign in to add an image or file."}, status=401)
         return render(
             request,
             "ARCHIVE/partials/upload_modal.html",

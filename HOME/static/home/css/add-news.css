@@ -423,6 +423,9 @@
   gap: 14px;
   margin-bottom: 12px;
 }
+.archive-picker-header-actions { display: flex; align-items: center; gap: 8px; }
+.archive-picker-header-actions .editor-modal-btn { white-space: nowrap; }
+.archive-picker-header-actions .editor-modal-btn:disabled { opacity: .6; cursor: wait; }
 .archive-picker-header .editor-modal-intro { margin-bottom: 0; }
 .archive-picker-frame {
   width: 100%;

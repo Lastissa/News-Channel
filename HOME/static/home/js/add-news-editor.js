@@ -27,6 +27,8 @@
   var note = shell.querySelector("[data-editor-loading-note]");
   var draftStatus = shell.querySelector("[data-editor-draft-status]");
   var archiveModal = shell.querySelector("[data-archive-modal]");
+  var archiveFrame = archiveModal ? archiveModal.querySelector(".archive-picker-frame") : null;
+  var archiveRefreshBtn = archiveModal ? archiveModal.querySelector("[data-archive-refresh]") : null;
   var modal = shell.querySelector("[data-editor-modal]");
   var modalCard = modal ? modal.querySelector(".editor-modal-card") : null;
   var modalTitle = modal ? modal.querySelector("[data-editor-modal-title]") : null;
@@ -36,6 +38,8 @@
   var modalEditBtn = modal ? modal.querySelector("[data-editor-modal-edit]") : null;
   var modalConfirmBtn = modal ? modal.querySelector("[data-editor-modal-confirm]") : null;
   var guideCopyBtn = shell.querySelector("[data-guide-copy-all]");
+  var modalEditTarget = null;
+  var modalConfirmWarnings = true;
 
   var PREVIEW_KEY = "abu-editor-preview";
   var DRAFT_KEY = shell.dataset.draftKey;
@@ -102,8 +106,8 @@
     }
     setDraftStatus(
       draft.uploadedImageSelected
-        ? "Draft restored. Reselect the uploaded image file if needed."
-        : "Draft restored from this browser."
+        ? "Draft restored. Reselect the uploaded image file."
+        : "Draft restored."
     );
   }
 
@@ -152,6 +156,16 @@
     });
   });
   if (archiveModal) {
+    if (archiveRefreshBtn && archiveFrame) {
+      archiveRefreshBtn.addEventListener("click", function () {
+        archiveRefreshBtn.disabled = true;
+        archiveFrame.addEventListener("load", function onArchiveLoad() {
+          archiveRefreshBtn.disabled = false;
+          archiveFrame.removeEventListener("load", onArchiveLoad);
+        });
+        archiveFrame.src = archiveFrame.getAttribute("src");
+      });
+    }
     archiveModal.querySelectorAll("[data-archive-close]").forEach(function (button) {
       button.addEventListener("click", closeArchivePicker);
     });
@@ -400,7 +414,9 @@
   function closeModal() {
     if (!modal) return;
     modal.hidden = true;
-    if (modalReturnFocus && modalReturnFocus.focus) modalReturnFocus.focus();
+    var focusTarget = modalEditTarget || modalReturnFocus;
+    if (focusTarget && focusTarget.focus) focusTarget.focus();
+    modalEditTarget = null;
     modalReturnFocus = null;
   }
 
@@ -411,7 +427,9 @@
       return;
     }
     modalReturnFocus = document.activeElement;
-        modalTitle.textContent = options.title;
+    modalEditTarget = options.editTarget || contentInput;
+    modalConfirmWarnings = options.confirmWarnings !== false;
+    modalTitle.textContent = options.title;
     modalIntro.textContent = options.intro;
     modalList.innerHTML = "";
     options.items.forEach(function (item) {
@@ -432,11 +450,11 @@
     });
     modalEditBtn.addEventListener("click", function () {
       closeModal();
-      contentInput.focus();
     });
     modalConfirmBtn.addEventListener("click", function () {
+      var confirmWarnings = modalConfirmWarnings;
       closeModal();
-      submitStory(true);
+      submitStory(confirmWarnings);
     });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !modal.hidden) closeModal();
@@ -529,6 +547,22 @@
     if (!contentInput.value.trim()) {
       toast("The story content cannot be empty.", "error");
       contentInput.focus();
+      return;
+    }
+
+    var hasMainImage = Boolean(
+      imageInput.value.trim()
+      || (imageFileInput && imageFileInput.files && imageFileInput.files.length)
+    );
+    if (!hasMainImage) {
+      openModal({
+        title: "No main image added",
+        intro: "This story does not have a main image. Stories with a main image are more engaging and easier to recognize.",
+        items: [{ message: "You can add an image URL or upload an image before publishing." }],
+        askToPost: true,
+        editTarget: imageInput,
+        confirmWarnings: false
+      });
       return;
     }
 

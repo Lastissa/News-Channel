@@ -42,8 +42,8 @@
 {% block content %}
 <section class="editor-shell is-loading"
          id="editor-shell"
-         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261006-1"
-         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261006-1"
+         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261006-2"
+         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261006-3"
          data-draft-key="abureport-add-news-draft-{{ request.user.pk }}">
   <div class="editor-toolbar">
     <h1>+ News</h1>
@@ -206,7 +206,10 @@
         <div>
           <h2 class="editor-modal-title" id="archive-picker-title">Choose an image / FIle from the archive</h2>
         </div>
-        <button type="button" class="editor-modal-btn" data-archive-close aria-label="Close archive">Close</button>
+        <div class="archive-picker-header-actions">
+          <button type="button" class="editor-modal-btn" data-archive-refresh aria-label="Refresh archive">Refresh</button>
+          <button type="button" class="editor-modal-btn" data-archive-close aria-label="Close archive">Close</button>
+        </div>
       </div>
       <iframe class="archive-picker-frame" src="{% url 'archive:gallery' %}" title="Image and file archive"></iframe>
     </section>
