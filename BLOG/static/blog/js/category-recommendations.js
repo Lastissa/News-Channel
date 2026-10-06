@@ -1,7 +1,28 @@
 (function () {
   "use strict";
 
+  function watchAuthorMostViewed() {
+    var list = document.querySelector(".author-most-viewed-list");
+    if (!list) return;
+    if (!("IntersectionObserver" in window)) {
+      list.classList.add("is-inview");
+      return;
+    }
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
+          list.classList.add("is-inview");
+        } else if (!entry.isIntersecting) {
+          list.classList.remove("is-inview");
+        }
+      });
+    }, { threshold: [0, 0.2] });
+    observer.observe(list);
+  }
+
   function init() {
+    watchAuthorMostViewed();
     var panel = document.querySelector("[data-read-also]");
     if (!panel) return;
 

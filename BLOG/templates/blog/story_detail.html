@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load custom_tag format_copy_btn static %}
+{% load custom_tag format_copy_btn static archive_extras %}
 
 {% block title %}{{ blog.heading }} | {{ project_name }}{% endblock %}
 {% block meta_description %}{{excerp}}{% endblock %}
@@ -66,7 +66,7 @@
 {% endif %}
 <section class="story-article-shell">
   <article class="story-article no-inner-shell" aria-labelledby="story-heading">
-    <div class="story-reading-layout has-read-also-rail{% if author_recent_stories %} has-author-rail{% endif %}">
+    <div class="story-reading-layout has-read-also-rail{% if author_most_viewed_stories %} has-author-rail{% endif %}">
       <div class="story-reading-column">
     <header class="story-header">
       <div class="story-kicker-row">
@@ -370,30 +370,37 @@ visit https://www.abureport.com.ng for more up to date stories
         </section>
       </aside>
 
-      {% if author_recent_stories %}
+      {% if author_most_viewed_stories %}
         <aside class="story-rail story-rail-author" aria-label="More stories from {{ blog.author_name }}">
-          <section class="author-more-stories" aria-labelledby="author-more-title">
+          <section class="author-more-stories" aria-labelledby="author-most-viewed-title">
             <div class="story-rail-heading">
-              <h2 id="author-more-title">Also from {{ blog.author_name }}</h2>
+              <h2 id="author-most-viewed-title">Most viewed by {{ blog.author_name }}</h2>
             </div>
-            <div class="story-grid">
-              {% for story in author_recent_stories %}
-                <article class="story-card">
-                  <a class="story-card-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1">
-                    <img src="{{ story.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+            <ol class="trending-list author-most-viewed-list">
+              {% for story in author_most_viewed_stories %}
+                <li class="trending-item">
+                  <span class="trending-rank" aria-label="Rank {{ forloop.counter }}">{{ forloop.counter }}</span>
+                  <a class="trending-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1" aria-hidden="true">
+                    {% if story.image_1 %}
+                      <img src="{{ story.image_1|cloudinary_proxy }}" alt="" loading="lazy">
+                    {% else %}
+                      <img src="{% static '404.jpg' %}" alt="" loading="lazy">
+                    {% endif %}
                   </a>
-                  <div class="story-card-body">
-                    <div class="story-card-meta">
-                      <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
-                      <span class="meta-divider" aria-hidden="true"></span>
-                      <time class="meta-time" datetime="{{ story.date_created|date:'c' }}">{{ story.date_created|date:"M d, Y" }}</time>
-                    </div>
-                    <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
-                    <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
+                  <div class="trending-body">
+                    <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
+                    <h3 class="trending-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
+                    <span class="trending-meta">
+                      <svg viewBox="0 0 20 20" class="trending-eye" aria-hidden="true">
+                        <path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                        <circle cx="10" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                      </svg>
+                      {{ story.views }} views
+                    </span>
                   </div>
-                </article>
+                </li>
               {% endfor %}
-            </div>
+            </ol>
           </section>
         </aside>
       {% endif %}
@@ -405,7 +412,7 @@ visit https://www.abureport.com.ng for more up to date stories
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'blog/js/story-ticker.js' %}" defer></script>
-  <script src="{% static 'blog/js/category-recommendations.js' %}?v=20261006-3" defer></script>
+  <script src="{% static 'blog/js/category-recommendations.js' %}?v=20261006-4" defer></script>
 {% endblock %}
 
 {% block newsletter_popup %}

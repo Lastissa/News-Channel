@@ -13,6 +13,47 @@
   var loading = false;
   var observer = null;
 
+  var popularList = document.querySelector(".portfolio-popular-list");
+  var popularRail = document.querySelector(".portfolio-popular-rail");
+  var mobileLayout = window.matchMedia("(max-width: 899.98px)");
+  var popularRailPlaceholder = popularRail ? document.createComment("portfolio-popular-rail") : null;
+  if (popularRail && popularRail.parentNode && popularRailPlaceholder) {
+    popularRail.parentNode.insertBefore(popularRailPlaceholder, popularRail);
+  }
+
+  function placePopularRail() {
+    if (!popularRail || !popularRailPlaceholder || !popularRailPlaceholder.parentNode) return;
+
+    if (mobileLayout.matches) {
+      var firstStory = items && items.querySelector("[data-feed-story]");
+      if (firstStory) firstStory.insertAdjacentElement("afterend", popularRail);
+    } else {
+      popularRailPlaceholder.parentNode.insertBefore(popularRail, popularRailPlaceholder.nextSibling);
+    }
+  }
+
+  placePopularRail();
+  if (mobileLayout.addEventListener) {
+    mobileLayout.addEventListener("change", placePopularRail);
+  } else {
+    mobileLayout.addListener(placePopularRail);
+  }
+
+  if (popularList && "IntersectionObserver" in window) {
+    var popularObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
+          popularList.classList.add("is-inview");
+        } else if (!entry.isIntersecting) {
+          popularList.classList.remove("is-inview");
+        }
+      });
+    }, { threshold: [0, 0.2] });
+    popularObserver.observe(popularList);
+  } else if (popularList) {
+    popularList.classList.add("is-inview");
+  }
+
   if (!items || !sentinel || !skeleton || !nextPage) return;
 
   function showToast(message, tone) {

@@ -343,7 +343,11 @@ class StoryDetailView(View):
         if author_profile and isinstance(author_profile.speciality, list):
             author_tags = [str(tag).strip() for tag in author_profile.speciality if str(tag).strip()]
 
-        author_recent_stories = Blog.objects.filter(author=blog.author).exclude(pk=blog.pk).order_by("-date_created")[:3]
+        author_most_viewed_stories = (
+            Blog.objects.filter(author=blog.author)
+            .exclude(pk=blog.pk)
+            .order_by("-views", "-date_created", "-pk")[:3]
+        )
 
 
         #   ONLY A CONFIRMED NON-BOT REQUEST EVER MOVES THE COUNTER. A bot hit
@@ -408,7 +412,7 @@ class StoryDetailView(View):
             "comments": comments,
             "author_profile": author_profile,
             "author_tags": author_tags,
-            "author_recent_stories": author_recent_stories,
+            "author_most_viewed_stories": author_most_viewed_stories,
             "is_bookmarked": is_bookmarked,
             "is_liked": is_liked,
             "liked_comment_ids": request.session.get("liked_comments", []) if request.user.is_authenticated else [],

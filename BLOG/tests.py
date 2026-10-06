@@ -389,11 +389,26 @@ class StoryDetailRecommendationsMarkupTests(TestCase):
             heading="Story page recommendation test",
             content="First paragraph.\n\nSecond paragraph.",
         )
-        Blog.objects.create(
+        second = Blog.objects.create(
             author=author,
             category="GENERAL",
             heading="Another story from the same author",
             content="Author rail story content.",
+            views=30,
+        )
+        most_viewed = Blog.objects.create(
+            author=author,
+            category="GENERAL",
+            heading="Most viewed author story",
+            content="Popular author story content.",
+            views=90,
+        )
+        third = Blog.objects.create(
+            author=author,
+            category="GENERAL",
+            heading="Third author story",
+            content="Third author story content.",
+            views=20,
         )
 
         response = self.client.get(reverse("blog:story_detail", args=[story.slug]))
@@ -403,8 +418,10 @@ class StoryDetailRecommendationsMarkupTests(TestCase):
         self.assertContains(response, "data-read-also")
         self.assertContains(response, "Read similar stories")
         self.assertContains(response, 'class="read-also-skeleton"')
-        self.assertContains(response, "Also from Story Page Author")
+        self.assertContains(response, "Most viewed by Story Page Author")
         self.assertContains(response, "Another story from the same author")
+        self.assertContains(response, "Most viewed author story")
+        self.assertContains(response, 'class="trending-list author-most-viewed-list"')
         self.assertContains(response, "blog/js/category-recommendations.js")
         self.assertContains(response, 'class="story-like-icon"')
         self.assertContains(response, 'aria-label="Like this story"')
@@ -414,7 +431,10 @@ class StoryDetailRecommendationsMarkupTests(TestCase):
         self.assertLess(content.index("First paragraph.</p>"), content.index("<p>Second paragraph.</p>"))
         self.assertLess(content.index("<p>Second paragraph.</p>"), content.index("comments-title"))
         self.assertLess(content.index("comments-title"), content.index('data-read-also'))
-        self.assertLess(content.index('data-read-also'), content.index("Also from Story Page Author"))
+        self.assertLess(content.index('data-read-also'), content.index("Most viewed by Story Page Author"))
+        self.assertLess(content.index("Most viewed author story"), content.index("Another story from the same author"))
+        self.assertLess(content.index("Another story from the same author"), content.index("Third author story"))
+        self.assertNotIn(story.heading, content[content.index("author-most-viewed-list"):])
         self.assertIn("story-rail-read-also", content)
         self.assertIn("story-rail-author", content)
 

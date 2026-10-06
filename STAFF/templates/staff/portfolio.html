@@ -20,7 +20,7 @@
   <meta name="twitter:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
   <meta name="twitter:description" content="{{ meta_description }}">
   <script type="application/ld+json">{{ person_schema_json }}</script>
-  <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}">
+  <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}?v=20261006-2">
 {% endblock %}
 
 {% comment %}
@@ -134,48 +134,79 @@
     </div>
   </header>
 
-  <section class="portfolio-feed" id="portfolio-feed"
-           data-feed-url="{% url 'staff:portfolio_stories' staff_profile.slug %}"
-           data-next-page="{% if stories_page.has_next %}{{ stories_page.next_page_number }}{% endif %}"
-           aria-labelledby="portfolio-feed-title">
-    <header class="portfolio-feed-head">
-      <div>
-        <p class="portfolio-feed-eyebrow">Latest updates</p>
-        <h2 id="portfolio-feed-title">Posts by {{ display_name }}</h2>
-      </div>
-      <span class="portfolio-feed-count">{{ stats.story_count }} stor{{ stats.story_count|pluralize:"y,ies" }}</span>
-    </header>
+  <div class="portfolio-content-layout">
+    <section class="portfolio-feed" id="portfolio-feed"
+             data-feed-url="{% url 'staff:portfolio_stories' staff_profile.slug %}"
+             data-next-page="{% if stories_page.has_next %}{{ stories_page.next_page_number }}{% endif %}"
+             aria-labelledby="portfolio-feed-title">
+      <header class="portfolio-feed-head">
+        <div>
+          <p class="portfolio-feed-eyebrow">Latest updates</p>
+          <h2 id="portfolio-feed-title">Posts by {{ display_name }}</h2>
+        </div>
+        <span class="portfolio-feed-count">{{ stats.story_count }} stor{{ stats.story_count|pluralize:"y,ies" }}</span>
+      </header>
 
-    {% if stories %}
-      <div class="portfolio-feed-items" data-feed-items>
-        {% include "staff/partials/portfolio_feed_items.html" %}
-      </div>
-      <div class="portfolio-feed-skeleton" data-feed-skeleton hidden aria-hidden="true">
-        <article class="portfolio-feed-card portfolio-feed-skeleton-card">
-          <span class="portfolio-skeleton-line portfolio-skeleton-line--short"></span>
-          <span class="portfolio-skeleton-line portfolio-skeleton-line--title"></span>
-          <span class="portfolio-skeleton-media"></span>
-          <span class="portfolio-skeleton-line"></span>
-          <span class="portfolio-skeleton-line portfolio-skeleton-line--medium"></span>
-        </article>
-        <article class="portfolio-feed-card portfolio-feed-skeleton-card">
-          <span class="portfolio-skeleton-line portfolio-skeleton-line--short"></span>
-          <span class="portfolio-skeleton-line portfolio-skeleton-line--title"></span>
-          <span class="portfolio-skeleton-media"></span>
-          <span class="portfolio-skeleton-line"></span>
-          <span class="portfolio-skeleton-line portfolio-skeleton-line--medium"></span>
-        </article>
-      </div>
-      <div class="portfolio-feed-sentinel" data-feed-sentinel
-           {% if not stories_page.has_next %}hidden{% endif %} aria-hidden="true"></div>
-      <p class="portfolio-feed-end" data-feed-end {% if stories_page.has_next %}hidden{% endif %}>
-        You're all caught up.
-      </p>
-      <p class="sr-only" data-feed-status aria-live="polite"></p>
-    {% else %}
-      <p class="portfolio-feed-empty">No stories published yet.</p>
+      {% if stories %}
+        <div class="portfolio-feed-items" data-feed-items>
+          {% include "staff/partials/portfolio_feed_items.html" %}
+        </div>
+        <div class="portfolio-feed-skeleton" data-feed-skeleton hidden aria-hidden="true">
+          <article class="portfolio-feed-card portfolio-feed-skeleton-card">
+            <span class="portfolio-skeleton-line portfolio-skeleton-line--short"></span>
+            <span class="portfolio-skeleton-line portfolio-skeleton-line--title"></span>
+            <span class="portfolio-skeleton-media"></span>
+            <span class="portfolio-skeleton-line"></span>
+            <span class="portfolio-skeleton-line portfolio-skeleton-line--medium"></span>
+          </article>
+          <article class="portfolio-feed-card portfolio-feed-skeleton-card">
+            <span class="portfolio-skeleton-line portfolio-skeleton-line--short"></span>
+            <span class="portfolio-skeleton-line portfolio-skeleton-line--title"></span>
+            <span class="portfolio-skeleton-media"></span>
+            <span class="portfolio-skeleton-line"></span>
+            <span class="portfolio-skeleton-line portfolio-skeleton-line--medium"></span>
+          </article>
+        </div>
+        <div class="portfolio-feed-sentinel" data-feed-sentinel
+             {% if not stories_page.has_next %}hidden{% endif %} aria-hidden="true"></div>
+        <p class="portfolio-feed-end" data-feed-end {% if stories_page.has_next %}hidden{% endif %}>
+          You're all caught up.
+        </p>
+        <p class="sr-only" data-feed-status aria-live="polite"></p>
+      {% else %}
+        <p class="portfolio-feed-empty">No stories published yet.</p>
+      {% endif %}
+    </section>
+
+    {% if top_viewed_stories %}
+      <aside class="portfolio-popular-rail" aria-labelledby="portfolio-popular-title">
+        <section class="portfolio-popular-section">
+          <header class="portfolio-popular-heading">
+            <h2 id="portfolio-popular-title">Most viewed stories</h2>
+          </header>
+          <ol class="portfolio-popular-list">
+            {% for story in top_viewed_stories %}
+              <li class="portfolio-popular-item">
+                <span class="portfolio-popular-rank" aria-label="Rank {{ forloop.counter }}">{{ forloop.counter }}</span>
+                <a class="portfolio-popular-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1" aria-hidden="true">
+                  {% if story.image_1 %}
+                    <img src="{{ story.image_1|default:'https://placehold.co/160x160/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+                  {% else %}
+                    <img src="{% static '404.jpg' %}" alt="" loading="lazy">
+                  {% endif %}
+                </a>
+                <div class="portfolio-popular-copy">
+                  <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
+                  <h3><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
+                  <span class="portfolio-popular-views">{{ story.views|floatformat:"0g" }} views</span>
+                </div>
+              </li>
+            {% endfor %}
+          </ol>
+        </section>
+      </aside>
     {% endif %}
-  </section>
+  </div>
 </section>
 
 {% if False %}
@@ -434,5 +465,5 @@
 
 {% block extra_scripts %}
   {{ block.super }}
-  <script src="{% static 'staff/js/portfolio-feed.js' %}" defer></script>
+  <script src="{% static 'staff/js/portfolio-feed.js' %}?v=20261006-3" defer></script>
 {% endblock %}

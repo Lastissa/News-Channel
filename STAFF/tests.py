@@ -27,6 +27,7 @@ class PortfolioFeedTests(TestCase):
                 heading=f"Portfolio story {index}",
                 category="NEWS",
                 content=f"Story content {index}",
+                views=index * 10,
             )
             for index in range(7)
         ]
@@ -38,8 +39,25 @@ class PortfolioFeedTests(TestCase):
         self.assertContains(response, "Posts by Portfolio Author")
         self.assertContains(response, "portfolio-feed-skeleton")
         self.assertContains(response, "data-next-page=\"2\"")
+        self.assertContains(response, "portfolio-feed.js?v=20261006-3")
         self.assertNotContains(response, "Recent story reach")
         self.assertEqual(len(response.context["stories"]), 6)
+        self.assertEqual(
+            [story.heading for story in response.context["top_viewed_stories"]],
+            ["Portfolio story 6", "Portfolio story 5", "Portfolio story 4"],
+        )
+        content = response.content.decode()
+        rail_start = content.index('class="portfolio-popular-rail"')
+        feed_start = content.index('id="portfolio-feed"')
+        self.assertGreater(rail_start, feed_start)
+        self.assertLess(
+            content.index("Portfolio story 6", rail_start),
+            content.index("Portfolio story 5", rail_start),
+        )
+        self.assertLess(
+            content.index("Portfolio story 5", rail_start),
+            content.index("Portfolio story 4", rail_start),
+        )
 
     def test_feed_endpoint_returns_next_slice_and_pagination_headers(self):
         final_story = self.stories[0]

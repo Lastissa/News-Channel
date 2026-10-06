@@ -325,6 +325,11 @@ class PortfolioView(View):
 
         stories_page = _portfolio_story_paginator(author).get_page(1)
         stories = _prepare_portfolio_stories(stories_page.object_list)
+        top_viewed_stories = (
+            Blog.objects.filter(author=author)
+            .only("id", "slug", "heading", "category", "image_1", "views")
+            .order_by("-views", "-date_created", "-pk")[:3]
+        )
 
         context = {
             "author": author,
@@ -341,6 +346,7 @@ class PortfolioView(View):
             "top_category": coverage[0]["label"] if coverage else "",
             "stories": stories,
             "stories_page": stories_page,
+            "top_viewed_stories": top_viewed_stories,
             "follower_count": follower_count,
             "following_count": following_count,
             "is_following": is_following,
