@@ -4,6 +4,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 
 from HOME.views import BingIndexNowView, YandexIndexNow, FavicoView, RobotsTxtView, SitemapXmlView, UnsubscribeView
+from STAFF.views import EditorialTeamView
 
 handler404 = "HOME.views.handler404"
 handler500 = "HOME.views.handler500"
@@ -18,10 +19,10 @@ urlpatterns = [
     path('sy/', include("_.urls")),
     path('_admin/', admin.site.urls),
     path('control/', include("ADMIN.urls")),
+    path('editorial/', EditorialTeamView.as_view(), name="editorial_team"),
     path('auth/', include("AUTHENTICATION.urls")),
     path('story/', include("BLOG.urls")),
     path('portfolio/', include("STAFF.urls")),
     path('archive/', include("ARCHIVE.urls")),
     path('', include("HOME.urls")),
 ]
-

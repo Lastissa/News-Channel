@@ -13,7 +13,7 @@
       <ul>
         <li><a href="{{ home_url }}"{% if request.path == home_url %} class="is-current" aria-current="page"{% endif %}>Home</a></li>
         <li><a href="{{ archive_url }}"{% if request.path == archive_url %} class="is-current" aria-current="page"{% endif %}>Archive</a></li>
-        <li><a href="#" class="soon" >Editorial team</a></li>
+        <li><a href="{% url 'editorial_team' %}"{% if request.resolver_match.url_name == "editorial_team" %} class="is-current" aria-current="page"{% endif %}>Editorial team</a></li>
         <li class="has-dropdown">
           <button type="button" class="dropdown-toggle" aria-expanded="false" aria-haspopup="true">News category
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>

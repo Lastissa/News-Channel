@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime, time
 
 from django.core.paginator import EmptyPage, Paginator
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.http import Http404, JsonResponse
 from django.shortcuts import render
@@ -394,6 +394,110 @@ class PortfolioView(View):
             schema["sameAs"] = same_as
         #   Encode < so a bio can never close the script tag early.
         return json.dumps(schema, ensure_ascii=False).replace("<", "\\u003c")
+
+
+class EditorialTeamView(View):
+    """Public directory of active editorial accounts and their published work."""
+
+    def get(self, request):
+        from SERVICE_INTERNAL.config import About
+
+        authors = list(
+            Auth.objects.filter(is_active=True)
+            .filter(Q(is_staff=True) | Q(is_admin=True) | Q(is_superuser=True))
+            .annotate(
+                story_count=Count("blogs"),
+                total_views=Sum("blogs__views"),
+            )
+            .prefetch_related(
+                Prefetch(
+                    "blogs",
+                    queryset=Blog.objects.only(
+                        "id", "author_id", "slug", "heading", "category", "image_1", "date_created"
+                    ).order_by("-date_created", "-pk")[:1],
+                    to_attr="latest_editorial_stories",
+                )
+            )
+        )
+        profiles = {
+            profile.auth_id: profile
+            for profile in StaffProfile.objects.filter(auth_id__in=[author.pk for author in authors])
+        }
+
+        members = []
+        for author in authors:
+            profile = profiles.get(author.pk)
+            speciality = profile.speciality if profile and isinstance(profile.speciality, list) else []
+            members.append(
+                {
+                    "display_name": _display_name(profile, author),
+                    "portrait": author.profile_img or "",
+                    "slug": profile.slug if profile else "",
+                    "profile": profile,
+                    "speciality": [str(beat).strip() for beat in speciality if str(beat).strip()],
+                    "joined": author.date_joined,
+                    "story_count": author.story_count,
+                    "total_views": author.total_views or 0,
+                    "latest_story": next(iter(author.latest_editorial_stories), None),
+                }
+            )
+
+        members.sort(key=lambda member: member["display_name"].casefold())
+        total_stories = Blog.objects.count()
+
+        contributors_with_stories = [
+            member for member in members if member["latest_story"] is not None
+        ]
+        highlight = max(
+            contributors_with_stories,
+            key=lambda member: member["latest_story"].date_created,
+            default=None,
+        )
+        person_schema = [
+            {
+                "@type": "Person",
+                "name": member["display_name"],
+                **(
+                    {
+                        "url": (
+                            f"{About.domain.rstrip('/')}"
+                            f"{reverse('staff:portfolio', args=[member['slug']])}"
+                        )
+                    }
+                    if member["slug"]
+                    else {}
+                ),
+            }
+            for member in members
+        ]
+        team_schema = {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": f"{About.project_name} Editorial Team",
+            "url": f"{About.domain.rstrip('/')}{reverse('editorial_team')}",
+            "member": person_schema,
+        }
+        team_schema_json = json.dumps(team_schema, ensure_ascii=False).replace("<", "\\u003c")
+
+        return render(
+            request,
+            "staff/editorial_team.html",
+            {
+                "members": members,
+                "highlight": highlight,
+                "team_size": len(members),
+                "total_stories": total_stories,
+                "project_name": About.project_name,
+                "project_cachphrase": About.project_cachphrase,
+                "meta_description": (
+                    f"Meet the writers and editors behind {About.project_name}, "
+                    f"browse their latest work, and explore all {len(members)} active "
+                    f"editorial team members."
+                ),
+                "team_schema_json": team_schema_json,
+                "page_og_image": highlight["portrait"] if highlight else None,
+            },
+        )
 
 
 class PortfolioStoriesView(View):

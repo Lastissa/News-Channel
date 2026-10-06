@@ -1,442 +1,281 @@
 {% extends "base.html" %}
-{% load static l10n %}
-
-{% comment %}
-  THE EDITORIAL TEAM PAGE.
-
-  Rule this whole template follows: it prints what the database holds and
-  nothing else. Every count, date and name below comes from the view's
-  aggregates. Where a person has no bio, no stated beat, no promotion on
-  record or no published story, the block is simply absent -- there is no
-  placeholder, no sample text, no "coming soon" standing in for a fact the
-  newsroom has not recorded yet.
-{% endcomment %}
+{% load static %}
 
 {% block title %}Editorial Team · {{ project_name }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
 
+{% block og_image %}
+  {% if page_og_image %}
+  <meta property="og:image" content="{{ page_og_image }}">
+  <meta name="twitter:image" content="{{ page_og_image }}">
+  {% else %}
+  {{ block.super }}
+  {% endif %}
+{% endblock og_image %}
+
 {% block extra_head %}
   {{ block.super }}
-  {% comment %} canonical + og:url already come from base.html via site_domain + request.path {% endcomment %}
   <meta property="og:type" content="website">
   <meta property="og:title" content="Editorial Team · {{ project_name }}">
   <meta property="og:description" content="{{ meta_description }}">
-  {% comment %} The view hands over JSON that is already safe to print raw:
-     <, > and & are escaped there, so |safe here cannot let a name or
-     headline break out of the script element. Do NOT swap this for
-     `json_script`, which hardcodes type="application/json" and is ignored
-     by search engines. {% endcomment %}
   <script type="application/ld+json">{{ team_schema_json|safe }}</script>
-  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}">
+  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261006-2">
 {% endblock %}
 
 {% block content %}
-<section class="team-shell">
-
-  {# ---------- MASTHEAD: the page's only claim, and it is a real count ---------- #}
-  <header class="team-masthead">
-    <p class="team-kicker">{{ project_name }}</p>
-    <h1>Editorial Team</h1>
-    <p class="team-standfirst">{{ project_cachphrase }}</p>
-
-    {% comment %}
-      THE THREE FIGURES A READER ACTUALLY WANTS FROM THIS PAGE, all of them
-      counted live. Rendered only when they are non zero, so an empty
-      newsroom never displays a row of zeroes as if it were a result.
-    {% endcomment %}
-    {% if team_size or week_story_count %}
-    <dl class="team-figures">
-      {% if team_size %}
-      <div>
-        <dt>On the team</dt>
-        <dd>{{ team_size }}</dd>
-        <small>{{ team_size|pluralize:"member,members" }}</small>
-      </div>
-      {% endif %}
-      {% if week_story_count %}
-      <div>
-        <dt>Last {{ week_days }} days</dt>
-        <dd>{{ week_story_count }}</dd>
-        <small>{{ week_story_count|pluralize:"story,stories" }} published</small>
-      </div>
-      {% endif %}
-    </dl>
-    {% endif %}
-  </header>
-
-  {# ---------- RECENT HIGHLIGHT: the one featured writer ---------- #}
-  <section class="team-week" aria-labelledby="team-week-heading">
-    <header class="team-section-head">
-      <h2 id="team-week-heading">Recent highlight</h2>
-      {% comment %}
-        THE EXACT WINDOW, PRINTED. "This week" on its own is unfalsifiable:
-        a reader cannot tell whether it means the last seven times 24 hours,
-        the last seven days including empty ones, or the current calendar
-        week. Both ends of the real window this page counted are shown, so
-        the figure underneath can be checked against the story dates.
-      {% endcomment %}
-      <p class="team-section-note">
-        Most stories published between {{ window_start_label }} and {{ window_end_label }}.
-      </p>
-    </header>
-
-    {% if has_highlight %}
-    <article class="team-featured">
-      <header class="team-featured-bar">
-        <p class="team-featured-flag">
-          <span class="team-featured-flag-text">Most stories published</span>
-        </p>
-        <p class="team-featured-window">
-          <time datetime="{{ window_start|date:'c' }}">{{ window_start_label }}</time>
-          <span class="team-featured-window-to">to</span>
-          <time datetime="{{ window_end|date:'c' }}">{{ window_end_label }}</time>
-        </p>
-      </header>
-
-      <div class="team-featured-body">
-        <div class="team-featured-who">
-          <div class="team-portrait team-portrait-xl">
-            {% if highlight.portrait %}
-              <img src="{{ highlight.portrait }}" alt="" loading="eager" width="96" height="96"
-                   onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
-              <span class="team-initial" hidden aria-hidden="true">{{ highlight.display_name|slice:":1"|upper }}</span>
-            {% else %}
-              {% comment %} NO PHOTO ON RECORD. An initial tile, never a stock
-                face: putting a picture of somebody who did not upload one
-                would be inventing a likeness for a real named person. {% endcomment %}
-              <span class="team-initial" aria-hidden="true">{{ highlight.display_name|slice:":1"|upper }}</span>
-            {% endif %}
-          </div>
-          <div class="team-featured-id">
-            <h3 class="team-featured-name">
-              {% if highlight.slug %}<a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.display_name }}</a>
-              {% else %}{{ highlight.display_name }}{% endif %}
-            </h3>
-            <p class="team-featured-role">{{ highlight.role_label }}</p>
-            {% if highlight.speciality %}
-            <ul class="team-beats team-beats-featured">
-              {% for beat in highlight.speciality %}<li>{{ beat }}</li>{% endfor %}
-            </ul>
-            {% endif %}
-          </div>
-        </div>
-
-        {% comment %}
-          THE HEADLINE NUMBER, WITH ITS DENOMINATOR. "6 stories" on its own is
-          a boast; "6 of the 10 the newsroom published" is a measurement.
-          Both numbers are the same database count, so they cannot disagree.
-        {% endcomment %}
-        <div class="team-featured-figure">
-          <p class="team-featured-count">
-            <strong>{{ highlight.headline_count }}</strong>
-            <span class="team-featured-count-word">{{ highlight.headline_count|pluralize:"story,stories" }}</span>
-          </p>
-          <p class="team-featured-share">
-            of the {{ highlight.week_total }} {{ highlight.week_total|pluralize:"story,stories" }}
-            the newsroom published in that window
-          </p>
-        </div>
-      </div>
-
-      {% comment %}
-        THE STORIES THEMSELVES, so the number above is checkable rather than
-        a bare score. A writer with more stories than the preview cap says so
-        honestly instead of quietly showing a truncated list as if that were
-        all they filed.
-      {% endcomment %}
-      {% if highlight.stories %}
-      <div class="team-featured-work">
-        <h4 class="team-featured-work-head">What they filed</h4>
-        <ol class="team-featured-stories">
-          {% for story in highlight.stories %}
-          <li class="team-featured-story">
-            <a class="team-featured-story-link" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
-            <p class="team-featured-story-meta">
-              <span class="team-cat team-cat-on-dark">{{ story.get_category_display|title }}</span>
-              <time datetime="{{ story.date_created|date:'c' }}">{{ story.date_created|date:"M d, H:i" }}</time>
-              <span>{{ story.views }} view{{ story.views|pluralize }}</span>
-            </p>
-          </li>
-          {% endfor %}
-        </ol>
-        {% if highlight.week_hidden_count %}
-        <p class="team-featured-more">
-          {{ highlight.stories|length }} of {{ highlight.headline_count }} shown,
-          {{ highlight.week_hidden_count }} more in the same window
-        </p>
-        {% endif %}
-      </div>
-      {% endif %}
-
-      <footer class="team-featured-foot">
-        {% if highlight.slug %}
-        <a class="team-btn" href="{% url 'staff:portfolio' highlight.slug %}">Open their portfolio</a>
-        {% endif %}
-        {% if highlight.story_count %}
-        <p class="team-featured-lifetime">
-          <strong>{{ highlight.story_count }}</strong>
-          {{ highlight.story_count|pluralize:"story,stories" }} and
-          <strong>{{ highlight.total_views|floatformat:"0g" }}</strong>
-          {{ highlight.total_views|pluralize:"view,views" }} all time
-        </p>
-        {% endif %}
-        <p class="team-featured-rule">
-          Ranked by stories published in the window, nothing else. Writers who tied share the position shown.
-        </p>
-      </footer>
-    </article>
-
-    {# ---------- EVERYONE ELSE WHO REPORTED, COUNTED AND NAMED ---------- #}
-    {% if runners_up %}
-    <div class="team-others">
-      <h3 class="team-others-heading">Everyone else who reported in this window</h3>
-      <ol class="team-others-list">
-        {% for runner in runners_up %}
-        <li class="team-other">
-          <p class="team-other-position" aria-hidden="true">{{ runner.position }}</p>
-          <div class="team-portrait team-portrait-sm">
-            {% if runner.portrait %}
-              <img src="{{ runner.portrait }}" alt="" loading="lazy" width="44" height="44"
-                   onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
-              <span class="team-initial" hidden aria-hidden="true">{{ runner.display_name|slice:":1"|upper }}</span>
-            {% else %}
-              <span class="team-initial" aria-hidden="true">{{ runner.display_name|slice:":1"|upper }}</span>
-            {% endif %}
-          </div>
-          <div class="team-other-body">
-            <h4 class="team-other-name">
-              {% if runner.slug %}<a href="{% url 'staff:portfolio' runner.slug %}">{{ runner.display_name }}</a>
-              {% else %}{{ runner.display_name }}{% endif %}
-            </h4>
-            <p class="team-other-meta">
-              <span class="team-role-tag">{{ runner.role_label }}</span>
-              <span class="team-other-count">
-                {{ runner.headline_count }} {{ runner.headline_count|pluralize:"story,stories" }}
-              </span>
-            </p>
-            {% if runner.lead_story %}
-            <p class="team-other-story">
-              Latest
-              <a href="{% url 'blog:story_detail' runner.lead_story.0.slug %}">{{ runner.lead_story.0.heading }}</a>
-            </p>
-            {% endif %}
-          </div>
-        </li>
-        {% endfor %}
-      </ol>
-    </div>
-    {% endif %}
-    {% else %}
-    <p class="team-empty">
-      No stories were published in the last {{ week_days }} days, so there is nobody to
-      feature. The window counted was {{ window_start_label }} to {{ window_end_label }};
-      the roster below still shows who is on the team.
+<div class="editorial-page">
+  <section class="editorial-intro" aria-labelledby="editorial-title">
+    <p class="editorial-eyebrow"><span aria-hidden="true"></span> The people behind the reporting</p>
+    <h1 id="editorial-title">Meet our <em>editorial team.</em></h1>
+    <p class="editorial-lead">
+      Get to know our journalists and explore the stories they bring to {{ project_name }}.
     </p>
-    {% endif %}
+    <div class="editorial-stats" aria-label="Editorial team statistics">
+      <div class="editorial-stat" aria-label="{{ team_size }} active team members">
+        <strong class="editorial-count" data-count-up="{{ team_size }}">{{ team_size }}</strong>
+        <span class="editorial-stat-label">
+          <svg class="editorial-stat-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Active {{ team_size|pluralize:"journalist,journalists" }}
+        </span>
+      </div>
+      <span class="editorial-stat-divider" aria-hidden="true"></span>
+      <div class="editorial-stat" aria-label="{{ total_stories }} published stories">
+        <strong class="editorial-count" data-count-up="{{ total_stories }}">{{ total_stories }}</strong>
+        <span class="editorial-stat-label">
+          <svg class="editorial-stat-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5z"></path>
+            <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20M8 6h8M8 9h8"></path>
+          </svg>
+          All published {{ total_stories|pluralize:"story,stories" }}
+        </span>
+      </div>
+    </div>
   </section>
 
-  {# ---------- THE ROSTER ---------- #}
-  <section class="team-roster" aria-labelledby="team-roster-heading">
-    <header class="team-section-head">
-      <h2 id="team-roster-heading">The team</h2>
-      <p class="team-section-note">
-        {% if team_size %}
-          Everyone with an active profile on the {{ project_name }} newsroom, grouped by role.
+  {% if highlight %}
+  <section class="editorial-spotlight" aria-labelledby="editorial-spotlight-title">
+    <div class="editorial-spotlight-copy">
+      <p class="editorial-spotlight-label">Latest story</p>
+      <h2 id="editorial-spotlight-title">
+        {% if highlight.latest_story.slug %}
+          <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}">{{ highlight.latest_story.heading }}</a>
         {% else %}
-          No editorial staff profiles exist yet, so there is nobody to list.
+          {{ highlight.latest_story.heading }}
+        {% endif %}
+      </h2>
+      <p class="editorial-spotlight-byline">
+        By
+        {% if highlight.slug %}
+          <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.display_name }}</a>
+        {% else %}
+          {{ highlight.display_name }}
+        {% endif %}
+        {% if highlight.latest_story.date_created %}
+          <span aria-hidden="true">·</span>
+          <time datetime="{{ highlight.latest_story.date_created|date:'c' }}">
+            {{ highlight.latest_story.date_created|date:"F j, Y" }}
+          </time>
         {% endif %}
       </p>
+      {% if highlight.slug %}
+      <a class="editorial-spotlight-link" href="{% url 'staff:portfolio' highlight.slug %}">
+        Explore their stories <span aria-hidden="true">↗</span>
+      </a>
+      {% endif %}
+    </div>
+    <div class="editorial-spotlight-scene">
+      <div class="editorial-spotlight-art" aria-hidden="true">
+        <span class="editorial-spotlight-art-label">{{ project_name }} / THE NEWSROOM</span>
+        <span class="editorial-spotlight-art-number">01</span>
+        <span class="editorial-spotlight-art-rule"></span>
+        <span class="editorial-spotlight-art-word">REPORT</span>
+      </div>
+      <div class="editorial-spotlight-portrait" aria-hidden="true">
+        {% if highlight.portrait %}
+        <img src="{{ highlight.portrait }}" alt="" loading="lazy"
+             onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
+        <span hidden>{{ highlight.display_name|slice:":1"|upper }}</span>
+        {% else %}
+        <span>{{ highlight.display_name|slice:":1"|upper }}</span>
+        {% endif %}
+      </div>
+      {% if highlight.slug %}
+      <a class="editorial-spotlight-profile" href="{% url 'staff:portfolio' highlight.slug %}">
+      {% else %}
+      <div class="editorial-spotlight-profile">
+      {% endif %}
+        <span class="editorial-profile-avatar" aria-hidden="true">
+          {% if highlight.portrait %}
+          <img src="{{ highlight.portrait }}" alt="" loading="lazy">
+          {% else %}
+          {{ highlight.display_name|slice:":1"|upper }}
+          {% endif %}
+        </span>
+        <span class="editorial-profile-copy">
+          <small>Latest by</small>
+          <strong>{{ highlight.display_name }}</strong>
+        </span>
+        {% if highlight.slug %}
+        <svg class="editorial-profile-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M5 12h14M13 5l7 7-7 7"></path>
+        </svg>
+        {% endif %}
+      {% if highlight.slug %}
+      </a>
+      {% else %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="editorial-roster" aria-labelledby="editorial-roster-title">
+    <header class="editorial-section-heading">
+      <div>
+        <p class="editorial-eyebrow">{{ project_name }}</p>
+        <h2 id="editorial-roster-title">The team</h2>
+      </div>
+      <p>Browse their work by name, subject, or story.</p>
     </header>
 
-    {% for group in team_groups %}
-    <section class="team-role-group" aria-labelledby="team-role-{{ forloop.counter }}">
-      <h3 class="team-role-heading" id="team-role-{{ forloop.counter }}">
-        {{ group.role_label }}
-        <span class="team-role-count">{{ group.members|length }}</span>
-      </h3>
+    {% if members %}
+    <div class="editorial-directory-tools">
+      <div class="editorial-search">
+        <span class="editorial-search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
+        </span>
+        <label class="sr-only" for="editorial-journalist-search">Search journalists</label>
+        <input
+          id="editorial-journalist-search"
+          type="search"
+          data-journalist-search
+          aria-controls="editorial-directory"
+          placeholder="Search journalists, topics, or stories"
+          autocomplete="off"
+        >
+        <button type="button" class="editorial-search-clear" data-search-clear aria-label="Clear journalist search" hidden>
+          <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"></path></svg>
+        </button>
+        <kbd aria-hidden="true">/</kbd>
+      </div>
+      <p class="editorial-search-status" data-search-status role="status" aria-live="polite">
+        Showing {{ team_size }} {{ team_size|pluralize:"journalist,journalists" }}
+      </p>
+    </div>
 
-      <ul class="team-grid">
-        {% for member in group.members %}
-        <li class="team-card">
-          <div class="team-portrait">
-            {% if member.portrait %}
-              <img src="{{ member.portrait }}" alt="" loading="lazy" width="56" height="56"
+    <ul class="editorial-grid" id="editorial-directory">
+      {% for member in members %}
+        <li
+          class="editorial-card"
+          data-journalist-card
+          data-search-text="{{ member.display_name }} {{ member.profile.bio|default:'' }} {{ member.speciality|join:' ' }} {{ member.latest_story.heading|default:'' }} {{ member.latest_story.category|default:'' }}"
+        >
+          <div class="editorial-card-top">
+            <div class="editorial-avatar">
+              {% if member.portrait %}
+              <img src="{{ member.portrait }}" alt="" loading="lazy" width="72" height="72"
                    onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
-              <span class="team-initial" hidden aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
-            {% else %}
-              <span class="team-initial" aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
+              <span hidden aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
+              {% else %}
+              <span aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
+              {% endif %}
+            </div>
+            {% if member.joined %}
+            <time class="editorial-member-since" datetime="{{ member.joined|date:'c' }}">
+              Joined {{ member.joined|date:"Y" }}
+            </time>
             {% endif %}
           </div>
 
-          <div class="team-card-body">
-            <h4 class="team-card-name">
-              {% if member.slug %}<a href="{% url 'staff:portfolio' member.slug %}">{{ member.display_name }}</a>
-              {% else %}{{ member.display_name }}{% endif %}
-            </h4>
-
-            <p class="team-card-meta">
-              <span class="team-role-tag">{{ member.role_label }}</span>
-              {% if member.joined %}
-              <span class="team-card-joined">On the team since {{ member.joined|date:"F Y" }}</span>
-              {% endif %}
-            </p>
-
-            {% if member.promoted %}
-            <p class="team-card-promoted">Last promoted {{ member.promoted|date:"F Y" }}</p>
+          <h4 class="editorial-name">
+            {% if member.slug %}
+            <a href="{% url 'staff:portfolio' member.slug %}">{{ member.display_name }}</a>
+            {% else %}
+            {{ member.display_name }}
             {% endif %}
+          </h4>
 
-            {% if member.speciality %}
-            <ul class="team-beats">
-              {% for beat in member.speciality %}<li>{{ beat }}</li>{% endfor %}
-            </ul>
-            {% endif %}
+          {% if member.profile.bio %}
+          <p class="editorial-bio">{{ member.profile.bio|truncatechars:190 }}</p>
+          {% endif %}
 
-            {% if member.profile.bio %}
-            <p class="team-card-bio">{{ member.profile.bio|truncatechars:220 }}</p>
-            {% endif %}
+          {% if member.speciality %}
+          <ul class="editorial-beats" aria-label="Reporting specialties">
+            {% for beat in member.speciality %}<li>{{ beat }}</li>{% endfor %}
+          </ul>
+          {% endif %}
 
-            {% comment %}
-              LIFETIME OUTPUT, FROM THE SAME AGGREGATE THE PORTFOLIO USES.
-              A member who has not filed yet says exactly that. They are
-              still listed: someone who joined the newsroom and has not
-              published is a fact about the team, not a reason to hide them.
-            {% endcomment %}
-            <p class="team-card-output">
-              {% if member.story_count %}
-                <strong>{{ member.story_count }}</strong>
-                {{ member.story_count|pluralize:"story,stories" }},
-                <strong>{{ member.total_views|floatformat:"0g" }}</strong>
-                {{ member.total_views|pluralize:"view,views" }} all time
-              {% else %}
-                No stories published yet
-              {% endif %}
-            </p>
-
-            {% if member.profile.tribute_bio %}
-            {% comment %} THE EDITORS' OWN NOTE ABOUT THIS PERSON, written by
-              an admin. Only rendered where one was actually written, and
-              attributed as an endorsement rather than as biography. {% endcomment %}
-            <div class="team-endorsement">
-              <span class="team-endorsement-label">From the editors</span>
-              <p>{{ member.profile.tribute_bio|truncatechars:260 }}</p>
+          <div class="editorial-card-foot">
+            <div class="editorial-output">
+              <strong>{{ member.story_count }}</strong>
+              {{ member.story_count|pluralize:"story,stories" }}
+              <span class="editorial-output-divider" aria-hidden="true"></span>
+              <strong>{{ member.total_views|floatformat:"0g" }}</strong>
+              {{ member.total_views|pluralize:"view,views" }}
+            </div>
+            {% if member.latest_story %}
+            <article class="editorial-latest">
+              <div class="editorial-latest-media" aria-hidden="true">
+                {% if member.latest_story.image_1 %}
+                <img src="{{ member.latest_story.image_1 }}" alt="" loading="lazy" width="112" height="84">
+                {% else %}
+                <span>{{ member.latest_story.heading|slice:":1"|upper }}</span>
+                {% endif %}
+              </div>
+              <div class="editorial-latest-copy">
+                <p class="editorial-latest-kicker">
+                  <span>Latest story</span>
+                  {% if member.latest_story.category %}<span>{{ member.latest_story.get_category_display|title }}</span>{% endif %}
+                </p>
+                {% if member.latest_story.slug %}
+                <a class="editorial-latest-headline" href="{% url 'blog:story_detail' member.latest_story.slug %}">
+                  {{ member.latest_story.heading }}
+                  <span aria-hidden="true">↗</span>
+                </a>
+                {% else %}
+                <p class="editorial-latest-headline">{{ member.latest_story.heading }}</p>
+                {% endif %}
+                {% if member.latest_story.date_created %}
+                <time class="editorial-latest-date" datetime="{{ member.latest_story.date_created|date:'c' }}">
+                  {{ member.latest_story.date_created|date:"M j, Y" }}
+                </time>
+                {% endif %}
+              </div>
+            </article>
+            {% else %}
+            <div class="editorial-latest editorial-latest-empty">
+              <div class="editorial-latest-media" aria-hidden="true"><span>+</span></div>
+              <div class="editorial-latest-copy">
+                <p class="editorial-latest-kicker"><span>Latest story</span></p>
+                <p class="editorial-no-story">No stories published yet</p>
+              </div>
             </div>
             {% endif %}
           </div>
         </li>
-        {% endfor %}
-      </ul>
-    </section>
-    {% empty %}
-    <p class="team-empty">
-      No editorial staff to show yet. A profile appears here once a staff account has one.
-    </p>
-    {% endfor %}
-
-    {% comment %}
-      STAFF ONLY, AND ONLY WHEN THE NUMBER IS NON ZERO. Published work by
-      staff accounts with no profile has no name and no portfolio page
-      behind it, so it cannot be listed honestly. Rather than invent a card
-      for it or let it disappear without trace, the count is raised to the
-      people who can fix it. Never rendered for visitors or plain members.
-    {% endcomment %}
-    {% if unprofiled_story_count %}
-    <p class="team-internal-note">
-      <strong>{{ unprofiled_story_count }}</strong>
-      {{ unprofiled_story_count|pluralize:"story has,stories have" }} been published by
-      {{ unprofiled_story_count|pluralize:"a staff account,staff accounts" }}
-      {{ unprofiled_story_count|pluralize:"that has,that have" }} no staff profile yet, so
-      {{ unprofiled_story_count|pluralize:"it is,they are" }} left out of the totals on this page.
-    </p>
+      {% endfor %}
+    </ul>
+    <div class="editorial-search-empty" data-search-empty hidden>
+      <span aria-hidden="true">⌕</span>
+      <h3>No journalists found</h3>
+      <p>Try another name, topic, or story title.</p>
+    </div>
+    {% else %}
+    <div class="editorial-empty">
+      <span aria-hidden="true">✦</span>
+      <h3>Our newsroom is getting ready.</h3>
+      <p>There are no active editorial team members to display yet.</p>
+    </div>
     {% endif %}
   </section>
+</div>
+{% endblock %}
 
-  {# ---------- HOW THIS NEWSROOM WORKS ---------- #}
-  {% comment %}
-    Every line below describes something the code actually does. No code of
-    conduct, ethics pledge or corrections policy is invented here: an
-    editorial page that publishes rules nobody wrote is worse than one that
-    publishes none. What is listed is the writing format every story must
-    follow (see DOCS/NEWS_CONTENT_CONVENTION.MD) and the two publishing
-    guarantees the models enforce.
-  {% endcomment %}
-  <section class="team-practice" aria-labelledby="team-practice-heading">
-    <header class="team-section-head">
-      <h2 id="team-practice-heading">How this newsroom works</h2>
-      <p class="team-section-note">The rules the publishing system actually enforces.</p>
-    </header>
-
-    <ul class="team-practice-list">
-      <li>
-        <h3>One format, one meaning</h3>
-        <p>
-          Every story is written in plain paragraphs with the same small set of
-          markers: <code>#</code> for a section heading, <code>*</code> for a bullet,
-          <code>1.</code> for a numbered point, <code>**bold**</code> and
-          <code>*italic*</code> for emphasis, a pasted web address for a link, and
-          <code>imgl</code>, <code>imgr</code> or <code>imgc</code> to place a picture.
-          One marker does one job, so a line of ordinary text is never published
-          as a heading by accident.
-        </p>
-      </li>
-      <li>
-        <h3>Headings are fixed once published</h3>
-        <p>
-          A headline generates its web address the first time the story is saved
-          and is never rewritten afterwards. Old shared and indexed links keep
-          resolving to the same story, and a published title can never quietly
-          change into something the original link does not describe. Correcting a
-          headline means a deliberate delete and repost.
-        </p>
-      </li>
-      <li>
-        <h3>Two timestamps, never one</h3>
-        <p>
-          Every story keeps the exact time it was published separately from the
-          exact time it was last changed, so a correction is visible as a
-          correction instead of being indistinguishable from the original.
-        </p>
-      </li>
-      <li>
-        <h3>Attribution on every story</h3>
-        <p>
-          Each story carries its author, its category and its publication time.
-          Every picture and file in the shared archive records who uploaded it and
-          when, and is served from this site's own domain.
-        </p>
-      </li>
-    </ul>
-  </section>
-
-  {# ---------- REACH THE NEWSROOM ---------- #}
-  {% comment %}
-    The real, configured contact routes for the project, straight out of
-    SERVICE_INTERNAL.config.About via the context processor. A handle that
-    was never filled in is skipped rather than drawn as a dead icon, which
-    is the same rule the portfolio page follows.
-  {% endcomment %}
-  <section class="team-contact" aria-labelledby="team-contact-heading">
-    <header class="team-section-head">
-      <h2 id="team-contact-heading">Reach the newsroom</h2>
-      <p class="team-section-note">For a story tip, a correction, or to reach a specific writer, use the route below.</p>
-    </header>
-
-    <ul class="team-contact-list">
-      {% for link in social_links %}
-      <li>
-        <a href="{{ link }}" target="_blank" rel="noopener noreferrer">{{ link }}</a>
-      </li>
-      {% endfor %}
-      {% if partnership_email %}
-      <li><a href="mailto:{{ partnership_email }}">{{ partnership_email }}</a></li>
-      {% endif %}
-      {% if whatsapp_dm %}
-      <li><a href="{{ whatsapp_dm }}" target="_blank" rel="noopener noreferrer">WhatsApp message</a></li>
-      {% endif %}
-      {% if mobile %}
-      <li><span class="team-contact-plain">{{ mobile }}</span></li>
-      {% endif %}
-    </ul>
-  </section>
-
-</section>
+{% block extra_scripts %}
+  {{ block.super }}
+  <script src="{% static 'staff/js/editorial-motion.js' %}?v=20261006-2" defer></script>
 {% endblock %}
