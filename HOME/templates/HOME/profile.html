@@ -7,31 +7,13 @@
 
 {% block content %}
 <section class="profile-shell">
-  <div class="profile-header-bar">
-    <h1>
-      {% if profile and profile.slug %}
-        <a href="{% url 'staff:portfolio' profile.slug %}">Profile</a>
-      {% else %}
-        Profile
-      {% endif %}
-    </h1>
-    <div class="profile-header-actions">
-      {% if is_admin_user %}
+  {% comment %} {% if is_admin_user %}
+    <div class="profile-header-bar">
+      <div class="profile-header-actions">
         <a href="{% url 'control:panel' %}" class="profile-add-news-link">PANEL</a>
-      {% endif %}
-      {% comment %} REMOVED SINCE ITS ALREADY IN THE NAV {% endcomment %}
-      {% comment %} {% if show_staff_dashboard %}<a href="{% url 'home:add_news' %}" class="profile-add-news-link" data-add-news-link> <b>+</b> NeWs</a>{% endif %} {% endcomment %}
-      {% comment %} DELETE ACCOUNT: every account except the superuser. The
-          placard overlay is fetched by htmx only once this button is pressed,
-          so nothing about the flow ships with the page itself. {% endcomment %}
-      {% if not user.is_superuser %}
-        <button type="button" class="profile-add-news-link profile-delete-account-btn"
-                hx-get="{% url 'home:profile_delete_placard' %}?step=1"
-                hx-target="[data-delete-overlay]"
-                hx-swap="innerHTML">Delete Account</button>
-      {% endif %}
+      </div>
     </div>
-  </div>
+  {% endif %} {% endcomment %}
 
   <div class="profile-layout">
     <aside class="profile-summary" aria-label="Profile settings">
@@ -50,7 +32,16 @@
 
       <div class="profile-info-list">
         <div><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>
-        <div><span>Last login</span><strong>{{ user.last_login|date:"M d, Y H:i"|default:"Not recorded" }}</strong></div>
+        <div class="profile-last-login-row">
+          <span>Last login</span>
+          <strong>{{ user.last_login|date:"M d, Y H:i"|default:"Not recorded" }}</strong>
+          {% if not user.is_superuser %}
+            <button type="button" class="profile-delete-account-btn"
+                    hx-get="{% url 'home:profile_delete_placard' %}?step=1"
+                    hx-target="[data-delete-overlay]"
+                    hx-swap="innerHTML">Delete Account</button>
+          {% endif %}
+        </div>
         <div><span>Active sessions</span><strong>{{ user_sessions|length }}</strong></div>
       </div>
 
@@ -298,7 +289,7 @@
                    hx-get="{% url 'home:profile_published' %}" hx-trigger="input changed delay:300ms, search"
                    hx-target="#profile-published-list" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#profile-published-list">
           </div>
-          <div id="profile-published-list" class="profile-bookmark-shell">
+          <div id="profile-published-list" class="profile-bookmark-shell" aria-live="polite">
             {% include "HOME/partials/profile_published_list.html" %}
           </div>
         </section>
@@ -315,7 +306,7 @@
                  hx-get="{% url 'home:profile_bookmarks' %}" hx-trigger="input changed delay:300ms, search"
                  hx-target="#profile-bookmarks-list" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#profile-bookmarks-list">
         </div>
-        <div id="profile-bookmarks-list" class="profile-bookmark-shell">
+        <div id="profile-bookmarks-list" class="profile-bookmark-shell" aria-live="polite">
           {% include "HOME/partials/profile_bookmarks_list.html" %}
         </div>
       </section>
@@ -330,7 +321,7 @@
                  hx-get="{% url 'home:profile_history' %}" hx-trigger="input changed delay:300ms, search"
                  hx-target="#profile-history-list" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#profile-history-list">
         </div>
-        <div id="profile-history-list" class="profile-bookmark-shell">
+        <div id="profile-history-list" class="profile-bookmark-shell" aria-live="polite">
           {% include "HOME/partials/profile_history_list.html" %}
         </div>
       </section>
@@ -347,7 +338,7 @@
                  hx-get="{% url 'home:profile_following' %}" hx-trigger="input changed delay:300ms, search"
                  hx-target="#profile-following-list" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#profile-following-list">
         </div>
-        <div id="profile-following-list" class="profile-bookmark-shell" data-following-endpoint="{% url 'home:profile_following' %}">
+        <div id="profile-following-list" class="profile-bookmark-shell" data-following-endpoint="{% url 'home:profile_following' %}" aria-live="polite">
           {% include "HOME/partials/profile_following_list.html" %}
         </div>
       </section>
@@ -358,8 +349,8 @@
           <h3>Followers</h3>
           <span class="panel-tag" id="followers-count-tag">{{ followers_page_obj.paginator.count }} total</span>
         </div>
-        <p>These accounts follow you. Their emails are partly hidden.</p>
-        <div id="profile-followers-list" class="profile-bookmark-shell">
+        <p>These accounts follow you.</p>
+        <div id="profile-followers-list" class="profile-bookmark-shell" aria-live="polite">
           {% include "HOME/partials/profile_followers_list.html" %}
         </div>
       </section>
@@ -369,7 +360,7 @@
         <div class="panel-header">
           <h3>Recent comments</h3>
         </div>
-        <div id="profile-comments-list" class="profile-bookmark-shell" data-comments-page="{{ comments_page_obj.number }}" data-comments-endpoint="{% url 'home:profile_comments' %}">
+        <div id="profile-comments-list" class="profile-bookmark-shell" data-comments-page="{{ comments_page_obj.number }}" data-comments-endpoint="{% url 'home:profile_comments' %}" aria-live="polite">
           {% if recent_comments %}
           <ul class="profile-list">
             {% for comment in recent_comments %}
@@ -390,14 +381,14 @@
         {% if comments_page_obj.paginator.num_pages > 1 %}
         <nav class="story-pagination profile-comments-pagination" aria-label="Comments pagination">
           {% if comments_page_obj.has_previous %}
-            <button type="button" class="story-page-btn page-nav" data-comments-page-btn data-page="{{ comments_page_obj.previous_page_number }}">Prev</button>
+            <button type="button" class="story-page-btn profile-page-btn page-nav" data-comments-page-btn data-page="{{ comments_page_obj.previous_page_number }}">Prev</button>
           {% endif %}
 
           {% for page_num in comments_page_range %}
             {% if page_num == comments_page_obj.paginator.ELLIPSIS %}
               <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
             {% else %}
-              <button type="button" class="story-page-btn {% if page_num == comments_page_obj.number %}is-active{% endif %}"
+              <button type="button" class="story-page-btn profile-page-btn {% if page_num == comments_page_obj.number %}is-active{% endif %}"
                       data-comments-page-btn data-page="{{ page_num }}"
                       aria-label="Go to page {{ page_num }}"
                       {% if page_num == comments_page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</button>
@@ -405,7 +396,7 @@
           {% endfor %}
 
           {% if comments_page_obj.has_next %}
-            <button type="button" class="story-page-btn page-nav" data-comments-page-btn data-page="{{ comments_page_obj.next_page_number }}">Next</button>
+            <button type="button" class="story-page-btn profile-page-btn page-nav" data-comments-page-btn data-page="{{ comments_page_obj.next_page_number }}">Next</button>
           {% endif %}
         </nav>
         {% endif %}
@@ -464,6 +455,54 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+  <script>
+    (function () {
+      function showListSkeleton(target) {
+        if (!target || target.querySelector("[data-profile-skeleton]")) return;
+
+        var loader = document.createElement("div");
+        loader.className = "profile-list-skeleton";
+        loader.dataset.profileSkeleton = "";
+        loader.setAttribute("aria-hidden", "true");
+        for (var i = 0; i < 3; i += 1) {
+          var row = document.createElement("div");
+          row.className = "profile-list-skeleton-row";
+          row.innerHTML =
+            '<span class="profile-list-skeleton-copy">' +
+            '<span></span><span></span>' +
+            '</span><span class="profile-list-skeleton-action"></span>';
+          loader.appendChild(row);
+        }
+        target.appendChild(loader);
+      }
+
+      function hideListSkeleton(target) {
+        if (!target) return;
+        var loader = target.querySelector("[data-profile-skeleton]");
+        if (loader) loader.remove();
+      }
+
+      window.AbuProfileListLoading = {
+        show: showListSkeleton,
+        hide: hideListSkeleton
+      };
+
+      document.body.addEventListener("htmx:beforeRequest", function (event) {
+        var target = event.detail && event.detail.target;
+        if (target && target.classList.contains("profile-bookmark-shell")) {
+          target.setAttribute("aria-busy", "true");
+          showListSkeleton(target);
+        }
+      });
+      document.body.addEventListener("htmx:afterRequest", function (event) {
+        var target = event.detail && event.detail.target;
+        if (target && target.classList.contains("profile-bookmark-shell")) {
+          hideListSkeleton(target);
+          target.setAttribute("aria-busy", "false");
+        }
+      });
+    })();
+  </script>
   <script>
     (function () {
       /*  SOCIAL ICONS: one field open at a time; tapping the open icon closes it. */

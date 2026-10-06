@@ -656,6 +656,8 @@ class ProfileListSearchTests(QuietTestCase):
         response = self.client.get(reverse("home:profile_history"), {"q": "timetable"})
         self.assertContains(response, "WAEC timetable released")
         self.assertNotContains(response, "JAMB result checker opens")
+        self.assertContains(response, self.waec.date_created.strftime("%b %d, %Y"))
+        self.assertNotContains(response, "ago")
 
     def test_pager_keeps_the_search_box_value(self, _ping):
         for n in range(6):
@@ -668,3 +670,6 @@ class ProfileListSearchTests(QuietTestCase):
         response = self.client.get(reverse("home:profile"))
         for box_id in ("published-search", "bookmark-search", "history-search"):
             self.assertContains(response, f'id="{box_id}"')
+        self.assertNotContains(response, 'class="profile-header-bar"')
+        self.assertContains(response, 'class="profile-last-login-row"')
+        self.assertContains(response, 'class="profile-delete-account-btn"')

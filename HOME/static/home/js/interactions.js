@@ -1087,12 +1087,33 @@
 
     var endpoint = list.dataset[config.endpointKey];
     var page = pageBtn.dataset.page;
-    if (!endpoint || !page) return;
+    if (!endpoint || !page || list.classList.contains("is-loading")) return;
+
+    var pagination = list.closest(".profile-card").querySelector(config.paginationSelector);
+    var pagerButtons = pagination ? pagination.querySelectorAll("button") : [];
+    pagerButtons.forEach(function (button) {
+      button.disabled = true;
+      button.setAttribute("aria-disabled", "true");
+    });
+    pageBtn.classList.add("is-loading");
+    list.classList.add("is-loading");
+    list.setAttribute("aria-busy", "true");
+
+    function clearPagingState() {
+      list.classList.remove("is-loading");
+      list.setAttribute("aria-busy", "false");
+      if (window.AbuProfileListLoading) window.AbuProfileListLoading.hide(list);
+      pagerButtons.forEach(function (button) {
+        button.disabled = false;
+        button.removeAttribute("aria-disabled");
+      });
+    }
 
     list.classList.add("is-animating");
     var previousHeight = list.offsetHeight || 0;
     list.style.height = previousHeight + "px";
     list.style.overflow = "hidden";
+    if (window.AbuProfileListLoading) window.AbuProfileListLoading.show(list);
 
     fetch(endpoint + "?page=" + encodeURIComponent(page), {
       method: "GET",
@@ -1106,6 +1127,7 @@
       })
       .then(function (result) {
         if (!result.ok) {
+          clearPagingState();
           list.classList.remove("is-animating");
           list.style.height = "";
           list.style.overflow = "";
@@ -1113,6 +1135,7 @@
           return;
         }
 
+        clearPagingState();
         list.innerHTML = renderProfileItems(config, result.payload);
 
         requestAnimationFrame(function () {
@@ -1132,26 +1155,26 @@
           }, duration + 40);
         });
 
-        var pagination = list.closest(".profile-card").querySelector(config.paginationSelector);
         if (pagination && result.payload.page_range) {
           var buttonsHtml = "";
           if (result.payload.has_previous) {
-            buttonsHtml += '<button type="button" class="story-page-btn page-nav" ' + config.buttonAttr + ' data-page="' + (result.payload.page - 1) + '">Prev</button>';
+            buttonsHtml += '<button type="button" class="story-page-btn profile-page-btn page-nav" ' + config.buttonAttr + ' data-page="' + (result.payload.page - 1) + '">Prev</button>';
           }
           result.payload.page_range.forEach(function (pageNum) {
             if (pageNum === "…") {
               buttonsHtml += '<span class="story-page-btn is-ellipsis" aria-hidden="true">…</span>';
               return;
             }
-            buttonsHtml += '<button type="button" class="story-page-btn ' + (Number(pageNum) === Number(result.payload.page) ? 'is-active' : '') + '" ' + config.buttonAttr + ' data-page="' + pageNum + '" aria-label="Go to page ' + pageNum + '" ' + (Number(pageNum) === Number(result.payload.page) ? 'aria-current="page"' : '') + '>' + pageNum + '</button>';
+            buttonsHtml += '<button type="button" class="story-page-btn profile-page-btn ' + (Number(pageNum) === Number(result.payload.page) ? 'is-active' : '') + '" ' + config.buttonAttr + ' data-page="' + pageNum + '" aria-label="Go to page ' + pageNum + '" ' + (Number(pageNum) === Number(result.payload.page) ? 'aria-current="page"' : '') + '>' + pageNum + '</button>';
           });
           if (result.payload.has_next) {
-            buttonsHtml += '<button type="button" class="story-page-btn page-nav" ' + config.buttonAttr + ' data-page="' + (result.payload.page + 1) + '">Next</button>';
+            buttonsHtml += '<button type="button" class="story-page-btn profile-page-btn page-nav" ' + config.buttonAttr + ' data-page="' + (result.payload.page + 1) + '">Next</button>';
           }
           pagination.innerHTML = buttonsHtml;
         }
       })
       .catch(function () {
+        clearPagingState();
         list.classList.remove("is-animating");
         list.style.height = "";
         list.style.overflow = "";

@@ -12,6 +12,13 @@
   margin-bottom: 24px;
 }
 
+.profile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
 .profile-header-bar h1 {
   color: var(--nav-fg);
   font-size: clamp(1.5rem, 2vw, 2.1rem);
@@ -34,6 +41,39 @@
 
 .profile-add-news-link:hover {
   background: var(--amber-alt-deep);
+}
+
+.profile-delete-account-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgba(180, 35, 24, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: #b42318;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease,
+    transform 160ms ease, opacity 160ms ease;
+}
+
+.profile-delete-account-btn:hover,
+.profile-delete-account-btn:focus-visible {
+  color: #fff;
+  background: #b42318;
+  border-color: #b42318;
+  transform: translateY(-1px);
+}
+
+.profile-delete-account-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
 }
 
 .profile-layout {
@@ -236,6 +276,15 @@
   font-weight: 700;
   text-align: right;
   white-space: nowrap;
+}
+
+.profile-info-list .profile-last-login-row {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.profile-last-login-row .profile-delete-account-btn {
+  margin-left: auto;
 }
 
 .profile-image-link-form {
@@ -639,6 +688,52 @@
 
   .profile-identity-row {
     flex-direction: row;
+  }
+}
+
+@media (max-width: 540px) {
+  .profile-info-list .profile-last-login-row {
+    align-items: flex-start;
+  }
+
+  .profile-last-login-row strong {
+    max-width: calc(100% - 86px);
+    white-space: normal;
+  }
+
+  .profile-last-login-row .profile-delete-account-btn {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .profile-card {
+    padding: 14px 12px 10px;
+  }
+
+  .profile-list li {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .profile-list li > div:first-child {
+    flex: 1 1 160px;
+  }
+
+  .profile-list .published-story-actions,
+  .profile-list .profile-bookmark-actions {
+    margin-left: auto;
+  }
+
+  .story-pagination {
+    gap: 6px;
+  }
+
+  .story-pagination .profile-page-btn,
+  .profile-comments-pagination .story-page-btn {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 7px 10px;
   }
 }
 
@@ -1344,8 +1439,96 @@ html.avatar-crop-open {
   border-color: var(--amber-alt-deep);
 }
 
-/* htmx puts .htmx-request on the list while its search / page request is in flight */
-.profile-bookmark-shell.htmx-request { opacity: 0.55; }
+/* Keep the current rows visible under a clear loading veil while searches or
+   pagination requests are in flight. */
+.profile-bookmark-shell {
+  position: relative;
+  border-radius: 6px;
+}
+
+.profile-bookmark-shell.htmx-request,
+.profile-bookmark-shell.is-loading {
+  min-height: 180px;
+  cursor: progress;
+}
+
+.profile-bookmark-shell.htmx-settling > .profile-list,
+.profile-bookmark-shell.htmx-settling > .empty-copy {
+  animation: profile-list-arrive 260ms ease both;
+}
+
+.profile-list-skeleton {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  gap: 0;
+  padding: 0 8px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  pointer-events: none;
+}
+
+.profile-list-skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 57px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.profile-list-skeleton-copy {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+}
+
+.profile-list-skeleton-copy span,
+.profile-list-skeleton-action {
+  display: block;
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(100deg, var(--line) 20%, var(--paper) 42%, var(--line) 64%);
+  background-size: 220% 100%;
+  animation: profile-skeleton-shimmer 1.25s ease-in-out infinite;
+}
+
+.profile-list-skeleton-copy span:first-child { width: min(72%, 360px); height: 13px; }
+.profile-list-skeleton-copy span:last-child { width: min(43%, 220px); }
+.profile-list-skeleton-action { width: 52px; height: 25px; flex: 0 0 52px; }
+
+@keyframes profile-skeleton-shimmer {
+  to { background-position: -220% 0; }
+}
+
+.profile-bookmark-shell.is-animating > * {
+  animation: profile-list-arrive 260ms ease both;
+}
+
+@keyframes profile-list-arrive {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.profile-bookmark-shell.htmx-request .profile-page-btn {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-bookmark-shell,
+  .profile-page-btn,
+  .profile-delete-account-btn {
+    transition: none;
+    animation: none;
+  }
+  .profile-list-skeleton-copy span,
+  .profile-list-skeleton-action {
+    animation: none;
+  }
+}
 
 /* =====================================================================
    PANEL HEADINGS: clearly a level above the list items beneath them

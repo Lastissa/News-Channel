@@ -43,7 +43,7 @@
      separate per theme because a colour that reads fine on the light page
      background can disappear against the dark one. */
   --toast-bg: #ffffff;
-  --toast-bg-error: #ffffff;
+  --toast-bg-error: #fb4646;
   --toast-fg: #0E1B2C;
   color-scheme: light;
 }

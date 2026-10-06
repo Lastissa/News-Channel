@@ -112,7 +112,7 @@
                       <path class="follow-icon-plus" d="M18 7v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
                       <path class="follow-icon-check" d="m15.2 10.1 2 2 3.3-3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    <span data-follow-label>{% if is_following_author %}Following{% else %}Follow author{% endif %}</span>
+                    <span data-follow-label>{% if is_following_author %}Following{% else %}Follow{% endif %}</span>
                   </button>
                 </form>
               {% endif %}
@@ -187,7 +187,7 @@ official website at https://www.abureport.com.ng
                     <div class="story-card-meta">
                       <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
                       <span class="meta-divider" aria-hidden="true"></span>
-                      <span class="meta-time">{{ story.date_created|timesince }} ago</span>
+                      <time class="meta-time" datetime="{{ story.date_created|date:'c' }}">{{ story.date_created|date:"M d, Y" }}</time>
                     </div>
                     <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
                     <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
@@ -255,7 +255,7 @@ official website at https://www.abureport.com.ng
                 <path class="follow-icon-plus" d="M18 7v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
                 <path class="follow-icon-check" d="m15.2 10.1 2 2 3.3-3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              <span data-follow-label>{% if is_following_author %}Following{% else %}Follow author{% endif %}</span>
+              <span data-follow-label>{% if is_following_author %}Following{% else %}Follow{% endif %}</span>
             </button>
           </form>
           {% comment %} <span class="follow-count" aria-live="polite"><strong data-follow-count>{{ author_follower_count }}</strong> following</span> {% endcomment %}
@@ -347,7 +347,7 @@ official website at https://www.abureport.com.ng
                   {% if request.user.is_authenticated and comment.author_id == request.user.id %} Me
                   {% elif author_profile_data and author_profile_data.full_name %}{{ author_profile_data.full_name }}
                   {% else %}{{ comment.author.email|before_at }}{% endif %}</strong>
-                <time class="comment-date" datetime="{{ comment.date_created|date:'c' }}" title="{{ comment.date_created|date:'j M Y, H:i' }}">{{ comment.date_created|timesince }} ago</time>
+                <time class="comment-date" datetime="{{ comment.date_created|date:'c' }}" title="{{ comment.date_created|date:'j M Y, H:i' }}">{{ comment.date_created|date:"M d, Y" }}</time>
               </div>
               <div class="comment-toolbar">
                 <form method="post" action="{% url 'blog:comment_like' comment.id %}" class="comment-like-form" data-comment-like-form data-endpoint="{% url 'blog:comment_like' comment.id %}">

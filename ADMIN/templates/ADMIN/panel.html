@@ -11,14 +11,14 @@
 
 {% block content %}
 <section class="panel-shell">
-  <div class="panel-header-bar">
+  {% comment %}<div class="panel-header-bar">
     <h1>PANEL</h1>
     <a href="{% url 'home:profile' %}" class="panel-back-link">Profile</a>
-    {% comment %} <div class="panel-header-actions">
+     <div class="panel-header-actions">
       <span class="panel-role-tag">{% if is_superuser %}Superuser{% else %}Admin{% endif %}</span>
       <a href="{% url 'home:profile' %}" class="panel-back-link">Profile</a>
-    </div> {% endcomment %}
-  </div>
+    </div> 
+  </div>{% endcomment %}
 
   <div class="panel-grid">
 

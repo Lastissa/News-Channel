@@ -22,7 +22,7 @@
       <div class="continue-card-body">
         <span class="tag">{{ cpost.get_category_display|title }}</span>
         <h3 class="continue-card-title"><a href="{% url 'blog:story_detail' cpost.slug %}">{{ cpost.heading }}</a></h3>
-        <span class="continue-card-meta">{{ cpost.date_created|timesince }} ago</span>
+        <time class="continue-card-meta" datetime="{{ cpost.date_created|date:'c' }}">{{ cpost.date_created|date:"M d, Y" }}</time>
       </div>
     </article>
     {% endfor %}

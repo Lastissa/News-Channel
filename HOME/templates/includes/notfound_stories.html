@@ -11,7 +11,7 @@
       <div class="nf-card-body">
         <div class="nf-card-meta">
           <span class="nf-card-tag">{{ post.get_category_display|title }}</span>
-          <span>{{ post.date_created|timesince }} ago</span>
+          <time datetime="{{ post.date_created|date:'c' }}">{{ post.date_created|date:"M d, Y" }}</time>
         </div>
         <h3 class="nf-card-title"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h3>
         <p class="nf-card-excerpt">{{ post.content|truncatewords:20 }}</p>

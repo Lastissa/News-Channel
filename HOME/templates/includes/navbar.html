@@ -35,6 +35,7 @@
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <ul class="dropdown-menu">
+            {% if request.user.is_authenticated and request.user.is_admin %}<li><a href="{% url 'control:panel' %}">Panel</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
             <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
             <li><a href="{% url 'home:profile' %}#reading-history">Stories history</a></li>

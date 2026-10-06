@@ -1291,7 +1291,7 @@ class ProfileView(View):
 
     def get(self, request):
         if not request.user.is_authenticated:
-            messages.info(request, "Please sign in to open your profile.")
+            messages.info(request, "sign in to open your profile.")
             return redirect("auth:login")
 
         profile = StaffProfile.objects.filter(auth=request.user).first()

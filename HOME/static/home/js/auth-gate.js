@@ -35,8 +35,8 @@
       verb: "save this story"
     },
     follow: {
-      title: "You do not have to follow this author.",
-      hook: "But followers are what let an author Know they have people rooting for their work. A free account takes under a minute. We will never share your email or spam you.",
+      title: "Followers are what let an author Know they have people rooting for their work",
+      hook: "Signup TO Follow Author So We Can Send This Author Newsletter Whenever They Publish A New Article. We will never share your email or spam you. If you want to opt out, click here <a>ff</a>",
       verb: "follow this author"
     }
   };

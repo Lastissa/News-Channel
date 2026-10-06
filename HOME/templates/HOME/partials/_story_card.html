@@ -7,7 +7,7 @@
     <div class="story-card-meta">
       <a class="tag" href="{% url 'home:home' %}?category={{ post.category }}">{{ post.get_category_display|title }}</a>
       <span class="meta-divider" aria-hidden="true"></span>
-      <span class="meta-time">{{ post.date_created|timesince }} ago</span>
+      <time class="meta-time" datetime="{{ post.date_created|date:'c' }}">{{ post.date_created|date:"M d, Y" }}</time>
     </div>
     <h3 class="story-card-title"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h3>
     <p class="story-card-excerpt">{{ post.content|truncatewords:22 }}</p>
