@@ -15,34 +15,34 @@
   /* Copy per action. Edit the words here, nothing else reads them. */
   var COPY = {
     like: {
-      title: "You do not have to like this story.",
-      hook: "But a like is how an author knows the work is being appreciated. Create a free account and back them in under a minute. We will never share your email or spam you.",
+      title: "A like is how an author knows the work is being appreciated.",
+      hook: "Sign in to like story",
       verb: "like this story"
     },
     comment: {
-      title: "You do not have to comment.",
-      hook: "But writers read every comment, and yours could be the one that keeps them going. A free account takes under a minute.",
+      title: "writers read every comment, and yours could be the one that keeps them going.",
+      hook: "Sign in to join the conversation",
       verb: "post your comment"
     },
     "comment-like": {
-      title: "You do not have to like this comment.",
-      hook: "But the reader who wrote it will notice. A free account takes under a minute.",
+      title: "To avoid Spam, SIgnin is required to like a comment.",
+      hook: "The Reader Who Made This Comment Will Notice.",
       verb: "like this comment"
     },
     bookmark: {
-      title: "You do not have to save this story.",
-      hook: "But every save tells the author the story was worth coming back to. A free account takes under a minute, and your reading list stays with you.",
+      title: "Saving a story helps you find it later.",
+      hook: "But how do we know where to attach it if you do not sign up?",
       verb: "save this story"
     },
     follow: {
       title: "Followers are what let an author Know they have people rooting for their work",
-      hook: "Signup TO Follow Author So We Can Send This Author Newsletter Whenever They Publish A New Article. We will never share your email or spam you. If you want to opt out, click here <a>ff</a>",
+      hook: "Signup To Follow Author.",
       verb: "follow this author"
     }
   };
   var FALLBACK = {
-    title: "You do not have to sign in.",
-    hook: "But a free account lets you support the authors you read. It takes under a minute.",
+    title: "This Action You Want To Perform Need Authentication.",
+    hook: "signin to continue.",
     verb: "continue"
   };
 

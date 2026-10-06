@@ -1231,15 +1231,15 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 12px 12px 12px 14px;
-  border: 1px solid var(--line);
+  padding: 12px;
+  /* border: 1px solid var(--line); */
   border-left: 12px solid var(--success);
-  border-radius: 12px;
+  /* border-radius: 12px; */
   background: var(--toast-bg);
   color: var(--toast-fg);
   box-shadow: 0 12px 30px rgba(14, 27, 44, 0.2);
   font-size: 0.9rem;
-  line-height: 1.4;
+  line-height: 1.2;
   text-align: left;
   pointer-events: auto;
 }
@@ -1247,7 +1247,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .site-toast__icon { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; color: var(--success); }
 .site-toast--error .site-toast__icon { color: var(--danger); }
 .site-toast__icon svg { display: block; width: 20px; height: 20px; }
-.site-toast__message { min-width: 0; overflow-wrap: anywhere; }
+.site-toast__message { min-width: 0; overflow-wrap: anywhere; font-weight:600;}
 .site-toast__close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px;

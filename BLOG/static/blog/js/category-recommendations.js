@@ -1,45 +1,66 @@
 (function () {
   "use strict";
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function init() {
     var panel = document.querySelector("[data-read-also]");
-    var storyBody = document.querySelector("[data-story-body]");
-    var rail = document.querySelector("[data-related-rail]");
-    if (!panel || !storyBody) return;
+    if (!panel) return;
 
     var list = panel.querySelector("[data-read-also-list]");
-    var firstParagraph = storyBody.querySelector("p");
-    var desktopLayout = window.matchMedia("(min-width: 1200px)");
     var endpoint = panel.dataset.endpoint;
+    var fallbackImage = panel.dataset.fallbackImage;
+    var skeletonMarkup = list ? list.innerHTML : "";
+    var rail = panel.closest("[data-read-also-rail]");
+    var layout = panel.closest(".story-reading-layout");
+    var storyBody = document.querySelector("[data-story-body]");
+    var mobileLayout = window.matchMedia("(max-width: 899.98px)");
+    var railPlaceholder = rail ? document.createComment("read-also-rail") : null;
 
-    function placePanel() {
-      if (desktopLayout.matches && rail) {
-        rail.appendChild(panel);
-      } else if (firstParagraph) {
-        firstParagraph.after(panel);
-      } else {
-        storyBody.appendChild(panel);
+    if (rail && rail.parentNode && railPlaceholder) {
+      rail.parentNode.insertBefore(railPlaceholder, rail);
+    }
+
+    function moveRailForViewport() {
+      if (!rail || !storyBody || !railPlaceholder || !railPlaceholder.parentNode) return;
+
+      if (mobileLayout.matches) {
+        var firstParagraph = Array.prototype.find.call(storyBody.children, function (child) {
+          return child.tagName === "P";
+        });
+        if (firstParagraph) {
+          firstParagraph.insertAdjacentElement("afterend", rail);
+        }
+      } else if (railPlaceholder.parentNode) {
+        railPlaceholder.parentNode.insertBefore(rail, railPlaceholder.nextSibling);
       }
     }
 
+    moveRailForViewport();
+    if (mobileLayout.addEventListener) {
+      mobileLayout.addEventListener("change", moveRailForViewport);
+    } else {
+      mobileLayout.addListener(moveRailForViewport);
+    }
+
     function makeStoryCard(story, index) {
-      var card = document.createElement("article");
+      var card = document.createElement("li");
       card.className = "read-also-card";
       card.style.setProperty("--card-index", index);
 
-      if (story.image) {
-        var imageLink = document.createElement("a");
-        imageLink.className = "read-also-card-image";
-        imageLink.href = story.url;
-        imageLink.tabIndex = -1;
+      var imageLink = document.createElement("a");
+      imageLink.className = "read-also-card-image";
+      imageLink.href = story.url;
+      imageLink.tabIndex = -1;
 
-        var image = document.createElement("img");
-        image.src = story.image;
-        image.alt = "";
-        image.loading = "lazy";
-        imageLink.appendChild(image);
-        card.appendChild(imageLink);
-      }
+      var image = document.createElement("img");
+      image.src = story.image || fallbackImage;
+      image.alt = "";
+      image.loading = "lazy";
+      image.onerror = function () {
+        image.onerror = null;
+        image.src = fallbackImage;
+      };
+      imageLink.appendChild(image);
+      card.appendChild(imageLink);
 
       var content = document.createElement("div");
       content.className = "read-also-card-content";
@@ -63,13 +84,6 @@
       heading.appendChild(link);
       content.appendChild(heading);
 
-      if (story.excerpt) {
-        var excerpt = document.createElement("p");
-        excerpt.className = "read-also-card-excerpt";
-        excerpt.textContent = story.excerpt;
-        content.appendChild(excerpt);
-      }
-
       card.appendChild(content);
       return card;
     }
@@ -88,21 +102,28 @@
       retry.dataset.readAlsoRetry = "";
       retry.textContent = "Try again";
 
-      list.append(message, retry);
+      var item = document.createElement("li");
+      item.className = "read-also-error-item";
+      item.append(message, retry);
+      list.appendChild(item);
       panel.setAttribute("aria-busy", "false");
     }
 
     function loadStories() {
       if (!endpoint || !list) return;
+      list.innerHTML = skeletonMarkup;
       panel.setAttribute("aria-busy", "true");
 
       fetch(endpoint, {
         method: "GET",
-        headers: { Accept: "application/json" },
-        credentials: "same-origin"
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        }
       })
         .then(function (response) {
-          if (!response.ok) throw new Error("Recommendations request failed.");
+          if (!response.ok) throw new Error("Recommendations request failed: " + response.status);
           return response.json();
         })
         .then(function (payload) {
@@ -110,7 +131,8 @@
             throw new Error("Recommendations response was invalid.");
           }
           if (!payload.stories.length) {
-            panel.hidden = true;
+            if (rail) rail.hidden = true;
+            if (layout) layout.classList.remove("has-read-also-rail");
             panel.setAttribute("aria-busy", "false");
             return;
           }
@@ -125,13 +147,19 @@
         .catch(showError);
     }
 
-    placePanel();
-    desktopLayout.addEventListener("change", placePanel);
     if (list) {
       list.addEventListener("click", function (event) {
-        if (event.target.closest("[data-read-also-retry]")) loadStories();
+        if (event.target instanceof Element && event.target.closest("[data-read-also-retry]")) {
+          loadStories();
+        }
       });
     }
     loadStories();
-  });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
 })();

@@ -1551,10 +1551,8 @@ class MostViewedView(View):
     HOME/static/home/js/most-viewed.js)."""
 
     def get(self, request):
-        posts = (
-            Blog.objects.select_related("author__staffprofile")
-            .order_by("-views", "-date_created")[:MOST_VIEWED_COUNT]
-        )
+        posts = cache_or_run("most-viewed-popular-stories", lambda: Blog.objects.select_related("author__staffprofile").order_by("-views", "-date_created")[:MOST_VIEWED_COUNT], timeout=30)
+        
         results = [
             {
                 "heading": post.heading,

@@ -1219,8 +1219,9 @@
     if (main) {
       main.dataset.liked = state;
       main.setAttribute("aria-pressed", state);
+      main.setAttribute("aria-label", liked ? "Unlike this story" : "Like this story");
       var label = main.querySelector("[data-story-like-label]");
-      if (label) label.textContent = liked ? "Unlike article" : "Like article";
+      if (label) label.textContent = liked ? "Liked" : "Like this story";
     }
     if (top) {
       top.dataset.liked = state;
@@ -1370,7 +1371,7 @@
       .catch(function () {
         setFollowPending(false);
         syncFollowButtons(wasFollowing);
-        toast("Connection issue. The follow was not updated.", "error");
+        toast("Connection issue. could not update.", "error");
       });
   });
 

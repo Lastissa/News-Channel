@@ -52,7 +52,7 @@
     "wordCount": {{ blog.word_count }}
   }
   </script>
-  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}">
+  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261006-3">
 {% endblock %}
 
 {% block content %}
@@ -66,6 +66,8 @@
 {% endif %}
 <section class="story-article-shell">
   <article class="story-article no-inner-shell" aria-labelledby="story-heading">
+    <div class="story-reading-layout has-read-also-rail{% if author_recent_stories %} has-author-rail{% endif %}">
+      <div class="story-reading-column">
     <header class="story-header">
       <div class="story-kicker-row">
         <button type="button"
@@ -172,56 +174,9 @@ official website at https://www.abureport.com.ng
         {% endif %}
       </figure>
 
-    <div class="story-reading-layout">
-      {% if author_recent_stories %}
-        <aside class="story-rail story-rail-author" aria-label="More stories from {{ blog.author_name }}">
-          <section class="author-more-stories" aria-labelledby="author-more-title">
-            <h2 id="author-more-title">Also from {{ blog.author_name }}</h2>
-            <div class="story-grid">
-              {% for story in author_recent_stories %}
-                <article class="story-card">
-                  <a class="story-card-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1">
-                    <img src="{{ story.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
-                  </a>
-                  <div class="story-card-body">
-                    <div class="story-card-meta">
-                      <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
-                      <span class="meta-divider" aria-hidden="true"></span>
-                      <time class="meta-time" datetime="{{ story.date_created|date:'c' }}">{{ story.date_created|date:"M d, Y" }}</time>
-                    </div>
-                    <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
-                    <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
-                  </div>
-                </article>
-              {% endfor %}
-            </div>
-          </section>
-        </aside>
-      {% endif %}
-
-      <div class="story-reading-column">
-        <div class="story-body" data-story-body>
-          {{ blog_content_html|safe }}
-        </div>
-        <section class="read-also-panel" data-read-also
-                 data-endpoint="{% url 'blog:category_recommendations' blog.slug %}"
-                 aria-labelledby="read-also-title" aria-busy="true">
-          <h2 id="read-also-title">Read also in {{ blog.get_category_display|title }}</h2>
-          <div class="read-also-list" data-read-also-list aria-live="polite">
-            {% for item in "123" %}
-              <div class="read-also-skeleton" aria-hidden="true">
-                <span class="read-also-skeleton-image"></span>
-                <span class="read-also-skeleton-copy">
-                  <span class="read-also-skeleton-line"></span>
-                  <span class="read-also-skeleton-line read-also-skeleton-line-short"></span>
-                </span>
-              </div>
-            {% endfor %}
-          </div>
-        </section>
+      <div class="story-body" data-story-body>
+        {{ blog_content_html|safe }}
       </div>
-      <aside class="story-rail story-rail-related" data-related-rail aria-label="Related stories"></aside>
-    </div>
 
     {% if support_email and "@" in support_email %}
     <p class="story-report-note">
@@ -233,8 +188,13 @@ official website at https://www.abureport.com.ng
     <div class="article-actions">
       <form method="post" action="{% url 'blog:blog_like' blog.id %}" class="action-form" data-story-like-form data-endpoint="{% url 'blog:blog_like' blog.id %}">
         {% csrf_token %}
-        <button type="submit" class="story-like-btn" data-story-like-btn data-liked="{% if is_liked %}true{% else %}false{% endif %}" aria-pressed="{% if is_liked %}true{% else %}false{% endif %}">
-          <span data-story-like-label>{% if is_liked %}Unlike article{% else %}Like article{% endif %}</span>
+        <button type="submit" class="story-like-btn" data-story-like-btn data-liked="{% if is_liked %}true{% else %}false{% endif %}" aria-pressed="{% if is_liked %}true{% else %}false{% endif %}" aria-label="{% if is_liked %}Unlike this story{% else %}Like this story{% endif %}">
+          <span class="story-like-icon-wrap" aria-hidden="true">
+            <svg class="story-like-icon" viewBox="0 0 24 24" focusable="false">
+              <path d="M20.8 4.9a5.5 5.5 0 0 0-7.8 0L12 5.9l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.3 1-1a5.5 5.5 0 0 0 0-7.8Z"/>
+            </svg>
+          </span>
+          <span class="story-like-copy" data-story-like-label>{% if is_liked %}Liked{% else %}Like this story{% endif %}</span>
           <span class="like-badge" data-story-like-count>{{ blog.likes }}</span>
         </button>
       </form>
@@ -378,6 +338,59 @@ official website at https://www.abureport.com.ng
         {% endfor %}
       </div>
     </section>
+      </div>
+
+      <aside class="story-rail story-rail-read-also" data-read-also-rail aria-label="Read similar stories">
+        <section class="read-also-panel" data-read-also
+                 data-endpoint="{% url 'blog:category_recommendations' blog.slug %}"
+                 data-fallback-image="{% static '404.jpg' %}"
+                 aria-labelledby="read-also-title" aria-busy="true">
+          <div class="story-rail-heading">
+            <h2 id="read-also-title">Read similar stories</h2>
+          </div>
+          <ul class="read-also-list" data-read-also-list aria-live="polite">
+            {% for item in "123" %}
+              <li class="read-also-skeleton" aria-hidden="true">
+                <span class="read-also-skeleton-image"></span>
+                <span class="read-also-skeleton-copy">
+                  <span class="read-also-skeleton-line read-also-skeleton-line-meta"></span>
+                  <span class="read-also-skeleton-line"></span>
+                  <span class="read-also-skeleton-line read-also-skeleton-line-short"></span>
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      </aside>
+
+      {% if author_recent_stories %}
+        <aside class="story-rail story-rail-author" aria-label="More stories from {{ blog.author_name }}">
+          <section class="author-more-stories" aria-labelledby="author-more-title">
+            <div class="story-rail-heading">
+              <h2 id="author-more-title">Also from {{ blog.author_name }}</h2>
+            </div>
+            <div class="story-grid">
+              {% for story in author_recent_stories %}
+                <article class="story-card">
+                  <a class="story-card-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1">
+                    <img src="{{ story.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+                  </a>
+                  <div class="story-card-body">
+                    <div class="story-card-meta">
+                      <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
+                      <span class="meta-divider" aria-hidden="true"></span>
+                      <time class="meta-time" datetime="{{ story.date_created|date:'c' }}">{{ story.date_created|date:"M d, Y" }}</time>
+                    </div>
+                    <h3 class="story-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
+                    <p class="story-card-excerpt">{{ story.content|truncatewords:22 }}</p>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        </aside>
+      {% endif %}
+    </div>
   </article>
 </section>
 {% endblock %}
@@ -385,7 +398,7 @@ official website at https://www.abureport.com.ng
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'blog/js/story-ticker.js' %}" defer></script>
-  <script src="{% static 'blog/js/category-recommendations.js' %}" defer></script>
+  <script src="{% static 'blog/js/category-recommendations.js' %}?v=20261006-3" defer></script>
 {% endblock %}
 
 {% block newsletter_popup %}
