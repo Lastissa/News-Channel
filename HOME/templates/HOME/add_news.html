@@ -7,7 +7,7 @@
 
 {% block extra_head %}
   {{ block.super }}
-  <meta name="viewport" content="initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   {% comment %} <meta name="viewport" content="initial-scale=0.5, width=1200"> {% endcomment %}
   <style>
     .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }
@@ -42,12 +42,15 @@
 {% block content %}
 <section class="editor-shell is-loading"
          id="editor-shell"
-         data-heavy-css="{% static 'home/css/add-news.css' %}"
-         data-heavy-js="{% static 'home/js/add-news-editor.js' %}">
+         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261006-1"
+         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261006-1"
+         data-draft-key="abureport-add-news-draft-{{ request.user.pk }}">
   <div class="editor-toolbar">
     <h1>+ News</h1>
     <div class="editor-actions">
       <span class="editor-loading-note" data-editor-loading-note>Preparing editor...</span>
+      <span class="editor-draft-status" data-editor-draft-status role="status" aria-live="polite"></span>
+      <button type="button" class="editor-preview-toggle" data-archive-open>Browse archive</button>
       <button type="button" class="editor-preview-toggle" data-editor-preview-toggle hidden>Hide preview</button>
       <button type="submit" form="add-news-form" class="editor-publish-btn" data-editor-publish disabled>Publish</button>
     </div>
@@ -74,6 +77,7 @@
             <input id="editor-image-file" type="file" name="image_file" data-editor-image-file accept="image/jpeg,image/png" hidden>
             <div class="editor-image-actions">
               <button type="button" class="editor-upload-btn" data-editor-upload-btn>Upload file</button>
+              <button type="button" class="editor-upload-btn" data-archive-open>Browse archive</button>
               <span class="editor-image-filename" data-editor-image-filename hidden></span>
               <button type="button" class="editor-upload-btn editor-image-clear-btn" data-editor-image-clear hidden>Remove File</button>
             </div>
@@ -193,6 +197,20 @@
         <button type="button" class="editor-modal-btn editor-modal-btn-primary" data-editor-modal-confirm>Yes, post anyway</button>
       </div>
     </div>
+  </div>
+
+  <div class="editor-modal archive-picker-modal" data-archive-modal hidden>
+    <div class="editor-modal-backdrop" data-archive-close></div>
+    <section class="editor-modal-card archive-picker-card" role="dialog" aria-modal="true" aria-labelledby="archive-picker-title">
+      <div class="archive-picker-header">
+        <div>
+          <h2 class="editor-modal-title" id="archive-picker-title">Choose an image from the archive</h2>
+          <p class="editor-modal-intro">Use the archive’s “Copy url” button, then paste the URL into the image field.</p>
+        </div>
+        <button type="button" class="editor-modal-btn" data-archive-close aria-label="Close archive">Close</button>
+      </div>
+      <iframe class="archive-picker-frame" src="{% url 'archive:gallery' %}" title="Image and file archive"></iframe>
+    </section>
   </div>
 </section>
 

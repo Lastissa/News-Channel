@@ -14,6 +14,8 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
 from django.contrib import messages
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import error_logger, is_rate_limited
@@ -224,6 +226,7 @@ def _paginate_own(user, page_number):
     }
 
 
+@method_decorator(xframe_options_sameorigin, name="dispatch")
 class ArchiveGalleryView(View):
     """GET: the full /archive/ page with the first PAGE_SIZE items.
     POST: the paginated grid only, for the htmx "see more" swap, based on

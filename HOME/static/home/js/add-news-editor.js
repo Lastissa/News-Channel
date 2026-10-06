@@ -25,6 +25,8 @@
   var publishBtn = shell.querySelector("[data-editor-publish]");
   var uploadBtn = shell.querySelector("[data-editor-upload-btn]");
   var note = shell.querySelector("[data-editor-loading-note]");
+  var draftStatus = shell.querySelector("[data-editor-draft-status]");
+  var archiveModal = shell.querySelector("[data-archive-modal]");
   var modal = shell.querySelector("[data-editor-modal]");
   var modalCard = modal ? modal.querySelector(".editor-modal-card") : null;
   var modalTitle = modal ? modal.querySelector("[data-editor-modal-title]") : null;
@@ -36,6 +38,8 @@
   var guideCopyBtn = shell.querySelector("[data-guide-copy-all]");
 
   var PREVIEW_KEY = "abu-editor-preview";
+  var DRAFT_KEY = shell.dataset.draftKey;
+  var DRAFT_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
   var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   var pendingPublish = false;
 
@@ -43,6 +47,118 @@
      only happens inside the publish handler further down, via the real
      `image_file` FormData entry the browser already attached to the form. */
   var selectedImageObjectUrl = null;
+
+  function setDraftStatus(message, isError) {
+    if (!draftStatus) return;
+    draftStatus.textContent = message;
+    draftStatus.classList.toggle("is-error", Boolean(isError));
+  }
+
+  function readDraft() {
+    var rawDraft;
+    try {
+      rawDraft = window.localStorage.getItem(DRAFT_KEY);
+    } catch (error) {
+      console.error("Could not read the saved story draft.", error);
+      setDraftStatus("Autosave is unavailable in this browser.", true);
+      return null;
+    }
+    if (!rawDraft) return null;
+
+    try {
+      var draft = JSON.parse(rawDraft);
+      if (!draft || typeof draft !== "object" || typeof draft.savedAt !== "number") {
+        throw new Error("Saved story draft has an invalid format.");
+      }
+      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE) {
+        window.localStorage.removeItem(DRAFT_KEY);
+        return null;
+      }
+      return draft;
+    } catch (error) {
+      console.error("Could not restore the saved story draft.", error);
+      try {
+        window.localStorage.removeItem(DRAFT_KEY);
+      } catch (removeError) {
+        console.error("Could not remove the invalid saved story draft.", removeError);
+      }
+      setDraftStatus("The saved draft could not be restored.", true);
+      return null;
+    }
+  }
+
+  function restoreDraft() {
+    var draft = readDraft();
+    if (!draft) return;
+
+    headingInput.value = typeof draft.heading === "string" ? draft.heading : "";
+    imageInput.value = typeof draft.image === "string" ? draft.image : "";
+    imageInfoInput.value = typeof draft.imageInfo === "string" ? draft.imageInfo : "";
+    contentInput.value = typeof draft.content === "string" ? draft.content : "";
+    if (typeof draft.category === "string") categorySelect.value = draft.category;
+    if (typeof draft.imageQuality === "string" && imageQualityField) {
+      var qualitySelect = imageQualityField.querySelector("select");
+      if (qualitySelect) qualitySelect.value = draft.imageQuality;
+    }
+    setDraftStatus(
+      draft.uploadedImageSelected
+        ? "Draft restored. Reselect the uploaded image file if needed."
+        : "Draft restored from this browser."
+    );
+  }
+
+  function saveDraft() {
+    try {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        heading: headingInput.value,
+        image: imageInput.value,
+        imageInfo: imageInfoInput.value,
+        category: categorySelect.value,
+        imageQuality: imageQualityField
+          ? imageQualityField.querySelector("select").value
+          : "",
+        content: contentInput.value,
+        uploadedImageSelected: Boolean(imageFileInput && imageFileInput.files && imageFileInput.files.length),
+        savedAt: Date.now()
+      }));
+      setDraftStatus("Draft saved in this browser.");
+    } catch (error) {
+      console.error("Could not save the story draft.", error);
+      setDraftStatus("Autosave failed. Keep this page open and copy your text.", true);
+    }
+  }
+
+  function clearDraft() {
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+      setDraftStatus("");
+    } catch (error) {
+      console.error("Could not clear the published story draft.", error);
+      setDraftStatus("Story published, but its local draft could not be cleared.", true);
+    }
+  }
+
+  function closeArchivePicker() {
+    if (!archiveModal) return;
+    archiveModal.hidden = true;
+  }
+
+  shell.querySelectorAll("[data-archive-open]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (!archiveModal) return;
+      archiveModal.hidden = false;
+      var closeButton = archiveModal.querySelector("[data-archive-close]");
+      if (closeButton) closeButton.focus();
+    });
+  });
+  if (archiveModal) {
+    archiveModal.querySelectorAll("[data-archive-close]").forEach(function (button) {
+      button.addEventListener("click", closeArchivePicker);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !archiveModal.hidden) closeArchivePicker();
+    });
+  }
 
   function toast(message, tone) {
     if (typeof window.AbuToast === "function") {
@@ -383,6 +499,7 @@
           return;
         }
 
+        clearDraft();
         if (selectedImageObjectUrl) { URL.revokeObjectURL(selectedImageObjectUrl); selectedImageObjectUrl = null; }
         toast(payload.detail || "Story published.");
         if (payload.story_url) {
@@ -550,6 +667,7 @@
       if (imageFilenameEl) { imageFilenameEl.textContent = file.name; imageFilenameEl.hidden = false; }
       if (imageClearBtn) imageClearBtn.hidden = false;
       if (imageQualityField) imageQualityField.hidden = false;
+      saveDraft();
       schedulePreview();
     });
   }
@@ -557,6 +675,7 @@
   if (imageClearBtn) {
     imageClearBtn.addEventListener("click", function () {
       clearSelectedImageFile();
+      saveDraft();
       schedulePreview();
     });
   }
@@ -564,12 +683,19 @@
   /* ---------- wire up + reveal ---------- */
   headingInput.addEventListener("input", function () {
     headingInput.classList.remove("is-error");
+    saveDraft();
     schedulePreview();
   });
-  imageInput.addEventListener("input", schedulePreview);
-  imageInfoInput.addEventListener("input", schedulePreview);
-  categorySelect.addEventListener("change", schedulePreview);
-  contentInput.addEventListener("input", schedulePreview);
+  imageInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
+  imageInfoInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
+  categorySelect.addEventListener("change", function () { saveDraft(); schedulePreview(); });
+  contentInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
+  if (imageQualityField) {
+    var imageQualitySelect = imageQualityField.querySelector("select");
+    if (imageQualitySelect) imageQualitySelect.addEventListener("change", saveDraft);
+  }
+
+  restoreDraft();
 
   renderPreview();
   applyPreviewState(shell.classList.contains("preview-off"));

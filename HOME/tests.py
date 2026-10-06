@@ -173,6 +173,10 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, 'id="formatting-guide"')
         self.assertContains(response, "formatting guide")
         self.assertContains(response, "data-guide-copy-all")
+        self.assertContains(response, "data-draft-key")
+        self.assertContains(response, "data-editor-draft-status")
+        self.assertContains(response, "data-archive-open")
+        self.assertContains(response, "Image and file archive")
         self.assertContains(response, "Do not begin the content with a")
 
     def test_headline_copy_in_first_paragraph_is_blocked_server_side(self, _ping):

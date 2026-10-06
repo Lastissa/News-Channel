@@ -72,6 +72,7 @@ class AdminMaxPeriod:
         self.get_response = get_response
         
     def __call__(self, request):
+        # ADMIN HAVE TO BE LOGGED OUT FAST TO PREVENT HAKCER USING THEIR CREDS.
         if request.user.is_authenticated and request.user.is_admin:
             tracker = request.session.get('last_activity')
             if not tracker:
