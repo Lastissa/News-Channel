@@ -23,6 +23,7 @@ has to know about.
 
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 from cloudinary.exceptions import Error as CloudinaryError
 from django.conf import settings
 
@@ -283,18 +284,38 @@ def upload_archive_file(file, public_id: str | None = None) -> dict:
     }
 
 
-def destroy_archive_asset(public_id: str, resource_type: str = "image") -> None:
-    """Best effort delete of a Cloudinary asset belonging to an
-    ArchiveImage row (see ARCHIVE.views.ArchiveItemDeleteView). Never
-    raises -- a failed remote delete must not stop the database row from
-    being removed, it just leaves an orphaned asset on Cloudinary that can
-    be cleaned up by hand later."""
+def archive_image_delivery_url(public_id: str, quality=ImageQuality.MEDIUM, width=None, height=None) -> str:
+    """Build a Cloudinary delivery URL for an existing archive image using
+    the selected quality preset and its current dimension limits."""
+    preset = dict(ImageQuality.resolve(quality))
+    if width:
+        preset["width"] = width
+    if height:
+        preset["height"] = height
+    secure_url, _ = cloudinary.utils.cloudinary_url(
+        public_id,
+        resource_type="image",
+        secure=True,
+        transformation=[preset],
+    )
+    return secure_url
+
+
+def destroy_archive_asset(public_id: str, resource_type: str = "image") -> bool:
+    """Delete an archive asset from Cloudinary. Returns true only when
+    Cloudinary confirms deletion or confirms the asset is already absent."""
     if not public_id:
-        return
+        error_logger(msg="CLOUDINARY DESTROY SKIPPED: archive asset has no public_id")
+        return False
     try:
-        cloudinary.uploader.destroy(public_id, resource_type=resource_type or "image", invalidate=True)
+        result = cloudinary.uploader.destroy(public_id, resource_type=resource_type or "image", invalidate=True)
     except CloudinaryError as exc:
         error_logger(msg=f"CLOUDINARY DESTROY FAILED ({public_id}): {exc}")
+        return False
+    if isinstance(result, dict) and result.get("result") in {"ok", "not found"}:
+        return True
+    error_logger(msg=f"CLOUDINARY DESTROY UNCONFIRMED ({public_id}): {result}")
+    return False
 
 
 def upload_archive_image(file, quality=ImageQuality.MEDIUM, width=None, height=None, public_id: str | None = None) -> dict:

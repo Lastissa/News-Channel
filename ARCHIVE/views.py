@@ -5,6 +5,7 @@ ArchiveManageModalView / ArchiveItemEditView / ArchiveItemDeleteView)."""
 
 import re
 from difflib import SequenceMatcher
+from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
@@ -12,6 +13,7 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.views import View
 from django.contrib import messages
 from django.utils.decorators import method_decorator
@@ -22,6 +24,7 @@ from SERVICE_INTERNAL.abstract import error_logger, is_rate_limited
 from SERVICE_INTERNAL.images import (
     ImageQuality,
     ImageUploadError,
+    archive_image_delivery_url,
     destroy_archive_asset,
     upload_archive_file,
     upload_archive_image,
@@ -108,6 +111,7 @@ def _serialize_images(images):
             "width": image.width,
             "height": image.height,
             "alt": image.alt,
+            "quality": image.quality,
             "quality_label": QUALITY_LABELS.get(image.quality, image.quality.title()),
             "original_filename": image.original_filename,
             "file_extension": _file_extension(image.original_filename),
@@ -175,6 +179,42 @@ def _clean_descr(raw_value):
     return (raw_value or "").strip()[:ALT_MAX_LENGTH]
 
 
+def _proxy_cloudinary_url(secure_url):
+    """Convert a URL returned by this project's Cloudinary upload into the
+    project's own proxy route before storing it."""
+    parsed = urlparse(secure_url)
+    cloudinary_host = f"res.cloudinary.com"
+    if parsed.hostname != cloudinary_host:
+        raise ImageUploadError("Cloudinary returned an unexpected asset URL.")
+
+    path_parts = parsed.path.lstrip("/").split("/", 1)
+    if len(path_parts) != 2 or path_parts[0] != settings.CLOUDINARY_CLOUD_NAME:
+        raise ImageUploadError("Cloudinary returned an unexpected asset URL.")
+    proxy_path = reverse("archive:cdn_proxy", kwargs={"cloud_path": path_parts[1]})
+    return f"{proxy_path}?{parsed.query}" if parsed.query else proxy_path
+
+
+def _public_id_from_url(url, resource_type):
+    """Recover a legacy row's Cloudinary public ID when its public_id field
+    predates ID storage. Never guesses from a URL without a version marker."""
+    parsed = urlparse(url)
+    path = parsed.path
+    if "/cdn/" in path:
+        path = path.split("/cdn/", 1)[1]
+    else:
+        cloud_prefix = f"/{settings.CLOUDINARY_CLOUD_NAME}/"
+        if cloud_prefix in path:
+            path = path.split(cloud_prefix, 1)[1]
+
+    match = re.search(r"(?:^|/)v\d+/(.+)$", path)
+    if not match:
+        return ""
+    public_id = match.group(1)
+    if resource_type != "raw":
+        public_id = re.sub(r"\.[^./]+$", "", public_id)
+    return public_id
+
+
 def _paginate(page_number, descr=""):
     if descr:
         ranked_ids = _descr_ranked_ids(descr)
@@ -217,6 +257,7 @@ def _paginate_own(user, page_number):
     page = paginator.get_page(page_number)
     return {
         "items": _serialize_images(page.object_list),
+        "quality_choices": ImageQuality.CHOICES,
         "page": page.number,
         "num_pages": paginator.num_pages,
         "has_next": page.has_next(),
@@ -338,6 +379,10 @@ class ArchiveUploadView(View):
             }
 
         image_url = uploaded["secure_url"]
+        try:
+            image_url = _proxy_cloudinary_url(image_url)
+        except ImageUploadError as exc:
+            return JsonResponse({"detail": str(exc), "valid": False}, status=502)
 
         #   NO EXACT ITEM TWICE: same url + same alt text is a duplicate.
         #   Checked here for a friendly message, and enforced again by the
@@ -428,6 +473,7 @@ class ArchiveItemEditView(View):
         item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
         alt = (request.POST.get("alt") or "").strip()
         replacement_file = request.FILES.get("upload_file")
+        requested_quality = (request.POST.get("quality") or item.quality).strip().lower()
 
         error = None
         if not alt:
@@ -439,10 +485,11 @@ class ArchiveItemEditView(View):
         #   dedupe check and the save below both know whether `item.url`
         #   is about to change.
         new_url = None
+        quality_changed = item.kind == ArchiveKind.IMAGE and requested_quality != item.quality
 
         if not error and replacement_file:
             if item.kind == ArchiveKind.IMAGE:
-                quality = (request.POST.get("quality") or item.quality).strip().lower()
+                quality = requested_quality
                 if quality not in QUALITY_LABELS:
                     error = "Select a valid image quality."
 
@@ -466,21 +513,47 @@ class ArchiveItemEditView(View):
                     except ImageUploadError as exc:
                         error = str(exc)
                     else:
-                        new_url = uploaded["secure_url"]
-                        item.quality = quality
-                        item.width = uploaded["width"]
-                        item.height = uploaded["height"]
-                        item.public_id = item.public_id or uploaded.get("public_id", "")
+                        try:
+                            new_url = _proxy_cloudinary_url(uploaded["secure_url"])
+                        except ImageUploadError as exc:
+                            error = str(exc)
+                        if not error:
+                            item.quality = quality
+                            item.width = uploaded["width"]
+                            item.height = uploaded["height"]
+                            item.public_id = item.public_id or uploaded.get("public_id", "")
             else:
                 try:
                     uploaded = upload_archive_file(replacement_file, public_id=item.public_id or None)
                 except ImageUploadError as exc:
                     error = str(exc)
                 else:
-                    new_url = uploaded["secure_url"]
-                    item.original_filename = uploaded["original_filename"]
-                    item.file_size = uploaded["bytes"]
-                    item.public_id = item.public_id or uploaded.get("public_id", "")
+                    try:
+                        new_url = _proxy_cloudinary_url(uploaded["secure_url"])
+                    except ImageUploadError as exc:
+                        error = str(exc)
+                    if not error:
+                        item.original_filename = uploaded["original_filename"]
+                        item.file_size = uploaded["bytes"]
+                        item.public_id = item.public_id or uploaded.get("public_id", "")
+
+        elif not error and quality_changed:
+            if requested_quality not in QUALITY_LABELS:
+                error = "Select a valid image quality."
+            elif not (item.public_id or _public_id_from_url(item.url, item.resource_type)):
+                error = "This image cannot change quality because its Cloudinary asset ID is missing."
+            else:
+                try:
+                    delivery_url = archive_image_delivery_url(
+                        item.public_id or _public_id_from_url(item.url, item.resource_type),
+                        requested_quality,
+                        width=item.width,
+                        height=item.height,
+                    )
+                    new_url = _proxy_cloudinary_url(delivery_url)
+                    item.quality = requested_quality
+                except ImageUploadError as exc:
+                    error = str(exc)
 
         if not error:
             dedupe_url = new_url or item.url
@@ -494,6 +567,8 @@ class ArchiveItemEditView(View):
             update_fields = ["alt"]
             if new_url:
                 update_fields += ["url", "quality", "width", "height", "public_id", "original_filename", "file_size"]
+            elif quality_changed:
+                update_fields.append("quality")
             try:
                 item.save(update_fields=list(dict.fromkeys(update_fields)))
             except IntegrityError:
@@ -502,7 +577,9 @@ class ArchiveItemEditView(View):
         context = _paginate_own(request.user, page_number=1)
         context["error"] = error
         if not error:
-            context["notice"] = "Picture/file updated." if new_url else "Description updated."
+            context["notice"] = "Picture/file updated." if replacement_file else (
+                "Description and image quality updated." if quality_changed else "Description updated."
+            )
         response = render(request, "ARCHIVE/partials/manage_list.html", context)
         if not error:
             response["HX-Trigger"] = "archive:refresh"
@@ -520,9 +597,12 @@ class ArchiveItemDeleteView(View):
             return JsonResponse({"detail": "Please sign in to manage your uploads."}, status=401)
 
         item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
-        destroy_archive_asset(item.public_id, item.resource_type)
+        public_id = item.public_id or _public_id_from_url(item.url, item.resource_type)
+        if not public_id or not destroy_archive_asset(public_id, item.resource_type):
+            context = _paginate_own(request.user, page_number=1)
+            context["error"] = "The Cloudinary image could not be deleted, so the archive item was kept. Please try again."
+            return render(request, "ARCHIVE/partials/manage_list.html", context)
         item.delete()
-        "TODO: also delete it in the cloudinary table itslelf, not just here."
         context = _paginate_own(request.user, page_number=1)
         context["notice"] = "Item deleted."
         response = render(request, "ARCHIVE/partials/manage_list.html", context)

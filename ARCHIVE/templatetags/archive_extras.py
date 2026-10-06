@@ -8,6 +8,7 @@ inline imgl/imgr/imgc pictures, avatars, ...).
 """
 
 import re
+from urllib.parse import urlparse
 
 from django import template
 from django.conf import settings
@@ -41,3 +42,14 @@ def cloudinary_proxy(url):
         return url
 
     return reverse("archive:cdn_proxy", kwargs={"cloud_path": cloud_path})
+
+
+@register.filter(name="archive_absolute_url")
+def archive_absolute_url(url, request):
+    """Make relative proxy URLs copyable outside this page while leaving
+    already-absolute, persisted URLs intact."""
+    if not url or not request:
+        return url
+    if urlparse(str(url)).scheme:
+        return url
+    return request.build_absolute_uri(str(url))

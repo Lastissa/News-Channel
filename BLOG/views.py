@@ -77,6 +77,14 @@ def _archive_dimensions_for_url(url):
     from outside the project."""
     dimensions = ArchiveImage.objects.filter(url=url).values("width", "height").first()
     if not dimensions:
+        parsed_path = urlparse(url).path
+        if "/cdn/" in parsed_path:
+            parsed_path = parsed_path.split("/cdn/", 1)[1]
+        elif parsed_path.startswith("/"):
+            parsed_path = parsed_path.lstrip("/")
+        if parsed_path:
+            dimensions = ArchiveImage.objects.filter(url__endswith=parsed_path).values("width", "height").first()
+    if not dimensions:
         return None, None
     return dimensions["width"], dimensions["height"]
 
