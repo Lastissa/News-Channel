@@ -1,0 +1,34 @@
+:root {
+  --paper: white;/*#fffcf7;*/
+  --ink: #0E1B2C;
+
+}
+
+html[data-theme="dark"] {
+  --paper:#0B1420;
+  --ink: #F3EFE6;
+
+}
+
+
+.dummy-loading{
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    z-index: 2601;
+    left: 0;
+    top: 0;
+    padding: 0;
+    margin: 0;
+    background-color: var(--paper);
+    justify-items: center;
+    align-content: center;
+
+}
+
+.dummy-loading p {
+    color: var(--ink);
+    font-size: 2rem;
+    word-spacing: 2px;
+    letter-spacing: 5px;
+}

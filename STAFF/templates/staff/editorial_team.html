@@ -19,7 +19,7 @@
   <meta property="og:title" content="Editorial Team · {{ project_name }}">
   <meta property="og:description" content="{{ meta_description }}">
   <script type="application/ld+json">{{ team_schema_json|safe }}</script>
-  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261006-2">
+  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261007-2">
 {% endblock %}
 
 {% block content %}
@@ -95,8 +95,8 @@
         <span class="editorial-spotlight-art-word">REPORT</span>
       </div>
       <div class="editorial-spotlight-portrait" aria-hidden="true">
-        {% if highlight.portrait %}
-        <img src="{{ highlight.portrait }}" alt="" loading="lazy"
+        {% if highlight.latest_story.image_1 %}
+        <img src="{{ highlight.latest_story.image_1 }}" alt="" loading="lazy"
              onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
         <span hidden>{{ highlight.display_name|slice:":1"|upper }}</span>
         {% else %}
@@ -151,119 +151,37 @@
         <label class="sr-only" for="editorial-journalist-search">Search journalists</label>
         <input
           id="editorial-journalist-search"
-          type="search"
+          type="text"
           data-journalist-search
           aria-controls="editorial-directory"
           placeholder="Search journalists, topics, or stories"
           autocomplete="off"
+          value="{{ search_query }}"
         >
         <button type="button" class="editorial-search-clear" data-search-clear aria-label="Clear journalist search" hidden>
           <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"></path></svg>
         </button>
-        <kbd aria-hidden="true">/</kbd>
       </div>
-      <p class="editorial-search-status" data-search-status role="status" aria-live="polite">
-        Showing {{ team_size }} {{ team_size|pluralize:"journalist,journalists" }}
+      <p class="editorial-search-status" data-search-status data-total="{{ filtered_count }}" data-page-size="{{ page_size }}" role="status" aria-live="polite">
+        Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ filtered_count }} journalists
       </p>
     </div>
 
     <ul class="editorial-grid" id="editorial-directory">
-      {% for member in members %}
-        <li
-          class="editorial-card"
-          data-journalist-card
-          data-search-text="{{ member.display_name }} {{ member.profile.bio|default:'' }} {{ member.speciality|join:' ' }} {{ member.latest_story.heading|default:'' }} {{ member.latest_story.category|default:'' }}"
-        >
-          <div class="editorial-card-top">
-            <div class="editorial-avatar">
-              {% if member.portrait %}
-              <img src="{{ member.portrait }}" alt="" loading="lazy" width="72" height="72"
-                   onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
-              <span hidden aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
-              {% else %}
-              <span aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
-              {% endif %}
-            </div>
-            {% if member.joined %}
-            <time class="editorial-member-since" datetime="{{ member.joined|date:'c' }}">
-              Joined {{ member.joined|date:"Y" }}
-            </time>
-            {% endif %}
-          </div>
-
-          <h4 class="editorial-name">
-            {% if member.slug %}
-            <a href="{% url 'staff:portfolio' member.slug %}">{{ member.display_name }}</a>
-            {% else %}
-            {{ member.display_name }}
-            {% endif %}
-          </h4>
-
-          {% if member.profile.bio %}
-          <p class="editorial-bio">{{ member.profile.bio|truncatechars:190 }}</p>
-          {% endif %}
-
-          {% if member.speciality %}
-          <ul class="editorial-beats" aria-label="Reporting specialties">
-            {% for beat in member.speciality %}<li>{{ beat }}</li>{% endfor %}
-          </ul>
-          {% endif %}
-
-          <div class="editorial-card-foot">
-            <div class="editorial-output">
-              <strong>{{ member.story_count }}</strong>
-              {{ member.story_count|pluralize:"story,stories" }}
-              <span class="editorial-output-divider" aria-hidden="true"></span>
-              <strong>{{ member.total_views|floatformat:"0g" }}</strong>
-              {{ member.total_views|pluralize:"view,views" }}
-            </div>
-            {% if member.latest_story %}
-            <article class="editorial-latest">
-              <div class="editorial-latest-media" aria-hidden="true">
-                {% if member.latest_story.image_1 %}
-                <img src="{{ member.latest_story.image_1 }}" alt="" loading="lazy" width="112" height="84">
-                {% else %}
-                <span>{{ member.latest_story.heading|slice:":1"|upper }}</span>
-                {% endif %}
-              </div>
-              <div class="editorial-latest-copy">
-                <p class="editorial-latest-kicker">
-                  <span>Latest story</span>
-                  {% if member.latest_story.category %}<span>{{ member.latest_story.get_category_display|title }}</span>{% endif %}
-                </p>
-                {% if member.latest_story.slug %}
-                <a class="editorial-latest-headline" href="{% url 'blog:story_detail' member.latest_story.slug %}">
-                  {{ member.latest_story.heading }}
-                  <span aria-hidden="true">↗</span>
-                </a>
-                {% else %}
-                <p class="editorial-latest-headline">{{ member.latest_story.heading }}</p>
-                {% endif %}
-                {% if member.latest_story.date_created %}
-                <time class="editorial-latest-date" datetime="{{ member.latest_story.date_created|date:'c' }}">
-                  {{ member.latest_story.date_created|date:"M j, Y" }}
-                </time>
-                {% endif %}
-              </div>
-            </article>
-            {% else %}
-            <div class="editorial-latest editorial-latest-empty">
-              <div class="editorial-latest-media" aria-hidden="true"><span>+</span></div>
-              <div class="editorial-latest-copy">
-                <p class="editorial-latest-kicker"><span>Latest story</span></p>
-                <p class="editorial-no-story">No stories published yet</p>
-              </div>
-            </div>
-            {% endif %}
-          </div>
-        </li>
-      {% endfor %}
+      {% include "staff/includes/editorial_cards.html" with members=members %}
     </ul>
-    <div class="editorial-search-empty" data-search-empty hidden>
+    <div class="editorial-search-empty" data-search-empty {% if filtered_count %}hidden{% endif %}>
       <span aria-hidden="true">⌕</span>
       <h3>No journalists found</h3>
       <p>Try another name, topic, or story title.</p>
     </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="editorial-pagination" aria-label="Journalist pages" data-editorial-pagination>
+      <button type="button" data-page-previous {% if not page_obj.has_previous %}disabled{% endif %}>Previous</button>
+      <span data-page-status data-current-page="{{ page_obj.number }}" aria-live="polite">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <button type="button" data-page-next {% if not page_obj.has_next %}disabled{% endif %}>Next</button>
+    </nav>
+    {% endif %}
     {% else %}
     <div class="editorial-empty">
       <span aria-hidden="true">✦</span>
@@ -272,10 +190,33 @@
     </div>
     {% endif %}
   </section>
+
+  <section class="editorial-standards" aria-labelledby="editorial-standards-title">
+    <p class="editorial-eyebrow">Our approach</p>
+    <h2 id="editorial-standards-title">How we report</h2>
+    <p class="editorial-standards-lead">A useful report is clear about what is known, where it came from, and what changes as a story develops.</p>
+    <div class="editorial-standards-grid">
+      <article>
+        <span>01</span>
+        <h3>Start with the facts</h3>
+        <p>We keep the headline direct and the opening focused on the essential details.</p>
+      </article>
+      <article>
+        <span>02</span>
+        <h3>Make it clear</h3>
+        <p>We organize reports with readable paragraphs, useful context, and attributed information.</p>
+      </article>
+      <article>
+        <span>03</span>
+        <h3>Update with care</h3>
+        <p>When important details change, the report should make the latest information easy to follow.</p>
+      </article>
+    </div>
+  </section>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
   {{ block.super }}
-  <script src="{% static 'staff/js/editorial-motion.js' %}?v=20261006-2" defer></script>
+  <script src="{% static 'staff/js/editorial-motion.js' %}?v=20261007-2" defer></script>
 {% endblock %}

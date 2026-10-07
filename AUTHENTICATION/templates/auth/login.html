@@ -102,7 +102,7 @@
       /*  If the redirect after a successful login never lands (cancelled or
             stuck), the button unfreezes after this many seconds so it can
             never end up permanently dead. */
-      var LOGIN_REDIRECT_WATCHDOG_SECONDS = 2;
+      var LOGIN_REDIRECT_WATCHDOG_SECONDS = 5;
 
       function setSubmitBusy(busy) {
         if (!submitBtn) return;
@@ -123,7 +123,7 @@
         window.setTimeout(function () {
           if (submitBtn && submitBtn.dataset.pending === 'true') {
             setSubmitBusy(false);
-            showAuthToast('Still here? The redirect did not happen. Try signing in again.');
+            showAuthToast('Still here? Slow Internet Dectected. Please Refresh Page');
           }
         }, LOGIN_REDIRECT_WATCHDOG_SECONDS * 1000);
       }

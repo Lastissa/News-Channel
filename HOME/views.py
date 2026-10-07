@@ -80,7 +80,8 @@ def handler500(request, exception=None):
                     <p>System is currently in service.</p>
                     <p>Please try again later.</p>
                     <p>We are very sorry for the inconvenience.</p>
-                    <p>This downtime is temporary as we are actively working on fixing some glitches with our database in order to best serve you more.</p>
+                    <p>This downtime is temporary as we are actively working on fixing some glitches with our database in order to best serve you more. </p>
+                    <p>If this screen is visible for more than 30 minutes, please contact +2348113577875 so we can quickly work on it.</p>
                     <p>{About.project_name} team cares.</p>
                 </body>
             </html>
@@ -307,11 +308,7 @@ class HomeView(View):
             featured = []
             paginator = Paginator(base_qs, PAGE_SIZE)
         else:
-            home_posts = cache_or_run(
-                "home_page_blogs_v2",
-                fn=lambda: {"posts": list(_home_blog_queryset())},
-                timeout=None,
-            )["posts"]
+            home_posts = cache_or_run("home_page_blogs",fn=lambda: {"posts": list(_home_blog_queryset())},timeout=None)["posts"]
             featured = home_posts[:FEATURED_COUNT]
             featured_ids = {post.id for post in featured}
             grid_posts = [post for post in home_posts if post.id not in featured_ids]
@@ -768,6 +765,7 @@ class PromoteView(View):
     is designed."""
 
     def get(self, request):
+        return HttpResponse("still in progress")
         return render(request, "HOME/promote.html")
 
 
@@ -810,7 +808,7 @@ class ProfileSendNewsletterToggleView(View):
 
         return JsonResponse(
             {
-                "detail": "News updates enabled." if new_state else "News updates disabled.",
+                "detail": "Thank you. News Update Enabled" if new_state else "News updates disabled.",
                 "enabled": new_state,
                 "status": "on" if new_state else "off",
             },

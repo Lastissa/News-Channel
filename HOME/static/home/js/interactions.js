@@ -1,5 +1,5 @@
 (function () {
-  "use strict";
+  // "use strict";
 
   /* ---------- helpers ---------- */
   function getCookie(name) {

@@ -298,7 +298,7 @@
     color-mix(in srgb, var(--slate) 8%, var(--surface)) 64%
   );
   background-size: 220% 100%;
-  animation: read-also-shimmer 1.3s ease-in-out infinite;
+  animation: read-also-shimmer 1.6s ease-in-out infinite;
 }
 .read-also-skeleton-image { width: 64px; height: 58px; }
 .read-also-skeleton-copy { display: grid; gap: 8px; }

@@ -11,7 +11,7 @@
   --paper-dim: #fefbff;
   --surface: #FFFFFF;
   --input-fill: rgb(249, 249, 250);
-  --amber: #e8a324;
+  --amber: #e8a324d3;
   --amber-alt:rgb(15, 113, 15);
   --amber-alt-deep:rgb(24, 100, 24);
   --amber-deep: #af700a;
@@ -2014,3 +2014,6 @@ html.nav-locked { overflow: hidden; }
 @media (max-width: 768px) {
   .comment-header { flex-direction: row; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 }
+
+/* purposedly put at the bottom so it only clear when the base.css is fully loaded */
+.dummy-loading{display: none;}

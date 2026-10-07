@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.db import connection
 import logging
 
+
 logger = logging.getLogger(__name__)
 
 from django.conf import settings
@@ -180,5 +181,7 @@ def cache_or_run(key, fn, timeout=300):
         set_cache(key, value, timeout)
         info_logger(msg=f"CACHE-SET: {key} set since no key was found in the cache")
     else:
+        msg = f"CRITICAL: Cache got a fn of None, almost raising a good 500 error message. LOOK INTO THIS FN {fn}"
+        error_logger(msg=msg)
         raise Exception("BEFORE CACHE CAN SET, THE FN NEED TO RETURN SOMETHING")
     return value

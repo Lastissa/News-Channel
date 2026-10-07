@@ -5,81 +5,186 @@
   var roster = document.querySelector(".editorial-roster");
   if (!page || !roster) return;
 
-  var cards = Array.prototype.slice.call(roster.querySelectorAll("[data-journalist-card]"));
+  var grid = roster.querySelector("#editorial-directory");
   var search = roster.querySelector("[data-journalist-search]");
   var clearSearch = roster.querySelector("[data-search-clear]");
   var searchStatus = roster.querySelector("[data-search-status]");
   var searchEmpty = roster.querySelector("[data-search-empty]");
+  var pagination = roster.querySelector("[data-editorial-pagination]");
+  var previousButton = roster.querySelector("[data-page-previous]");
+  var nextButton = roster.querySelector("[data-page-next]");
+  var pageStatus = roster.querySelector("[data-page-status]");
   var reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   var numberFormatter = new Intl.NumberFormat();
+  var pageSize = Number(searchStatus && searchStatus.dataset.pageSize) || 5;
+  var currentPage = Number(pageStatus && pageStatus.dataset.currentPage) || 1;
+  var currentTotal = Number(searchStatus && searchStatus.dataset.total) || 0;
+  var requestSequence = 0;
+  var activeRequest = null;
+  var searchTimer = 0;
+  var lastCardsMarkup = grid ? grid.innerHTML : "";
 
-  function normalize(value) {
-    return (value || "")
-      .toLocaleLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim();
+  function updateCards() {
+    var cards = Array.prototype.slice.call(grid.querySelectorAll("[data-journalist-card]"));
+    cards.forEach(function (card, index) {
+      if (reduceMotionQuery.matches) {
+        card.classList.add("is-visible");
+        return;
+      }
+      card.classList.remove("is-visible");
+      card.style.setProperty("--editorial-card-index", String(index));
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () {
+          card.classList.add("is-visible");
+        });
+      });
+    });
   }
 
-  if (search) {
-    function filterJournalists() {
-      var query = normalize(search.value);
-      var visibleCount = 0;
-
-      if (clearSearch) clearSearch.hidden = !search.value;
-      cards.forEach(function (card) {
-        var isMatch = normalize(card.getAttribute("data-search-text")).indexOf(query) !== -1;
-        var wasHidden = card.hidden;
-        card.hidden = !isMatch;
-        if (isMatch) {
-          visibleCount += 1;
-          if (wasHidden && query && !reduceMotionQuery.matches && card.animate) {
-            card.animate(
-              [
-                { opacity: 0, transform: "translateY(8px)" },
-                { opacity: 1, transform: "translateY(0)" }
-              ],
-              { duration: 260, easing: "cubic-bezier(.2, .65, .3, 1)" }
-            );
-          }
-        }
-      });
-
-      if (searchStatus) {
-        searchStatus.textContent =
-          "Showing " + visibleCount + " of " + cards.length + " " +
-          (cards.length === 1 ? "journalist" : "journalists");
-      }
-      if (searchEmpty) searchEmpty.hidden = visibleCount !== 0;
+  function showSkeletons() {
+    var skeleton = "";
+    for (var index = 0; index < 5; index += 1) {
+      skeleton +=
+        '<li class="editorial-card editorial-skeleton-card" aria-hidden="true">' +
+          '<span class="editorial-skeleton-avatar"></span>' +
+          '<span class="editorial-skeleton-line editorial-skeleton-name"></span>' +
+          '<span class="editorial-skeleton-line editorial-skeleton-copy"></span>' +
+          '<span class="editorial-skeleton-line editorial-skeleton-copy-short"></span>' +
+          '<span class="editorial-skeleton-story">' +
+            '<span class="editorial-skeleton-image"></span>' +
+            '<span class="editorial-skeleton-story-copy">' +
+              '<span class="editorial-skeleton-line editorial-skeleton-copy"></span>' +
+              '<span class="editorial-skeleton-line editorial-skeleton-copy-short"></span>' +
+            '</span>' +
+          '</span>' +
+        '</li>';
     }
+    grid.innerHTML = skeleton;
+    grid.setAttribute("aria-busy", "true");
+    if (searchEmpty) searchEmpty.hidden = true;
+    if (pagination) pagination.hidden = true;
+  }
 
-    search.addEventListener("input", filterJournalists);
+  function updatePagination(data) {
+    currentPage = data.page;
+    currentTotal = data.total;
+    if (searchStatus) {
+      var firstResult = data.total ? (data.page - 1) * pageSize + 1 : 0;
+      var lastResult = Math.min(data.page * pageSize, data.total);
+      searchStatus.textContent =
+        "Showing " + firstResult + "–" + lastResult + " of " + data.total +
+        " " + (data.total === 1 ? "journalist" : "journalists");
+    }
+    if (pageStatus) {
+      pageStatus.textContent = "Page " + data.page + " of " + data.pages;
+    }
+    if (previousButton) previousButton.disabled = !data.has_previous;
+    if (nextButton) nextButton.disabled = !data.has_next;
+    if (pagination) pagination.hidden = data.pages <= 1;
+    if (searchEmpty) searchEmpty.hidden = data.total !== 0;
+  }
+
+  function loadPage(pageNumber) {
+    if (activeRequest) activeRequest.abort();
+    var controller = "AbortController" in window ? new AbortController() : null;
+    activeRequest = controller;
+    var sequence = ++requestSequence;
+    var url = new URL(window.location.href);
+    url.searchParams.set("page", String(pageNumber));
+    var query = search ? search.value.trim() : "";
+    if (query) url.searchParams.set("q", query);
+    else url.searchParams.delete("q");
+
+    showSkeletons();
+    if (searchStatus) searchStatus.textContent = "Loading journalists…";
+    if (pageStatus) pageStatus.textContent = "Loading…";
+
+    var options = {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin"
+    };
+    if (controller) options.signal = controller.signal;
+
+    fetch(url.toString(), options)
+      .then(function (response) {
+        if (!response.ok) throw new Error("Journalist request failed with status " + response.status);
+        return response.json();
+      })
+      .then(function (data) {
+        if (sequence !== requestSequence) return;
+        grid.innerHTML = data.cards_html;
+        lastCardsMarkup = data.cards_html;
+        grid.removeAttribute("aria-busy");
+        updatePagination(data);
+        updateCards();
+        var canonicalUrl = new URL(window.location.href);
+        if (query) canonicalUrl.searchParams.set("q", query);
+        else canonicalUrl.searchParams.delete("q");
+        if (data.page > 1) canonicalUrl.searchParams.set("page", String(data.page));
+        else canonicalUrl.searchParams.delete("page");
+        window.history.replaceState({}, "", canonicalUrl);
+      })
+      .catch(function (error) {
+        if (error.name === "AbortError" || sequence !== requestSequence) return;
+        grid.innerHTML = lastCardsMarkup;
+        grid.removeAttribute("aria-busy");
+        if (searchStatus) {
+          var start = currentTotal ? (currentPage - 1) * pageSize + 1 : 0;
+          var end = Math.min(currentPage * pageSize, currentTotal);
+          searchStatus.textContent =
+            "Couldn’t load journalists. Showing " + start + "–" + end + " of " + currentTotal + ".";
+        }
+        if (pageStatus) pageStatus.textContent = "Page " + currentPage;
+        if (pagination) pagination.hidden = false;
+        updateCards();
+      });
+  }
+
+  if (grid && search) {
+    search.addEventListener("input", function () {
+      if (clearSearch) clearSearch.hidden = !search.value;
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(function () {
+        loadPage(1);
+      }, 280);
+    });
+
     search.addEventListener("keydown", function (event) {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || !search.value) return;
       event.preventDefault();
       search.value = "";
-      filterJournalists();
+      if (clearSearch) clearSearch.hidden = true;
+      window.clearTimeout(searchTimer);
+      loadPage(1);
     });
 
     if (clearSearch) {
       clearSearch.addEventListener("click", function () {
         search.value = "";
-        filterJournalists();
+        clearSearch.hidden = true;
+        window.clearTimeout(searchTimer);
+        loadPage(1);
         search.focus();
       });
     }
 
-    document.addEventListener("keydown", function (event) {
-      if (
-        event.key === "/" &&
-        !event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)
-      ) {
-        event.preventDefault();
-        search.focus();
-      }
+    if (previousButton) {
+      previousButton.addEventListener("click", function () {
+        if (currentPage > 1) loadPage(currentPage - 1);
+      });
+    }
+    if (nextButton) {
+      nextButton.addEventListener("click", function () {
+        if (currentPage * pageSize < currentTotal) loadPage(currentPage + 1);
+      });
+    }
+
+    updateCards();
+    window.addEventListener("popstate", function () {
+      var url = new URL(window.location.href);
+      search.value = url.searchParams.get("q") || "";
+      if (clearSearch) clearSearch.hidden = !search.value;
+      loadPage(Number(url.searchParams.get("page")) || 1);
     });
   }
 
@@ -116,12 +221,8 @@
       var progress = Math.min(1, (timestamp - startedAt) / duration);
       var eased = 1 - Math.pow(1 - progress, 3);
       counter.textContent = numberFormatter.format(Math.min(target, Math.floor(target * eased)));
-
-      if (progress < 1) {
-        window.requestAnimationFrame(step);
-      } else {
-        showCounterFinal(counter);
-      }
+      if (progress < 1) window.requestAnimationFrame(step);
+      else showCounterFinal(counter);
     }
 
     window.requestAnimationFrame(step);
@@ -136,37 +237,9 @@
   }
 
   if (reduceMotionQuery.matches) {
-    cards.forEach(function (card) {
-      card.classList.add("is-visible");
-    });
     counters.forEach(showCounterFinal);
   } else {
     roster.classList.add("editorial-motion-ready");
-
-    if ("IntersectionObserver" in window) {
-      var revealObserver = new IntersectionObserver(
-        function (entries, observer) {
-          entries.forEach(function (entry) {
-            if (!entry.isIntersecting) return;
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          });
-        },
-        { threshold: 0.08, rootMargin: "0px 0px -24px 0px" }
-      );
-      cards.forEach(function (card) {
-        revealObserver.observe(card);
-        var bounds = card.getBoundingClientRect();
-        if (bounds.bottom > 0 && bounds.top < window.innerHeight) {
-          card.classList.add("is-visible");
-        }
-      });
-    } else {
-      cards.forEach(function (card) {
-        card.classList.add("is-visible");
-      });
-    }
-
     startVisibleCounters();
     document.addEventListener("visibilitychange", startVisibleCounters);
   }

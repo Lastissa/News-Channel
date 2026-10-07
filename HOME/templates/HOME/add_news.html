@@ -35,6 +35,16 @@
     @media (max-width: 899.98px) {
       .editor-workspace { grid-template-columns: 1fr; }
       .editor-pane { height: auto; min-height: 0; }
+      .editor-toolbar {
+        position: sticky;
+        top: var(--header-h, 64px);
+        z-index: 40;
+        margin-bottom: 14px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+        box-shadow: 0 5px 14px rgba(14, 27, 44, 0.08);
+      }
     }
   </style>
 {% endblock %}

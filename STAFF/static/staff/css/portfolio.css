@@ -1276,7 +1276,7 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
   border-radius: 7px;
   background: linear-gradient(100deg, var(--paper-dim) 30%, var(--line) 50%, var(--paper-dim) 70%);
   background-size: 250% 100%;
-  animation: portfolio-skeleton-shimmer 1.4s ease-in-out infinite;
+  animation: portfolio-skeleton-shimmer 1.7s ease-in-out infinite;
 }
 
 .portfolio-skeleton-line {

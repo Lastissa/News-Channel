@@ -42,14 +42,13 @@
         })();
     </script>
     
-<link rel="preload" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
-<link rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261006-4">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
+    <link rel="stylesheet" href="{% static "home/css/light_base.css" %}">
+    <link rel="stylesheet" href="{% static 'home/css/base.css' %}" media="print" onload="this.media='all'">
     {% block extra_head %}
-    {% comment %} TITLE AND DESCRIPTION ALREADY TAKEN CARE OF BY NoRMAL TITLE AND DESCRPTION META TAG AS THEY ARE ALWAYS PRESENT {% endcomment %}
-    {% comment %} <meta property="og:title" content="{{project_name}}">
-    <meta property="og:description" content="{{project_cachphrase}}"> {% endcomment %}
     {% block og_image %}
+    <!--Defaul is the oficial site logo--> 
     <meta property="og:image" content="{{ site_domain }}{% static 'logo.jpg' %}">
     {% endblock og_image %}
     
@@ -70,6 +69,9 @@
 
 
 <body>
+    <div class="dummy-loading">
+        <p> PLEASE WAIT... </p>
+    </div>
     {% include "includes/navbar.html" %}
     {% if messages %}
     <div id="django-message-host" style="display:none;">
@@ -84,11 +86,10 @@
     {% block footer %}{% include "includes/footer.html" %}{% endblock %}
     {% block floating_social %}{% include "includes/floating_social.html" %}{% endblock %}
     {% block newsletter_popup %}{% endblock %}
-
     <script src="{% static 'home/js/app.js' %}" defer></script>
     <script src="{% static 'home/js/carousel.js' %}" defer></script>
     <script src="{% static 'home/js/hero-teaser.js' %}" defer></script>
-    <script src="{% static 'home/js/interactions.js' %}?v=20261006-5" defer></script>
+    <script src="{% static 'home/js/interactions.js' %}" defer></script>
     <script src="{% static 'home/js/auth-gate.js' %}" defer></script>
     {% block extra_scripts %}{% endblock %}
 </body>

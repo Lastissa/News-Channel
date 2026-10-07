@@ -149,7 +149,7 @@
 
 Written by {{blog.author_name}} | ABUREPORT TEAM
 
-visit https://www.abureport.com.ng for more up to date stories
+visit https://www.abureport.com.ng for more up to date news.
 
 ">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
@@ -170,7 +170,7 @@ visit https://www.abureport.com.ng for more up to date stories
         {% if blog.image_info %}
           <figcaption>{{ blog.image_info }}</figcaption>
         {% else %}
-          <figcaption>404 meaning caption not found </figcaption>
+          <figcaption>404 - caption not found </figcaption>
         {% endif %}
       </figure>
 
@@ -180,16 +180,17 @@ visit https://www.abureport.com.ng for more up to date stories
 
     {% if support_email and "@" in support_email %}
     <details class="story-report-note">
-      <summary>Noticed any missing or inappropriate content? Click here to inform us.</summary>
-      <p>Your report will be sent to our support team. {% if request.user.is_authenticated %}Your account email will be included.{% else %}You will be listed as Anonymous.{% endif %}</p>
+      <summary>Noticed any missing or inappropriate content? Please Click Here to report it to us.</summary>
+      <p>This report will be sent directly to our support team. {% if request.user.is_authenticated %}Your email will be included for feedback.{% else %}You will be listed as Anonymous.{% endif %}</p>
       <form method="post" action="{% url 'blog:story_report' blog.id %}" data-story-report-form>
         {% csrf_token %}
-        <label for="story-report-content">What should we know?</label>
+        <label for="story-report-content">What did you notice?</label>
         <textarea id="story-report-content" name="content" rows="5" maxlength="5000" required></textarea>
         <button type="submit">Send report</button>
         <p class="story-report-status" data-story-report-status role="status" aria-live="polite" hidden></p>
-      </form>
+      </form> 
     </details>
+    {% else %}<details class="story-report-note"> We have not set up our support email, soon as we does, you will be able to send us mail for us to make corrections if you notice any errors in this story. Thank You</details>
     {% endif %}
 
     <div class="article-actions">

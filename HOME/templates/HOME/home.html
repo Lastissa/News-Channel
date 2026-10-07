@@ -5,13 +5,12 @@
 {% block title %}
 {% spaceless %}
 {% if is_filtered %}
-  {% if query %}Results for "{{ query|truncatechars:50 }}" - ABUREPORT
-  {% elif active_category %}Latest On {{ active_category|title }} -  ABUREPORT
-  {% else %}{{block.super}}
+  {% if query %}Results for "{{ query|truncatechars:50 }}" | {{project_name}}
+  {% elif active_category %}Latest On {{ active_category|title }} |  | {{project_name}}
+  {% else %} {{ block.super }}
   {% endif %}
-  {% if page_obj.number > 1 %} - Page {{ page_obj.number }}{% endif %}
-{% else %}
-  {{ block.super }}
+  {% if page_obj.number > 1 %} | Page {{ page_obj.number }}{% endif %}
+{% else %} {{project_name}} | {{project_cachphrase}}
 {% endif %}
 {% endspaceless %}
 {% endblock title %}
@@ -19,7 +18,7 @@
 
 {% block meta_description %}
 {% spaceless %}
-{% if is_filtered %}{% if query %}Results for {{ query|truncatechars:50 }} - ABUREPORT{% elif active_category %}Latest On {{ active_category|title }} - ABUREPORT{% endif %}{% else %}{{project_name}} is a Nigerian digital news platform providing reliable, timely and relevant news, updates, educational related services and stories for readers in Nigeria and beyond.{% endif %}
+{% if is_filtered %}{% if query %}Results for {{ query|truncatechars:50 }} | | {{project_name}}{% elif active_category %}Latest On {{ active_category|title }} | | {{project_name}}{% endif %}{% else %}{{project_name}} is a Nigerian digital news platform providing reliable, timely and relevant news, updates, educational related services and stories for readers in Nigeria and beyond.{% endif %}
 {% endspaceless %}
 {% endblock meta_description %}
 
@@ -36,7 +35,7 @@
 <div class="ad-ticker" aria-label="Sponsored">
   <div class="headline-ticker-track" data-ticker-track>
     <span class="headline-ticker-segment" data-ticker-segment>
-      {% for item in ad_center_items %}<a class="ad-ticker-link" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %}>{{ item.text }}</a><span class="ticker-sep" aria-hidden="true">*</span>{% endfor %}
+      {% for item in ad_center_items %}<a class="ad-ticker-link" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_self"{% endif %}>{{ item.text }}</a><span class="ticker-sep" aria-hidden="true">*</span>{% endfor %}
     </span>
   </div>
 </div>
@@ -69,9 +68,9 @@
 
 {{post.content | filter_copy_btn_text}}
 
-Written by {{post.author.staffprofile.full_name}} | ABUREPORT TEAM
+Written by {{post.author.staffprofile.full_name}} | | {{project_name}} TEAM
 
-visit https://www.abureport.com.ng for more up to date stories
+visit https://www.| {{project_name}}.com.ng for more up to date stories
 "
                   aria-label="Copy link to this story" title="Copy link to this story">
             <svg viewBox="0 0 24 24" class="share-icon" aria-hidden="true">
@@ -219,8 +218,6 @@ visit https://www.abureport.com.ng for more up to date stories
 {% block extra_head %}
 {{ block.super }}
 <meta name="yandex-verification" content="1093315bd8192b90" />
-{% comment %} FOR THEM GOOGLE ADS {% endcomment %}
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5391303565722259" crossorigin="anonymous"></script>
 {% endblock extra_head %}
 
 {% block newsletter_popup %}

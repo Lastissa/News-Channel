@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import unicodedata
 from datetime import date, datetime, time
 
 from django.core.paginator import EmptyPage, Paginator
@@ -10,6 +11,7 @@ from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.http import Http404, JsonResponse
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
@@ -26,6 +28,7 @@ from STAFF.models import AuthorFollow, StaffProfile
 logger = logging.getLogger(__name__)
 
 PORTFOLIO_STORY_LIMIT = 6
+EDITORIAL_PAGE_SIZE = 5
 PORTFOLIO_FEED_FIELDS = (
     "id",
     "slug",
@@ -443,10 +446,63 @@ class EditorialTeamView(View):
             )
 
         members.sort(key=lambda member: member["display_name"].casefold())
+        all_members = members
         total_stories = Blog.objects.count()
+        query = request.GET.get("q", "").strip()
+        if query:
+            def normalize_search(value):
+                decomposed = unicodedata.normalize("NFD", value.casefold())
+                return "".join(
+                    character
+                    for character in decomposed
+                    if not unicodedata.combining(character)
+                )
+
+            normalized_query = normalize_search(query)
+            members = [
+                member
+                for member in all_members
+                if normalized_query
+                in normalize_search(
+                    " ".join(
+                        [
+                            member["display_name"],
+                            member["profile"].bio if member["profile"] else "",
+                            " ".join(member["speciality"]),
+                            member["latest_story"].heading
+                            if member["latest_story"]
+                            else "",
+                            member["latest_story"].get_category_display()
+                            if member["latest_story"]
+                            else "",
+                        ]
+                    )
+                )
+            ]
+
+        paginator = Paginator(members, EDITORIAL_PAGE_SIZE)
+        page_obj = paginator.get_page(request.GET.get("page", 1))
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            cards_html = render_to_string(
+                "staff/includes/editorial_cards.html",
+                {"members": page_obj.object_list},
+                request=request,
+            )
+            return JsonResponse(
+                {
+                    "cards_html": cards_html,
+                    "page": page_obj.number,
+                    "pages": paginator.num_pages,
+                    "page_size": EDITORIAL_PAGE_SIZE,
+                    "has_previous": page_obj.has_previous(),
+                    "has_next": page_obj.has_next(),
+                    "total": paginator.count,
+                    "query": query,
+                }
+            )
 
         contributors_with_stories = [
-            member for member in members if member["latest_story"] is not None
+            member for member in all_members if member["latest_story"] is not None
         ]
         highlight = max(
             contributors_with_stories,
@@ -468,7 +524,7 @@ class EditorialTeamView(View):
                     else {}
                 ),
             }
-            for member in members
+            for member in all_members
         ]
         team_schema = {
             "@context": "https://schema.org",
@@ -483,15 +539,19 @@ class EditorialTeamView(View):
             request,
             "staff/editorial_team.html",
             {
-                "members": members,
+                "members": page_obj.object_list,
                 "highlight": highlight,
-                "team_size": len(members),
+                "team_size": len(all_members),
                 "total_stories": total_stories,
+                "page_obj": page_obj,
+                "filtered_count": paginator.count,
+                "page_size": EDITORIAL_PAGE_SIZE,
+                "search_query": query,
                 "project_name": About.project_name,
                 "project_cachphrase": About.project_cachphrase,
                 "meta_description": (
                     f"Meet the writers and editors behind {About.project_name}, "
-                    f"browse their latest work, and explore all {len(members)} active "
+                    f"browse their latest work, and explore all {len(all_members)} active "
                     f"editorial team members."
                 ),
                 "team_schema_json": team_schema_json,

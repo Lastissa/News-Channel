@@ -1,10 +1,13 @@
 import html
+import hashlib
+import hmac
 import logging
 import re
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import F, Prefetch
 from django.http import HttpResponse, JsonResponse
@@ -276,7 +279,7 @@ def build_ticker_text(content):
     blocks = [block for block in re.split(r"\n\s*\n", content.strip()) if block.strip()]
     cleaned_blocks = [text for block in blocks if (text := _clean_content_block(block))]
 
-    return " * ".join(cleaned_blocks)
+    return " ** ".join(cleaned_blocks)
 
 class StoryHome(View):
     """Redirect to the latest story. This is not meant to exist as a page
@@ -310,20 +313,17 @@ class StoryDetailView(View):
         if blog.last_edited:
             messages.info(
                 request,
-                f"This post was last updated {blog.edited_gap_label} after its initial publication.",
+                f"Last updated {blog.edited_gap_label} after its initial publication.",
                 extra_tags="story-edited",
             )
 
         #   THE STORY ROW ABOVE COMES FROM A 100s CACHE, SO ITS `likes` CAN BE
         #   STALE. Other readers may have liked/unliked meanwhile, so the
         #   counter is always re-read from the database before rendering.
-        blog.refresh_from_db(fields=["likes"])
+        blog.refresh_from_db(fields=["likes", "views"])
         is_liked = (
             request.user.is_authenticated
-            and (
-                BlogLike.objects.filter(blog=blog, user=request.user).exists()
-                or blog.id in request.session.get("liked_blogs", [])
-            )
+            and BlogLike.objects.filter(blog=blog, user=request.user).exists()
         )
 
         blog_content = parse_story_content(blog.content)
@@ -350,9 +350,9 @@ class StoryDetailView(View):
         )
 
 
-        #   ONLY A CONFIRMED NON-BOT REQUEST EVER MOVES THE COUNTER. A bot hit
-        #   is logged (IP + User-Agent) for visibility but never touches
-        #   `views` -- see SERVICE_INTERNAL.abstract.is_bot_request.
+        #   Only a confirmed non-bot, non-HTMX page visit moves the counter.
+        #   A short per-story/per-IP cache key makes accidental reloads
+        #   idempotent without storing the address in the cache key.
         if is_bot_request(request):
             info_logger(
                 msg=(
@@ -360,13 +360,21 @@ class StoryDetailView(View):
                     f"ua={request.META.get('HTTP_USER_AGENT', '')[:200]!r}"
                 )
             )
-        else:
-            Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
-            blog.refresh_from_db(fields=["views"])
+        elif request.headers.get("HX-Request", "").lower() != "true":
+            remote_addr = request.META.get("REMOTE_ADDR", "").strip() or "unknown"
+            address_hash = hmac.new(
+                settings.SECRET_KEY.encode("utf-8"),
+                remote_addr.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            view_dedupe_key = f"story-view:{blog.pk}:{address_hash}"
+            if cache.add(view_dedupe_key, "1", timeout=5):
+                Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
+                blog.refresh_from_db(fields=["views"])
 
-            alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
-            if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
-                _try_send_story_views_alert_email(blog.author, blog)
+                alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
+                if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
+                    _try_send_story_views_alert_email(blog.author, blog)
 
         if request.user.is_authenticated:
             # THROUGH LET ME ACCESS THE BG MODEL THAT DJANGO CREATE FOR M2M

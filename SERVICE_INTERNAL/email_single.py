@@ -10,6 +10,7 @@ to that one method.
 
 import re
 from urllib.parse import quote
+from django.utils import timezone
 import resend
 
 from SERVICE_INTERNAL.abstract import info_logger, error_logger
@@ -337,3 +338,4 @@ def _try_send_new_follower_email(author: object, follower_label: str, follower_c
     )
     _dispatch_email(author.email, subject, html_message)
     info_logger(msg=f"EMAIL: new follower alert sent to {author.email} (followers={follower_count})")
+

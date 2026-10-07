@@ -1,0 +1,90 @@
+{% for member in members %}
+<li
+  class="editorial-card"
+  data-journalist-card
+  data-search-text="{{ member.display_name }} {{ member.profile.bio|default:'' }} {{ member.speciality|join:' ' }} {{ member.latest_story.heading|default:'' }} {{ member.latest_story.category|default:'' }}"
+>
+  <div class="editorial-card-top">
+    <div class="editorial-avatar">
+      {% if member.portrait %}
+      <img src="{{ member.portrait }}" alt="" loading="lazy" width="72" height="72"
+           onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
+      <span hidden aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
+      {% else %}
+      <span aria-hidden="true">{{ member.display_name|slice:":1"|upper }}</span>
+      {% endif %}
+    </div>
+    {% if member.joined %}
+    <time class="editorial-member-since" datetime="{{ member.joined|date:'c' }}">
+      Joined {{ member.joined|date:"Y" }}
+    </time>
+    {% endif %}
+  </div>
+
+  <h3 class="editorial-name">
+    {% if member.slug %}
+    <a href="{% url 'staff:portfolio' member.slug %}">{{ member.display_name }}</a>
+    {% else %}
+    {{ member.display_name }}
+    {% endif %}
+  </h3>
+
+  {% if member.profile.bio %}
+  <p class="editorial-bio">{{ member.profile.bio|truncatechars:190 }}</p>
+  {% endif %}
+
+  {% if member.speciality %}
+  <ul class="editorial-beats" aria-label="Reporting specialties">
+    {% for beat in member.speciality %}<li>{{ beat }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="editorial-card-foot">
+    <div class="editorial-output">
+      <strong>{{ member.story_count }}</strong>
+      {{ member.story_count|pluralize:"story,stories" }}
+      <span class="editorial-output-divider" aria-hidden="true"></span>
+      <strong>{{ member.total_views|floatformat:"0g" }}</strong>
+      {{ member.total_views|pluralize:"view,views" }}
+    </div>
+    {% if member.latest_story %}
+    <article class="editorial-latest">
+      <div class="editorial-latest-media" aria-hidden="true">
+        {% if member.latest_story.image_1 %}
+        <img src="{{ member.latest_story.image_1 }}" alt="" loading="lazy" width="112" height="84">
+        {% else %}
+        <span>{{ member.latest_story.heading|slice:":1"|upper }}</span>
+        {% endif %}
+      </div>
+      <div class="editorial-latest-copy">
+        <p class="editorial-latest-kicker">
+          <span>Latest story</span>
+          {% if member.latest_story.category %}<span>{{ member.latest_story.get_category_display|title }}</span>{% endif %}
+        </p>
+        {% if member.latest_story.slug %}
+        <a class="editorial-latest-headline" href="{% url 'blog:story_detail' member.latest_story.slug %}">
+          {{ member.latest_story.heading }}
+          <span aria-hidden="true">↗</span>
+        </a>
+        {% else %}
+        <p class="editorial-latest-headline">{{ member.latest_story.heading }}</p>
+        {% endif %}
+        {% if member.latest_story.date_created %}
+        <time class="editorial-latest-date" datetime="{{ member.latest_story.date_created|date:'c' }}">
+          {{ member.latest_story.date_created|date:"M j, Y" }}
+        </time>
+        {% endif %}
+      </div>
+    </article>
+    {% else %}
+    <div class="editorial-latest editorial-latest-empty">
+      <div class="editorial-latest-media" aria-hidden="true"><span>+</span></div>
+      <div class="editorial-latest-copy">
+        <p class="editorial-latest-kicker"><span>Latest story</span></p>
+        <p class="editorial-no-story">No stories published yet</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</li>
+{% endfor %}

@@ -182,6 +182,8 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "20261006-3")
         self.assertContains(response, "Image and file archive")
         self.assertContains(response, "Do not begin the content with a")
+        self.assertContains(response, "position: sticky")
+        self.assertContains(response, "top: var(--header-h, 64px)")
 
     def test_headline_copy_in_first_paragraph_is_blocked_server_side(self, _ping):
         heading = "UNILORIN Announces New Academic Calendar"

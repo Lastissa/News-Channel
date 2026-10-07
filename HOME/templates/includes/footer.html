@@ -14,26 +14,10 @@
         <input type="email" id="newsletter-email" name="email" placeholder="you@example.com" required>
         <button type="submit">Get News Update</button>
       </form>
-      {% comment %} {% else %}
-       {% endcomment %}
       {% endif %}
       <p class="newsletter-status" id="newsletter-status" role="status" aria-live="polite"></p>
     </div>
   </div>
-    {% comment %} <div class="footer-promote">
-      <a href="{% url 'home:promote' %}" class="footer-promote-link" aria-label="Promote your business with us">
-        <div class="footer-promote-copy">
-          <p class="footer-promote-kicker">Grow smarter</p>
-          <h3>Want us to help promote your business?</h3>
-          <p class="footer-promote-meta">Reach a wider audience with tailored visibility, high-trust storytelling, and smarter digital promotion.</p>
-          <span class="footer-promote-action">Get started <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.6 5.4 7.2 6.8l4.6 4.6-4.6 4.6 1.4 1.4 6-6z"/></svg></span>
-        </div>
-        <div class="footer-promote-visual" aria-hidden="true">
-          <img src="{% static 'promote.jpg' %}" alt="Business promotion illustration" loading="lazy">
-        </div>
-      </a>
-    </div> {% endcomment %}
-    
   <div class="footer-main">
     {% if not request.user.is_authenticated %}
     <div class="footer-signin">
@@ -102,14 +86,13 @@
 
     <div class="footer-credit">
       <a href="https://issa-abdulsalm-opeyemi-ochre.vercel.app/" target="_blank" rel="noopener noreferrer" class="footer-credit-link">
-        <img src="{% static 'profile.png' %}" alt="Lastissa" class="footer-credit-avatar">
-        <img src="{% static 'lastissa-logo.png' %}" alt="Lastissa logo" class="footer-credit-avatar">
+        <img src="{% static 'profile.png' %}" alt="Lastissa" class="footer-credit-avatar" loading="lazy">
+        <img src="{% static 'lastissa-logo.png' %}" alt="Lastissa logo" class="footer-credit-avatar" loading="lazy">
         <span class="footer-credit-text">
           <span class="footer-credit-label">Built By</span>
           <span class="footer-credit-name">SY Team <i class="footer-credit-hint">(Get More Info)</i></span>
         </span>
       </a>
-      {% comment %} <span class="footer-credit-note">A community project to help student gain access to information faster</span> {% endcomment %}
     </div>
   </div>
 
