@@ -69,7 +69,7 @@
     skeleton.hidden = false;
     feed.setAttribute("aria-busy", "true");
     if (status) status.textContent = "Loading more stories.";
-    showToast("Please wait while more stories load.", "info");
+    // showToast("Please wait while more stories load.", "info");
 
     fetch(feed.dataset.feedUrl + "?page=" + encodeURIComponent(nextPage), {
       credentials: "same-origin",

@@ -104,7 +104,7 @@
     counter.dataset.countStarted = "true";
     var startedAt = 0;
     var duration = Math.min(1800, Math.max(900, 900 + Math.log10(target + 1) * 220));
-    counter.textContent = "0";
+    counter.textContent = "00";
     counter.classList.add("is-counting");
 
     function step(timestamp) {

@@ -1,5 +1,6 @@
 import logging
 import random
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, logout as auth_logout
@@ -99,7 +100,7 @@ class RobotsTxtView(View):
                 "Disallow: /_admin/",
                 "Disallow: /control/",
                 "Disallow: /sy/",
-                "Disallow: /auth/",
+                # "Disallow: /auth/",
                 "Disallow: /profile/",
                 "Disallow: /load-more/",
                 "",
@@ -416,7 +417,9 @@ class AddNewsView(View):
 
     def dispatch(self, request, *args, **kwargs):
         if not staff_only(request.user):
-            return redirect("home:profile")
+            messages.info(request, "Sign in to open the editor.")
+            url = reverse("auth:login") + "?" + urlencode({"to": "/profile/add-news"})
+            return redirect(url)
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
