@@ -1,24 +1,22 @@
 <div class="dummy-loading" id="splash" role="status" aria-label="Loading">
     <div class="sp-bg"></div>
-    <div class="sp-row" aria-hidden="true">
-        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
-        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
-        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
-        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
-        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
+    <div class="sp-stage" aria-hidden="true">
+        <div class="sp-row">{% for ch in project_name %}{% if ch == " " %}<span class="sp-space"></span>{% else %}<span class="sp-letter"><i class="sp-shadow"></i><b class="sp-glyph">{{ ch }}</b></span>{% endif %}{% endfor %}<i class="sp-line"></i></div>
+        <p class="sp-tag">{% for word in project_cachphrase.split %}<span class="sp-word"><span class="sp-word-in" style="--w:{{ forloop.counter0 }}">{{ word }}</span></span> {% endfor %}</p>
     </div>
 </div>
 <script>
-/* Splash physics: five paper sheets fall under gravity, bounce, squash and rock on
-   landing, then a ripple of hops sweeps across them until the site is ready, when
-   they fall away. Hand written, no libraries. Full intro plays once per browser
-   session; later pages only cover the screen until base.css has loaded. */
+/* Splash physics: the letters of the project name fall under gravity onto a line, bounce,
+   squash and rock on landing, the catchphrase then drops out from under the line, and a
+   ripple of hops sweeps across the letters until the site is ready, when everything falls
+   away. Hand written, no libraries. The full intro plays once per browser session; later
+   pages only cover the screen until base.css has loaded. */
 (function () {
   var root = document.getElementById('splash');
   if (!root) return;
   var css = document.getElementById('base-css');
-  var MIN = 2.5;          /* seconds the intro is guaranteed to play */
-  var FAILSAFE = 10;      /* seconds before the splash lets go even if base.css never arrives */
+  var MIN = 2.8;          /* seconds the intro is guaranteed to play */
+  var FAILSAFE = 12;      /* seconds before the splash lets go even if base.css never arrives */
   var G = 2600;           /* gravity, px/s^2 */
   var BOUNCE = 0.36;      /* energy kept on each landing */
   var HOP = 340;          /* upward speed of a ripple hop, px/s */
@@ -26,7 +24,6 @@
   function finish() { root.classList.add('sp-gone'); }
 
   var seen = false;
-  // Remove the below line to make the splash appear always
   try { seen = sessionStorage.getItem('sp-seen') === '1'; sessionStorage.setItem('sp-seen', '1'); } catch (e) {}
 
   /* later pages in the session: no show, just wait for base.css */
@@ -41,7 +38,8 @@
   }
 
   var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (still) {            /* sheets stay at rest, the cover simply fades */
+  if (still) {            /* letters stay at rest, the cover simply fades */
+    root.classList.add('sp-said');
     var t0 = 0;
     var p2 = setInterval(function () {
       t0 += 0.03;
@@ -54,7 +52,14 @@
     return;
   }
 
-  var slots = root.querySelectorAll('.sp-slot');
+  var slots = root.querySelectorAll('.sp-letter');
+  if (!slots.length) { setTimeout(function () { finish(); }, 0); return; }
+  /* find the baseline so the line, the shadows and the pivot all sit exactly where the letters stand */
+  var probe = document.createElement('i');
+  probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+  slots[0].children[1].appendChild(probe);
+  root.style.setProperty('--sp-base', (probe.getBoundingClientRect().bottom - slots[0].children[1].getBoundingClientRect().top).toFixed(1) + 'px');
+  slots[0].children[1].removeChild(probe);
   var H = window.innerHeight;
   var S = [];
   for (var i = 0; i < slots.length; i++) {
@@ -64,7 +69,7 @@
       y: -(H / 2 + slots[i].offsetHeight + 40 + i * 30), vy: 0,   /* y: px above (-) or below (+) its resting spot */
       a: 0, va: 0,                                                  /* tilt, degrees */
       q: 0, vq: 0,                                                  /* squash */
-      start: i * 0.11, exitAt: 0, out: false, kickAt: -1
+      start: i * 0.08, exitAt: 0, out: false, kickAt: -1, landed: false
     });
   }
 
@@ -74,7 +79,7 @@
     s.vy += G * dt;
     s.y += s.vy * dt;
     if (!s.out && s.y >= 0) {                 /* landing */
-      var v = s.vy; s.y = 0;
+      var v = s.vy; s.y = 0; s.landed = true;
       if (v > 45) {
         v = Math.min(v, 1100);
         s.vy = -s.vy * BOUNCE;
@@ -96,11 +101,15 @@
   }
 
   var DT = 1 / 240, T = 0, acc = 0, last = 0;
-  var nextWave = 0, dirRight = true, exiting = false, exitT = 0, done = false;
+  var nextWave = 0, dirRight = true, exiting = false, exitT = 0, done = false, said = false;
 
   function startWave() {
     for (var j = 0; j < S.length; j++) S[dirRight ? j : S.length - 1 - j].kickAt = T + j * 0.09;
     dirRight = !dirRight;
+  }
+  function allLanded() {
+    for (var j = 0; j < S.length; j++) if (!S[j].landed) return false;
+    return true;
   }
   function allSettled() {
     for (var j = 0; j < S.length; j++) if (S[j].y !== 0 || S[j].vy !== 0) return false;
@@ -109,7 +118,7 @@
   function beginExit() {
     exiting = true; exitT = T;
     root.classList.add('sp-leaving');
-    for (var j = 0; j < S.length; j++) S[j].exitAt = T + j * 0.06;
+    for (var j = 0; j < S.length; j++) S[j].exitAt = T + j * 0.04;
   }
 
   function frame(ts) {
@@ -128,7 +137,8 @@
     for (var k = 0; k < S.length; k++) { draw(S[k]); if (S[k].y < H / 2 + 80) gone = false; }
 
     if (!exiting) {
-      if (T > nextWave && allSettled() && T > 1.0) { startWave(); nextWave = T + 1.7; }
+      if (!said && allLanded()) { said = true; root.classList.add('sp-said'); }
+      if (T > nextWave && allSettled() && said) { startWave(); nextWave = T + 1.7; }
       if ((T >= MIN && ready()) || T > FAILSAFE) beginExit();
     } else if (gone || T - exitT > 1.6) { done = true; finish(); }
     if (!done) requestAnimationFrame(frame);

@@ -57,49 +57,96 @@ html { background-color: var(--paper); }
 }
 .sp-leaving { pointer-events: none; }
 .sp-leaving .sp-bg { opacity: 0; }
-.sp-quiet .sp-row { display: none; }
+.sp-quiet .sp-stage { display: none; }
 
+/* ---- the stage: the name on a ruled line, the catchphrase underneath ---- */
+.sp-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--sp-fs) * 0.42);
+  max-width: 94vw;
+  --sp-fs: min(11.5vw, 15vmin, 104px);
+  /* system fonts only: a web font arriving mid-animation would change the letter widths */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
 .sp-row {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: calc(var(--sp-w) * 0.34);
+  align-items: baseline;          /* every letter shares one baseline, and that baseline sits on the line */
+  gap: 0.03em;
+  font-size: var(--sp-fs);
+  font-weight: 800;
+  line-height: 1;
 }
-.sp-row::after {              /* the floor the sheets land on */
-  content: "";
-  position: absolute;
-  left: -14%;
-  right: -14%;
-  bottom: -1px;
-  height: 1px;
-  background-color: var(--line);
-}
-.sp-slot {
-  position: relative;
-  width: var(--sp-w);
-  height: calc(var(--sp-w) * 3.3 * var(--hf));
-}
-.sp-sheet {
-  position: absolute;
-  inset: 0;
-  background-color: var(--c);
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px var(--line), inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  transform-origin: 50% 100%;
+.sp-letter { position: relative; display: block; }
+.sp-space { display: block; width: 0.28em; }
+.sp-glyph {
+  display: block;
+  font: inherit;
+  color: var(--c);
+  transform-origin: 50% var(--sp-base, 85%);   /* tilt and squash pivot on the line, like a letter standing on it */
   will-change: transform;
 }
 .sp-shadow {
   position: absolute;
-  left: -35%;
-  right: -35%;
-  bottom: -6px;
-  height: 12px;
+  left: -30%;
+  right: -30%;
+  top: calc(var(--sp-base, 85%) - 5px);
+  height: 10px;
   background: radial-gradient(closest-side, var(--sp-shadow), transparent);
 }
-.sp-slot:nth-child(1) { --c: var(--sp-1); --hf: 0.92; }
-.sp-slot:nth-child(2) { --c: var(--sp-2); --hf: 1.18; }
-.sp-slot:nth-child(3) { --c: var(--sp-3); --hf: 1; }
-.sp-slot:nth-child(4) { --c: var(--sp-4); --hf: 1.32; }
-.sp-slot:nth-child(5) { --c: var(--sp-5); --hf: 0.84; }
+.sp-line {                       /* the horizontal line the letters land on, drawn out from the centre */
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: var(--sp-base, 85%);
+  height: 2px;
+  margin-top: -1px;
+  background-color: var(--line);
+  transform-origin: 50% 50%;
+  animation: sp-draw 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: opacity 0.3s ease;
+}
+@keyframes sp-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.sp-letter:nth-child(5n+1) { --c: var(--sp-1); }
+.sp-letter:nth-child(5n+2) { --c: var(--sp-2); }
+.sp-letter:nth-child(5n+3) { --c: var(--sp-3); }
+.sp-letter:nth-child(5n+4) { --c: var(--sp-4); }
+.sp-letter:nth-child(5n+5) { --c: var(--sp-5); }
+
+/* ---- the catchphrase: each word drops out from under the line once the letters have landed ---- */
+.sp-tag {
+  margin: 0;
+  max-width: 100%;
+  text-align: center;
+  font-size: max(13px, calc(var(--sp-fs) * 0.27));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  color: var(--slate);
+}
+.sp-word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.3em; margin-bottom: -0.3em; }
+.sp-word-in {
+  display: inline-block;
+  transform: translateY(-125%);
+  opacity: 0;
+  transition: transform 0.7s cubic-bezier(0.3, 1.35, 0.5, 1) calc(var(--w) * 0.11s), opacity 0.25s ease calc(var(--w) * 0.11s);
+}
+.sp-said .sp-word-in { transform: none; opacity: 1; }
+.sp-leaving .sp-word-in {        /* on the way out the words fall away, last word first */
+  transform: translateY(160%);
+  opacity: 0;
+  transition: transform 0.45s ease-in calc((4 - var(--w)) * 0.05s), opacity 0.4s ease;
+}
+.sp-leaving .sp-line { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-line { animation: none; }
+  .sp-word-in { transform: none; transition: opacity 0.4s ease; }
+  .sp-leaving .sp-word-in { transform: none; }
+}
 </style>
 <noscript><style>.dummy-loading { display: none !important; }</style></noscript>
