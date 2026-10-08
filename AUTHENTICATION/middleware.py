@@ -80,6 +80,6 @@ class AdminMaxPeriod:
             if tracker and time.time() - tracker > 3600:  # 1 hour
                 logout(request)
                 from django.contrib import messages
-                messages.error(request, "ADMIN INACTIVE FOR TOO LONG. (logged out).!")
+                messages.error(request, "ADMIN (logged out)!")
             
         return self.get_response(request)

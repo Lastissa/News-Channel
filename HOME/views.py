@@ -908,11 +908,11 @@ class ProfileLogoutAllSessionsView(View):
 
 
 class ProfileImageUpdateView(View):
-    """Validate and save a new profile image, either a pasted URL (unchanged
-    flow) or an uploaded file. An uploaded file always goes through
-    SERVICE_INTERNAL.images.upload_profile_image, which applies a fixed,
-    automatic optimization, i.e. the person never picks a quality here,
-    that choice only exists for staff on the Add news page."""
+    """Save a new profile image from an uploaded file. The file always goes
+    through SERVICE_INTERNAL.images.upload_profile_image, which applies a
+    fixed, automatic optimization, i.e. the person never picks a quality
+    here, that choice only exists for staff on the Add news page. A profile
+    image can no longer be set from a pasted link."""
 
     @staticmethod
     def _too_frequent(request):
@@ -926,29 +926,17 @@ class ProfileImageUpdateView(View):
             return JsonResponse({"detail": "Please sign in to update your profile image.", "valid": False}, status=401)
 
         image_file = request.FILES.get("image_file")
-        if image_file:
-            #   RATE LIMIT BEFORE CLOUDINARY: the upload overwrites this user's one avatar asset in place, so a
-            #   request that is going to be refused must never get as far as touching it.
-            too_frequent = self._too_frequent(request)
-            if too_frequent: return too_frequent
-            try:
-                image_url = upload_profile_image(image_file, request.user.pk)
-            except ImageUploadError as exc:
-                return JsonResponse({"detail": str(exc), "valid": False}, status=400)
-        else:
-            image_url = (request.POST.get("image_url") or "").strip()
-            if not image_url:
-                return JsonResponse({"detail": "Please add a valid image URL.", "valid": False}, status=400)
+        if not image_file:
+            return JsonResponse({"detail": "Please choose an image file to upload.", "valid": False}, status=400)
 
-            validator = URLValidator(schemes=["http", "https"])
-            try:
-                validator(image_url)
-            except ValidationError:
-                return JsonResponse({"detail": "The URL must be a valid http or https link.", "valid": False}, status=400)
-
-            #   RATE LIMIT THE ENDPOINT JUST BEFORE DATABASE UPLOAD
-            too_frequent = self._too_frequent(request)
-            if too_frequent: return too_frequent
+        #   RATE LIMIT BEFORE CLOUDINARY: the upload overwrites this user's one avatar asset in place, so a
+        #   request that is going to be refused must never get as far as touching it.
+        too_frequent = self._too_frequent(request)
+        if too_frequent: return too_frequent
+        try:
+            image_url = upload_profile_image(image_file, request.user.pk)
+        except ImageUploadError as exc:
+            return JsonResponse({"detail": str(exc), "valid": False}, status=400)
 
         request.user.profile_img = image_url
         request.user.save(update_fields=["profile_img"])
@@ -1190,7 +1178,6 @@ class ProfileStaffUpdateView(View):
         if len(full_name) > 100:
             return JsonResponse({"detail": "Full name is limited to 100 characters."}, status=400)
         profile.full_name = full_name
-        profile.slug = full_name.replace(" ", "-")
 
         profile.bio = (request.POST.get("bio") or "").strip()
 
@@ -1204,7 +1191,7 @@ class ProfileStaffUpdateView(View):
                     return JsonResponse({"detail": f"The {field.replace('_handle', '')} link must be a valid http or https URL."}, status=400)
             setattr(profile, field, value or None)
 
-        editable_fields = ["full_name", "bio", "twitter_handle", "facebook_handle", "whatsapp_handle", 'slug']
+        editable_fields = ["full_name", "bio", "twitter_handle", "facebook_handle", "whatsapp_handle"]
 
         is_admin = admin_only(request.user)
         if "gender" in request.POST:
@@ -1223,8 +1210,6 @@ class ProfileStaffUpdateView(View):
             profile.speciality = [part.strip() for part in raw.split(",") if part.strip()]
             editable_fields.append("speciality")
 
-        # THE SLUG NEED TO BE UPDATED COS IT CARRIES THE AUTHOR PAGE DATA
-        editable_fields.append('slug')
         profile.save(update_fields=editable_fields)
 
         return JsonResponse(

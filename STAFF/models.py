@@ -17,9 +17,9 @@ class StaffProfile(models.Model):
     auth = models.OneToOneField("AUTHENTICATION.Auth", on_delete=models.CASCADE, related_name="staffprofile")
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     full_name = models.CharField(max_length=100, blank=True)
-    #   SEO/GEO URL SLUG. GENERATED ONCE FROM `full_name` THE FIRST TIME THIS
-    #   PROFILE IS SAVED (SEE save() BELOW). REPLACES THE OLD /portfolio/<id>/
-    #   NUMERIC PATH WITH A DESCRIPTIVE /portfolio/<full-name>/ PATH.
+    #   SEO/GEO URL SLUG. BUILT FROM `full_name` WHEN THIS PROFILE IS FIRST SAVED
+    #   AND REBUILT WHENEVER `full_name` CHANGES (SEE save() BELOW), SO THE
+    #   /portfolio/<full-name>/ PATH ALWAYS MATCHES THE CURRENT NAME.
     slug = models.SlugField(max_length=150, blank=True, null=True, unique=True)
     twitter_handle = models.URLField(blank=True, null=True)
     whatsapp_handle = models.URLField(blank=True, null=True)
@@ -37,26 +37,44 @@ class StaffProfile(models.Model):
         verbose_name = "Staff profile"
         verbose_name_plural = "Staff profiles"
 
-    def save(self, *args, **kwargs):
-        """Generate `slug` once, the first time this profile is saved.
+    def _build_unique_slug(self):
+        """`slugify(full_name)`, with a short numeric suffix ("jane-doe-2") when
+        another staff member already holds it, so every profile keeps a
+        working, unique URL. This profile's own current slug never counts as
+        taken, so renaming to something that slugifies the same keeps it."""
+        base = slugify(self.full_name) or f"staff-{self.pk}"
+        candidate = base
+        suffix = 2
+        while StaffProfile.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
+            candidate = f"{base}-{suffix}"
+            suffix += 1
+        return candidate
 
-        Slug is `slugify(full_name)` (e.g. "portfolio/jane-doe/"). If that
-        base is already taken by another staff member, a short numeric
-        suffix ("jane-doe-2") is appended so every profile still gets a
-        working, unique URL. Once set it is never regenerated on later
-        saves, so an already shared/indexed portfolio link never breaks.
+    def save(self, *args, **kwargs):
+        """Keep `slug` in step with `full_name`.
+
+        The slug is generated the first time the profile is saved and is
+        rebuilt whenever a save changes `full_name` (e.g. "portfolio/jane-doe/"
+        becomes "portfolio/jane-smith/"). A save that does not change the name,
+        or one restricted with update_fields that leaves full_name out, never
+        touches the slug. The slug is written with a queryset update, so it is
+        saved even when the caller used update_fields.
+
+        The old portfolio address stops working after a rename, because the
+        slug is the address.
         """
         is_new = self._state.adding
+        update_fields = kwargs.get("update_fields")
+        name_changed = False
+        if not is_new and self.pk and (update_fields is None or "full_name" in update_fields):
+            previous = StaffProfile.objects.filter(pk=self.pk).values_list("full_name", flat=True).first()
+            name_changed = previous is not None and previous != self.full_name
         super().save(*args, **kwargs)
-        if is_new and not self.slug:
-            base = slugify(self.full_name) or f"staff-{self.pk}"
-            candidate = base
-            suffix = 2
-            while StaffProfile.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
-                candidate = f"{base}-{suffix}"
-                suffix += 1
-            StaffProfile.objects.filter(pk=self.pk).update(slug=candidate)
-            self.slug = candidate
+        if (is_new and not self.slug) or name_changed:
+            candidate = self._build_unique_slug()
+            if candidate != self.slug:
+                StaffProfile.objects.filter(pk=self.pk).update(slug=candidate)
+                self.slug = candidate
 
     def __str__(self):
         return f"{self.auth.email} + {self.full_name}"

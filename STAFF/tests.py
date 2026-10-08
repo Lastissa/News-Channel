@@ -229,3 +229,95 @@ class EditorialTeamPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'aria-current="page"')
         self.assertContains(response, 'href="/editorial/"')
+
+
+class StaffSlugFollowsNameTests(TestCase):
+    """The portfolio slug is built from full_name and has to move with it."""
+
+    def make_profile(self, email, name):
+        auth = Auth.objects.create_user(email=email, is_staff=True)
+        return StaffProfile.objects.create(auth=auth, gender="O", full_name=name)
+
+    def test_slug_is_built_from_the_name_on_first_save(self):
+        profile = self.make_profile("slug-new@example.com", "Jane Doe")
+        self.assertEqual(profile.slug, "jane-doe")
+
+    def test_renaming_rebuilds_the_slug(self):
+        profile = self.make_profile("slug-rename@example.com", "Jane Doe")
+        profile.full_name = "Jane Smith"
+        profile.save()
+        self.assertEqual(profile.slug, "jane-smith")
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-smith")
+
+    def test_renaming_with_update_fields_still_rebuilds_the_slug(self):
+        profile = self.make_profile("slug-fields@example.com", "Jane Doe")
+        profile.full_name = "Jane Smith"
+        profile.save(update_fields=["full_name"])
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-smith")
+
+    def test_saving_without_a_name_change_keeps_the_slug(self):
+        profile = self.make_profile("slug-same@example.com", "Jane Doe")
+        profile.bio = "New bio"
+        profile.save()
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-doe")
+
+    def test_a_name_that_slugifies_the_same_keeps_the_slug(self):
+        profile = self.make_profile("slug-case@example.com", "Jane Doe")
+        profile.full_name = "JANE  doe!"
+        profile.save()
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-doe")
+
+    def test_a_taken_slug_gets_a_numeric_suffix(self):
+        self.make_profile("slug-first@example.com", "Jane Smith")
+        profile = self.make_profile("slug-second@example.com", "Jane Doe")
+        profile.full_name = "Jane Smith"
+        profile.save()
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-smith-2")
+
+    def test_update_fields_that_leave_the_name_out_do_not_touch_the_slug(self):
+        profile = self.make_profile("slug-skip@example.com", "Jane Doe")
+        profile.full_name = "Jane Smith"
+        profile.bio = "New bio"
+        profile.save(update_fields=["bio"])
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-doe")
+        self.assertEqual(profile.full_name, "Jane Doe")
+
+    def test_profile_update_endpoint_moves_the_portfolio_address(self):
+        profile = self.make_profile("slug-view@example.com", "Jane Doe")
+        with mock.patch("AUTHENTICATION.signals._try_send_login_email"):
+            self.client.force_login(profile.auth)
+        response = self.client.post(reverse("home:profile_staff_update"), {"full_name": "Jane Smith"})
+        self.assertEqual(response.status_code, 200)
+
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-smith")
+        self.assertEqual(self.client.get(reverse("staff:portfolio", args=["jane-smith"])).status_code, 200)
+        self.assertEqual(self.client.get("/portfolio/jane-doe/").status_code, 404)
+
+    def test_slug_comes_from_djangos_slugify_and_is_always_lowercase(self):
+        from django.utils.text import slugify
+
+        profile = self.make_profile("slug-django@example.com", "Ol\u00fawa\u1e63eun  O'Brien-Smith")
+        self.assertEqual(profile.slug, slugify("Ol\u00fawa\u1e63eun  O'Brien-Smith"))
+        self.assertEqual(profile.slug, profile.slug.lower())
+
+        profile.full_name = "JANE McDONALD"
+        profile.save()
+        profile.refresh_from_db()
+        self.assertEqual(profile.slug, "jane-mcdonald")
+
+    def test_the_lowercase_address_returns_the_new_name_after_a_rename(self):
+        profile = self.make_profile("slug-name@example.com", "Jane Doe")
+        profile.full_name = "Jane Smith"
+        profile.save()
+
+        response = self.client.get(reverse("staff:portfolio", args=[profile.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Jane Smith")
+        self.assertNotContains(response, "Jane Doe")

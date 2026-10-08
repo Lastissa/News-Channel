@@ -34,7 +34,7 @@ _INDEXNOW_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="index
 INDEXNOW_KEY = "28499029458943a79b9877afdefa8212"
 
 INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow"
-INDEXNOW_TIMEOUT_SECONDS = 10
+INDEXNOW_TIMEOUT_SECONDS = 12
 
 
 def _do_ping(url: str) -> bool:

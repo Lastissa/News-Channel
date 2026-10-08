@@ -62,7 +62,9 @@
       <p class="editorial-spotlight-label">Latest story</p>
       <h2 id="editorial-spotlight-title">
         {% if highlight.latest_story.slug %}
-          <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}">{{ highlight.latest_story.heading }}</a>
+          <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.latest_story.heading }}</a>
+          {% comment %} THIS ONE IS THE NEWS LINKS BUT I AM REPALCING IT WITH THE AUTHOR LINK {% endcomment %}
+          {% comment %} <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}">{{ highlight.latest_story.heading }}</a> {% endcomment %}
         {% else %}
           {{ highlight.latest_story.heading }}
         {% endif %}
@@ -95,9 +97,9 @@
         <span class="editorial-spotlight-art-word">REPORT</span>
       </div>
       <div class="editorial-spotlight-portrait" aria-hidden="true">
-        {% if highlight.latest_story.image_1 %}
-        <img src="{{ highlight.latest_story.image_1 }}" alt="" loading="lazy"
-             onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
+        {% if highlight.latest_story.image_1 %} 
+        <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}"><img src="{{ highlight.latest_story.image_1 }}" alt="" loading="lazy"
+             onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;"></a>
         <span hidden>{{ highlight.display_name|slice:":1"|upper }}</span>
         {% else %}
         <span>{{ highlight.display_name|slice:":1"|upper }}</span>
@@ -194,7 +196,15 @@
   <section class="editorial-standards" aria-labelledby="editorial-standards-title">
     <p class="editorial-eyebrow">Our approach</p>
     <h2 id="editorial-standards-title">How we report</h2>
-    <p class="editorial-standards-lead">A useful report is clear about what is known, where it came from, and what changes as a story develops.</p>
+    <p class="editorial-standards-lead">At AbuReport, we believe news should be clear, accurate, relevant, and easy to understand. We report stories that matter to our readers, with particular attention to education, technology, universities, examinations, scholarships, public institutions, and developments affecting Nigerian students and young people.
+
+Our reporting process focuses on facts before speed. We verify information from official sources, institutional announcements, credible documents, and other reliable sources before publishing. Where appropriate, we provide links to the original or primary source so readers can verify the information themselves.
+
+We write our reports in a straightforward manner, separating confirmed information from claims, expectations, and developing situations. We avoid unnecessary sensationalism, misleading headlines, and information that cannot be reasonably verified.
+
+For developing stories, we may publish an initial report when there is sufficient credible information, then update the story as new facts become available. Corrections are made when errors are identified.
+
+Our goal is simple: to provide reliable reports that help readers understand what happened, why it matters, and what they may need to do next.</p>
     <div class="editorial-standards-grid">
       <article>
         <span>01</span>

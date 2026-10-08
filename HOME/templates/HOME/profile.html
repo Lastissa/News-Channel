@@ -7,6 +7,13 @@
 
 {% block content %}
 <section class="profile-shell">
+  {% comment %} {% if is_admin_user %}
+    <div class="profile-header-bar">
+      <div class="profile-header-actions">
+        <a href="{% url 'control:panel' %}" class="profile-add-news-link">PANEL</a>
+      </div>
+    </div>
+  {% endif %} {% endcomment %}
 
   <div class="profile-layout">
     <aside class="profile-summary" aria-label="Profile settings">
@@ -14,7 +21,7 @@
         <div class="profile-avatar-wrap">
           <img src="{{ user.profile_img}}" alt="{{ user.email }} avatar" class="profile-avatar" onerror="this.onerror=null;this.src='/static/404.jpg';">
         </div>
-        <a href="{% url 'staff:portfolio' profile.slug %}">
+
         <div class="profile-identity-copy">
           <h2>{% if profile and profile.full_name %}{{ profile.full_name }}{% else %}{{ request.user.email | before_at }}{% endif %}</h2>
           <p class="profile-role">
@@ -22,7 +29,6 @@
           </p>
         </div>
       </div>
-    </a>
 
       <div class="profile-info-list">
         <div><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>
@@ -132,29 +138,15 @@
       </div>
 
       <div class="profile-actions profile-image-actions">
-        <div class="profile-image-link-form">
-          <label class="visually-hidden" for="profile-image-url">Profile image URL</label>
-          <input id="profile-image-url" type="url" name="image_url" placeholder="Paste image URL for Preview before update" autocomplete="off">
-          {% comment %} MOBILE: the two update buttons are icon only so the whole row fits on one line, the words come back
-              from 900px up. The label span stays in the page for screen readers, aria-label carries the same words. {% endcomment %}
-          <div class="profile-image-actions-row">
-            <button type="button" class="profile-action-btn preview-image-btn" data-preview-profile-image >Preview</button>
-            <button type="button" class="profile-action-btn primary save-image-btn avatar-icon-btn" data-save-profile-image aria-label="Update pic (link)" title="Update pic (link)">
-              <svg class="avatar-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-              <span class="avatar-btn-label">Update pic (link)</span>
-            </button>
-            <button type="button" class="profile-action-btn upload-avatar-btn avatar-icon-btn" data-upload-profile-image aria-label="Upload avatar (file)" title="Upload avatar (file)">
-              <svg class="avatar-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <path d="M17 8l-5-5-5 5" />
-                <path d="M12 3v12" />
-              </svg>
-              <span class="avatar-btn-label">Upload avatar (file)</span>
-            </button>
-          </div>
+        <div class="profile-image-actions-row">
+          <button type="button" class="profile-action-btn upload-avatar-btn avatar-icon-btn" data-upload-profile-image aria-label="Upload avatar (file)" title="Upload avatar (file)">
+            <svg class="avatar-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="M17 8l-5-5-5 5" />
+              <path d="M12 3v12" />
+            </svg>
+            <span class="avatar-btn-label">Upload avatar (file)</span>
+          </button>
         </div>
         <input id="profile-avatar-file" type="file" name="image_file" data-profile-avatar-file accept="image/jpeg,image/png" hidden>
       </div>

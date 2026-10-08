@@ -287,19 +287,10 @@
   margin-left: auto;
 }
 
-.profile-image-link-form {
-  display: grid;
-  gap: 10px;
-  width: 100%;
-}
-
-/*  MOBILE FIRST: Preview takes the free width and the two update buttons are
-    icon only squares beside it, so the whole row stays on one line. From
-    900px the words come back and the file button drops onto its own line. */
+/*  One button now (upload from a file), so the row is a single full width column. */
 .profile-image-actions-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px 44px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .profile-image-actions-row .profile-action-btn {
@@ -309,12 +300,11 @@
 }
 
 .profile-image-actions-row .avatar-icon-btn {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0;
+  padding: 10px 14px;
 }
 
 .profile-image-actions-row .upload-avatar-btn {
@@ -332,40 +322,10 @@
   stroke-linejoin: round;
 }
 
-/*  Hidden the screen reader safe way, never display:none, so the button
-    still has its name when only the icon shows. */
 .avatar-btn-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
+  text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (min-width: 900px) {
-  .profile-image-actions-row {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .profile-image-actions-row .upload-avatar-btn {
-    grid-column: 1 / -1;
-  }
-
-  .profile-image-actions-row .avatar-icon-btn {
-    padding: 10px 14px;
-  }
-
-  .avatar-btn-label {
-    position: static;
-    width: auto;
-    height: auto;
-    overflow: hidden;
-    clip: auto;
-    clip-path: none;
-    text-overflow: ellipsis;
-  }
 }
 
 .profile-setting-block {
