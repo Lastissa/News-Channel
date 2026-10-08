@@ -6,6 +6,7 @@ import re
 import unicodedata
 from datetime import date, datetime, time
 
+from django.contrib import messages
 from django.core.paginator import EmptyPage, Paginator
 from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
@@ -534,7 +535,7 @@ class EditorialTeamView(View):
             "member": person_schema,
         }
         team_schema_json = json.dumps(team_schema, ensure_ascii=False).replace("<", "\\u003c")
-
+        messages.info(request, msg= "Page still in progress, Please Check Back Later")
         return render(
             request,
             "staff/editorial_team.html",

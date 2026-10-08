@@ -7,6 +7,8 @@ from django.db import DatabaseError, models
 from django.db.models.functions import Lower
 from django.utils.text import slugify
 
+from SERVICE_INTERNAL.abstract import invalidate_cache
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +96,7 @@ def refresh_category_cache():
     every committed Category change (BLOG/signals.py). The stale entry is
     deleted BEFORE the table is read, so if that read ever failed the cache
     would be left empty (the next reader rebuilds it) rather than stale."""
-    cache.delete(CATEGORY_CACHE_KEY)
+    invalidate_cache(CATEGORY_CACHE_KEY)
     choices = _load_category_choices()
     cache.set(CATEGORY_CACHE_KEY, choices, timeout=None)   #   timeout=None: NEVER EXPIRES
     return choices

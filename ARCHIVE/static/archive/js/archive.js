@@ -17,6 +17,15 @@
      button for "Load more") so a page/description-search swap never looks
      like the button just froze, and the grid's height animates instead of
      jumping when the new page has fewer cards than the last one. */
+/* ---------- ALSO IN THIS FILE (page upgrade) ----------
+   - icon search that expands in place, "/" focuses it, Escape closes it
+   - All / Images / Files tabs (plain links without JS, htmx swap with it)
+   - the address bar follows the grid (?descr= &kind= &page=) so a refresh or a
+     shared link lands on the same view
+   - after a page change the view scrolls back to the top of the grid
+   - image viewer (click a picture; arrow keys, swipe, Escape)
+   - popups: focus moves in, Tab is kept inside, focus returns on close,
+     the page behind does not scroll, and they animate out */
 (function () {
   "use strict";
 
@@ -28,10 +37,40 @@
   var mainContent = document.getElementById("main-content");
   var overlayHost = document.querySelector("[data-archive-overlay]");
   var galleryEndpoint = shell.dataset.galleryEndpoint;
+  var csrfToken = shell.dataset.csrf || "";
+  var searchForm = document.querySelector("[data-archive-search-form]");
+  var searchInput = document.querySelector("[data-archive-search]");
+  var searchToggle = document.querySelector("[data-archive-search-toggle]");
+  var kindInput = document.querySelector("[data-archive-kind]");
+  var tabs = document.querySelectorAll("[data-archive-kind-btn]");
+  var lastOpener = null;
 
   function getCookie(name) {
     var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
     return match ? decodeURIComponent(match.pop()) : "";
+  }
+
+  function csrf() {
+    return csrfToken || getCookie("csrftoken");
+  }
+
+  var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  /* keeps Tab / Shift+Tab inside an open dialog */
+  function trapTab(container, event) {
+    if (event.key !== "Tab" || !container) return;
+    var nodes = Array.prototype.filter.call(container.querySelectorAll(FOCUSABLE), function (node) {
+      return node.offsetParent !== null || node === document.activeElement;
+    });
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+
+  function lockScroll(locked) {
+    document.documentElement.classList.toggle("archive-locked", locked);
   }
 
   function extractDetail(rawText, genericMessage) {
@@ -75,17 +114,32 @@
     }, 5000);
   }
 
-  function refreshGridToPage1() {
+  /* loads one page of the grid for the current search + type filter */
+  function loadGrid(page) {
+    var values = {
+      page: page || 1,
+      descr: searchInput ? searchInput.value : "",
+      kind: kindInput ? kindInput.value : "",
+    };
     if (window.htmx && galleryEndpoint) {
       window.htmx.ajax("POST", galleryEndpoint, {
         target: "#archive-grid-shell",
         swap: "innerHTML",
-        /* keep whatever is typed in the description search, so the refresh
-           after an upload/edit doesn't silently drop the filter */
-        values: { page: 1, descr: (document.querySelector("[data-archive-search]") || {}).value || "" },
-        headers: { "X-CSRFToken": getCookie("csrftoken") },
+        values: values,
+        headers: { "X-CSRFToken": csrf() },
       });
+    } else {
+      var query = new URLSearchParams();
+      if (values.descr) query.set("descr", values.descr);
+      if (values.kind) query.set("kind", values.kind);
+      if (values.page > 1) query.set("page", values.page);
+      window.location.href = galleryEndpoint + (query.toString() ? "?" + query.toString() : "");
     }
+  }
+
+  /* after an upload/edit/delete: back to page 1, keeping the search and type filter */
+  function refreshGridToPage1() {
+    loadGrid(1);
   }
 
   /* ---------- gallery pagination: skeleton cards + no-freeze buttons ----------
@@ -138,29 +192,57 @@
 
   if (gridShell) {
     var pendingGridHTML = null;
+    var activeXhr = null;
+    var scrollAfterSwap = false;
 
-    gridShell.addEventListener("htmx:beforeRequest", function (event) {
-      var btn = event.target.closest && event.target.closest("[data-archive-page-btn]");
-      if (!btn) return;
+    document.body.addEventListener("htmx:beforeRequest", function (event) {
+      if (!event.detail || event.detail.target !== gridShell) return;
 
-      pendingGridHTML = gridShell.innerHTML;
-      gridShell.style.height = gridShell.offsetHeight + "px";
-      gridShell.style.overflow = "hidden";
-      gridShell.classList.add("is-paginating");
+      /* a newer request replaces one still in flight, so a slow old answer can never land on top of a newer one */
+      if (activeXhr && activeXhr !== event.detail.xhr) { try { activeXhr.abort(); } catch (err) { /* settled */ } }
+      activeXhr = event.detail.xhr || null;
 
-      var pageSize = parseInt(gridShell.dataset.archivePageSize, 10) || 5;
+      /* typing in the search only dims the cards; everything else (page buttons, tabs, refreshes) shows the skeleton */
+      if (event.target === searchInput) {
+        gridShell.classList.add("is-searching");
+        return;
+      }
+
+      scrollAfterSwap = !!(event.target.closest && event.target.closest("[data-archive-page-btn]"));
+      if (!gridShell.classList.contains("is-paginating")) {
+        pendingGridHTML = gridShell.innerHTML;
+        gridShell.style.height = gridShell.offsetHeight + "px";
+        gridShell.style.overflow = "hidden";
+        gridShell.classList.add("is-paginating");
+      }
+      var pageSize = Math.min(parseInt(gridShell.dataset.archivePageSize, 10) || 6, 6);
       gridShell.innerHTML = buildGridSkeleton(pageSize);
     });
 
     gridShell.addEventListener("htmx:afterSwap", function () {
+      activeXhr = null;
+      gridShell.classList.remove("is-searching");
+      syncFromGrid();
+      sweepLoadedImages();
       if (!gridShell.classList.contains("is-paginating")) return;
       gridShell.classList.remove("is-paginating");
       pendingGridHTML = null;
       settleGridHeight();
+      if (scrollAfterSwap) {
+        scrollAfterSwap = false;
+        var top = gridShell.getBoundingClientRect().top + window.pageYOffset - 140;
+        if (top < window.pageYOffset) window.scrollTo({ top: Math.max(top, 0), behavior: "smooth" });
+      }
     });
 
     function recoverFailedPage(event) {
-      if (!gridShell.classList.contains("is-paginating")) return;
+      if (!event.detail || event.detail.target !== gridShell) return;
+      activeXhr = null;
+      gridShell.classList.remove("is-searching");
+      if (!gridShell.classList.contains("is-paginating")) {
+        toast(extractDetail(event.detail.xhr ? event.detail.xhr.responseText : "", "Could not load that page."), "error");
+        return;
+      }
       gridShell.classList.remove("is-paginating");
       if (pendingGridHTML !== null) gridShell.innerHTML = pendingGridHTML;
       pendingGridHTML = null;
@@ -170,10 +252,110 @@
       var responseText = event.detail && event.detail.xhr ? event.detail.xhr.responseText : "";
       toast(extractDetail(responseText, "Could not load that page."), "error");
     }
-    gridShell.addEventListener("htmx:responseError", recoverFailedPage);
-    gridShell.addEventListener("htmx:sendError", recoverFailedPage);
-    gridShell.addEventListener("htmx:timeout", recoverFailedPage);
+    document.body.addEventListener("htmx:responseError", recoverFailedPage);
+    document.body.addEventListener("htmx:sendError", recoverFailedPage);
+    document.body.addEventListener("htmx:timeout", recoverFailedPage);
   }
+
+  /* pictures that finished loading before their onload handler could run (cache hits) */
+  function sweepLoadedImages() {
+    var imgs = document.querySelectorAll(".archive-card-media img:not(.is-loaded)");
+    for (var i = 0; i < imgs.length; i++) {
+      if (imgs[i].complete && imgs[i].naturalWidth > 0) imgs[i].classList.add("is-loaded");
+    }
+  }
+  sweepLoadedImages();
+
+  /* after every swap: tabs, hidden type field and address bar follow what the server actually rendered */
+  function syncFromGrid() {
+    var meta = gridShell && gridShell.querySelector("[data-archive-meta]");
+    if (!meta) return;
+    var kind = meta.dataset.kind || "";
+    var page = parseInt(meta.dataset.page, 10) || 1;
+    var descr = meta.dataset.descr || "";
+    if (kindInput) kindInput.value = kind;
+    for (var i = 0; i < tabs.length; i++) {
+      var active = (tabs[i].dataset.archiveKindBtn || "") === kind;
+      tabs[i].classList.toggle("is-active", active);
+      if (active) tabs[i].setAttribute("aria-current", "true"); else tabs[i].removeAttribute("aria-current");
+      tabs[i].setAttribute("href", tabHref(tabs[i].dataset.archiveKindBtn || "", descr));
+    }
+    var query = new URLSearchParams();
+    if (descr) query.set("descr", descr);
+    if (kind) query.set("kind", kind);
+    if (page > 1) query.set("page", page);
+    var qs = query.toString();
+    try { window.history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : "")); } catch (err) { /* ignore */ }
+  }
+
+  function tabHref(kind, descr) {
+    var query = new URLSearchParams();
+    if (kind) query.set("kind", kind);
+    if (descr) query.set("descr", descr);
+    var qs = query.toString();
+    return galleryEndpoint + (qs ? "?" + qs : "");
+  }
+
+  /* ---------- type tabs ---------- */
+  for (var t = 0; t < tabs.length; t++) {
+    tabs[t].addEventListener("click", function (event) {
+      if (!window.htmx || event.metaKey || event.ctrlKey || event.shiftKey || event.button) return;
+      event.preventDefault();
+      var kind = this.dataset.archiveKindBtn || "";
+      if (kindInput && kindInput.value === kind) return;
+      if (kindInput) kindInput.value = kind;
+      loadGrid(1);
+    });
+  }
+
+  /* ---------- icon search ---------- */
+  function setSearchOpen(open, focusInput) {
+    if (!searchForm) return;
+    searchForm.classList.toggle("is-open", open);
+    if (searchToggle) searchToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open && focusInput && searchInput) searchInput.focus();
+  }
+
+  if (searchForm && searchInput) {
+    searchForm.addEventListener("submit", function (event) {
+      if (!window.htmx) return;               /* no htmx: plain GET submit still works */
+      event.preventDefault();
+      var isOpen = searchForm.classList.contains("is-open");
+      if (!isOpen) { setSearchOpen(true, true); return; }
+      if (!searchInput.value.trim()) { setSearchOpen(false); return; }
+      loadGrid(1);
+    });
+
+    searchInput.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      if (searchInput.value) {
+        searchInput.value = "";
+        loadGrid(1);
+      }
+      setSearchOpen(false);
+      if (searchToggle) searchToggle.focus();
+    });
+
+    /* "/" jumps to the search, like most sites with a library of items */
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      var el = document.activeElement;
+      var tag = el && el.tagName ? el.tagName.toLowerCase() : "";
+      if (tag === "input" || tag === "textarea" || tag === "select" || (el && el.isContentEditable)) return;
+      if (document.querySelector("[data-archive-modal]") || (viewer && !viewer.hidden)) return;
+      event.preventDefault();
+      setSearchOpen(true, true);
+    });
+  }
+
+  /* "Clear search" (summary line and empty state) */
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest("[data-archive-clear-search]")) return;
+    if (searchInput) searchInput.value = "";
+    loadGrid(1);
+    setSearchOpen(false);
+  });
 
   /* ---------- manage popup "Load more" button: same idea, lighter touch --
      it only ever appends more rows (hx-target="this" hx-swap="outerHTML"
@@ -212,8 +394,48 @@
 
   function closeModal() {
     revokePreviewObjectUrl();
-    if (overlayHost) overlayHost.innerHTML = "";
+    if (!overlayHost) return;
+    var layer = overlayHost.querySelector("[data-archive-modal]");
+    var opener = lastOpener;
+    lastOpener = null;
+    function finish() {
+      overlayHost.innerHTML = "";
+      lockScroll(false);
+      if (opener && document.body.contains(opener)) opener.focus();
+    }
+    if (!layer) { finish(); return; }
+    layer.classList.add("is-closing");
+    window.setTimeout(finish, 170);
   }
+
+  /* a popup just landed in the overlay slot: lock the page behind it and move focus inside */
+  document.body.addEventListener("htmx:afterSwap", function (event) {
+    if (!overlayHost || event.detail.target !== overlayHost) return;
+    if (!overlayHost.querySelector("[data-archive-modal]")) return;
+    lockScroll(true);
+    var first = overlayHost.querySelector('input:not([type="hidden"]):not([type="file"]), select, button[data-archive-modal-close]');
+    var fileInput = overlayHost.querySelector("[data-archive-upload-file]");
+    var target = fileInput || first;
+    if (target) target.focus({ preventScroll: true });
+  });
+
+  /* remember what opened the popup so focus can go back to it */
+  document.addEventListener("click", function (event) {
+    var opener = event.target.closest("[data-archive-add-btn], [data-archive-manage-btn]");
+    if (opener) lastOpener = opener;
+  });
+
+  /* drag over the drop zone highlights it (the invisible input underneath takes the actual drop) */
+  document.addEventListener("dragover", function (event) {
+    var zone = event.target.closest && event.target.closest("[data-archive-dropzone]");
+    if (zone) zone.classList.add("is-dragover");
+  });
+  ["dragleave", "drop"].forEach(function (name) {
+    document.addEventListener(name, function (event) {
+      var zone = event.target.closest && event.target.closest("[data-archive-dropzone]");
+      if (zone) zone.classList.remove("is-dragover");
+    });
+  });
 
   /* ---------- Add Image / File: show a preview of whatever was chosen
      before it uploads. A picture gets the usual thumbnail + pre-filled
@@ -317,8 +539,115 @@
     if (event.target.closest("[data-archive-modal-close]")) closeModal();
   });
   document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && overlayHost && overlayHost.querySelector("[data-archive-modal]")) closeModal();
+    if (event.key === "Escape" && viewer && !viewer.hidden) { closeViewer(); return; }
+    if (event.key === "Escape" && overlayHost && overlayHost.querySelector("[data-archive-modal]")) { closeModal(); return; }
+    var layer = overlayHost && overlayHost.querySelector("[data-archive-modal] [role='dialog']");
+    if (layer) trapTab(layer, event);
   });
+
+  /* ---------- image viewer ----------
+     Opens from any picture card ([data-archive-open], its data-* attributes carry
+     everything shown). Prev/Next walk through the pictures on the current page. */
+  var viewer = document.querySelector("[data-archive-viewer]");
+  var viewerIndex = -1;
+  var viewerOpener = null;
+  var touchStartX = null;
+
+  function viewerItems() {
+    return gridShell ? Array.prototype.slice.call(gridShell.querySelectorAll("[data-archive-open]")) : [];
+  }
+
+  function fillViewer(index) {
+    var items = viewerItems();
+    var item = items[index];
+    if (!item || !viewer) return;
+    viewerIndex = index;
+    var d = item.dataset;
+    var stage = viewer.querySelector(".archive-viewer-stage");
+    var img = viewer.querySelector("[data-viewer-img]");
+    stage.classList.add("is-loading");
+    img.onload = function () { stage.classList.remove("is-loading"); };
+    img.onerror = function () { img.onerror = null; img.src = "/static/404.jpg"; stage.classList.remove("is-loading"); };
+    img.alt = d.title || "";
+    img.src = d.viewSrc;
+    if (img.complete && img.naturalWidth > 0) stage.classList.remove("is-loading");
+
+    viewer.querySelector("[data-viewer-title]").textContent = d.title || "";
+    viewer.querySelector("[data-viewer-dims]").textContent = (d.width && d.height && d.width !== "0") ? d.width + " \u00d7 " + d.height + " px" : "Unknown";
+    viewer.querySelector("[data-viewer-quality]").textContent = d.quality || "";
+    viewer.querySelector("[data-viewer-uploader]").textContent = d.uploader || "";
+    viewer.querySelector("[data-viewer-date]").textContent = d.date || "";
+    viewer.querySelector("[data-viewer-download]").setAttribute("href", d.download || d.viewSrc);
+    viewer.querySelector("[data-viewer-copy]").dataset.shareUrl = d.copy || "";
+    viewer.classList.toggle("is-single", items.length < 2);
+
+    /* warm the neighbours so Prev/Next feels instant */
+    [index - 1, index + 1].forEach(function (n) {
+      if (items[n]) { var warm = new Image(); warm.src = items[n].dataset.viewSrc; }
+    });
+  }
+
+  function openViewer(index, opener) {
+    if (!viewer) return;
+    viewerOpener = opener || null;
+    viewer.classList.remove("is-closing");
+    viewer.hidden = false;
+    lockScroll(true);
+    fillViewer(index);
+    var closeBtn = viewer.querySelector(".archive-viewer-close");
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
+  }
+
+  function closeViewer() {
+    if (!viewer || viewer.hidden) return;
+    viewer.classList.add("is-closing");
+    window.setTimeout(function () {
+      viewer.hidden = true;
+      viewer.classList.remove("is-closing");
+      viewer.querySelector("[data-viewer-img]").removeAttribute("src");
+      if (!(overlayHost && overlayHost.querySelector("[data-archive-modal]"))) lockScroll(false);
+      if (viewerOpener && document.body.contains(viewerOpener)) viewerOpener.focus({ preventScroll: true });
+      viewerOpener = null;
+    }, 180);
+  }
+
+  function stepViewer(delta) {
+    var items = viewerItems();
+    if (items.length < 2) return;
+    fillViewer((viewerIndex + delta + items.length) % items.length);
+  }
+
+  if (viewer) {
+    document.addEventListener("click", function (event) {
+      var open = event.target.closest("[data-archive-open]");
+      if (open) {
+        event.preventDefault();
+        openViewer(viewerItems().indexOf(open), open);
+        return;
+      }
+      if (viewer.hidden) return;
+      if (event.target.closest("[data-archive-viewer-close]")) closeViewer();
+      else if (event.target.closest("[data-viewer-prev]")) stepViewer(-1);
+      else if (event.target.closest("[data-viewer-next]")) stepViewer(1);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (viewer.hidden) return;
+      if (event.key === "ArrowLeft") { event.preventDefault(); stepViewer(-1); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); stepViewer(1); }
+      else trapTab(viewer.querySelector(".archive-viewer-body"), event);
+    });
+
+    viewer.addEventListener("touchstart", function (event) {
+      touchStartX = event.touches.length === 1 ? event.touches[0].clientX : null;
+    }, { passive: true });
+    viewer.addEventListener("touchend", function (event) {
+      if (touchStartX === null) return;
+      var dx = event.changedTouches[0].clientX - touchStartX;
+      touchStartX = null;
+      if (Math.abs(dx) > 60) stepViewer(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  }
 
   /* ---------- Edit Added Images: an edit/save or a delete inside the
      manage popup re-renders the manage list itself via plain htmx (see

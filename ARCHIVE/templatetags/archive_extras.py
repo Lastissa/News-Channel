@@ -8,7 +8,7 @@ inline imgl/imgr/imgc pictures, avatars, ...).
 """
 
 import re
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from django import template
 from django.conf import settings
@@ -53,3 +53,15 @@ def archive_absolute_url(url, request):
     if urlparse(str(url)).scheme:
         return url
     return request.build_absolute_uri(str(url))
+
+
+@register.filter(name="archive_download_url")
+def archive_download_url(url, filename):
+    """Adds `?filename=` (or `&filename=` when the url already carries a
+    query) so ARCHIVE.views.CloudinaryProxyView serves the item as a
+    download under its original name. A blank filename (every picture)
+    leaves the url untouched."""
+    if not url or not filename:
+        return url
+    separator = "&" if "?" in str(url) else "?"
+    return f"{url}{separator}filename={quote(str(filename))}"

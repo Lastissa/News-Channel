@@ -526,7 +526,7 @@
       })
       .catch(function () {
         setPublishPending(false);
-        toast("Network Error.Unable to publish story.", "error");
+        toast("Network Error. Refresh Browser", "error");
       });
   }
 

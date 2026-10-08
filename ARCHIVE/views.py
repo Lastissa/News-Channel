@@ -15,13 +15,14 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views import View
-from django.contrib import messages
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import error_logger, is_rate_limited
 from SERVICE_INTERNAL.images import (
+    ARCHIVE_FILE_MAX_BYTES,
+    MAX_UPLOAD_BYTES,
     ImageQuality,
     ImageUploadError,
     archive_image_delivery_url,
@@ -33,7 +34,10 @@ from SERVICE_INTERNAL.permissions import is_authenticated
 
 from ARCHIVE.models import ArchiveImage, ArchiveKind
 
-PAGE_SIZE = 5  #   HOW MANY ITEMS LOAD AT ONCE, BOTH FIRST PAINT AND EVERY HTMX PAGE
+#   HOW MANY ITEMS LOAD AT ONCE, BOTH FIRST PAINT AND EVERY HTMX PAGE. 12 divides
+#   evenly into the 1, 2 and 3 column grids (archive.css), so no page ends on a
+#   half empty row. (It was 5, which always left an orphan card on desktop.)
+PAGE_SIZE = 12
 MANAGE_PAGE_SIZE = 12  #   items shown at once in the "Edit Added Images" list
 
 MIN_DIMENSION = 50
@@ -46,6 +50,10 @@ ALT_MAX_LENGTH = 150
 #   this similar (0.70 == 70%), so typos and near spellings ("pictur",
 #   "wedding" vs "weding") still find the item, not just exact words.
 DESCR_MATCH_THRESHOLD = 0.70
+
+#   TYPE FILTER ("kind" key on the gallery page): "" means everything, otherwise
+#   only rows of that ArchiveKind. Anything else a visitor types is ignored.
+KIND_FILTERS = (ArchiveKind.IMAGE, ArchiveKind.FILE)
 
 #   {"low": "Low", "medium": "Medium", "high": "High"} -- the human word
 #   before the " - ..." blurb in ImageQuality.CHOICES.
@@ -159,15 +167,19 @@ def _descr_score(query_words, description):
     return total / len(query_words)
 
 
-def _descr_ranked_ids(descr):
+def _descr_ranked_ids(descr, kind=""):
     """Ids of every item whose description matches `descr` (fuzzy, see above),
     best match first, newest first among equal matches. Only id + alt are
-    read from the database, the comparison itself is done here."""
+    read from the database, the comparison itself is done here. `kind`
+    ("" or an ArchiveKind) narrows the candidates before the comparison."""
     query_words = _descr_words(descr)
     if not query_words:
         return []
+    candidates = ArchiveImage.objects.order_by("-date_created")
+    if kind:
+        candidates = candidates.filter(kind=kind)
     scored = []
-    for item_id, alt in ArchiveImage.objects.order_by("-date_created").values_list("id", "alt"):
+    for item_id, alt in candidates.values_list("id", "alt"):
         score = _descr_score(query_words, alt)
         if score is not None:
             scored.append((score, item_id))
@@ -177,6 +189,11 @@ def _descr_ranked_ids(descr):
 
 def _clean_descr(raw_value):
     return (raw_value or "").strip()[:ALT_MAX_LENGTH]
+
+
+def _clean_kind(raw_value):
+    value = (raw_value or "").strip().lower()
+    return value if value in KIND_FILTERS else ""
 
 
 def _proxy_cloudinary_url(secure_url):
@@ -215,12 +232,15 @@ def _public_id_from_url(url, resource_type):
     return public_id
 
 
-def _paginate(page_number, descr=""):
+def _paginate(page_number, descr="", kind=""):
     if descr:
-        ranked_ids = _descr_ranked_ids(descr)
+        ranked_ids = _descr_ranked_ids(descr, kind)
         paginator = Paginator(ranked_ids, PAGE_SIZE)
     else:
-        paginator = Paginator(ArchiveImage.objects.select_related("author").order_by("-date_created"), PAGE_SIZE)
+        queryset = ArchiveImage.objects.select_related("author").order_by("-date_created")
+        if kind:
+            queryset = queryset.filter(kind=kind)
+        paginator = Paginator(queryset, PAGE_SIZE)
     if page_number > paginator.num_pages and paginator.num_pages:
         raise Http404("Page not found.")
     page = paginator.get_page(page_number)
@@ -232,6 +252,10 @@ def _paginate(page_number, descr=""):
     return {
         "images": _serialize_images(page_items),
         "descr": descr,
+        "kind": kind,
+        #   REAL count of everything the current search + type filter matches,
+        #   shown in the summary line above the grid (gallery_grid.html).
+        "total": paginator.count,
         "page": page.number,
         "num_pages": paginator.num_pages,
         "has_next": page.has_next(),
@@ -269,20 +293,33 @@ def _paginate_own(user, page_number):
 
 @method_decorator(xframe_options_sameorigin, name="dispatch")
 class ArchiveGalleryView(View):
-    """GET: the full /archive/ page with the first PAGE_SIZE items.
-    POST: the paginated grid only, for the htmx "see more" swap, based on
-    whatever page the (still anonymous-allowed) viewer is on."""
+    """GET: the full /archive/ page. `descr`, `kind` and `page` in the query
+    string are honoured, so a search, a type filter and the page a visitor
+    is on survive a refresh or a shared link (archive.js keeps the address
+    bar in step with the grid). A page number past the end falls back to
+    page 1 instead of a 404, because a stale link should still open.
+    POST: the paginated grid only, for the htmx swap, based on whatever
+    page, search and type filter the (still anonymous-allowed) viewer is on."""
 
     def get(self, request):
-        context = _paginate(page_number=1, descr=_clean_descr(request.GET.get("descr")))
+        descr = _clean_descr(request.GET.get("descr"))
+        kind = _clean_kind(request.GET.get("kind"))
+        try:
+            page_number = _resolve_page_number(request.GET.get("page"), default=1)
+            context = _paginate(page_number=page_number, descr=descr, kind=kind)
+        except Http404:
+            context = _paginate(page_number=1, descr=descr, kind=kind)
         context["can_upload"] = is_authenticated(request.user)
-        if not request.user.is_authenticated:
-            messages.info(request, message="Log In To Upload Your Own Files")
         return render(request, "ARCHIVE/gallery.html", context)
 
     def post(self, request):
         page_number = _resolve_page_number(request.POST.get("page"), default=1)
-        context = _paginate(page_number=page_number, descr=_clean_descr(request.POST.get("descr")))
+        context = _paginate(
+            page_number=page_number,
+            descr=_clean_descr(request.POST.get("descr")),
+            kind=_clean_kind(request.POST.get("kind")),
+        )
+        context["can_upload"] = is_authenticated(request.user)
         return render(request, "ARCHIVE/partials/gallery_grid.html", context)
 
 
@@ -297,7 +334,14 @@ class ArchiveUploadModalView(View):
         return render(
             request,
             "ARCHIVE/partials/upload_modal.html",
-            {"quality_choices": ImageQuality.CHOICES, "default_quality": ImageQuality.MEDIUM},
+            {
+                "quality_choices": ImageQuality.CHOICES,
+                "default_quality": ImageQuality.MEDIUM,
+                #   the real limits enforced in SERVICE_INTERNAL.images, so the
+                #   hint under the file picker can never drift from them
+                "image_max_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
+                "file_max_mb": ARCHIVE_FILE_MAX_BYTES // (1024 * 1024),
+            },
         )
 
 
@@ -646,7 +690,6 @@ class CloudinaryProxyView(View):
         requested_filename = (query_params.pop("filename", [""])[0] or "").strip()
 
         real_url = f"https://res.cloudinary.com/{settings.CLOUDINARY_CLOUD_NAME}/{cloud_path}"
-        print(real_url)
         query_string = query_params.urlencode()
         if query_string:
             real_url = f"{real_url}?{query_string}"

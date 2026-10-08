@@ -2,19 +2,29 @@
   <div class="archive-modal-backdrop" data-archive-modal-close></div>
   <div class="archive-modal-card" role="dialog" aria-modal="true" aria-labelledby="archive-modal-title">
     <div class="archive-modal-head">
-      <h3 id="archive-modal-title">Add image or file</h3>
-      <button type="button" class="archive-modal-close" data-archive-modal-close aria-label="Close">&times;</button>
+      <div>
+        <span class="archive-eyebrow">Upload</span>
+        <h3 id="archive-modal-title">Add image or file</h3>
+      </div>
+      <button type="button" class="archive-modal-close" data-archive-modal-close aria-label="Close">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
     </div>
 
-    <p class="archive-modal-error" data-archive-upload-error hidden></p>
+    <p class="archive-modal-error" data-archive-upload-error hidden role="alert"></p>
 
     <form data-archive-upload-form data-endpoint="{% url 'archive:upload' %}">
       {% csrf_token %}
       <div class="archive-modal-field">
-        <label for="archive-upload-file">Picture or file (from your phone or device)</label>
-        <input id="archive-upload-file" type="file" name="upload_file"
-               accept="image/jpeg,image/png,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.zip,.rar,.7z,.mp3,.wav,.mp4,.mov,.json"
-               required data-archive-upload-file>
+        <span class="archive-modal-label">Picture or file</span>
+        <label class="archive-file-zone" for="archive-upload-file" data-archive-dropzone>
+          <svg viewBox="0 0 24 24" class="archive-file-zone-icon" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="archive-file-zone-title">Choose a file or drop it here</span>
+          <span class="archive-file-zone-hint">JPEG or PNG pictures up to {{ image_max_mb }} MB. Other files (PDF, Office, text, audio, video, archives) up to {{ file_max_mb }} MB.</span>
+          <input id="archive-upload-file" class="archive-file-zone-input" type="file" name="upload_file"
+                 accept="image/jpeg,image/png,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.zip,.rar,.7z,.mp3,.wav,.mp4,.mov,.json"
+                 required data-archive-upload-file>
+        </label>
         <div class="archive-modal-preview" data-archive-upload-preview hidden>
           <img data-archive-upload-preview-img alt="Selected picture preview">
           <div class="archive-modal-preview-file" data-archive-upload-preview-file hidden>

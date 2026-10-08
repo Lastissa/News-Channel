@@ -26,6 +26,7 @@ from SERVICE_INTERNAL.abstract import (
     cache_or_run,
     get_cache,
     info_logger,
+    invalidate_cache,
     is_rate_limited,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig
@@ -524,6 +525,8 @@ class AddNewsView(View):
         #   SERVICE_INTERNAL.indexnow.ping_indexnow. Fire-and-forget: this
         #   can never fail the publish itself.
         ping_indexnow(story_url)
+        # invalidate the home_page_blogs so new article can be get
+        invalidate_cache("home_page_blogs")
 
         return _response(
             {"detail": "Story published.", "story_url": reverse("blog:story_detail", args=[blog.slug]), "id": blog.pk},

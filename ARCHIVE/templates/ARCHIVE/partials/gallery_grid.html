@@ -1,75 +1,75 @@
 {% load static %}
 {% load archive_extras %}
-  {% if num_pages > 1 %}
-  <nav class="story-pagination archive-pagination" aria-label="Archive pages">
-    {% if has_previous %}
-    <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ previous_page }}", "descr": "{{ descr|escapejs }}"}'
-            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-            hx-target="#archive-grid-shell" hx-swap="innerHTML">Prev</button>
-    {% endif %}
-    {% for page_num in page_range %}
-      {% if page_num == "…" %}
-        <span class="story-page-btn is-ellipsis" aria-hidden="true">…</span>
-      {% else %}
-        <button type="button" class="story-page-btn {% if page_num == page %}is-active{% endif %}" data-archive-page-btn
-                hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ page_num }}", "descr": "{{ descr|escapejs }}"}'
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-target="#archive-grid-shell" hx-swap="innerHTML"
-                {% if page_num == page %}aria-current="page"{% endif %}
-                aria-label="Go to page {{ page_num }}">{{ page_num }}</button>
-      {% endif %}
-    {% endfor %}
-    {% if has_next %}
-    <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ next_page }}", "descr": "{{ descr|escapejs }}"}'
-            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-            hx-target="#archive-grid-shell" hx-swap="innerHTML">Next</button>
-    {% endif %}
-  </nav>
+<p class="archive-summary" aria-live="polite" data-archive-meta data-page="{{ page }}" data-kind="{{ kind }}" data-descr="{{ descr }}">
+  {% if descr %}
+  <span>{{ total }} result{{ total|pluralize }} for &ldquo;{{ descr }}&rdquo;{% if kind == 'image' %} in images{% elif kind == 'file' %} in files{% endif %}</span>
+  <button type="button" class="archive-link-btn" data-archive-clear-search>Clear search</button>
+  {% else %}
+  <span>{{ total }} {% if kind == 'image' %}image{% elif kind == 'file' %}file{% else %}item{% endif %}{{ total|pluralize }}{% if num_pages > 1 %} &middot; Page {{ page }} of {{ num_pages }}{% endif %}</span>
   {% endif %}
+</p>
+
 {% if images %}
   <div class="archive-grid">
     {% for image in images %}
     {% with proxied_url=image.url|cloudinary_proxy %}
-    <article class="archive-card" id="archive-card-{{ image.id }}">
+    {% with absolute_url=proxied_url|archive_absolute_url:request %}
+    <article class="archive-card" id="archive-card-{{ image.id }}" style="--i: {{ forloop.counter0 }}">
       <div class="archive-card-media{% if image.kind == 'file' %} archive-card-media-file{% endif %}">
         {% if image.kind == 'image' %}
-        <img src="{{ proxied_url }}" width="{{ image.width }}" height="{{ image.height }}"
-             alt="{{ image.alt }}" loading="lazy" onerror="this.onerror=null;this.src='/static/404.jpg';">
+        <button type="button" class="archive-card-open" data-archive-open
+                data-view-src="{{ proxied_url }}"
+                data-title="{{ image.alt }}"
+                data-width="{{ image.width }}" data-height="{{ image.height }}"
+                data-quality="{{ image.quality_label }}"
+                data-uploader="{{ image.uploader_email }}"
+                data-date="{{ image.date_created|date:'j M Y' }}"
+                data-download="{{ proxied_url }}"
+                data-copy="{{ absolute_url }}"
+                aria-label="View larger: {{ image.alt }}">
+          <img src="{{ proxied_url }}" width="{{ image.width }}" height="{{ image.height }}"
+               alt="{{ image.alt }}" loading="lazy" decoding="async"
+               onload="this.classList.add('is-loaded')"
+               onerror="this.onerror=null;this.src='/static/404.jpg';this.classList.add('is-loaded')">
+        </button>
+        <span class="archive-tag">Image</span>
         {% else %}
-        <a class="archive-card-file-icon" href="{{ proxied_url }}?filename={{ image.original_filename|urlencode }}"
-           download="{{ image.original_filename }}" aria-label="Download {{ image.alt }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {% if image.file_extension %}<span class="archive-card-file-ext">.{{ image.file_extension|lower }}</span>{% endif %}
-        </a>
+        <div class="archive-filetile" aria-hidden="true">
+          <svg viewBox="0 0 64 80" class="archive-filesheet"><path d="M6 2h36l16 16v58a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M42 2v16h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <span class="archive-filetile-ext">{% if image.file_extension %}{{ image.file_extension|lower }}{% else %}file{% endif %}</span>
+        </div>
+        <span class="archive-tag">File</span>
         {% endif %}
       </div>
       <div class="archive-card-body">
         <p class="archive-card-desc">{{ image.alt }}</p>
-        <div class="archive-card-meta">
-          <span class="archive-card-uploader" title="Uploaded by">{{ image.uploader_email }}</span>
+        <ul class="archive-card-specs">
           {% if image.kind == 'image' %}
-          <span class="archive-card-quality-tag">{{ image.quality_label }}</span>
+          {% if image.width and image.height %}<li>{{ image.width }} &times; {{ image.height }}</li>{% endif %}
+          <li>{{ image.quality_label }} quality</li>
           {% else %}
-          <span class="archive-card-quality-tag">{{ image.file_size_label }}</span>
+          <li>{{ image.file_size_label }}</li>
+          {% if image.original_filename %}<li class="archive-card-filename" title="{{ image.original_filename }}">{{ image.original_filename }}</li>{% endif %}
           {% endif %}
-        </div>
+        </ul>
+        <p class="archive-card-credit">
+          <span class="archive-card-uploader" title="Added by">{{ image.uploader_email }}</span>
+          <time datetime="{{ image.date_created|date:'c' }}">{{ image.date_created|date:"j M Y" }}</time>
+        </p>
         <div class="archive-card-actions">
-          <a class="archive-card-btn" href="{{ proxied_url }}{% if image.kind == 'file' %}?filename={{ image.original_filename|urlencode }}{% endif %}"
-             download="{{ image.original_filename }}" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 20 20" class="archive-card-btn-icon" aria-hidden="true"><path d="M10 3v9m0 0l-3.5-3.5M10 12l3.5-3.5M4 15h12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <a class="archive-card-btn is-primary" href="{{ proxied_url|archive_download_url:image.original_filename }}"
+             download="{{ image.original_filename }}" aria-label="Download {{ image.alt }}">
+            <svg viewBox="0 0 20 20" class="archive-card-btn-icon" aria-hidden="true"><path d="M10 3v9m0 0-3.5-3.5M10 12l3.5-3.5M4 15h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Download
           </a>
-          <button type="button" class="archive-card-btn" data-share-btn
-                  data-share-url="{{ proxied_url|archive_absolute_url:request }}">
-                  {% comment %} data-share-url="{% if image.kind == 'image' %}imgl {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% else %}filel {{ request.scheme }}://{{ request.get_host }}{{ proxied_url }} {{ image.alt }}{% endif %}"> {% endcomment %}
+          <button type="button" class="archive-card-btn is-icon" data-share-btn data-share-url="{{ absolute_url }}"
+                  aria-label="Copy link to {{ image.alt }}" title="Copy link">
             <svg viewBox="0 0 20 20" class="archive-card-btn-icon" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 13V5a1.5 1.5 0 0 1 1.5-1.5H13" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-            Copy url
           </button>
         </div>
       </div>
     </article>
+    {% endwith %}
     {% endwith %}
     {% endfor %}
   </div>
@@ -78,16 +78,16 @@
   <nav class="story-pagination archive-pagination" aria-label="Archive pages">
     {% if has_previous %}
     <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ previous_page }}", "descr": "{{ descr|escapejs }}"}'
+            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ previous_page }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-            hx-target="#archive-grid-shell" hx-swap="innerHTML">Prev</button>
+            hx-target="#archive-grid-shell" hx-swap="innerHTML" aria-label="Previous page">Prev</button>
     {% endif %}
     {% for page_num in page_range %}
       {% if page_num == "…" %}
         <span class="story-page-btn is-ellipsis" aria-hidden="true">…</span>
       {% else %}
         <button type="button" class="story-page-btn {% if page_num == page %}is-active{% endif %}" data-archive-page-btn
-                hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ page_num }}", "descr": "{{ descr|escapejs }}"}'
+                hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ page_num }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}"}'
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-target="#archive-grid-shell" hx-swap="innerHTML"
                 {% if page_num == page %}aria-current="page"{% endif %}
@@ -96,16 +96,22 @@
     {% endfor %}
     {% if has_next %}
     <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ next_page }}", "descr": "{{ descr|escapejs }}"}'
+            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ next_page }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-            hx-target="#archive-grid-shell" hx-swap="innerHTML">Next</button>
+            hx-target="#archive-grid-shell" hx-swap="innerHTML" aria-label="Next page">Next</button>
     {% endif %}
   </nav>
   {% endif %}
-  {% else %}
-  {% if descr %}
-  <p class="archive-empty">No pictures or files have a description close to &ldquo;{{ descr }}&rdquo;.</p>
-  {% else %}
-  <p class="archive-empty">No pictures or files in the archive yet.</p>
-  {% endif %}
-  {% endif %}
+{% else %}
+  <div class="archive-empty">
+    <svg viewBox="0 0 24 24" class="archive-empty-icon" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+    {% if descr %}
+    <p class="archive-empty-title">Nothing matches &ldquo;{{ descr }}&rdquo;</p>
+    <p class="archive-empty-text">Check the spelling or try fewer words. Close spellings are matched too.</p>
+    <button type="button" class="archive-action-btn" data-archive-clear-search>Clear search</button>
+    {% else %}
+    <p class="archive-empty-title">{% if kind == 'image' %}No images yet{% elif kind == 'file' %}No files yet{% else %}The archive is empty{% endif %}</p>
+    <p class="archive-empty-text">{% if can_upload %}Use &ldquo;Add image or file&rdquo; above to share the first one.{% else %}Sign in to share the first one.{% endif %}</p>
+    {% endif %}
+  </div>
+{% endif %}

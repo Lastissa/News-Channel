@@ -3,7 +3,7 @@
   <div class="archive-manage-row-media{% if item.kind == 'file' %} archive-manage-row-media-file{% endif %}">
     {% with proxied_url=item.url|cloudinary_proxy %}
     {% if item.kind == 'image' %}
-    <img src="{{ proxied_url }}" alt="{{ item.alt }}" loading="lazy">
+    <img src="{{ proxied_url }}" alt="{{ item.alt }}" loading="lazy" onerror="this.onerror=null;this.src='/static/404.jpg';">
     {% else %}
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     {% endif %}

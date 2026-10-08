@@ -185,3 +185,8 @@ def cache_or_run(key, fn, timeout=300):
         error_logger(msg=msg)
         raise Exception("BEFORE CACHE CAN SET, THE FN NEED TO RETURN SOMETHING")
     return value
+
+def invalidate_cache(key):
+    response  = cache.delete(key)
+    if response: info_logger(msg =f"CACHE-DELETE: Succesfully deleted cache with key ({key})")
+    else:info_logger(msg= f"CACHE-DELETE: Tried to delete ({key}) but there is no cache with that key")
