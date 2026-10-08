@@ -49,7 +49,7 @@
     var isError = tone === "error";
     var isInfo = tone === "info";
     var isPersistentNotice = placement === "top";
-    var duration = isPersistentNotice ? 8000 : (isError ? 7000 : 5000);
+    var duration = isPersistentNotice ? 8000 : (isError ? 3000 : 2500);
     var remaining = duration;
     var timerStartedAt = 0;
     var paused = false;
