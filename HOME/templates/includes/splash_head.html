@@ -1,0 +1,105 @@
+<style id="splash-critical">
+/* SPLASH STYLES, inlined so the splash paints from the very first bytes of HTML.
+   Token names and values mirror HOME/static/home/css/base.css, which cannot be
+   used here because it loads after first paint. If a colour changes there,
+   change it here too. */
+:root {
+  --ink: #0E1B2C;
+  --paper: white;
+  --slate: #5B6B7C;
+  --amber: #e8a324d3;
+  --amber-alt: rgb(15, 113, 15);
+  --brand: #22D3EE;
+  --line: rgba(14, 27, 44, 0.12);
+  --sp-1: var(--ink);
+  --sp-2: var(--brand);
+  --sp-3: var(--amber);
+  --sp-4: var(--amber-alt);
+  --sp-5: var(--slate);
+  --sp-shadow: rgba(14, 27, 44, 0.30);
+  --sp-w: clamp(30px, 8.5vmin, 64px);
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  --ink: #F3EFE6;
+  --paper: #0B1420;
+  --slate: #93A2B3;
+  --amber-deep: #EDB35A;
+  --amber-alt-deep: rgb(33, 182, 33);
+  --brand-deep: #22D3EE;
+  --line: rgba(243, 239, 230, 0.14);
+  --sp-1: var(--ink);
+  --sp-2: var(--brand-deep);
+  --sp-3: var(--amber-deep);
+  --sp-4: var(--amber-alt-deep);
+  --sp-5: var(--slate);
+  --sp-shadow: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+html { background-color: var(--paper); }
+
+/* base.css ends with .dummy-loading{display:none}. The script below decides when
+   the splash may go, so display is forced here and removed through .sp-gone. */
+.dummy-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 2601;
+  display: grid !important;
+  place-items: center;
+  overflow: hidden;
+}
+.dummy-loading.sp-gone { display: none !important; }
+.sp-bg {
+  position: absolute;
+  inset: 0;
+  background-color: var(--paper);
+  transition: opacity 0.5s ease;
+}
+.sp-leaving { pointer-events: none; }
+.sp-leaving .sp-bg { opacity: 0; }
+.sp-quiet .sp-row { display: none; }
+
+.sp-row {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--sp-w) * 0.34);
+}
+.sp-row::after {              /* the floor the sheets land on */
+  content: "";
+  position: absolute;
+  left: -14%;
+  right: -14%;
+  bottom: -1px;
+  height: 1px;
+  background-color: var(--line);
+}
+.sp-slot {
+  position: relative;
+  width: var(--sp-w);
+  height: calc(var(--sp-w) * 3.3 * var(--hf));
+}
+.sp-sheet {
+  position: absolute;
+  inset: 0;
+  background-color: var(--c);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--line), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+.sp-shadow {
+  position: absolute;
+  left: -35%;
+  right: -35%;
+  bottom: -6px;
+  height: 12px;
+  background: radial-gradient(closest-side, var(--sp-shadow), transparent);
+}
+.sp-slot:nth-child(1) { --c: var(--sp-1); --hf: 0.92; }
+.sp-slot:nth-child(2) { --c: var(--sp-2); --hf: 1.18; }
+.sp-slot:nth-child(3) { --c: var(--sp-3); --hf: 1; }
+.sp-slot:nth-child(4) { --c: var(--sp-4); --hf: 1.32; }
+.sp-slot:nth-child(5) { --c: var(--sp-5); --hf: 0.84; }
+</style>
+<noscript><style>.dummy-loading { display: none !important; }</style></noscript>

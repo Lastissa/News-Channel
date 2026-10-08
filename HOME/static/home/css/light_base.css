@@ -1,34 +1,77 @@
+/* Critical CSS: this file blocks render and base.css loads late, so the splash
+   cannot use tokens from base.css. The --splash-* values below mirror them
+   (--brand, --ink, --amber, --slate) and must be kept in step by hand. */
 :root {
   --paper: white;/*#fffcf7;*/
   --ink: #0E1B2C;
-
+  --splash-1: #22D3EE;
+  --splash-2: #0E1B2C;
+  --splash-3: #e8a324d3;
+  --splash-4: #5B6B7C;
+  --splash-amp: 20px;      /* max vertical displacement from the resting line */
+  --splash-half-cycle: 0.7s;
 }
 
 html[data-theme="dark"] {
   --paper:#0B1420;
   --ink: #F3EFE6;
-
+  --splash-1: #22D3EE;
+  --splash-2: #F3EFE6;
+  --splash-3: #EDB35A;
+  --splash-4: #93A2B3;
 }
 
 
+/* Full screen splash. base.css ends with .dummy-loading{display:none}, which
+   removes it once the main stylesheet has loaded. */
 .dummy-loading{
     position: fixed;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     z-index: 2601;
-    left: 0;
-    top: 0;
-    padding: 0;
     margin: 0;
+    padding: 0;
+    display: grid;
+    place-items: center;
     background-color: var(--paper);
-    justify-items: center;
-    align-content: center;
-
 }
 
-.dummy-loading p {
-    color: var(--ink);
-    font-size: 2rem;
-    word-spacing: 2px;
-    letter-spacing: 5px;
+.dummy-loading__tokens{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.dummy-loading__token{
+    display: block;
+    width: 18px;
+    height: 36px;
+    background-color: var(--token-color);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(14, 27, 44, 0.22);
+    animation: splash-oscillate var(--splash-half-cycle) ease-in-out infinite alternate;
+    /* negative delay: every token is already mid-motion on first paint */
+    animation-delay: calc(var(--i) * 0.14s - 0.56s);
+}
+.dummy-loading__token:nth-child(1){ --i: 0; --token-color: var(--splash-1); }
+.dummy-loading__token:nth-child(2){ --i: 1; --token-color: var(--splash-2); }
+.dummy-loading__token:nth-child(3){ --i: 2; --token-color: var(--splash-3); }
+.dummy-loading__token:nth-child(4){ --i: 3; --token-color: var(--splash-4); }
+
+@keyframes splash-oscillate{
+    from{ transform: translateY(calc(var(--splash-amp) * -1)); }
+    to{ transform: translateY(var(--splash-amp)); }
+}
+
+/* Reduced motion: no travel, a soft fade instead */
+@media (prefers-reduced-motion: reduce){
+    .dummy-loading__token{
+        animation-name: splash-fade;
+        animation-duration: 1s;
+        transform: none;
+    }
+    @keyframes splash-fade{
+        from{ opacity: 0.35; }
+        to{ opacity: 1; }
+    }
 }

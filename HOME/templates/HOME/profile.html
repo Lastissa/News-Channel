@@ -7,13 +7,6 @@
 
 {% block content %}
 <section class="profile-shell">
-  {% comment %} {% if is_admin_user %}
-    <div class="profile-header-bar">
-      <div class="profile-header-actions">
-        <a href="{% url 'control:panel' %}" class="profile-add-news-link">PANEL</a>
-      </div>
-    </div>
-  {% endif %} {% endcomment %}
 
   <div class="profile-layout">
     <aside class="profile-summary" aria-label="Profile settings">
@@ -21,7 +14,7 @@
         <div class="profile-avatar-wrap">
           <img src="{{ user.profile_img}}" alt="{{ user.email }} avatar" class="profile-avatar" onerror="this.onerror=null;this.src='/static/404.jpg';">
         </div>
-
+        <a href="{% url 'staff:portfolio' profile.slug %}">
         <div class="profile-identity-copy">
           <h2>{% if profile and profile.full_name %}{{ profile.full_name }}{% else %}{{ request.user.email | before_at }}{% endif %}</h2>
           <p class="profile-role">
@@ -29,6 +22,7 @@
           </p>
         </div>
       </div>
+    </a>
 
       <div class="profile-info-list">
         <div><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>

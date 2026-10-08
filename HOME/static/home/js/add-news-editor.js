@@ -486,7 +486,7 @@
         if (result.status === 409 && payload.needs_confirmation && payload.warnings && payload.warnings.length) {
           openModal({
             title: "Check these before posting",
-            intro: "Nothing has been posted yet. These are suggestions, not errors:",
+            intro: "Some Issue Require Your Attention Before Story Can Be Published. These are suggestions, not errors:",
             items: payload.warnings,
             askToPost: true
           });

@@ -1190,6 +1190,7 @@ class ProfileStaffUpdateView(View):
         if len(full_name) > 100:
             return JsonResponse({"detail": "Full name is limited to 100 characters."}, status=400)
         profile.full_name = full_name
+        profile.slug = full_name.replace(" ", "-")
 
         profile.bio = (request.POST.get("bio") or "").strip()
 
@@ -1203,7 +1204,7 @@ class ProfileStaffUpdateView(View):
                     return JsonResponse({"detail": f"The {field.replace('_handle', '')} link must be a valid http or https URL."}, status=400)
             setattr(profile, field, value or None)
 
-        editable_fields = ["full_name", "bio", "twitter_handle", "facebook_handle", "whatsapp_handle"]
+        editable_fields = ["full_name", "bio", "twitter_handle", "facebook_handle", "whatsapp_handle", 'slug']
 
         is_admin = admin_only(request.user)
         if "gender" in request.POST:
@@ -1222,6 +1223,8 @@ class ProfileStaffUpdateView(View):
             profile.speciality = [part.strip() for part in raw.split(",") if part.strip()]
             editable_fields.append("speciality")
 
+        # THE SLUG NEED TO BE UPDATED COS IT CARRIES THE AUTHOR PAGE DATA
+        editable_fields.append('slug')
         profile.save(update_fields=editable_fields)
 
         return JsonResponse(

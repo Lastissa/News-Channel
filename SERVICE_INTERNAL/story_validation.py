@@ -25,7 +25,7 @@ SIMILARITY_WARN = 0.75
 
 #   Very short content is allowed when meaningful, but the author is asked to
 #   confirm that it contains enough information. Length alone is not a block.
-SHORT_BODY_WARN_WORDS = 30
+SHORT_BODY_WARN_WORDS = 40
 
 IMG_RE = re.compile(r"^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$")
 FILE_RE = re.compile(r"^filel\s+(\S+)(?:\s+(.*))?$")

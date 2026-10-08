@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% include "includes/splash_head.html" %}
     {% comment %} {% csrf_token %} {% endcomment %}
     <title>{% block title %}{{ project_name }} · {{ project_cachphrase }}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %} - {{ project_cachphrase }}{% endblock %}">
@@ -44,8 +45,7 @@
     
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
-    <link rel="stylesheet" href="{% static "home/css/light_base.css" %}">
-    <link rel="stylesheet" href="{% static 'home/css/base.css' %}" media="print" onload="this.media='all'">
+    <link id="base-css" rel="stylesheet" href="{% static 'home/css/base.css' %}" media="print" onload="this.media='all'">
     {% block extra_head %}
     {% block og_image %}
     <!--Defaul is the oficial site logo--> 
@@ -69,9 +69,7 @@
 
 
 <body>
-    <div class="dummy-loading">
-        <p> PLEASE WAIT... </p>
-    </div>
+    {% include "includes/splash.html" %}
     {% include "includes/navbar.html" %}
     {% if messages %}
     <div id="django-message-host" style="display:none;">

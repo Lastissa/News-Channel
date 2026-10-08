@@ -1,0 +1,140 @@
+<div class="dummy-loading" id="splash" role="status" aria-label="Loading">
+    <div class="sp-bg"></div>
+    <div class="sp-row" aria-hidden="true">
+        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
+        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
+        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
+        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
+        <span class="sp-slot"><i class="sp-shadow"></i><b class="sp-sheet"></b></span>
+    </div>
+</div>
+<script>
+/* Splash physics: five paper sheets fall under gravity, bounce, squash and rock on
+   landing, then a ripple of hops sweeps across them until the site is ready, when
+   they fall away. Hand written, no libraries. Full intro plays once per browser
+   session; later pages only cover the screen until base.css has loaded. */
+(function () {
+  var root = document.getElementById('splash');
+  if (!root) return;
+  var css = document.getElementById('base-css');
+  var MIN = 2.5;          /* seconds the intro is guaranteed to play */
+  var FAILSAFE = 10;      /* seconds before the splash lets go even if base.css never arrives */
+  var G = 2600;           /* gravity, px/s^2 */
+  var BOUNCE = 0.36;      /* energy kept on each landing */
+  var HOP = 340;          /* upward speed of a ripple hop, px/s */
+  function ready() { return !css || css.media === 'all'; }
+  function finish() { root.classList.add('sp-gone'); }
+
+  var seen = false;
+  // Remove the below line to make the splash appear always
+  try { seen = sessionStorage.getItem('sp-seen') === '1'; sessionStorage.setItem('sp-seen', '1'); } catch (e) {}
+
+  /* later pages in the session: no show, just wait for base.css */
+  if (seen) {
+    root.classList.add('sp-quiet');
+    var waited = 0;
+    var poll = setInterval(function () {
+      waited += 0.03;
+      if (ready() || waited > FAILSAFE) { clearInterval(poll); finish(); }
+    }, 30);
+    return;
+  }
+
+  var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still) {            /* sheets stay at rest, the cover simply fades */
+    var t0 = 0;
+    var p2 = setInterval(function () {
+      t0 += 0.03;
+      if ((ready() && t0 > 0.7) || t0 > FAILSAFE) {
+        clearInterval(p2);
+        root.classList.add('sp-leaving');
+        setTimeout(finish, 520);
+      }
+    }, 30);
+    return;
+  }
+
+  var slots = root.querySelectorAll('.sp-slot');
+  var H = window.innerHeight;
+  var S = [];
+  for (var i = 0; i < slots.length; i++) {
+    S.push({
+      sheet: slots[i].children[1], shadow: slots[i].children[0],
+      w: slots[i].offsetWidth,
+      y: -(H / 2 + slots[i].offsetHeight + 40 + i * 30), vy: 0,   /* y: px above (-) or below (+) its resting spot */
+      a: 0, va: 0,                                                  /* tilt, degrees */
+      q: 0, vq: 0,                                                  /* squash */
+      start: i * 0.11, exitAt: 0, out: false, kickAt: -1
+    });
+  }
+
+  function sim(s, dt, T) {
+    if (T < s.start) return;
+    if (s.kickAt >= 0 && T >= s.kickAt) { s.kickAt = -1; if (s.y === 0) s.vy = -HOP; }
+    s.vy += G * dt;
+    s.y += s.vy * dt;
+    if (!s.out && s.y >= 0) {                 /* landing */
+      var v = s.vy; s.y = 0;
+      if (v > 45) {
+        v = Math.min(v, 1100);
+        s.vy = -s.vy * BOUNCE;
+        s.vq += v * 0.003;
+        s.va += (Math.random() < 0.5 ? -1 : 1) * v * 0.06;
+      } else s.vy = 0;
+    }
+    s.va += (-190 * s.a - 14 * s.va) * dt; s.a += s.va * dt;   /* damped spring: tilt */
+    s.vq += (-420 * s.q - 22 * s.vq) * dt; s.q += s.vq * dt;   /* damped spring: squash */
+  }
+
+  function draw(s) {
+    var lift = Math.abs(Math.sin(s.a * Math.PI / 180)) * s.w * 0.5;   /* a tilted sheet rests on its corner */
+    s.sheet.style.transform = 'translate3d(0,' + (s.y - lift).toFixed(2) + 'px,0) rotate(' + s.a.toFixed(2) +
+      'deg) scale(' + (1 + s.q * 0.55).toFixed(3) + ',' + (1 - s.q).toFixed(3) + ')';
+    var h = Math.max(0, Math.min(1, -s.y / 260));                     /* shadow reacts to height */
+    s.shadow.style.transform = 'scale(' + (1 - h * 0.5).toFixed(3) + ')';
+    s.shadow.style.opacity = s.out ? 0 : (1 - h * 0.85).toFixed(3);
+  }
+
+  var DT = 1 / 240, T = 0, acc = 0, last = 0;
+  var nextWave = 0, dirRight = true, exiting = false, exitT = 0, done = false;
+
+  function startWave() {
+    for (var j = 0; j < S.length; j++) S[dirRight ? j : S.length - 1 - j].kickAt = T + j * 0.09;
+    dirRight = !dirRight;
+  }
+  function allSettled() {
+    for (var j = 0; j < S.length; j++) if (S[j].y !== 0 || S[j].vy !== 0) return false;
+    return true;
+  }
+  function beginExit() {
+    exiting = true; exitT = T;
+    root.classList.add('sp-leaving');
+    for (var j = 0; j < S.length; j++) S[j].exitAt = T + j * 0.06;
+  }
+
+  function frame(ts) {
+    if (!last) last = ts;
+    var d = Math.min((ts - last) / 1000, 0.05); last = ts;
+    acc += d;
+    while (acc >= DT) {
+      T += DT; acc -= DT;
+      for (var j = 0; j < S.length; j++) {
+        var s = S[j];
+        if (exiting && !s.out && T >= s.exitAt) { s.out = true; s.vy = -160; s.va = (j % 2 ? 1 : -1) * 110; }
+        sim(s, DT, T);
+      }
+    }
+    var gone = true;
+    for (var k = 0; k < S.length; k++) { draw(S[k]); if (S[k].y < H / 2 + 80) gone = false; }
+
+    if (!exiting) {
+      if (T > nextWave && allSettled() && T > 1.0) { startWave(); nextWave = T + 1.7; }
+      if ((T >= MIN && ready()) || T > FAILSAFE) beginExit();
+    } else if (gone || T - exitT > 1.6) { done = true; finish(); }
+    if (!done) requestAnimationFrame(frame);
+  }
+
+  for (var m = 0; m < S.length; m++) draw(S[m]);
+  requestAnimationFrame(frame);
+})();
+</script>
