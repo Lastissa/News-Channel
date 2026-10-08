@@ -523,7 +523,7 @@ class BlogLikeView(View):
             else:
                 BlogLike.objects.create(blog=blog, user=user)
                 Blog.objects.filter(pk=blog.pk).update(likes=F("likes") + 1)
-                liked, detail = True, "Story liked. Thank You"
+                liked, detail = True, "Thank You"
 
             if had_legacy_like:
                 request.session["liked_blogs"] = [

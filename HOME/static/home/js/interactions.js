@@ -179,7 +179,7 @@
         toast(result.detail, "success");
       })
       .catch(function () {
-        var detail = "We could not send your report because of a connection issue. Please try again.";
+        var detail = "We could not send your report because of a Network problem. Please try again.";
         if (status) {
           status.textContent = detail;
           status.hidden = false;
@@ -764,7 +764,7 @@
       emptyText: "No bookmarks saved yet.",
       dateKey: "created_at",
       loadError: "Could not load bookmarks.",
-      netError: "Connection issue. Bookmarks could not be loaded.",
+      netError: "Network Error. unable to load Bookmarks.",
     },
     history: {
       listId: "profile-history-list",
@@ -774,7 +774,7 @@
       emptyText: "No reading history yet.",
       dateKey: "date_created",
       loadError: "Could not load history.",
-      netError: "Connection issue. History could not be loaded.",
+      netError: "Network Error. Unable to load History.",
     },
     comment: {
       listId: "profile-comments-list",
@@ -785,7 +785,7 @@
       excerptKey: "excerpt",
       linkLabel: "View",
       loadError: "Could not load comments.",
-      netError: "Connection issue. Comments could not be loaded.",
+      netError: "Network Error. Unable to load Comments.",
     },
     staff: {
       listId: "profile-staff-list",
@@ -795,7 +795,7 @@
       emptyText: "No staff accounts found.",
       excerptKey: "detail",
       loadError: "Could not load the staff directory.",
-      netError: "Connection issue. The staff directory could not be loaded.",
+      netError: "Network Error. Unable to load staffs.",
     },
     staffPublished: {
       listId: "profile-staff-published-list",
@@ -805,7 +805,7 @@
       emptyText: "No stories published yet.",
       excerptKey: "detail",
       loadError: "Could not load the published news.",
-      netError: "Connection issue. The published news could not be loaded.",
+      netError: "Network Error. Unable to load published news.",
     },
     published: {
       listId: "profile-published-list",
@@ -816,7 +816,7 @@
       dateKey: "date_created",
       viewsKey: "views",
       loadError: "Could not load published stories.",
-      netError: "Connection issue. Published stories could not be loaded.",
+      netError: "Network Error. Published stories could not be loaded.",
     },
   };
 
@@ -916,7 +916,7 @@
       .catch(function () {
         button.dataset.pending = "false";
         button.disabled = false;
-        toast("Connection issue. Please try again.", "error");
+        toast("Network Error. Please try again.", "error");
       });
   });
 
@@ -968,7 +968,7 @@
       .catch(function () {
         button.dataset.pending = "false";
         button.disabled = false;
-        toast("Connection issue. The story was not deleted.", "error");
+        toast("Network Error. Unable to delete story.", "error");
       });
   });
 
@@ -1061,7 +1061,7 @@
           staffSaveBtn.disabled = false;
           staffSaveBtn.classList.remove("is-pending");
           staffSaveBtn.textContent = originalText;
-          toast("Connection issue. Staff profile was not updated.", "error");
+          toast("Network Error. Staff profile was not updated.", "error");
         });
     });
   }
@@ -1282,7 +1282,7 @@
       .catch(function () {
         button.dataset.pending = "false";
         setStoryLikePending(false);
-        toast("Connection issue. Your like was not saved.", "error");
+        toast("Network Error. Your like was not saved.", "error");
       });
   });
 

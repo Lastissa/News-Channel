@@ -237,7 +237,8 @@
   margin: 0;
   font-size: clamp(1.2rem, 2.5vw, 1.8rem);
   line-height: 1.2;
-  overflow-x: scroll;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .profile-role {

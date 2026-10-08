@@ -34,11 +34,11 @@ newsletter-popup.js logic in interactions.js.
     <button type="button" class="newsletter-popup-close" data-newsletter-popup-close aria-label="Close">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
-
+    <!--Ask Once per day for non login users : I AM NOT SURE THIS IS ACTUALLY FOLLOWING ONCE PER DAY REQUEST YET: TODO-->
     <div class="newsletter-popup-body">
       <p class="newsletter-popup-kicker" id="newsletter-popup-title">Stay up to date.</p>
-      <h3 class="newsletter-popup-heading">Get {{ project_name }} Latest Stories Soon As They Are Posted.</h3>
-      <p class="newsletter-popup-sub">Completely optional. Close this anytime and we won't ask again today.</p>
+      <h3 class="newsletter-popup-heading">Get Our Latest Stories Soon As They Are Posted.</h3>
+      <p class="newsletter-popup-sub">Receive email alert soon as a new report is uploaded to stay up-to-date(Completely optional).</p>
 
       <form id="newsletter-popup-form" class="newsletter-popup-form" data-newsletter-popup-form novalidate>
         {% csrf_token %}
