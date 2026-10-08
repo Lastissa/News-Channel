@@ -14,7 +14,7 @@
     <div class="story-card-footer">
       <span class="story-card-byline">{{ post.author.staffprofile.full_name|slice:":20"|default:"UNKNOWN" }}</span>
       <button type="button"
-              class="bookmark-chip"
+              class="bookmark-chip has-label"
               data-bookmark-btn
               data-blog-id="{{ post.id }}"
               data-endpoint="{% url 'home:bookmark' post.id %}"
@@ -24,6 +24,7 @@
         <svg viewBox="0 0 20 20" class="bookmark-icon" aria-hidden="true">
           <path d="M5 3.5h10a1 1 0 011 1V18l-6-3.6L4 18V4.5a1 1 0 011-1z" fill="{% if post.id in saved_ids %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
         </svg>
+        <span class="bookmark-label">Read later</span>
       </button>
     </div>
   </div>

@@ -83,7 +83,7 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
         </div>
       </div>
       <button type="button"
-              class="bookmark-chip hero-bookmark"
+              class="bookmark-chip hero-bookmark has-label"
               data-bookmark-btn
               data-blog-id="{{ post.id }}"
               data-endpoint="{% url 'home:bookmark' post.id %}"
@@ -93,6 +93,7 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
         <svg viewBox="0 0 20 20" class="bookmark-icon" aria-hidden="true">
           <path d="M5 3.5h10a1 1 0 011 1V18l-6-3.6L4 18V4.5a1 1 0 011-1z" fill="{% if post.id in saved_ids %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
         </svg>
+        <span class="bookmark-label">Read later</span>
       </button>
     </article>
     {% endfor %}

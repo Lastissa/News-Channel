@@ -480,6 +480,9 @@ html.auth-gate-locked { overflow: hidden; }
 .bookmark-chip:hover { transform: translateY(-2px); }
 .bookmark-chip.is-saved { color: var(--amber); border-color: var(--amber); }
 .bookmark-chip .bookmark-icon { width: 18px; height: 18px; }
+/* "Read later" text beside the icon so the button explains itself (home hero + story cards) */
+.bookmark-chip.has-label { width: auto; gap: 7px; padding: 0 13px; flex-shrink: 0; }
+.bookmark-chip .bookmark-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1; white-space: nowrap; }
 .hero-bookmark { position: absolute; top: 20px; right: 20px; z-index: 3; }
 
 .hero-empty { padding: 60px 20px; text-align: center; }
@@ -674,10 +677,12 @@ a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 .story-card-title { font-size: 20px; line-height: 1.3; margin-bottom: 0; }
 .story-card-title a:hover { text-decoration: underline; text-decoration-color: var(--amber); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .story-card-excerpt { color: var(--slate); font-size: 0.92rem; margin-bottom: 0; flex: 1; }
-.story-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
-.story-card-byline { font-size: 0.82rem; color: var(--slate); }
+.story-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.story-card-byline { font-size: 0.82rem; color: var(--slate); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .story-card-footer .bookmark-chip { width: 34px; height: 34px; border-radius: var(--radius-s); border-color: var(--line); background: var(--paper-dim); color: var(--ink-soft); }
 .story-card-footer .bookmark-chip:hover { background: var(--ink); color: var(--paper); }
+.story-card-footer .bookmark-chip.has-label { width: auto; padding: 0 11px; gap: 6px; }
+.story-card-footer .bookmark-chip .bookmark-label { font-size: 0.74rem; }
 .story-card-footer .bookmark-chip.is-saved { color: var(--amber-deep); border-color: var(--amber-deep); background: transparent; }
 
 .empty-state { text-align: center; color: var(--slate); padding: 40px 10px; }
