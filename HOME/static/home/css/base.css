@@ -1414,7 +1414,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 
 /* ---------- CSRF failure page ---------- */
-.csrf-fail-icon { color: var(--amber-deep); margin-bottom: 12px; }
+.csrf-fail-icon { color: var(--danger); margin-bottom: 12px; }
 .csrf-fail-icon svg { width: 40px; height: 40px; }
 .csrf-fail-steps { margin: 0 0 22px; padding-left: 21px; }
 .csrf-fail-steps li { margin-bottom: 10px; color: var(--ink); }

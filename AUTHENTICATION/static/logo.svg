@@ -5,7 +5,7 @@
        visitor's system setting (prefers-color-scheme). Inlined in a page it also follows html[data-theme],
        which wins. Orange is the same in both. The fill attributes on the paths are the fallback for any
        viewer that ignores the stylesheet. */
-    .abu-logo { --logo-mark: #12306E; --logo-word: #F96E13; --logo-tag: #545557; }
+    .abu-logo { --logo-mark: #08399b; --logo-word: #F96E13; --logo-tag: #b1b2b5; }
     @media (prefers-color-scheme: dark) {
       .abu-logo { --logo-mark: #F3EFE6; --logo-tag: #93A2B3; }
     }
