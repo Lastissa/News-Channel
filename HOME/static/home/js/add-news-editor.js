@@ -2,7 +2,7 @@
    loader in add_news.html so the page skeleton paints first.
 
    The preview engine below is a direct port of BLOG.views.parse_story_content
-   and _linkify_text (see docs/NEWS_CONTENT_CONVENTION.MD) so what the author
+   and _linkify_text (see DOCS/NEWS_CONTENT_CONVENTION.MD) so what the author
    sees here is exactly what every reader will get on the published page. */
 (function () {
   "use strict";
@@ -38,6 +38,11 @@
   var modalEditBtn = modal ? modal.querySelector("[data-editor-modal-edit]") : null;
   var modalConfirmBtn = modal ? modal.querySelector("[data-editor-modal-confirm]") : null;
   var guideCopyBtn = shell.querySelector("[data-guide-copy-all]");
+  var guideToggleBtn = shell.querySelector("[data-guide-toggle]");
+  var guideEl = shell.querySelector("[data-format-guide]");
+  var toolbarEl = shell.querySelector("[data-editor-toolbar]");
+  var tabButtons = shell.querySelectorAll("[data-editor-tab]");
+  var archiveStage = archiveModal ? archiveModal.querySelector(".archive-picker-stage") : null;
   var modalEditTarget = null;
   var modalConfirmWarnings = true;
 
@@ -46,6 +51,8 @@
   var DRAFT_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
   var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   var pendingPublish = false;
+  var MOBILE_QUERY = window.matchMedia ? window.matchMedia("(max-width: 899.98px)") : { matches: false };
+  var MODAL_CLOSE_MS = 240;
 
   /* Local-only preview of a chosen file. No upload happens here, that
      only happens inside the publish handler further down, via the real
@@ -142,28 +149,111 @@
     }
   }
 
+  /* ---------- animated dialogs ----------
+     `hidden` can not be transitioned, so a dialog opens by clearing it and
+     adding .is-open on the next frame, and closes by dropping .is-open and
+     setting `hidden` once the fade is done. The page behind is locked from
+     scrolling while any dialog is open. */
+  function showDialog(el) {
+    if (!el) return;
+    window.clearTimeout(el._closeTimer);
+    el.hidden = false;
+    document.documentElement.classList.add("editor-modal-open");
+    void el.offsetWidth;
+    window.requestAnimationFrame(function () { el.classList.add("is-open"); });
+  }
+
+  function hideDialog(el) {
+    if (!el || el.hidden) return;
+    el.classList.remove("is-open");
+    el._closeTimer = window.setTimeout(function () {
+      el.hidden = true;
+      var anyOpen = shell.querySelector(".editor-modal:not([hidden])");
+      if (!anyOpen) document.documentElement.classList.remove("editor-modal-open");
+    }, MODAL_CLOSE_MS);
+  }
+
+  /* ---------- archive picker ----------
+     The picker shows the real /archive/ page in a frame. It is same-origin,
+     so once it has loaded the site header, footer, splash and floating
+     buttons are hidden and the gallery gets a compact, touch friendly layout
+     (two columns on a phone). Only the picker is affected, the real archive
+     page keeps its own styles. */
+  var ARCHIVE_EMBED_CSS = [
+    "#splash,.dummy-loading,.site-header,.site-footer,.fab-stack,#newsletter-popup{display:none!important}",
+    "html,body{background:var(--paper)!important}",
+    "body{padding-top:0!important}",
+    ".archive-shell{padding:16px 16px 32px!important}",
+    ".archive-hero{padding-bottom:12px!important}",
+    ".archive-hero::after,.archive-heading,.archive-header-actions{animation:none!important}",
+    ".archive-eyebrow{display:none!important}",
+    ".archive-hero h1{font-size:1.4rem!important}",
+    ".archive-subtitle{margin-top:4px!important;font-size:0.84rem!important}",
+    ".archive-toolbar{position:sticky;top:0;z-index:20;background:var(--paper);padding:10px 0 6px!important}",
+    ".archive-tab{padding:11px 14px!important}",
+    "@media (max-width:560px){",
+    ".archive-shell{padding:12px 12px 28px!important}",
+    ".archive-subtitle{display:none!important}",
+    ".archive-hero{gap:10px!important}",
+    ".archive-header-actions .archive-action-btn{padding:9px 10px!important;font-size:0.8rem!important}",
+    ".archive-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}",
+    ".archive-card-media{aspect-ratio:1/1!important}",
+    ".archive-card-media .archive-tag{top:8px!important;font-size:0.6rem!important;padding:4px 12px 4px 7px!important}",
+    ".archive-card-body{padding:9px 9px 10px!important;gap:7px!important}",
+    ".archive-card-desc{font-size:0.8rem!important;-webkit-line-clamp:2}",
+    ".archive-card-specs,.archive-card-credit{display:none!important}",
+    ".archive-card-btn{min-height:38px!important;font-size:0.74rem!important;padding:7px 8px!important}",
+    ".archive-card-btn.is-icon{flex:0 0 38px!important}",
+    ".archive-card-btn-icon{width:14px!important;height:14px!important}",
+    ".archive-pagination{flex-wrap:wrap;justify-content:center}",
+    "}"
+  ].join("\n");
+
+  function styleArchiveFrame() {
+    if (!archiveFrame) return;
+    try {
+      var doc = archiveFrame.contentDocument;
+      if (doc && doc.querySelector(".archive-shell") && !doc.getElementById("picker-embed-css")) {
+        var styleEl = doc.createElement("style");
+        styleEl.id = "picker-embed-css";
+        styleEl.textContent = ARCHIVE_EMBED_CSS;
+        doc.head.appendChild(styleEl);
+      }
+    } catch (error) {
+      console.error("Could not style the archive picker.", error);
+    }
+    if (archiveStage) archiveStage.classList.add("is-loaded");
+    if (archiveRefreshBtn) archiveRefreshBtn.disabled = false;
+  }
+
+  function loadArchiveFrame(force) {
+    if (!archiveFrame) return;
+    var url = archiveFrame.getAttribute("data-src");
+    if (!url) return;
+    if (!force && archiveFrame.getAttribute("src")) return;
+    if (archiveStage) archiveStage.classList.remove("is-loaded");
+    archiveFrame.setAttribute("src", url);
+  }
+
   function closeArchivePicker() {
-    if (!archiveModal) return;
-    archiveModal.hidden = true;
+    hideDialog(archiveModal);
   }
 
   shell.querySelectorAll("[data-archive-open]").forEach(function (button) {
     button.addEventListener("click", function () {
       if (!archiveModal) return;
-      archiveModal.hidden = false;
+      loadArchiveFrame(false);
+      showDialog(archiveModal);
       var closeButton = archiveModal.querySelector("[data-archive-close]");
-      if (closeButton) closeButton.focus();
+      if (closeButton) closeButton.focus({ preventScroll: true });
     });
   });
   if (archiveModal) {
+    if (archiveFrame) archiveFrame.addEventListener("load", styleArchiveFrame);
     if (archiveRefreshBtn && archiveFrame) {
       archiveRefreshBtn.addEventListener("click", function () {
         archiveRefreshBtn.disabled = true;
-        archiveFrame.addEventListener("load", function onArchiveLoad() {
-          archiveRefreshBtn.disabled = false;
-          archiveFrame.removeEventListener("load", onArchiveLoad);
-        });
-        archiveFrame.src = archiveFrame.getAttribute("src");
+        loadArchiveFrame(true);
       });
     }
     archiveModal.querySelectorAll("[data-archive-close]").forEach(function (button) {
@@ -229,9 +319,9 @@
   var fileTokenRe = /^filel\s+(\S+)(?:\s+(.*))?$/;
 
   var IMG_SIDE_CLASSES = {
-    imgl: "story-inline-img-left",
-    imgr: "story-inline-img-right",
-    imgc: "story-inline-img-center"
+    imgl: "story-inline-fig-left",
+    imgr: "story-inline-fig-right",
+    imgc: "story-inline-fig-center"
   };
 
   function imageFilenameFromUrl(url) {
@@ -240,10 +330,18 @@
     return parts[parts.length - 1] || url;
   }
 
+  /* The description typed after the URL is shown beneath the picture, like
+     the banner description. With no description the file name is only used
+     for the alt attribute and no caption is printed. Mirrors
+     _render_inline_image in BLOG/views.py. */
   function renderInlineImage(direction, url, altText) {
-    var alt = (altText || "").trim() || imageFilenameFromUrl(url);
-    var sideClass = IMG_SIDE_CLASSES[direction] || "story-inline-img-left";
-    return '<img class="story-inline-img ' + sideClass + '" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">';
+    var caption = (altText || "").trim();
+    var alt = caption || imageFilenameFromUrl(url);
+    var figClass = IMG_SIDE_CLASSES[direction] || "story-inline-fig-left";
+    return '<figure class="story-inline-fig ' + figClass + '">' +
+      '<img class="story-inline-img" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">' +
+      (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
+      "</figure>";
   }
 
   function renderInlineFile(url, displayText) {
@@ -400,7 +498,7 @@
     pendingPublish = pending;
     publishBtn.disabled = pending;
     publishBtn.classList.toggle("is-pending", pending);
-    publishBtn.textContent = pending ? "Publishing..." : "Publish story";
+    publishBtn.textContent = pending ? "Publishing..." : "Publish";
   }
 
   /* ---------- validation dialog ----------
@@ -413,9 +511,10 @@
 
   function closeModal() {
     if (!modal) return;
-    modal.hidden = true;
+    hideDialog(modal);
     var focusTarget = modalEditTarget || modalReturnFocus;
-    if (focusTarget && focusTarget.focus) focusTarget.focus();
+    if (focusTarget) setView("write");
+    if (focusTarget && focusTarget.focus) focusTarget.focus({ preventScroll: true });
     modalEditTarget = null;
     modalReturnFocus = null;
   }
@@ -440,8 +539,8 @@
     modalQuestion.textContent = options.askToPost ? "Do you still want to post this story now?" : "";
     modalConfirmBtn.hidden = !options.askToPost;
     modalEditBtn.textContent = options.askToPost ? "No, let me edit" : "Back to editing";
-    modal.hidden = false;
-    modalEditBtn.focus();
+    showDialog(modal);
+    modalEditBtn.focus({ preventScroll: true });
   }
 
   if (modal) {
@@ -536,16 +635,19 @@
 
     if (!headingInput.value.trim()) {
       toast("You Forgot To Add Heading", "error");
+      setView("write");
       headingInput.focus();
       return;
     }
     if (!categorySelect.value) {
       toast("Select a category for the story.", "error");
+      setView("write");
       categorySelect.focus();
       return;
     }
     if (!contentInput.value.trim()) {
       toast("The story content cannot be empty.", "error");
+      setView("write");
       contentInput.focus();
       return;
     }
@@ -613,7 +715,7 @@
   function buildGuideText() {
     var guide = shell.querySelector("[data-format-guide]");
     if (!guide) return "";
-    var out = ["FORMATTING GUIDE", "None of this is required. A story written as plain paragraphs is fine."];
+    var out = ["FORMATTING GUIDE", "Follow the review checks before you publish. The formatting codes are optional but help segment the article for search engines."];
     guide.querySelectorAll("[data-guide-section]").forEach(function (section) {
       out.push("", section.getAttribute("data-guide-section").toUpperCase());
       section.querySelectorAll("[data-guide-item]").forEach(function (item) {
@@ -640,11 +742,13 @@
     var copyResetTimer = null;
     guideCopyBtn.addEventListener("click", function () {
       var text = buildGuideText();
+      var copyLabel = guideCopyBtn.getAttribute("data-label") || guideCopyBtn.textContent;
+      guideCopyBtn.setAttribute("data-label", copyLabel);
       function showCopied(ok) {
         guideCopyBtn.textContent = ok ? "Copied" : "Copy failed";
-                if (copyResetTimer) window.clearTimeout(copyResetTimer);
+        if (copyResetTimer) window.clearTimeout(copyResetTimer);
         copyResetTimer = window.setTimeout(function () {
-          guideCopyBtn.textContent = "Copy All";
+          guideCopyBtn.textContent = copyLabel;
         }, 1800);
       }
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -714,6 +818,57 @@
     });
   }
 
+  /* ---------- mobile: Write / Preview tabs ----------
+     On a phone only one pane shows at a time, so the author never scrolls
+     past a long preview to reach the form. Desktop keeps both panes. */
+  function setView(view) {
+    if (!MOBILE_QUERY.matches || shell.getAttribute("data-view") === view) return;
+    shell.setAttribute("data-view", view);
+    tabButtons.forEach(function (tab) {
+      var active = tab.getAttribute("data-editor-tab") === view;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (view === "preview") renderPreview();
+    var top = shell.getBoundingClientRect().top + window.pageYOffset;
+    if (window.pageYOffset > top) window.scrollTo({ top: top, behavior: "smooth" });
+  }
+
+  tabButtons.forEach(function (tab) {
+    tab.addEventListener("click", function () { setView(tab.getAttribute("data-editor-tab")); });
+  });
+
+  /* the sticky insert bar sits right under the sticky toolbar */
+  function syncToolbarHeight() {
+    if (toolbarEl) shell.style.setProperty("--editor-toolbar-h", toolbarEl.offsetHeight + "px");
+  }
+  syncToolbarHeight();
+  if (window.ResizeObserver && toolbarEl) new ResizeObserver(syncToolbarHeight).observe(toolbarEl);
+  window.addEventListener("resize", syncToolbarHeight);
+
+  /* the textarea grows with its text on small screens (page scroll only) */
+  function autosizeContent() {
+    if (!MOBILE_QUERY.matches) { contentInput.style.height = ""; return; }
+    contentInput.style.height = "auto";
+    contentInput.style.height = contentInput.scrollHeight + 2 + "px";
+  }
+  contentInput.addEventListener("input", autosizeContent);
+  if (MOBILE_QUERY.addEventListener) MOBILE_QUERY.addEventListener("change", autosizeContent);
+
+  /* ---------- formatting guide: sits at the top, closed until the author opens it ---------- */
+  function setGuideOpen(open) {
+    if (!guideEl || !guideToggleBtn) return;
+    guideEl.classList.toggle("is-collapsed", !open);
+    guideToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    guideToggleBtn.textContent = open ? "Hide guide" : "Read before publishing";
+  }
+  if (guideToggleBtn) {
+    guideToggleBtn.addEventListener("click", function () {
+      setGuideOpen(guideEl.classList.contains("is-collapsed"));
+    });
+    setGuideOpen(false);
+  }
+
   /* ---------- wire up + reveal ---------- */
   headingInput.addEventListener("input", function () {
     headingInput.classList.remove("is-error");
@@ -730,6 +885,7 @@
   }
 
   restoreDraft();
+  autosizeContent();
 
   renderPreview();
   applyPreviewState(shell.classList.contains("preview-off"));

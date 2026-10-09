@@ -36,12 +36,12 @@ URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 #   DOCS/NEWS_CONTENT_CONVENTION.MD).
 IMG_TOKEN_RE = re.compile(r"^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$")
 
-#   Which floated/blocking CSS class each keyword above renders with -- see
-#   _render_inline_image below.
-IMG_SIDE_CLASSES = {
-    "imgl": "story-inline-img-left",
-    "imgr": "story-inline-img-right",
-    "imgc": "story-inline-img-center",
+#   Which floated/blocking CSS class each keyword above puts on the <figure>
+#   that wraps the picture and its caption -- see _render_inline_image below.
+IMG_FIG_CLASSES = {
+    "imgl": "story-inline-fig-left",
+    "imgr": "story-inline-fig-right",
+    "imgc": "story-inline-fig-center",
 }
 
 #   INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
@@ -93,11 +93,17 @@ def _archive_dimensions_for_url(url):
 
 
 def _render_inline_image(direction, url, alt_text):
-    """Build the inline <img> for an imgl/imgr/imgc token. Always smaller
+    """Build the inline <figure> for an imgl/imgr/imgc token. Always smaller
     than the top-level hero image. imgl/imgr float left/right so
     surrounding text wraps it; imgc is centered and blocking -- it sits on
     its own line and nothing wraps around it, it is just kept smaller than
     the hero image the same way imgl/imgr are.
+
+    Caption: when the author typed alt text after the URL, it is shown
+    beneath the picture in a <figcaption>, the same way the headline image
+    description shows under the banner. When no alt text was typed the file
+    name is still used for the `alt` attribute (accessibility), but it is
+    never printed as a caption.
 
     Width/height: if `url` is a picture from /archive/, its real, stored
     size (see _archive_dimensions_for_url above) is rendered straight onto
@@ -107,12 +113,14 @@ def _render_inline_image(direction, url, alt_text):
     pasted from outside the project, where no size is known ahead of time)
     still gets a size: a tiny inline `onload` sets width/height from the
     image's own natural size once it has actually loaded, which is the
-    only way to know it without one. Either way the CSS on `.story-inline-img`
-    (max-width/max-height) is what actually caps the on-page size -- these
-    attributes are about reserving space and giving the browser real
-    numbers to shrink from, not about overriding that cap."""
-    alt = (alt_text or "").strip() or _image_filename_from_url(url)
-    side_class = IMG_SIDE_CLASSES.get(direction, "story-inline-img-left")
+    only way to know it without one. Either way the CSS on `.story-inline-fig`
+    (max-width) and `.story-inline-img` (max-height) is what actually caps
+    the on-page size -- these attributes are about reserving space and
+    giving the browser real numbers to shrink from, not about overriding
+    that cap."""
+    caption = (alt_text or "").strip()
+    alt = caption or _image_filename_from_url(url)
+    fig_class = IMG_FIG_CLASSES.get(direction, "story-inline-fig-left")
     safe_url = html.escape(url, quote=True)
     safe_alt = html.escape(alt, quote=True)
 
@@ -124,9 +132,12 @@ def _render_inline_image(direction, url, alt_text):
         size_attrs = ""
         onload_attr = ' onload="if(!this.getAttribute(\'width\')){this.width=this.naturalWidth;this.height=this.naturalHeight;}"'
 
+    caption_html = f"<figcaption>{html.escape(caption)}</figcaption>" if caption else ""
     return (
-        f'<img class="story-inline-img {side_class}" src="{safe_url}" alt="{safe_alt}"'
+        f'<figure class="story-inline-fig {fig_class}">'
+        f'<img class="story-inline-img" src="{safe_url}" alt="{safe_alt}"'
         f'{size_attrs} loading="lazy"{onload_attr}>'
+        f"{caption_html}</figure>"
     )
 
 

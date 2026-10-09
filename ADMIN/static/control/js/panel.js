@@ -153,6 +153,109 @@
     cards.forEach(function (card) { spy.observe(card); });
   })();
 
+  /* ---------- label bubble for icon-only buttons ----------
+     One shared bubble, positioned with fixed coordinates so no card or the
+     scrolling nav can clip it. Shown on mouse hover, keyboard focus and, for
+     touch/pen, on tap (short timeout, since touch has no hover). The text is
+     the button's own aria-label, so it always matches what a screen reader
+     says. The native title is moved to data-tip so the browser's own tooltip
+     does not appear on top of it. */
+  (function () {
+    var shell = document.querySelector("[data-panel]");
+    if (!shell) return;
+
+    var bubble = document.createElement("div");
+    bubble.className = "panel-tip";
+    bubble.setAttribute("role", "presentation");
+    bubble.setAttribute("aria-hidden", "true");
+    document.body.appendChild(bubble);
+
+    var current = null;
+    var hideTimer = null;
+    var SELECTOR = "button[aria-label], a[aria-label]";
+
+    function labelOf(node) {
+      if (node.hasAttribute("title")) {
+        node.dataset.tip = node.getAttribute("title");
+        node.removeAttribute("title");
+      }
+      /* the collapse button keeps its short title word ("Collapse") in sync
+         with aria-label, so prefer aria-label when it is the longer, fuller one */
+      return node.getAttribute("aria-label") || node.dataset.tip || "";
+    }
+
+    function place(node) {
+      var rect = node.getBoundingClientRect();
+      var tipRect = bubble.getBoundingClientRect();
+      var margin = 8;
+      var left = rect.left + rect.width / 2 - tipRect.width / 2;
+      left = Math.max(margin, Math.min(left, window.innerWidth - tipRect.width - margin));
+      var above = rect.top - tipRect.height - 8;
+      var below = rect.bottom + 8;
+      var top = above >= margin ? above : below;
+      bubble.dataset.side = above >= margin ? "above" : "below";
+      bubble.style.left = Math.round(left) + "px";
+      bubble.style.top = Math.round(top) + "px";
+    }
+
+    function show(node, autoHideMs) {
+      var text = labelOf(node);
+      if (!text) return;
+      window.clearTimeout(hideTimer);
+      current = node;
+      bubble.textContent = text;
+      bubble.classList.add("is-on");
+      place(node);
+      if (autoHideMs) hideTimer = window.setTimeout(hide, autoHideMs);
+    }
+
+    function hide() {
+      window.clearTimeout(hideTimer);
+      current = null;
+      bubble.classList.remove("is-on");
+    }
+
+    shell.addEventListener("pointerover", function (event) {
+      if (event.pointerType !== "mouse") return;
+      var node = event.target.closest(SELECTOR);
+      if (node && shell.contains(node)) show(node);
+    });
+    shell.addEventListener("pointerout", function (event) {
+      if (event.pointerType !== "mouse") return;
+      var node = event.target.closest(SELECTOR);
+      if (node && node === current && !node.contains(event.relatedTarget)) hide();
+    });
+
+    /* touch / pen: no hover exists, so a tap shows the label for a moment */
+    shell.addEventListener("pointerdown", function (event) {
+      if (event.pointerType === "mouse") return;
+      var node = event.target.closest(SELECTOR);
+      if (node && shell.contains(node)) show(node, 1800);
+    });
+
+    /* keyboard focus (not the focus a mouse click leaves behind) */
+    shell.addEventListener("focusin", function (event) {
+      var node = event.target.closest(SELECTOR);
+      if (node && node.matches(":focus-visible")) show(node);
+    });
+    shell.addEventListener("focusout", function (event) {
+      if (event.target.closest(SELECTOR) === current) hide();
+    });
+
+    /* a label that is showing while the user acts must not go stale or drift */
+    shell.addEventListener("click", function (event) {
+      var node = event.target.closest(SELECTOR);
+      if (node && node === current) window.setTimeout(function () {
+        if (current !== node) return;
+        bubble.textContent = labelOf(node);   /* e.g. Collapse becomes Expand */
+        place(node);
+      }, 0);
+    });
+    window.addEventListener("scroll", hide, { passive: true });
+    window.addEventListener("resize", hide);
+    document.addEventListener("keydown", function (event) { if (event.key === "Escape") hide(); });
+  })();
+
   /* ---------- lazy avatar images ---------- */
   var lazyObserver = null;
   function observeLazyImages(root) {

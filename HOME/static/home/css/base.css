@@ -528,17 +528,6 @@ html.auth-gate-locked { overflow: hidden; }
 .teaser-slide-inner { position: relative; z-index: 1; max-width: 100%; }
 .teaser-heading, .teaser-placeholder { color: #FAF8F3; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; margin: 0; }
 .teaser-body { color: rgba(250,248,243,0.75); font-size: 0.85rem; margin: 8px 0 0; }
-a.teaser-slide { color: inherit; text-decoration: none; }
-
-/* Image adverts. Desktop: the caption sits as a bar along the bottom of the
-   picture, paper as the background and ink as the text. Mobile: picture only. */
-.teaser-slide.has-image { align-items: flex-end; padding: 0; }
-.teaser-slide.has-image .teaser-slide-inner {
-  width: 100%; text-align: left; padding: 14px 16px;
-  background: var(--paper); border-top: 2px solid var(--brand-deep);
-}
-.teaser-slide.has-image .teaser-heading { color: var(--ink); font-size: 1rem; }
-.teaser-slide.has-image .teaser-body { color: var(--ink-soft); margin-top: 4px; }
 
 @media (max-width: 899px) {
   .hero-teaser {
@@ -560,7 +549,6 @@ a.teaser-slide { color: inherit; text-decoration: none; }
   .teaser-slide.is-active { flex: 0 0 46%; opacity: 1; }
   .teaser-heading, .teaser-placeholder { font-size: 0.92rem; }
   .teaser-body { display: none; }
-  .teaser-slide.has-image .teaser-slide-inner { display: none; }
 }
 
 /* ---------- Home tickers ---------- */
@@ -1032,6 +1020,40 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 @media (max-width: 599.98px) {
   .story-inline-img { max-width: min(55%, 200px); max-height: 190px; }
   .story-inline-img-center { max-width: min(85%, 320px); max-height: 260px; }
+}
+/*  Inline image figure (imgl / imgr / imgc). The <figure> carries the float,
+    the frame and the width cap; the picture inside just fills it. The
+    <figcaption> shows the author's image description beneath the picture,
+    styled like the banner caption (.story-hero-figure figcaption). The plain
+    .story-inline-img-* rules above are still used by the edit page preview. */
+.story-inline-fig {
+  margin: 4px 0 12px; width: fit-content; max-width: min(50%, 300px);
+  border: 1px solid var(--line); border-radius: 5px; overflow: hidden;
+  background: var(--paper); box-shadow: var(--shadow-card);
+}
+.story-inline-fig > .story-inline-img {
+  float: none; display: block; width: auto; max-width: 100%; max-height: 260px; height: auto;
+  margin: 0 auto; border: 0; border-radius: 0; box-shadow: none;
+}
+.story-inline-fig figcaption {
+  padding: 7px 10px 8px; font-size: 0.78rem; line-height: 1.4; color: var(--ink-soft);
+  font-style: italic; text-align: left; text-justify: auto; background: var(--paper);
+  border-top: 1px solid var(--line); overflow-wrap: anywhere;
+}
+.story-inline-fig-left { float: left; margin-right: 18px; }
+.story-inline-fig-right { float: right; margin-left: 18px; }
+.story-inline-fig-right figcaption { text-align: right; }
+.story-inline-fig-center {
+  float: none; clear: both; margin: 14px auto; max-width: min(65%, 460px);
+}
+.story-inline-fig-center > .story-inline-img { max-height: 320px; }
+.story-inline-fig-center figcaption { text-align: center; }
+@media (max-width: 599.98px) {
+  .story-inline-fig { max-width: min(55%, 200px); }
+  .story-inline-fig > .story-inline-img { max-height: 190px; }
+  .story-inline-fig-center { max-width: min(85%, 320px); }
+  .story-inline-fig-center > .story-inline-img { max-height: 260px; }
+  .story-inline-fig figcaption { font-size: 0.72rem; padding: 6px 8px 7px; }
 }
 /*  filel: inline downloadable file link (never floated -- a file has no
     picture to wrap text around, see DOCS/NEWS_CONTENT_CONVENTION.MD). Kept
