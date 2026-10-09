@@ -82,7 +82,9 @@
   gap: 24px;
 }
 
+.profile-side,
 .profile-summary,
+.profile-prefs,
 .profile-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -198,13 +200,71 @@
   }
 }
 
-/*  NEVER clamp this aside to the viewport: the staff record controls and the
-    logout-all block sit below one screen of content, and a sticky box with
-    overflow hidden can never reveal its bottom. */
+/*  SIDE NAV LAYOUT
+    Desktop (900px and up): .profile-side is ONE sticky card with its own
+    scrollbar, so the long settings list scrolls inside the aside instead of
+    riding along with the page. overflow-y: auto (never hidden) means the logout
+    block at the bottom can always be scrolled to. .profile-summary dissolves
+    (display: contents) so its rows and .profile-prefs share one flex column and
+    keep the original on screen order through `order`.
+    Mobile (under 900px): .profile-side dissolves instead. .profile-summary stays
+    on top as its own card and .profile-prefs (toggles, Joined, Delete Account)
+    drops below the main content. */
+.profile-side {
+  display: contents;
+}
+
+.profile-summary,
+.profile-prefs {
+  padding: 18px 18px 20px;
+  min-width: 0;
+}
+
 .profile-summary {
   align-self: start;
   height: auto;
-  padding: 18px 18px 20px;
+}
+
+.is-desktop-only {
+  display: none !important;
+}
+
+.profile-prefs-extra {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+}
+
+.profile-prefs-extra .profile-joined-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-prefs-extra .profile-joined-row span {
+  color: var(--slate);
+  font-size: 0.85rem;
+}
+
+.profile-prefs-extra .profile-joined-row strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.profile-delete-account-btn-block {
+  width: 100%;
+  min-height: 42px;
+}
+
+.profile-prefs-head {
+  margin-bottom: 4px;
+}
+
+.profile-prefs-head + .profile-setting-block {
+  margin-top: 12px;
 }
 
 .profile-identity-row {
@@ -627,10 +687,6 @@
   .profile-layout {
     grid-template-columns: minmax(290px, 330px) minmax(0, 1fr);
     align-items: start;
-  }
-
-  .profile-summary {
-    padding: 22px 20px;
   }
 
   .profile-identity-row {
@@ -1590,3 +1646,111 @@ html.avatar-crop-open {
 .profile-unfollow-btn:disabled { opacity: 0.6; cursor: wait; }
 .profile-list li[data-following-item] { transition: opacity 0.2s ease, transform 0.2s ease; }
 .profile-list li[data-following-item].is-removing { opacity: 0; transform: translateX(14px); }
+
+/* =====================================================================
+   SIDE NAV (see the SIDE NAV LAYOUT note near .profile-side)
+   ===================================================================== */
+@media (min-width: 900px) {
+  .profile-side {
+    display: flex;
+    flex-direction: column;
+    align-self: start;
+    position: sticky;
+    top: calc(var(--header-h) + 16px);
+    max-height: calc(100vh - var(--header-h) - 32px);
+    max-height: calc(100dvh - var(--header-h) - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding: 22px 20px;
+  }
+
+  .profile-summary {
+    display: contents;
+  }
+
+  .profile-identity-row { order: 1; }
+  .profile-info-list { order: 2; }
+  .profile-prefs { order: 3; }
+  .profile-image-actions { order: 4; }
+  .profile-logout-all-block { order: 5; }
+
+  .profile-prefs {
+    background: none;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .profile-prefs-head,
+  .profile-prefs-extra {
+    display: none;
+  }
+
+  .profile-prefs-head + .profile-setting-block {
+    margin-top: 20px;
+  }
+
+  .is-desktop-only {
+    display: flex !important;
+  }
+
+  .profile-info-list .profile-joined-row.is-desktop-only {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .profile-main { order: 1; }
+  .profile-prefs { order: 2; }
+}
+
+/* ---------- list loading: in flow five row skeleton + reserved pager ---------- */
+.profile-list-skeleton.is-flow {
+  position: static;
+  inset: auto;
+  padding: 0;
+  gap: 12px;
+  margin-bottom: 8px;
+  background: none;
+}
+
+.profile-list-skeleton.is-flow .profile-list-skeleton-row {
+  min-height: var(--profile-skeleton-row, 70px);
+  padding: 12px 0;
+}
+
+.profile-list-skeleton-pager {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 1.5rem;
+}
+
+.profile-list-skeleton-pager span {
+  display: block;
+  width: 2.65rem;
+  height: 2.65rem;
+  background: linear-gradient(100deg, var(--line) 20%, var(--paper) 42%, var(--line) 64%);
+  background-size: 220% 100%;
+  animation: profile-skeleton-shimmer 1.55s ease-in-out infinite;
+}
+
+.profile-bookmark-shell.is-searching > .profile-list,
+.profile-bookmark-shell.is-searching > .empty-copy {
+  opacity: 0.5;
+  transition: opacity 160ms ease;
+}
+
+.profile-bookmark-shell.is-paginating {
+  min-height: 0;
+  cursor: progress;
+}
+
+.profile-list li[data-published-story-item] { transition: opacity 0.2s ease, transform 0.2s ease; }
+.profile-list li[data-published-story-item].is-removing { opacity: 0; transform: translateX(14px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-list-skeleton-pager span { animation: none; }
+}

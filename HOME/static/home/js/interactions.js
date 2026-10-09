@@ -950,20 +950,27 @@
           return;
         }
 
-        var item = form.closest("[data-published-story-item]");
-        if (item) item.remove();
-
-        var list = document.getElementById("profile-published-list");
-        if (list && !list.querySelector("[data-published-story-item]")) {
-          list.innerHTML = '<p class="empty-copy">No stories published yet.</p>';
-        }
-
-        var total = document.querySelector("#published-stories .panel-tag");
-        if (total) {
-          var count = Number((total.textContent || "").trim().split(" ")[0]);
-          if (!isNaN(count)) total.textContent = Math.max(0, count - 1) + " total";
-        }
         toast(extractDetail(result.text, "Story deleted."));
+
+        /*  A delete changes what sits on every page after it, so the page is
+            asked for again instead of patched in the browser: same page, same
+            search text. The server clamps a page that no longer exists to the
+            last one, and the shared skeleton in profile.html holds the height
+            while it loads. The "N total" tag comes back out of band. */
+        var item = form.closest("[data-published-story-item]");
+        var list = document.getElementById("profile-published-list");
+        var search = document.getElementById("published-search");
+        var pageNode = list && list.querySelector("[data-published-page]");
+        var page = pageNode ? pageNode.getAttribute("data-published-page") : "1";
+        var query = search ? search.value.trim() : "";
+        if (item) item.classList.add("is-removing");
+        setTimeout(function () {
+          if (list && window.htmx && list.dataset.publishedEndpoint) {
+            window.htmx.ajax("GET", list.dataset.publishedEndpoint + "?page=" + encodeURIComponent(page) + "&q=" + encodeURIComponent(query), { target: "#profile-published-list", swap: "innerHTML" });
+          } else if (item) {
+            item.remove();
+          }
+        }, 220);
       })
       .catch(function () {
         button.dataset.pending = "false";

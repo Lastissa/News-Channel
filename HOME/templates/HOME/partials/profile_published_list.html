@@ -1,4 +1,6 @@
 {% comment %} Body of #profile-published-list. Rendered on first paint by profile.html and re-rendered by home:profile_published for search and paging. {% endcomment %}
+<span hidden data-published-page="{{ stories_page_obj.number }}"></span>
+{% if oob %}<span class="panel-tag" id="published-count-tag" hx-swap-oob="true">{{ published_total }} total</span>{% endif %}
 {% if published_stories %}
 <ul class="profile-list">
   {% for blog in published_stories %}

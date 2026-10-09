@@ -16,7 +16,9 @@
   {% endif %} {% endcomment %}
 
   <div class="profile-layout">
-    <aside class="profile-summary" aria-label="Profile settings">
+    {#  .profile-side is the sticky, self scrolling side nav on desktop. On mobile it dissolves (display: contents): .profile-summary stays on top and .profile-prefs drops under the main content. #}
+    <aside class="profile-side" aria-label="Profile settings">
+      <div class="profile-summary">
       <div class="profile-identity-row">
         <div class="profile-avatar-wrap">
           <img src="{{ user.profile_img}}" alt="{{ user.email }} avatar" class="profile-avatar" onerror="this.onerror=null;this.src='/static/404.jpg';">
@@ -31,12 +33,12 @@
       </div>
 
       <div class="profile-info-list">
-        <div><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>
+        <div class="profile-joined-row is-desktop-only"><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>
         <div class="profile-last-login-row">
           <span>Last login</span>
           <strong>{{ user.last_login|date:"M d, Y H:i"|default:"Not recorded" }}</strong>
           {% if not user.is_superuser %}
-            <button type="button" class="profile-delete-account-btn"
+            <button type="button" class="profile-delete-account-btn is-desktop-only"
                     hx-get="{% url 'home:profile_delete_placard' %}?step=1"
                     hx-target="[data-delete-overlay]"
                     hx-swap="innerHTML">Delete Account</button>
@@ -45,6 +47,35 @@
         <div><span>Active sessions</span><strong>{{ user_sessions|length }}</strong></div>
       </div>
 
+      <div class="profile-actions profile-image-actions">
+        <div class="profile-image-actions-row">
+          <button type="button" class="profile-action-btn upload-avatar-btn avatar-icon-btn" data-upload-profile-image aria-label="Upload avatar (file)" title="Upload avatar (file)">
+            <svg class="avatar-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="M17 8l-5-5-5 5" />
+              <path d="M12 3v12" />
+            </svg>
+            <span class="avatar-btn-label">Upload avatar (file)</span>
+          </button>
+        </div>
+        <input id="profile-avatar-file" type="file" name="image_file" data-profile-avatar-file accept="image/jpeg,image/png" hidden>
+      </div>
+
+      <!--  LOG OUT ALL SESSIONS: available to every signed in user. Ends every
+            session the account holds, including the one that clicked, so the
+            page then redirects to the login page. -->
+      <div class="profile-setting-block profile-logout-all-block">
+        <button type="button" class="profile-action-btn logout-all-btn"
+                data-logout-all-sessions
+                data-endpoint="{% url 'home:profile_logout_all' %}">
+          Log out all sessions
+        </button>
+        <p class="staff-record-feedback" data-logout-all-feedback role="status" aria-live="polite"></p>
+      </div>
+      </div>
+
+      <div class="profile-prefs">
+        <div class="panel-header profile-prefs-head"><h3>Account settings</h3></div>
       <div class="profile-setting-block">
         <div class="setting-row">
           <div class="setting-copy">
@@ -137,30 +168,16 @@
         </div>
       </div>
 
-      <div class="profile-actions profile-image-actions">
-        <div class="profile-image-actions-row">
-          <button type="button" class="profile-action-btn upload-avatar-btn avatar-icon-btn" data-upload-profile-image aria-label="Upload avatar (file)" title="Upload avatar (file)">
-            <svg class="avatar-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <path d="M17 8l-5-5-5 5" />
-              <path d="M12 3v12" />
-            </svg>
-            <span class="avatar-btn-label">Upload avatar (file)</span>
-          </button>
-        </div>
-        <input id="profile-avatar-file" type="file" name="image_file" data-profile-avatar-file accept="image/jpeg,image/png" hidden>
+      {#  MOBILE ONLY: Joined and Delete Account ride at the very bottom of the page, under the toggles. The desktop copies above stay hidden on mobile and these stay hidden on desktop (profile.css). #}
+      <div class="profile-prefs-extra">
+        <div class="profile-joined-row"><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>
+        {% if not user.is_superuser %}
+          <button type="button" class="profile-delete-account-btn profile-delete-account-btn-block"
+                  hx-get="{% url 'home:profile_delete_placard' %}?step=1"
+                  hx-target="[data-delete-overlay]"
+                  hx-swap="innerHTML">Delete Account</button>
+        {% endif %}
       </div>
-
-      <!--  LOG OUT ALL SESSIONS: available to every signed in user. Ends every
-            session the account holds, including the one that clicked, so the
-            page then redirects to the login page. -->
-      <div class="profile-setting-block profile-logout-all-block">
-        <button type="button" class="profile-action-btn logout-all-btn"
-                data-logout-all-sessions
-                data-endpoint="{% url 'home:profile_logout_all' %}">
-          Log out all sessions
-        </button>
-        <p class="staff-record-feedback" data-logout-all-feedback role="status" aria-live="polite"></p>
       </div>
     </aside>
 
@@ -267,7 +284,7 @@
         <section class="profile-card profile-panel" id="published-stories">
           <div class="panel-header">
             <h3>Published stories</h3>
-            <span class="panel-tag">{{ stories_page_obj.paginator.count }} total</span>
+            <span class="panel-tag" id="published-count-tag">{{ stories_page_obj.paginator.count }} total</span>
           </div>
           <div class="profile-search">
             <label for="published-search">Search published stories</label>
@@ -275,7 +292,7 @@
                    hx-get="{% url 'home:profile_published' %}" hx-trigger="input changed delay:300ms, search"
                    hx-target="#profile-published-list" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#profile-published-list">
           </div>
-          <div id="profile-published-list" class="profile-bookmark-shell" aria-live="polite">
+          <div id="profile-published-list" class="profile-bookmark-shell" data-published-endpoint="{% url 'home:profile_published' %}" aria-live="polite">
             {% include "HOME/partials/profile_published_list.html" %}
           </div>
         </section>
@@ -443,22 +460,49 @@
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script>
     (function () {
+      /*  PROFILE LIST LOADING (same idea as the archive gallery pagination).
+          Every HTMX list in a .profile-bookmark-shell (published, bookmarks,
+          history, following, followers) goes through here:
+            1. the shell's height is locked to at least FIVE skeleton rows plus
+               the pager, so the page below never jumps while the request runs;
+            2. the rows are replaced by a five row skeleton (page size is 5);
+            3. once the new page lands the height eases to the real height, and
+               if the card heading ended up above the screen it is scrolled back
+               into view, so focus stays on the list that was just used.
+          Typing in a search box only dims the rows, like the archive. */
+      var SKELETON_ROWS = 5;
+      var ROW_HEIGHT = 57;      /* overlay skeleton row (comments list) */
+      var FLOW_ROW_HEIGHT = 70; /* fallback real row height: 12px padding x2 + two text lines */
+      var FLOW_ROW_GAP = 12;    /* .profile-list gap */
+      var FLOW_LIST_MARGIN = 8; /* .profile-list bottom margin */
+      var PAGER_HEIGHT = 66;    /* pager buttons (42px) + their 24px top margin */
+
+      function skeletonRows(count) {
+        var rows = "";
+        for (var i = 0; i < count; i += 1) {
+          rows += '<div class="profile-list-skeleton-row">' +
+            '<span class="profile-list-skeleton-copy"><span></span><span></span></span>' +
+            '<span class="profile-list-skeleton-action"></span></div>';
+        }
+        return rows;
+      }
+
+      function buildFlowSkeleton() {
+        return '<div class="profile-list-skeleton is-flow" data-profile-skeleton aria-hidden="true">' +
+          skeletonRows(SKELETON_ROWS) + '</div>' +
+          '<div class="profile-list-skeleton-pager" aria-hidden="true"><span></span><span></span><span></span></div>';
+      }
+
+      /*  Helper kept for the comments list, which pages with fetch instead of
+          HTMX and keeps its pager outside the shell: it only overlays rows. */
       function showListSkeleton(target) {
         if (!target || target.querySelector("[data-profile-skeleton]")) return;
-
         var loader = document.createElement("div");
         loader.className = "profile-list-skeleton";
         loader.dataset.profileSkeleton = "";
         loader.setAttribute("aria-hidden", "true");
-        for (var i = 0; i < 3; i += 1) {
-          var row = document.createElement("div");
-          row.className = "profile-list-skeleton-row";
-          row.innerHTML =
-            '<span class="profile-list-skeleton-copy">' +
-            '<span></span><span></span>' +
-            '</span><span class="profile-list-skeleton-action"></span>';
-          loader.appendChild(row);
-        }
+        loader.innerHTML = skeletonRows(SKELETON_ROWS);
+        target.style.minHeight = (SKELETON_ROWS * ROW_HEIGHT) + "px";
         target.appendChild(loader);
       }
 
@@ -466,27 +510,113 @@
         if (!target) return;
         var loader = target.querySelector("[data-profile-skeleton]");
         if (loader) loader.remove();
+        target.style.minHeight = "";
       }
 
-      window.AbuProfileListLoading = {
-        show: showListSkeleton,
-        hide: hideListSkeleton
-      };
+      window.AbuProfileListLoading = { show: showListSkeleton, hide: hideListSkeleton };
+
+      function isShell(node) {
+        return !!(node && node.classList && node.classList.contains("profile-bookmark-shell"));
+      }
+
+      var stash = new WeakMap();   /* shell -> its rows before the skeleton replaced them */
+      var inflight = new WeakMap(); /* shell -> the xhr currently loading into it */
+
+      function headerOffset() {
+        var h = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 64;
+        return h + 16;
+      }
+
+      function settleHeight(shell) {
+        var locked = parseFloat(shell.style.height) || shell.scrollHeight;
+        shell.style.height = "auto";
+        var natural = shell.scrollHeight;
+        shell.style.height = locked + "px";
+        var duration = natural < locked ? 420 : 260;
+        shell.style.transition = "height " + duration + "ms cubic-bezier(0.22, 1, 0.36, 1)";
+        requestAnimationFrame(function () {
+          shell.style.height = natural + "px";
+          window.setTimeout(function () {
+            shell.style.transition = "";
+            shell.style.height = "";
+            shell.style.overflow = "";
+            shell.style.removeProperty("--profile-skeleton-row");
+          }, duration + 40);
+        });
+      }
+
+      function keepCardInView(shell) {
+        var card = shell.closest(".profile-card") || shell;
+        var top = card.getBoundingClientRect().top;
+        if (top < headerOffset()) {
+          window.scrollTo({ top: Math.max(top + window.pageYOffset - headerOffset(), 0), behavior: "smooth" });
+        }
+      }
 
       document.body.addEventListener("htmx:beforeRequest", function (event) {
-        var target = event.detail && event.detail.target;
-        if (target && target.classList.contains("profile-bookmark-shell")) {
-          target.setAttribute("aria-busy", "true");
-          showListSkeleton(target);
+        var shell = event.detail && event.detail.target;
+        if (!isShell(shell)) return;
+
+        var previous = inflight.get(shell);
+        if (previous && previous !== event.detail.xhr) { try { previous.abort(); } catch (err) { /* settled */ } }
+        inflight.set(shell, event.detail.xhr || null);
+        shell.setAttribute("aria-busy", "true");
+
+        var elt = event.detail.elt;
+        if (elt && elt.type === "search") {
+          if (!shell.classList.contains("is-paginating")) shell.classList.add("is-searching");
+          return;
         }
-      });
-      document.body.addEventListener("htmx:afterRequest", function (event) {
-        var target = event.detail && event.detail.target;
-        if (target && target.classList.contains("profile-bookmark-shell")) {
-          hideListSkeleton(target);
-          target.setAttribute("aria-busy", "false");
+
+        if (!shell.classList.contains("is-paginating")) {
+          stash.set(shell, shell.innerHTML);
+          /*  skeleton rows copy the height of a real row on screen right now (they
+              wrap taller on phones), so the skeleton fills the same room a full page does */
+          var sampleRow = shell.querySelector(".profile-list li");
+          var rowHeight = sampleRow ? sampleRow.offsetHeight : FLOW_ROW_HEIGHT;
+          shell.style.setProperty("--profile-skeleton-row", rowHeight + "px");
+          var reserved = SKELETON_ROWS * rowHeight + (SKELETON_ROWS - 1) * FLOW_ROW_GAP + FLOW_LIST_MARGIN + PAGER_HEIGHT;
+          shell.style.height = Math.max(shell.offsetHeight, reserved) + "px";
+          shell.style.overflow = "hidden";
+          shell.classList.add("is-paginating");
         }
+        shell.dataset.scrollAfter = (elt && elt.closest && elt.closest(".story-pagination")) ? "1" : "";
+        shell.innerHTML = buildFlowSkeleton();
       });
+
+      document.body.addEventListener("htmx:afterSwap", function (event) {
+        var shell = event.detail && event.detail.target;
+        if (!isShell(shell)) return;
+        inflight.delete(shell);
+        shell.classList.remove("is-searching");
+        shell.setAttribute("aria-busy", "false");
+        if (!shell.classList.contains("is-paginating")) return;
+        shell.classList.remove("is-paginating");
+        stash.delete(shell);
+        settleHeight(shell);
+        if (shell.dataset.scrollAfter === "1") keepCardInView(shell);
+        shell.dataset.scrollAfter = "";
+      });
+
+      function recover(event) {
+        var shell = event.detail && event.detail.target;
+        if (!isShell(shell)) return;
+        inflight.delete(shell);
+        shell.classList.remove("is-searching");
+        shell.setAttribute("aria-busy", "false");
+        if (shell.classList.contains("is-paginating")) {
+          shell.classList.remove("is-paginating");
+          if (stash.has(shell)) shell.innerHTML = stash.get(shell);
+          stash.delete(shell);
+          shell.style.transition = "";
+          shell.style.height = "";
+          shell.style.overflow = "";
+        }
+        if (typeof window.AbuToast === "function") window.AbuToast("Could not load that page. Try again.", "error");
+      }
+      document.body.addEventListener("htmx:responseError", recover);
+      document.body.addEventListener("htmx:sendError", recover);
+      document.body.addEventListener("htmx:timeout", recover);
     })();
   </script>
   <script>

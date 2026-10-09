@@ -1259,6 +1259,10 @@ class ProfilePublishedView(View):
                 "stories_page_obj": page,
                 "stories_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
                 "search_query": search_query,
+                #   the "N total" tag is swapped out of band after a delete refresh, and it must
+                #   stay the unfiltered total even while the search box is filtering the list
+                "oob": True,
+                "published_total": Blog.objects.filter(author=request.user).count(),
             },
         )
 
