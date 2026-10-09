@@ -21,6 +21,18 @@ AVOID:
 -   minimize rounded border constant usage as round edge borders for buttons & parallelogram shaped borders for label should be considered
 OTHERS:
     -   Remove "made with AI tag"
+## GENERAL PAGE FIX - MOBILE
+-   remove horizontal scrolling
+-   increase tap target size
+-   stop text overflow
+-   simpify form 
+-   buttons in thumb reach
+-   clickable phone numbers
+-   prevent popups covering the entire screen
+-   optimize for slow connection
+-   test on different screen sizes
+-   check for potrait and landscapelanscape mode
+-   eliminate jump while loading
 
 MOST IMPORTANTLY
 -   MAKE NO MISTALE

@@ -218,7 +218,7 @@ def _teaser_items():
             "heading": "Have something to promote? Let’s help you get the word out! Whether it’s your business, product, service, or event, we’d love to help you reach more people.",
             "body": "Tap the image above to reach us and let’s work together!",
             "image": curent_dummy_image[random.randint(0, len_current_dummy - 1)],
-            "url": ""
+            "url": "/"
         }
         for _ in range(TEASER_PLACEHOLDER_COUNT)
             ]

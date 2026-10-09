@@ -115,26 +115,27 @@
                   <h3>Review before you publish</h3>
                   <ol class="fg-rules fg-rules-key">
                     <li data-guide-item="Re-review your content and make sure it aligns with {{ project_name }} guidelines before publishing.">Re-review your content and make sure it aligns with {{ project_name }} guidelines before publishing.</li>
-                    <li data-guide-item="The first paragraph can have at most 70% similarity with the heading. Open with new information, not a copy of the headline.">The first paragraph can have <strong>at most 70% similarity</strong> with the heading. Open with new information, not a copy of the headline.</li>
-                    <li data-guide-item="Provide an image description for the headline image. It is shown beneath the image.">Provide an <strong>image description</strong> for the headline image. It is shown beneath the image.</li>
-                    <li data-guide-item="Keep the content SEO friendly: a clear headline, an opening paragraph that states what happened, who, where and when, and short sections with headings.">Keep the content <strong>SEO friendly</strong>: a clear headline, an opening paragraph that states what happened, who, where and when, and short sections with headings.</li>
-                    <li data-guide-item="Avoid frequent repetition of content in the article. Say each fact once.">Avoid frequent <strong>repetition</strong> of content in the article. Say each fact once.</li>
+                    <li data-guide-item="The first paragraph can have at most 70% similarity with the heading. Open with new information, not a copy of the headline.">The first paragraph can have at most 70% similarity with the heading. Open with new information, not a copy of the headline.</li>
+                    <li data-guide-item="Provide an image description for the headline image. It is shown beneath the image.">Provide an image description for the headline image. It is shown beneath the image.</li>
+                    <li data-guide-item="Keep the content SEO friendly: a clear headline, an opening paragraph that states what happened, with facts ,who, where and/or when and if necessary short sections with heading.">Keep the content SEO friendly: a clear headline, an opening paragraph that states what happened, with facts ,who, where and/or when and if necessary short sections with heading.</li>
+                    <li data-guide-item="Avoid frequent repetition of content in the article. Say each fact once.">Avoid frequent repetition of content in the article. Say each fact once.</li>
+                    <li data-guide-item="Try to Avoid plaigarism in the article.">Try to Avoid plaigarism in the article.</li>
                   </ol>
                 </section>
 
                 <section class="fg-block" data-guide-section="Rules checked when you publish">
                   <h3>Rules checked when you publish</h3>
                   <ol class="fg-rules">
-                    <li data-guide-item="Do not begin the content with a # heading that repeats the headline. The headline already appears above the story.">Do not begin the content with a <code>#</code> heading that repeats the headline. The headline already appears above the story.</li>
+                    <li data-guide-item="Do not begin the content with a # heading that repeats the headline. The headline already appears above the story.">Do not begin the content with a '#' heading that repeats the headline. The headline already appears above the story.</li>
                     <li data-guide-item="The story needs real content, not just a heading or filler. A very short story may trigger a warning; you can edit it or confirm that it contains enough information to post.">The story needs real content, not just a heading or filler. A very short story may trigger a warning; you can edit it or confirm that it contains enough information to post.</li>
-                    <li data-guide-item="Use headings for real sections. Empty ones like # or ## are rejected.">Use headings for real sections. Empty ones like <code>#</code> or <code>##</code> are rejected.</li>
-                    <li data-guide-item="Do not use lines of symbols such as ------ or ====== or ******. Leave a blank line instead.">Do not use lines of symbols such as <code>------</code> or <code>======</code> or <code>******</code>. Leave a blank line instead.</li>
+                    <li data-guide-item="Use headings for real sections. Empty ones like # or ## are rejected.">Use headings for real sections. Empty ones like '#' or '##' are rejected.</li>
+                    <li data-guide-item="Do not use lines of symbols such as ------ or ====== or ******. Leave a blank line instead.">Do not use lines of symbols such as '------' or '======' or '******' for content sepration. Leave a blank line instead.</li>
                     <li data-guide-item="Start with a normal paragraph where possible. Markdown headings are allowed for real sections, but do not repeat the main headline at the start of the story.">Start with a normal paragraph where possible. Markdown headings are allowed for real sections, but do not repeat the main headline at the start of the story.</li>
                   </ol>
                 </section>
 
                 <section class="fg-block" data-guide-section="Layout">
-                  <h3>Layout</h3>
+                  <h3>Layout GUIDE</h3>
                   <dl class="fg-table">
                     <div class="fg-row" data-guide-item="Blank line = new paragraph"><dt>Blank line</dt><dd>Starts a new paragraph</dd></div>
                     <div class="fg-row" data-guide-item="# Text = subheading"><dt><code>#</code> Text</dt><dd>Subheading</dd></div>
@@ -305,9 +306,6 @@
     }
     window.editorToast = lightToast;
 
-    if (window.matchMedia && window.matchMedia("(max-width: 899.98px)").matches) {
-      lightToast("Best experience on desktop");
-    }
 
     var css = document.createElement("link");
     css.rel = "stylesheet";
