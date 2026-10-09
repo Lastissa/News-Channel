@@ -5,6 +5,11 @@
   {% include "HOME/partials/trending_rail.html" %}
 </div>
 {% include "HOME/partials/continue_rail.html" %}
+{% elif forloop.first and not is_filtered %}
+{% include "HOME/partials/_story_card.html" with post=post %}
+<div class="trending-wide">
+  {% include "HOME/partials/trending_rail.html" %}
+</div>
 {% else %}
 {% include "HOME/partials/_story_card.html" with post=post %}
 {% endif %}

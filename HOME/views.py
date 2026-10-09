@@ -531,7 +531,7 @@ class AddNewsView(View):
         ping_indexnow(story_url)
         # invalidate the home_page_blogs so new article can be get
         invalidate_cache("home_page_blogs")
-
+        #TODO: send email of new news alert to all users who have news alert on and they follow the author + users who do not follow anyone, run in a background task and make sure in debug true it should not send anything , just a info_logger print
         return _response(
             {"detail": "Story published.", "story_url": reverse("blog:story_detail", args=[blog.slug]), "id": blog.pk},
             status=201,

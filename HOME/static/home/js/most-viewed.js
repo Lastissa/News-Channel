@@ -21,6 +21,9 @@
     "</svg>";
 
   var FALLBACK_IMG = "https://placehold.co/160x160/1F2A37/F6F3ED?text=%20";
+  /* Set from #trending-section's data-fallback-image (a local SVG) at init so
+     a broken/slow external thumbnail never forces an extra network request. */
+  var fallbackImage = FALLBACK_IMG;
 
   function formatViews(count) {
     var n = Number(count) || 0;
@@ -35,8 +38,8 @@
       '<li class="trending-item">' +
         // '<span class="trending-rank">' + "-" + "</span>" +
         '<a class="trending-media" href="' + url + '" tabindex="-1">' +
-          '<img src="' + escapeHtml(post.image || FALLBACK_IMG) + '" alt="" loading="lazy" ' +
-          'onerror="this.onerror=null;this.src=\'' + FALLBACK_IMG + '\';">' +
+          '<img src="' + escapeHtml(post.image || fallbackImage) + '" alt="" loading="lazy" decoding="async" ' +
+          'onerror="this.onerror=null;this.src=\'' + fallbackImage + '\';">' +
         "</a>" +
         '<div class="trending-body">' +
           '<span class="tag">' + escapeHtml(post.category || "") + "</span>" +
@@ -66,6 +69,8 @@
     var section = document.getElementById("trending-section");
     var list = document.getElementById("trending-list");
     if (!section || !list || !section.dataset.endpoint) return;
+
+    if (section.dataset.fallbackImage) fallbackImage = section.dataset.fallbackImage;
 
     fetch(section.dataset.endpoint, {
       credentials: "same-origin",

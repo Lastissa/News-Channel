@@ -2179,3 +2179,88 @@ html.nav-locked { overflow: hidden; }
 
 /* purposedly put at the bottom so it only clear when the base.css is fully loaded */
 .dummy-loading{display: none;}
+
+/* ============================================================
+   POST-LOAD POLISH (appended last so it wins by order):
+   - no default blue/grey "pressed link" blob on any tap target
+   - round the buttons that were still genuinely rectangular
+   - solid toast surface
+   - hide teaser clones on the desktop (stacked) layout
+   - standalone "Popular Stories" rail on Home pages 2+
+   - slow-connection / FOUC hardening (content-visibility)
+   ============================================================ */
+
+/* --- 1. Pressing never flashes the browser's blue rectangle --- */
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+/* Click-focus must not draw a default blue ring either; keyboard users
+   keep the amber :focus-visible outline defined site-wide. */
+button:focus:not(:focus-visible),
+input[type="button"]:focus:not(:focus-visible),
+input[type="submit"]:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* --- 2. Round the buttons that were still rectangular --- */
+.story-page-btn { border-radius: 11px; }
+.glass-btn { border-radius: 999px; }
+.glass-btn-icon { border-radius: 50%; }
+
+/* --- 3. Solid toast surface --- */
+.site-toast {
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--toast-accent);
+  border-radius: 16px;
+  background: var(--toast-bg);
+  box-shadow:
+    0 2px 3px rgba(14, 27, 44, 0.06),
+    0 10px 22px rgba(14, 27, 44, 0.16),
+    0 34px 70px rgba(14, 27, 44, 0.28);
+}
+.site-toast--error {
+  border-left-color: var(--toast-accent-error);
+  background: var(--toast-bg-error);
+}
+.site-toast__icon {
+  background: var(--toast-accent);
+  color: var(--toast-bg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--toast-accent) 45%, transparent);
+}
+.site-toast--error .site-toast__icon {
+  background: var(--toast-accent-error);
+  color: var(--toast-bg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--toast-accent-error) 45%, transparent);
+}
+.site-toast__message { font-size: 0.93rem; line-height: 1.45; }
+.site-toast__progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--toast-accent);
+}
+.site-toast--error .site-toast__progress { background: var(--toast-accent-error); }
+
+/* --- 4. Teaser clones: only the mobile (strip) layout ever shows them --- */
+@media (min-width: 900px) {
+  .teaser-slide[data-clone="true"] { display: none; }
+}
+
+/* --- 5. Standalone "Popular Stories" rail on Home pages 2+ ---------------
+   story_cards.html wraps the rail in .trending-wide outside the page-1
+   headline-feature; give it its own row and show its heading (mobile hides
+   it inside the page-1 layout where the rail is a compact sidebar). */
+.story-grid .trending-wide {
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+}
+.story-grid .trending-wide .section-heading { margin-bottom: 4px; }
+.story-grid .trending-wide .section-heading h2 { display: block; font-size: 1.05rem; }
+
+/* --- 6. Slow-connection / FOUC hardening --------------------------------
+   Skip layout+paint for what is below the first screenful; contain-intrinsic
+   sizes stop the scrollbar from jumping while those blocks are skipped. */
+.site-footer { content-visibility: auto; contain-intrinsic-size: auto 420px; }
+#trending-section { content-visibility: auto; contain-intrinsic-size: auto 280px; }

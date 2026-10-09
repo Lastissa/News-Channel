@@ -222,6 +222,14 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
 {% block extra_head %}
 {{ block.super }}
 <meta name="yandex-verification" content="1093315bd8192b90" />
+{% comment %} Slow-connection: fetch the first on-screen images before paint so
+the hero/teaser never pop in after the page reveals. {% endcomment %}
+{% if featured_posts and featured_posts.0.image_1 %}
+<link rel="preload" as="image" href="{{ featured_posts.0.image_1 }}" fetchpriority="high">
+{% endif %}
+{% if teaser_items and teaser_items.0.image %}
+<link rel="preload" as="image" href="{{ teaser_items.0.image }}">
+{% endif %}
 {% endblock extra_head %}
 
 {% block newsletter_popup %}
