@@ -13,8 +13,9 @@ from django.utils import timezone
 from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog
+from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.config import custom_context_processors
-from STAFF.models import StaffProfile
+from STAFF.models import AuthorFollow, StaffProfile
 
 
 _counter = itertools.count(1)
@@ -171,7 +172,7 @@ class AddNewsValidationTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="formatting-guide"')
-        self.assertContains(response, "formatting guide")
+        self.assertContains(response, "Formatting guide")
         self.assertContains(response, "data-guide-copy-all")
         self.assertContains(response, "data-draft-key")
         self.assertContains(response, "data-editor-draft-status")
@@ -179,7 +180,7 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "data-archive-refresh")
         self.assertContains(response, "data-editor-modal-confirm")
         self.assertContains(response, "add-news-editor.js")
-        self.assertContains(response, "20261006-3")
+        self.assertContains(response, "20261009-1")
         self.assertContains(response, "Image and file archive")
         self.assertContains(response, "Do not begin the content with a")
         self.assertContains(response, "position: sticky")
@@ -247,6 +248,75 @@ class AddNewsValidationTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Blog.objects.get(author=self.author).content, content)
+
+
+class NewStoryAlertTests(QuietTestCase):
+    """Publishing a story (HOME.views.AddNewsView) must queue the new-story
+    alert batch: everyone who has news alerts on AND follows this author, plus
+    everyone who has news alerts on and follows no author at all. DEBUG mode
+    must never send anything, only report via info_logger."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = make_staff("publisher@example.com")
+        self.client.force_login(self.author)
+
+    def _publish(self, heading="New alert test story"):
+        return self.client.post(
+            reverse("home:add_news"),
+            {
+                "heading": heading,
+                "category": "GENERAL",
+                "content": (
+                    "The transport office confirmed that the revised routes begin next Monday. "
+                    "Students can review the timetable online before classes resume.\n\n"
+                    "### Route information\n\n"
+                    "Buses will serve the north and south campuses throughout the day. "
+                    "Current fares remain unchanged, and staff will be available to answer questions."
+                ),
+            },
+        )
+
+    def test_publish_queues_alert_for_followers_and_unfollowed_users_only(self):
+        follower = Auth.objects.create_user(email="follower@example.com", send_newsletter=True)
+        lonely = Auth.objects.create_user(email="lonely@example.com", send_newsletter=True)
+        silent = Auth.objects.create_user(email="silent@example.com", send_newsletter=False)
+        other_author = make_staff("other-author@example.com")
+        other_fan = Auth.objects.create_user(email="other-fan@example.com", send_newsletter=True)
+
+        AuthorFollow.objects.create(follower=follower, author=self.author)
+        AuthorFollow.objects.create(follower=other_fan, author=other_author)
+
+        with mock.patch("HOME.views.ping_indexnow"), mock.patch(
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR"
+        ) as executor:
+            response = self._publish()
+
+        self.assertEqual(response.status_code, 201)
+        executor.submit.assert_called_once()
+        dispatched, recipients, subject, build_html_for = executor.submit.call_args[0]
+        self.assertEqual(dispatched.__name__, "_dispatch_batch_email")
+        self.assertEqual(
+            sorted(email.lower() for email in recipients),
+            ["follower@example.com", "lonely@example.com"],
+        )
+        recipient_set = {email.lower() for email in recipients}
+        #   The author never mails themself, switched-off users are skipped, and
+        #   somebody who follows a DIFFERENT author only gets that author's alerts.
+        self.assertNotIn("publisher@example.com", recipient_set)
+        self.assertNotIn("silent@example.com", recipient_set)
+        self.assertNotIn("other-fan@example.com", recipient_set)
+
+    def test_debug_mode_prints_but_never_sends(self):
+        Auth.objects.create_user(email="lonely@example.com", send_newsletter=True)
+
+        with mock.patch("HOME.views.ping_indexnow"), mock.patch(
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR"
+        ) as executor, mock.patch.object(email_batch.settings, "DEBUG", True):
+            response = self._publish()
+
+        self.assertEqual(response.status_code, 201)
+        executor.submit.assert_not_called()
 
 
 @mock.patch("HOME.views.ping_indexnow")

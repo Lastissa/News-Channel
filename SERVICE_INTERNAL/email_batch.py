@@ -69,13 +69,19 @@ def _dispatch_batch_email(recipients, subject, build_html_for):
 
 def _try_send_new_story_batch_email(blog: object):
     """
-    Fired right after a story is published. Recipients are:
+    Fired right after a story is published (HOME.views.AddNewsView). Recipients:
       (a) everyone who follows this story's author (STAFF.AuthorFollow), and
       (b) everyone who follows no author at all, so they still get exposed
           to new stories instead of never hearing from the site again.
     Only accounts with `send_newsletter` on are eligible, and the footer's
     unsubscribe link doubles as the opt-out by flipping that same flag off.
     The author themself is always excluded.
+
+    The dispatch is submitted to the shared background email pool
+    (_EMAIL_EXECUTOR), so the publish request never waits on Resend. DEBUG
+    mode sends nothing at all -- it only prints an info_logger line (which
+    prints to the console while DEBUG is on) reporting what would have gone
+    out.
     """
     author = blog.author
 
@@ -92,6 +98,15 @@ def _try_send_new_story_batch_email(blog: object):
         .values_list("email", flat=True)
         .distinct()
     )
+
+    #   DEBUG = DEV MODE: never touch Resend here, just print what would have
+    #   gone out. info_logger prints to the console while DEBUG is on.
+    if getattr(settings, "DEBUG"):
+        info_logger(
+            msg=f"NEW STORY ALERT (DEBUG): new story by {author.email} matched {len(recipients)} eligible recipient(s), "
+            "but nothing was sent because DEBUG=True"
+        )
+        return
 
     if not recipients:
         info_logger(msg=f"BATCH EMAIL: no eligible recipients for new story by {author.email}")
@@ -114,7 +129,7 @@ def _try_send_new_story_batch_email(blog: object):
             preference_note="You can turn off all news update emails from your profile settings at any time.",
         )
 
-    _dispatch_batch_email(recipients, subject, build_html_for)
+    _EMAIL_EXECUTOR.submit(_dispatch_batch_email, recipients, subject, build_html_for)
     info_logger(msg=f"BATCH EMAIL: new story alert queued for {len(recipients)} recipients (author={author.email}, blog={blog.pk})")
 
 

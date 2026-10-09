@@ -30,7 +30,10 @@ from SERVICE_INTERNAL.abstract import (
     is_rate_limited,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig
-from SERVICE_INTERNAL.email_batch import _try_send_account_deleted_batch_email
+from SERVICE_INTERNAL.email_batch import (
+    _try_send_account_deleted_batch_email,
+    _try_send_new_story_batch_email,
+)
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
 from SERVICE_INTERNAL.indexnow import ping_indexnow
@@ -531,7 +534,12 @@ class AddNewsView(View):
         ping_indexnow(story_url)
         # invalidate the home_page_blogs so new article can be get
         invalidate_cache("home_page_blogs")
-        #TODO: send email of new news alert to all users who have news alert on and they follow the author + users who do not follow anyone, run in a background task and make sure in debug true it should not send anything , just a info_logger print
+        #   NEW NEWS ALERT: email every user who has news alerts on and follows
+        #   this author, plus users who follow nobody at all. Dispatched on the
+        #   background email pool so the publish never waits on Resend, and a
+        #   pure info_logger print in DEBUG mode (nothing is ever sent) -- see
+        #   SERVICE_INTERNAL.email_batch._try_send_new_story_batch_email.
+        _try_send_new_story_batch_email(blog)
         return _response(
             {"detail": "Story published.", "story_url": reverse("blog:story_detail", args=[blog.slug]), "id": blog.pk},
             status=201,
