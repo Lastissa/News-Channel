@@ -1516,3 +1516,83 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
     transition: none;
   }
 }
+
+/* ---------- Author dock (floating contact links) ----------
+   Opens with the author's real links popping in one by one (bounce), with a
+   name tag so it is clear the links belong to the author, then folds into a
+   launcher button showing the author's picture. author-dock.js toggles
+   .is-open / .is-folded. No JS: the links just stay open (launcher hidden). */
+.author-dock {
+  --dock-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: fixed; right: 16px; bottom: 24px; z-index: 200;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+@media (min-width: 900px) { .author-dock { right: 24px; bottom: 32px; } }
+
+.author-dock-links { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.author-dock .fab-btn { border-radius: var(--radius-m); }
+
+/* name tag: parallelogram label, ink on paper */
+.author-dock-tag {
+  max-width: 220px; padding: 5px 18px 5px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--line);
+  font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+  box-shadow: var(--shadow-card);
+}
+
+/* each item transitions on its own delay so the stack opens from the
+   launcher upward and folds back down the other way */
+.author-dock .fab-btn, .author-dock-tag {
+  transition: transform .5s var(--dock-spring), opacity .3s ease, visibility 0s linear 0s,
+              background .18s ease, color .18s ease, box-shadow .18s ease;
+  transition-delay: calc(var(--i, 0) * 60ms), calc(var(--i, 0) * 60ms), 0s, 0s, 0s, 0s;
+}
+.author-dock.is-js.is-folded .fab-btn, .author-dock.is-js.is-folded .author-dock-tag {
+  opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(18px) scale(.6);
+  transition: transform .28s ease, opacity .22s ease, visibility 0s linear .3s;
+  transition-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 25ms), .3s;
+}
+.author-dock .fab-btn:hover { transform: translateY(-3px) scale(1.06); }
+
+/* first appearance: pop in with a bounce, staggered */
+.author-dock.is-intro .fab-btn, .author-dock.is-intro .author-dock-tag {
+  animation: dockPop .7s var(--dock-spring) both;
+  animation-delay: calc(500ms + var(--i, 0) * 90ms);
+}
+@keyframes dockPop {
+  from { opacity: 0; transform: translateY(26px) scale(.5); }
+  to { opacity: 1; transform: none; }
+}
+
+/* launcher: the author's picture */
+.author-dock-toggle {
+  position: relative; width: 56px; height: 56px; padding: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  background: var(--ink); color: var(--paper);
+  border: 2px solid var(--brand); border-radius: var(--radius-m);
+  box-shadow: var(--shadow-raised);
+  transition: transform .3s var(--dock-spring), border-color .2s ease;
+}
+.author-dock-toggle[hidden] { display: none; }
+.author-dock-toggle img { width: 100%; height: 100%; object-fit: cover; }
+.author-dock-initial { font-weight: 700; font-size: 1.2rem; }
+.author-dock-toggle:hover { transform: scale(1.06); }
+.author-dock-toggle:focus-visible { outline: 2px solid var(--brand-deep); outline-offset: 3px; }
+/* a small plus/close mark in the corner says "tap for contact links" */
+.author-dock-toggle::after {
+  content: ""; position: absolute; right: 0; bottom: 0; width: 16px; height: 16px;
+  background: var(--brand); clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+.author-dock.is-js.is-folded .author-dock-toggle.is-nudge { animation: dockBounce 1.1s var(--dock-spring) 2; }
+@keyframes dockBounce {
+  0%, 100% { transform: none; }
+  30% { transform: translateY(-14px); }
+  55% { transform: translateY(0); }
+  75% { transform: translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .author-dock .fab-btn, .author-dock-tag, .author-dock-toggle { transition: none; animation: none !important; }
+  .author-dock.is-intro .fab-btn, .author-dock.is-intro .author-dock-tag { animation: none; }
+}

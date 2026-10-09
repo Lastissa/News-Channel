@@ -20,7 +20,7 @@
   <meta name="twitter:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
   <meta name="twitter:description" content="{{ meta_description }}">
   <script type="application/ld+json">{{ person_schema_json }}</script>
-  <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}?v=20261006-2">
+  <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}?v=20261009-1">
 {% endblock %}
 
 {% comment %}
@@ -29,16 +29,35 @@
   the profile is never drawn.
 {% endcomment %}
 {% block floating_social %}
-<div class="fab-stack" aria-label="Contact {{ display_name }}">
-  <a class="fab-btn fab-email" href="mailto:{{ author.email }}" aria-label="Email {{ display_name }}" title="Email">
-    {% include "staff/partials/social_icon.html" with key="email" %}
-  </a>
-  {% for social in socials %}
-    <a class="fab-btn fab-{{ social.key }}" href="{{ social.url }}" target="_blank" rel="noopener noreferrer"
-       aria-label="{{ social.aria }}" title="{{ social.label }}">
-      {% include "staff/partials/social_icon.html" with key=social.key %}
+{% comment %}
+  Author dock. Opens showing the author's actual links (with a name tag so it
+  is clear they belong to the author), then folds into a launcher button that
+  carries the author's picture. author-dock.js drives the fold; without JS the
+  links simply stay open. Every link keeps its aria-label.
+{% endcomment %}
+<div class="author-dock is-intro" data-author-dock aria-label="Contact {{ display_name }}">
+  <div class="author-dock-links" id="author-dock-links">
+    <span class="author-dock-tag" style="--i: {{ socials|length|add:1 }}">{{ display_name }}</span>
+    <a class="fab-btn fab-email" style="--i: {{ socials|length }}" href="mailto:{{ author.email }}" aria-label="Email {{ display_name }}" title="Email">
+      {% include "staff/partials/social_icon.html" with key="email" %}
     </a>
-  {% endfor %}
+    {% for social in socials %}
+      <a class="fab-btn fab-{{ social.key }}" style="--i: {{ forloop.revcounter0 }}" href="{{ social.url }}" target="_blank" rel="noopener noreferrer"
+         aria-label="{{ social.aria }}" title="{{ social.label }}">
+        {% include "staff/partials/social_icon.html" with key=social.key %}
+      </a>
+    {% endfor %}
+  </div>
+  <button type="button" class="author-dock-toggle" data-dock-toggle aria-expanded="true" aria-controls="author-dock-links"
+          aria-label="Contact {{ display_name }}" title="Contact {{ display_name }}" hidden>
+    {% if author.profile_img %}
+      <img src="{{ author.profile_img }}" alt="{{ display_name }}, {{ role_label }}" width="52" height="52"
+           onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
+      <span class="author-dock-initial" hidden aria-hidden="true">{{ display_name|slice:":1"|upper }}</span>
+    {% else %}
+      <span class="author-dock-initial" aria-hidden="true">{{ display_name|slice:":1"|upper }}</span>
+    {% endif %}
+  </button>
 </div>
 {% endblock %}
 
@@ -190,9 +209,9 @@
                 <span class="portfolio-popular-rank" aria-label="Rank {{ forloop.counter }}">{{ forloop.counter }}</span>
                 <a class="portfolio-popular-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1" aria-hidden="true">
                   {% if story.image_1 %}
-                    <img src="{{ story.image_1|default:'https://placehold.co/160x160/1F2A37/F6F3ED?text=%20' }}" alt="" loading="lazy">
+                    <img src="{{ story.image_1|default:'https://placehold.co/160x160/1F2A37/F6F3ED?text=%20' }}" alt="{% if story.image_info and story.image_info != 'The image is self explanatory.' %}{{ story.image_info }}{% else %}{{ story.heading }}{% endif %}" loading="lazy">
                   {% else %}
-                    <img src="{% static '404.jpg' %}" alt="" loading="lazy">
+                    <img src="{% static '404.jpg' %}" alt="No picture for {{ story.heading }}" loading="lazy">
                   {% endif %}
                 </a>
                 <div class="portfolio-popular-copy">
@@ -466,4 +485,5 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'staff/js/portfolio-feed.js' %}?v=20261006-3" defer></script>
+  <script src="{% static 'staff/js/author-dock.js' %}?v=20261009-1" defer></script>
 {% endblock %}

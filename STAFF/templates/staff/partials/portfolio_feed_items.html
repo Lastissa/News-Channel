@@ -4,7 +4,7 @@
     <header class="portfolio-feed-card-head">
       <a class="portfolio-feed-author" href="{% url 'staff:portfolio' staff_profile.slug %}">
         {% if staff_image %}
-          <img src="{{ staff_image }}" alt="" loading="lazy">
+          <img src="{{ staff_image }}" alt="{{ display_name }} profile picture" loading="lazy">
         {% else %}
           <span aria-hidden="true">{{ display_name|slice:":1"|upper }}</span>
         {% endif %}
@@ -20,7 +20,7 @@
 
     {% if story.image_1 %}
       <a class="portfolio-feed-image" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1" aria-hidden="true">
-        <img src="{{ story.image_1|cloudinary_proxy }}" alt="{{ story.image_info }}" loading="lazy">
+        <img src="{{ story.image_1|cloudinary_proxy }}" alt="{% if story.image_info and story.image_info != 'The image is self explanatory.' %}{{ story.image_info }}{% else %}{{ story.heading }}{% endif %}" loading="lazy">
       </a>
     {% endif %}
 
