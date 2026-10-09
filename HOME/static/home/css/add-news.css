@@ -275,7 +275,7 @@ html.editor-modal-open { overflow: hidden; }
 .format-guide.is-collapsed .fg-body-wrap { grid-template-rows: 0fr; }
 .format-guide.is-collapsed .fg-body { visibility: hidden; transition: visibility 0s 0.34s; }
 
-.fg-intro { margin: 0 0 16px; font-size: 0.88rem; line-height: 1.55; color: var(--slate); }
+.fg-intro { margin: 0 0 16px; font-size: 0.88rem; line-height: 1.55; color: var(--ink-soft); }
 
 .fg-block h3 { margin: 0 0 10px; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
 .fg-block h3 span { font-weight: 400; font-size: 0.78rem; letter-spacing: 0; text-transform: none; color: var(--slate); margin-left: 6px; }

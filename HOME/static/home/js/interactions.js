@@ -950,27 +950,20 @@
           return;
         }
 
-        toast(extractDetail(result.text, "Story deleted."));
-
-        /*  A delete changes what sits on every page after it, so the page is
-            asked for again instead of patched in the browser: same page, same
-            search text. The server clamps a page that no longer exists to the
-            last one, and the shared skeleton in profile.html holds the height
-            while it loads. The "N total" tag comes back out of band. */
         var item = form.closest("[data-published-story-item]");
+        if (item) item.remove();
+
         var list = document.getElementById("profile-published-list");
-        var search = document.getElementById("published-search");
-        var pageNode = list && list.querySelector("[data-published-page]");
-        var page = pageNode ? pageNode.getAttribute("data-published-page") : "1";
-        var query = search ? search.value.trim() : "";
-        if (item) item.classList.add("is-removing");
-        setTimeout(function () {
-          if (list && window.htmx && list.dataset.publishedEndpoint) {
-            window.htmx.ajax("GET", list.dataset.publishedEndpoint + "?page=" + encodeURIComponent(page) + "&q=" + encodeURIComponent(query), { target: "#profile-published-list", swap: "innerHTML" });
-          } else if (item) {
-            item.remove();
-          }
-        }, 220);
+        if (list && !list.querySelector("[data-published-story-item]")) {
+          list.innerHTML = '<p class="empty-copy">No stories published yet.</p>';
+        }
+
+        var total = document.querySelector("#published-stories .panel-tag");
+        if (total) {
+          var count = Number((total.textContent || "").trim().split(" ")[0]);
+          if (!isNaN(count)) total.textContent = Math.max(0, count - 1) + " total";
+        }
+        toast(extractDetail(result.text, "Story deleted."));
       })
       .catch(function () {
         button.dataset.pending = "false";
@@ -1974,7 +1967,8 @@
     if (!popup) return; // not rendered for this page/user (see newsletter_popup.html)
 
     var STORAGE_KEY = "abureport-newsletter-popup-state";
-    var DISMISS_MS = 3 * 24 * 60 * 60 * 1000; // re-offer 3 days after a manual dismiss
+    var ONCE_PER_DAY_MS = 24 * 60 * 60 * 1000; // asked at most once per day, even if the visitor just ignores it
+    var DISMISS_MS = 3 * 24 * 60 * 60 * 1000; // re-offer 3 days after a manual dismiss (longer than the daily rule)
     var FALLBACK_DELAY_MS = 8000; // used only when the page can't scroll at all
 
     function readState() {
@@ -2006,6 +2000,8 @@
       popup.classList.add("is-visible");
       popup.setAttribute("aria-hidden", "false");
       window.removeEventListener("scroll", onScroll);
+      // remember that it was shown, so reloads and other pages stay quiet for a day
+      writeState(String(Date.now() + ONCE_PER_DAY_MS));
     }
 
     function hidePopup(persistDismiss) {

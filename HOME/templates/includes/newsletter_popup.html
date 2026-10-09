@@ -15,8 +15,9 @@ Optional include params:
 
 It is entirely optional for the visitor: a visible close (×) button, a
 "Not now" cancel button, and a line of copy saying so -- no full-screen
-backdrop, the rest of the page stays usable, and dismissing it (or
-subscribing) suppresses it for a while via localStorage. See
+backdrop, the rest of the page stays usable, and it is shown at most
+once every 24 hours, and dismissing it (or subscribing) suppresses it for
+longer, all via localStorage. See
 newsletter-popup.js logic in interactions.js.
 {% endcomment %}
 {% if not request.user.is_authenticated %}
@@ -34,7 +35,7 @@ newsletter-popup.js logic in interactions.js.
     <button type="button" class="newsletter-popup-close" data-newsletter-popup-close aria-label="Close">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
-    <!--Ask Once per day for non login users : I AM NOT SURE THIS IS ACTUALLY FOLLOWING ONCE PER DAY REQUEST YET: TODO-->
+    {% comment %} Shown at most once per 24 hours per browser (the time is saved in localStorage the moment it appears, see interactions.js). {% endcomment %}
     <div class="newsletter-popup-body">
       <p class="newsletter-popup-kicker" id="newsletter-popup-title">Stay up to date.</p>
       <h3 class="newsletter-popup-heading">Get Our Latest Stories Soon As They Are Posted.</h3>

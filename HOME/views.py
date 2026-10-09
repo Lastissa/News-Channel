@@ -196,24 +196,27 @@ def _page_context(page, user):
 
 
 def _teaser_items():
-    """Data for the hero's side picture carousel (HOME/home.html). Each item is
-    {heading, body, image, url}. Real data is the live Partner.AdvertImage rows
-    the admin manages in PANEL (active + not expired, newest first). Until at
-    least one exists the old placeholder slides are shown so the carousel is
-    never empty. The template and hero-teaser.js only read those four keys."""
-    from Partner.models import AdvertImage
-    live = AdvertImage.objects.filter(expiry_date__gte=timezone.now(), is_active=True).order_by("-date_created")
-    if live:
-        return [{"heading": row.heading, "body": row.body, "image": row.image_url, "url": row.url or ""} for row in live]
+    """Data for the hero's side/teaser carousel (HOME/home.html).
 
+    TODO: no real data source decided yet. Swap this out (a query, a
+    settings list, whatever it ends up being) once that's settled — the
+    template only ever reads heading / body / image off each item, so as
+    long as this keeps returning dicts with that shape (any of the three
+    can be blank/omitted) nothing else needs to change. Until then it just
+    returns enough identical placeholder slots for the carousel to have
+    something to animate between, and the template falls back to a plain
+    "Coming soon" label whenever heading and body are both empty.
+    """
     from django.templatetags.static import static
     curent_dummy_image = [
         static('partner/ad_demo_1.jpg'),
         static('partner/ad_demo_2.png'),
         static('partner/ad_demo_3.jpg'),
+        static('partner/ad_demo_4.jpg'),
+        static('partner/ad_demo_5.jpg'),
     ]
     len_current_dummy = len(curent_dummy_image) -1  if bool(curent_dummy_image) else 0
-    return [{"heading": f"Have something to promote? Let’s help you get the word out! Whether it’s your business, product, service, or event, we’d love to help you reach more people.", "body": "Tap the image above to reach us and let’s work together!", "image": curent_dummy_image[random.randint(0, len_current_dummy)], "url": ""} for _ in range(TEASER_PLACEHOLDER_COUNT)]
+    return [{"heading": f"Hello fam {_}", "body": "body", "image": curent_dummy_image[random.randint(0, len_current_dummy)]} for _ in range(TEASER_PLACEHOLDER_COUNT)]
 
 
 def _resolve_page_number(raw_value, *, default=1):
@@ -1256,10 +1259,6 @@ class ProfilePublishedView(View):
                 "stories_page_obj": page,
                 "stories_page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
                 "search_query": search_query,
-                #   the "N total" tag is swapped out of band after a delete refresh, and it must
-                #   stay the unfiltered total even while the search box is filtering the list
-                "oob": True,
-                "published_total": Blog.objects.filter(author=request.user).count(),
             },
         )
 
@@ -1531,11 +1530,94 @@ class ProfileDeleteAccountView(View):
         }
         return context
 
+#   EVERY `type` THE FOOTER UNSUBSCRIBE LINK OF AN EMAIL CAN CARRY (see the
+#   unsubscribe_query values in SERVICE_INTERNAL/email_single.py and
+#   email_batch.py). Anything not listed here is refused, so the query string
+#   can never be used to switch off a setting that was not meant to be reachable.
+UNSUBSCRIBE_KINDS = {
+    "author_post": {
+        "label": "new story alert emails",
+        "detail": "the emails telling you when a new story is published",
+    },
+    "login_alert": {
+        "label": "login alert emails",
+        "detail": "the emails telling you when your account is signed in to",
+    },
+    "story_views_alert": {
+        "label": "story views alert emails",
+        "detail": "the emails telling you when one of your stories reaches a new views milestone",
+    },
+    "new_follower_alert": {
+        "label": "new follower alert emails",
+        "detail": "the emails telling you when someone starts following you",
+    },
+}
+
+
+def _switch_off_email_setting(kind, email):
+    """Turn the matching email preference OFF for the account with this email.
+    It only ever switches things off, never on, and says nothing about whether
+    the account exists (the caller shows the same result either way)."""
+    user_model = get_user_model()
+    if kind == "author_post":
+        user_model.objects.filter(email__iexact=email).update(send_newsletter=False)
+    elif kind == "login_alert":
+        user_model.objects.filter(email__iexact=email).update(receive_email_login_alert=False)
+    elif kind == "story_views_alert":
+        StaffProfile.objects.filter(auth__email__iexact=email).update(get_blog_notification=False)
+    elif kind == "new_follower_alert":
+        StaffProfile.objects.filter(auth__email__iexact=email).update(get_follower_notification=False)
+
+
 class UnsubscribeView(View):
-    "TODO: Handle unsuscribe logic for when user want to stop receving email click"
+    """Landing page for the Unsubscribe link in the footer of our emails
+    (/unsubscribe/?type=...&email=...).
+
+    GET only shows what is about to be switched off and asks for a click, so
+    an email scanner or link previewer that opens the link can not unsubscribe
+    anybody. The POST from that button does the switch (CSRF protected, rate
+    limited per IP). A link with no or unknown details gets a plain
+    explanation and a way to manage emails from the profile instead."""
+
+    EMAIL_MAX_LENGTH = 254
+
+    def _clean(self, source):
+        kind = (source.get("type") or "").strip()
+        email = (source.get("email") or "").strip()
+        valid = kind in UNSUBSCRIBE_KINDS and "@" in email and len(email) <= self.EMAIL_MAX_LENGTH
+        return kind, email, valid
+
+    def _page(self, request, state, kind="", email="", status=200):
+        spec = UNSUBSCRIBE_KINDS.get(kind, {})
+        context = {
+            "state": state,
+            "kind": kind,
+            "email": email,
+            "masked_email": _mask_email(email) if email else "",
+            "label": spec.get("label", ""),
+            "detail": spec.get("detail", ""),
+        }
+        return render(request, "HOME/unsubscribe.html", context, status=status)
+
     def get(self, request):
-        return render(request, 'HOME/unsubscribe.html')
-    
+        kind, email, valid = self._clean(request.GET)
+        if not valid:
+            return self._page(request, "invalid")
+        return self._page(request, "confirm", kind, email)
+
+    def post(self, request):
+        remaining_time, is_limited = is_rate_limited(request, 60, 10, scope="unsubscribe")
+        if is_limited:
+            return self._page(request, "limited", status=429)
+
+        kind, email, valid = self._clean(request.POST)
+        if not valid:
+            return self._page(request, "invalid", status=400)
+
+        _switch_off_email_setting(kind, email)
+        info_logger(msg=f"UNSUBSCRIBE: {kind} emails switched off for {_mask_email(email)}")
+        return self._page(request, "done", kind, email)
+
 
 MOST_VIEWED_COUNT = 3
 
