@@ -2146,7 +2146,7 @@ html.nav-locked { overflow: hidden; }
   .story-card-footer .bookmark-chip:not(.has-label) { width: 44px; height: 44px; }
   .story-card-footer .bookmark-chip.has-label { min-height: 44px; padding: 0 16px; }
   .story-bookmark-chip { height: 40px; padding: 0 12px; }
-  .comment-submit-btn { width: 100%; min-height: 44px; justify-content: center; }
+  .comment-submit-btn { width: 100%; justify-content: center; }
   .comment-toolbar .comment-like-btn,
   .comment-toolbar .comment-delete-btn { height: 44px; min-width: 44px; }
   .comment-toolbar .comment-like-btn { padding: 0 14px; }
