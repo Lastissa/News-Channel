@@ -27,9 +27,10 @@ from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
+from SERVICE_INTERNAL.images import ImageUploadError, destroy_archive_asset, upload_advert_image
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
-from Partner.models import AdvertText
+from Partner.models import AdvertImage, AdvertText
 from ADMIN.models import SiteSettings
 from STAFF.models import GENDER_CHOICES, StaffProfile
 
@@ -705,6 +706,7 @@ class PanelView(View):
                 "site_settings": SiteSettings.get_solo(),
                 "category_rows": _category_rows(),
                 "text_awareness_items": _text_awareness_items(),
+                "image_advert_items": _image_advert_items(),
                 "gallery_items": staff_directory_rows(list(gallery_page.object_list)),
                 "gallery_has_next": gallery_page.has_next(),
                 "gallery_next_page": gallery_page.next_page_number() if gallery_page.has_next() else None,
@@ -1222,3 +1224,153 @@ class PanelTextAwarenessDeleteView(View):
         row.delete()
         info_logger(msg=f"PANEL: text awareness {item_id} deleted by {request.user.email}")
         return JsonResponse({"detail": "Text deleted."}, status=200)
+
+
+"""
+------------------------------------------------------------
+#   IMAGE ADVERTS
+------------------------------------------------------------
+The picture carousel beside the hero on the home page
+(HOME.views._teaser_items) shows every Partner.AdvertImage row that is
+active and not expired. Mobile shows the picture only, desktop also shows
+heading + body under it. These three endpoints let an admin add, edit
+(optionally replacing the picture in place) and delete those rows from PANEL.
+"""
+
+IMAGE_ADVERT_LIST_LIMIT = 100   #   newest rows shown in PANEL
+
+
+def _image_advert_item(row):
+    expiry = timezone.localtime(row.expiry_date)
+    if not row.is_active:
+        status = "paused"
+    elif row.expiry_date < timezone.now():
+        status = "expired"
+    else:
+        status = "live"
+    return {
+        "id": row.id,
+        "heading": row.heading,
+        "body": row.body,
+        "image": row.image_url,
+        "url": row.url or "",
+        "expiry_input": expiry.strftime("%Y-%m-%dT%H:%M"),
+        "expiry_label": expiry.strftime("%d %b %Y, %H:%M"),
+        "is_active": row.is_active,
+        "status": status,
+        "added_by": _mask_email(row.author.email) if row.author_id else "",
+    }
+
+
+def _image_advert_items():
+    rows = AdvertImage.objects.select_related("author").order_by("-date_created")[:IMAGE_ADVERT_LIST_LIMIT]
+    return [_image_advert_item(row) for row in rows]
+
+
+def _clean_image_advert(post):
+    """Validate the posted text fields (the picture is checked separately).
+    Returns (values, error)."""
+    heading = " ".join((post.get("heading") or "").split())
+    body = " ".join((post.get("body") or "").split())
+    if len(heading) > 90:
+        return None, "The heading can be at most 90 characters."
+    if len(body) > 200:
+        return None, "The text can be at most 200 characters."
+
+    url = (post.get("url") or "").strip()
+    if url:
+        if not url.lower().startswith(("http://", "https://")):
+            return None, "The link must start with http:// or https://"
+        try:
+            URLValidator(schemes=["http", "https"])(url)
+        except ValidationError:
+            return None, "Enter a valid link, or leave it empty."
+
+    expiry = parse_datetime((post.get("expiry_date") or "").strip())
+    if expiry is None:
+        return None, "Pick when this advert should stop showing."
+    if timezone.is_naive(expiry):
+        expiry = timezone.make_aware(expiry, timezone.get_current_timezone())
+
+    is_active = (post.get("is_active") or "").lower() in ("1", "true", "on", "yes")
+    return {"heading": heading, "body": body, "url": url or None, "expiry_date": expiry, "is_active": is_active}, None
+
+
+class PanelImageAdvertCreateView(View):
+    def post(self, request):
+        denied = _text_awareness_guard(request)
+        if denied:
+            return denied
+        values, error = _clean_image_advert(request.POST)
+        if error:
+            return JsonResponse({"detail": error}, status=400)
+        if values["expiry_date"] <= timezone.now():
+            return JsonResponse({"detail": "The end time has to be in the future."}, status=400)
+
+        image_file = request.FILES.get("image")
+        if image_file is None:
+            return JsonResponse({"detail": "Choose the advert picture."}, status=400)
+        try:
+            uploaded = upload_advert_image(image_file)
+        except ImageUploadError as exc:
+            return JsonResponse({"detail": str(exc)}, status=400)
+
+        try:
+            row = AdvertImage.objects.create(
+                author=request.user,
+                image_url=uploaded["secure_url"],
+                image_public_id=uploaded["public_id"],
+                **values,
+            )
+        except Exception:
+            #   THE PICTURE IS ALREADY UP, DON'T LEAVE IT ORPHANED
+            destroy_archive_asset(uploaded["public_id"])
+            raise
+        info_logger(msg=f"PANEL: image advert {row.id} added by {request.user.email}")
+        return JsonResponse({"detail": "Advert added to the home page.", "item": _image_advert_item(row)}, status=201)
+
+
+class PanelImageAdvertUpdateView(View):
+    def post(self, request, item_id):
+        denied = _text_awareness_guard(request)
+        if denied:
+            return denied
+        row = AdvertImage.objects.select_related("author").filter(pk=item_id).first()
+        if row is None:
+            return JsonResponse({"detail": "That advert no longer exists."}, status=404)
+        values, error = _clean_image_advert(request.POST)
+        if error:
+            return JsonResponse({"detail": error}, status=400)
+
+        #   A NEW PICTURE IS OPTIONAL ON EDIT. WHEN SENT, IT OVERWRITES THE
+        #   EXISTING CLOUDINARY ASSET IN PLACE (SAME public_id).
+        image_file = request.FILES.get("image")
+        if image_file is not None:
+            try:
+                uploaded = upload_advert_image(image_file, public_id=row.image_public_id or None)
+            except ImageUploadError as exc:
+                return JsonResponse({"detail": str(exc)}, status=400)
+            row.image_url = uploaded["secure_url"]
+            row.image_public_id = uploaded["public_id"]
+
+        for field, value in values.items():
+            setattr(row, field, value)
+        row.save()
+        info_logger(msg=f"PANEL: image advert {row.id} edited by {request.user.email}")
+        return JsonResponse({"detail": "Advert updated.", "item": _image_advert_item(row)}, status=200)
+
+
+class PanelImageAdvertDeleteView(View):
+    def post(self, request, item_id):
+        denied = _text_awareness_guard(request)
+        if denied:
+            return denied
+        row = AdvertImage.objects.filter(pk=item_id).first()
+        if row is None:
+            return JsonResponse({"detail": "That advert no longer exists."}, status=404)
+        public_id = row.image_public_id
+        row.delete()
+        if public_id:
+            destroy_archive_asset(public_id)
+        info_logger(msg=f"PANEL: image advert {item_id} deleted by {request.user.email}")
+        return JsonResponse({"detail": "Advert deleted."}, status=200)

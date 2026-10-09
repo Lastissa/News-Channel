@@ -528,6 +528,17 @@ html.auth-gate-locked { overflow: hidden; }
 .teaser-slide-inner { position: relative; z-index: 1; max-width: 100%; }
 .teaser-heading, .teaser-placeholder { color: #FAF8F3; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; margin: 0; }
 .teaser-body { color: rgba(250,248,243,0.75); font-size: 0.85rem; margin: 8px 0 0; }
+a.teaser-slide { color: inherit; text-decoration: none; }
+
+/* Image adverts. Desktop: the caption sits as a bar along the bottom of the
+   picture, paper as the background and ink as the text. Mobile: picture only. */
+.teaser-slide.has-image { align-items: flex-end; padding: 0; }
+.teaser-slide.has-image .teaser-slide-inner {
+  width: 100%; text-align: left; padding: 14px 16px;
+  background: var(--paper); border-top: 2px solid var(--brand-deep);
+}
+.teaser-slide.has-image .teaser-heading { color: var(--ink); font-size: 1rem; }
+.teaser-slide.has-image .teaser-body { color: var(--ink-soft); margin-top: 4px; }
 
 @media (max-width: 899px) {
   .hero-teaser {
@@ -549,6 +560,7 @@ html.auth-gate-locked { overflow: hidden; }
   .teaser-slide.is-active { flex: 0 0 46%; opacity: 1; }
   .teaser-heading, .teaser-placeholder { font-size: 0.92rem; }
   .teaser-body { display: none; }
+  .teaser-slide.has-image .teaser-slide-inner { display: none; }
 }
 
 /* ---------- Home tickers ---------- */

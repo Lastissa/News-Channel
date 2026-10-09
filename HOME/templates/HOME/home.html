@@ -133,24 +133,27 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
   auto-advances. Same markup drives both layouts; CSS + hero-teaser.js
   handle the rest.
 
-  teaser_items comes from HomeView (see HOME/views.py, _teaser_items()).
-  It's placeholder "coming soon" data for now — each item is already a
-  dict with heading/body/image keys so swapping in real data later needs
-  no template changes.
+  teaser_items comes from HomeView (see HOME/views.py, _teaser_items()):
+  the live image adverts an admin manages in PANEL, as dicts with
+  heading/body/image/url keys (placeholder slides until one exists).
 {% endcomment %}
-<aside class="hero-teaser" id="teaser-carousel" aria-label="More stories on the way" data-autoplay="4200">
+<aside class="hero-teaser" id="teaser-carousel" aria-label="Adverts" data-autoplay="4200">
   <div class="teaser-track">
     {% for item in teaser_items %}
-    <div class="teaser-slide {% if forloop.first %}is-active{% endif %}"
+    {% if item.url %}<a class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %} aria-label="{{ item.heading|default:'Advert' }}"
          data-index="{{ forloop.counter0 }}"
-         {% if item.image %}style="--teaser-image: url('{{ item.image }}');"{% endif %}>
+         {% if item.image %}style="--teaser-image: url('{{ item.image }}');"{% endif %}>{% else %}<div class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}"
+         data-index="{{ forloop.counter0 }}"
+         {% if item.image %}style="--teaser-image: url('{{ item.image }}');"{% endif %}>{% endif %}
+      {% comment %} Mobile: picture only (CSS hides .teaser-slide-inner on .has-image). Desktop: caption bar at the bottom in paper/ink. {% endcomment %}
+      {% if item.heading or item.body or not item.image %}
       <div class="teaser-slide-inner">
-        {% comment %} I WILL STILL CHANGE THE LAYOUT , PLEASE REMIND BE, THIS IS JUST A DUMMY LAYOUT {% endcomment %}
         {% if item.heading %}<p class="teaser-heading">{{ item.heading }}</p>{% endif %}
         {% if item.body %}<p class="teaser-body">{{ item.body }}</p>{% endif %}
         {% if not item.heading and not item.body %}<p class="teaser-placeholder">Coming soon</p>{% endif %}
       </div>
-    </div>
+      {% endif %}
+    {% if item.url %}</a>{% else %}</div>{% endif %}
     {% endfor %}
   </div>
 </aside>

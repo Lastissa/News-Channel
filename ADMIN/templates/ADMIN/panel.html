@@ -10,238 +10,366 @@
 {% endblock %}
 
 {% block content %}
-<section class="panel-shell">
-  {% comment %}<div class="panel-header-bar">
-    <h1>PANEL</h1>
-    <a href="{% url 'home:profile' %}" class="panel-back-link">Profile</a>
-     <div class="panel-header-actions">
-      <span class="panel-role-tag">{% if is_superuser %}Superuser{% else %}Admin{% endif %}</span>
-      <a href="{% url 'home:profile' %}" class="panel-back-link">Profile</a>
-    </div> 
-  </div>{% endcomment %}
+{% comment %}
+  Icon sprite. Every icon on this page (here and in panel.js) is
+  <svg class="ic"><use href="#i-NAME"/></svg>. Buttons that only carry an icon
+  always get aria-label + title so nothing is lost for screen readers.
+{% endcomment %}
+<svg class="panel-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+</svg>
+
+<section class="panel-shell" data-panel>
+
+  <nav class="panel-nav" aria-label="Panel sections" data-panel-nav>
+    <a class="panel-nav-link" href="#panel-staff-gallery" aria-label="Staff" title="Staff"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></a>
+    <a class="panel-nav-link" href="#panel-text-awareness" aria-label="Text awareness" title="Text awareness"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></a>
+    <a class="panel-nav-link" href="#panel-image-adverts" aria-label="Image adverts" title="Image adverts"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg></a>
+    <a class="panel-nav-link" href="#panel-mass-email" aria-label="Mass email" title="Mass email"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg></a>
+    <a class="panel-nav-link" href="#panel-sessions" aria-label="Active sessions" title="Active sessions"><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg></a>
+    <a class="panel-nav-link" href="#panel-socials" aria-label="Site socials" title="Site socials"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg></a>
+    <a class="panel-nav-link" href="#panel-categories" aria-label="News categories" title="News categories"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg></a>
+    <a class="panel-nav-link" href="#panel-speciality" aria-label="Search staff by speciality" title="Search staff by speciality"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></a>
+  </nav>
 
   <div class="panel-grid">
 
     <section class="panel-card panel-card-wide" id="panel-staff-gallery" aria-label="Staff directory">
-      <div class="panel-card-header">
-        {% comment %} <h2>Staff</h2> {% endcomment %}
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <h2>Staff</h2>
         <div class="panel-card-header-actions">
-          <a href="{% url 'control:staff_create' %}" class="panel-ghost-btn">+ Staff</a>
+          <a href="{% url 'control:staff_create' %}" class="panel-icon-btn" aria-label="Add staff" title="Add staff"><svg class="ic" aria-hidden="true"><use href="#i-user-plus"/></svg></a>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Staff" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
-      </div>
-      <div class="panel-gallery-viewport" data-gallery-viewport tabindex="0" aria-label="Staff, scroll horizontally">
-        <div class="panel-gallery-track" data-gallery-track
-             data-next-page="{{ gallery_next_page|default:'' }}"
-             data-has-next="{{ gallery_has_next|yesno:'true,false' }}"
-             data-endpoint="{% url 'control:panel_gallery' %}">
-          {% for member in gallery_items %}
-          <a class="panel-gallery-card" href="{{ member.url }}">
-            <span class="panel-gallery-avatar">
-              {% if member.profile_img %}
-                <img data-src="{{ member.profile_img }}" alt="" loading="lazy" class="panel-lazy-avatar">
-              {% else %}
-                <span class="panel-gallery-initial">{{ member.heading|slice:":1" }}</span>
-              {% endif %}
-            </span>
-            <span class="panel-gallery-name">{{ member.heading }}</span>
-            <span class="panel-gallery-role">{{ member.authority }}</span>
-          </a>
-          {% endfor %}
-          {% if not gallery_items %}
-            <p class="empty-copy">No staff accounts found.</p>
-          {% endif %}
-          <button type="button" class="panel-gallery-load-more" data-gallery-load-more{% if not gallery_has_next %} hidden{% endif %}>Load more</button>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <div class="panel-gallery-viewport" data-gallery-viewport tabindex="0" aria-label="Staff, scroll horizontally">
+          <div class="panel-gallery-track" data-gallery-track
+               data-next-page="{{ gallery_next_page|default:'' }}"
+               data-has-next="{{ gallery_has_next|yesno:'true,false' }}"
+               data-endpoint="{% url 'control:panel_gallery' %}">
+            {% for member in gallery_items %}
+            <a class="panel-gallery-card" href="{{ member.url }}">
+              <span class="panel-gallery-avatar">
+                {% if member.profile_img %}
+                  <img data-src="{{ member.profile_img }}" alt="" loading="lazy" class="panel-lazy-avatar">
+                {% else %}
+                  <span class="panel-gallery-initial">{{ member.heading|slice:":1" }}</span>
+                {% endif %}
+              </span>
+              <span class="panel-gallery-name">{{ member.heading }}</span>
+              <span class="panel-gallery-role">{{ member.authority }}</span>
+            </a>
+            {% endfor %}
+            {% if not gallery_items %}
+              <p class="panel-empty">No staff accounts found.</p>
+            {% endif %}
+            <button type="button" class="panel-gallery-load-more" data-gallery-load-more aria-label="Load more staff" title="Load more"{% if not gallery_has_next %} hidden{% endif %}><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+          </div>
         </div>
-      </div>
+      </div></div>
     </section>
 
     <section class="panel-card panel-card-wide" id="panel-text-awareness" aria-label="Text awareness">
-      <div class="panel-card-header">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></span>
         <h2>Text awareness</h2>
         <span class="panel-eyebrow" data-ta-total></span>
-      </div>
-      <p class="panel-sender-note ta-intro">The texts scrolling in the bar at the top of the home page. Only live ones are shown to readers.</p>
-
-      <div class="ta-layout">
-        <div class="ta-compose">
-          <h3 class="ta-subhead">Add new text</h3>
-          <form class="panel-form" data-ta-form data-endpoint="{% url 'control:panel_text_awareness_create' %}">
-            <div class="panel-field">
-              <label for="ta-content">Text <small data-ta-count>0 / 400</small></label>
-              <textarea id="ta-content" name="content" rows="3" maxlength="400" required placeholder="" data-ta-content></textarea>
-            </div>
-            <div class="panel-field">
-              <label for="ta-url">Link <small>(optional)</small></label>
-              <input id="ta-url" type="url" name="url" placeholder="https://...">
-            </div>
-            <div class="panel-field">
-              <label for="ta-expiry">Stops showing on</label>
-              <input id="ta-expiry" type="datetime-local" name="expiry_date" required>
-            </div>
-            <input type="hidden" name="is_active" value="1">
-            <div class="ta-preview" aria-hidden="true">
-              <span class="ta-preview-label">Preview</span>
-              <span class="ta-preview-text" data-ta-preview>Your text appears here</span>
-            </div>
-            <button type="submit" class="panel-primary-btn ta-add-btn">Add text</button>
-          </form>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Text awareness" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <div class="ta-layout">
+          <div class="ta-compose">
+            <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg><span class="panel-sr">Add new text</span></h3>
+            <form class="panel-form" data-ta-form data-endpoint="{% url 'control:panel_text_awareness_create' %}">
+              <div class="panel-field">
+                <label for="ta-content">Text <small data-ta-count>0 / 400</small></label>
+                <textarea id="ta-content" name="content" rows="3" maxlength="400" required placeholder="" data-ta-content></textarea>
+              </div>
+              <div class="panel-field">
+                <label for="ta-url"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg><span class="panel-sr">Link, optional</span></label>
+                <input id="ta-url" type="url" name="url" placeholder="https://...">
+              </div>
+              <div class="panel-field">
+                <label for="ta-expiry"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg><span class="panel-sr">Stops showing on</span></label>
+                <input id="ta-expiry" type="datetime-local" name="expiry_date" required>
+              </div>
+              <input type="hidden" name="is_active" value="1">
+              <div class="ta-preview" aria-hidden="true">
+                <span class="ta-preview-label">Preview</span>
+                <span class="ta-preview-text" data-ta-preview>Your text appears here</span>
+              </div>
+              <button type="submit" class="panel-primary-btn ta-add-btn" aria-label="Add text" title="Add text"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+            </form>
+          </div>
 
-        <div class="ta-feed">
-          <h3 class="ta-subhead">Currently Added</h3>
-          <div class="ta-list" data-ta-list
-               data-update-endpoint="{% url 'control:panel_text_awareness_update' 0 %}"
-               data-delete-endpoint="{% url 'control:panel_text_awareness_delete' 0 %}"></div>
+          <div class="ta-feed">
+            <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg><span class="panel-sr">Currently added</span></h3>
+            <div class="ta-list" data-ta-list
+                 data-update-endpoint="{% url 'control:panel_text_awareness_update' 0 %}"
+                 data-delete-endpoint="{% url 'control:panel_text_awareness_delete' 0 %}"></div>
+          </div>
         </div>
-      </div>
-      {{ text_awareness_items|json_script:"ta-initial" }}
+        {{ text_awareness_items|json_script:"ta-initial" }}
+      </div></div>
+    </section>
+
+    <section class="panel-card panel-card-wide" id="panel-image-adverts" aria-label="Image adverts">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg></span>
+        <h2>Image adverts</h2>
+        <span class="panel-eyebrow" data-ad-total></span>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Image adverts" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+        </div>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <div class="ta-layout">
+          <div class="ta-compose">
+            <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg><span class="panel-sr">Add new advert</span></h3>
+            <form class="panel-form" data-ad-form data-endpoint="{% url 'control:panel_image_advert_create' %}">
+              <label class="ad-drop" for="ad-image" data-ad-drop title="JPG or PNG, 5 MB max">
+                <input id="ad-image" class="panel-file-input" type="file" name="image" accept="image/jpeg,image/png" required data-ad-file>
+                <img class="ad-drop-preview" alt="" hidden data-ad-preview>
+                <span class="ad-drop-empty" data-ad-empty><svg class="ic ic-lg" aria-hidden="true"><use href="#i-upload"/></svg><span class="panel-sr">Choose a JPG or PNG picture</span></span>
+                <span class="ad-drop-caption" aria-hidden="true" hidden data-ad-caption>
+                  <span class="ad-drop-caption-heading" data-ad-caption-heading></span>
+                  <span class="ad-drop-caption-body" data-ad-caption-body></span>
+                </span>
+              </label>
+              <div class="panel-field">
+                <label for="ad-heading">Heading <small data-ad-count-heading>0 / 90</small></label>
+                <input id="ad-heading" type="text" name="heading" maxlength="90" autocomplete="off" data-ad-heading>
+              </div>
+              <div class="panel-field">
+                <label for="ad-body">Text <small data-ad-count-body>0 / 200</small></label>
+                <textarea id="ad-body" name="body" rows="2" maxlength="200" data-ad-body></textarea>
+              </div>
+              <div class="panel-field">
+                <label for="ad-url"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg><span class="panel-sr">Opens this link when clicked, optional</span></label>
+                <input id="ad-url" type="url" name="url" placeholder="https://...">
+              </div>
+              <div class="panel-field">
+                <label for="ad-expiry"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg><span class="panel-sr">Stops showing on</span></label>
+                <input id="ad-expiry" type="datetime-local" name="expiry_date" required>
+              </div>
+              <input type="hidden" name="is_active" value="1">
+              <button type="submit" class="panel-primary-btn ta-add-btn" aria-label="Add advert" title="Add advert"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+            </form>
+          </div>
+
+          <div class="ta-feed">
+            <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg><span class="panel-sr">Currently added</span></h3>
+            <div class="ta-list" data-ad-list
+                 data-update-endpoint="{% url 'control:panel_image_advert_update' 0 %}"
+                 data-delete-endpoint="{% url 'control:panel_image_advert_delete' 0 %}"></div>
+          </div>
+        </div>
+        {{ image_advert_items|json_script:"ad-initial" }}
+      </div></div>
     </section>
 
     <section class="panel-card" id="panel-mass-email" aria-label="Send mass email">
-      <div class="panel-card-header">
-        <h2>Send mass email</h2>
-      </div>
-      {% if not sender_full_name %}
-        <p class="panel-warning">Your staff profile has no full name set. Add one on your profile before you can send mass email.</p>
-      {% endif %}
-      <form class="panel-form" data-mass-email-form data-endpoint="{% url 'control:panel_mass_email' %}" data-search-endpoint="{% url 'control:panel_staff_search' %}">
-        <div class="panel-field">
-          <label for="mass-email-subject">Email heading</label>
-          <input id="mass-email-subject" type="text" name="subject" maxlength="150" required placeholder="e.g. Scheduled maintenance this weekend">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg></span>
+        <h2>Mass email</h2>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Mass email" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
-        <div class="panel-field">
-          <label for="mass-email-body">Message body</label>
-          <textarea id="mass-email-body" name="body" rows="5" required placeholder="Write the message..."></textarea>
-        </div>
-
-        <div class="panel-field">
-          <label>Recipients</label>
-          <div class="panel-toggle-row" data-recipient-toggles>
-            <button type="button" class="panel-toggle-chip" data-toggle="member">Member</button>
-            <button type="button" class="panel-toggle-chip" data-toggle="staff">Staff</button>
-            <button type="button" class="panel-toggle-chip" data-toggle="admin">Admin</button>
-            <button type="button" class="panel-toggle-chip panel-toggle-add" data-toggle-add>+ Search</button>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        {% if not sender_full_name %}
+          <p class="panel-warning">Your staff profile has no full name set. Add one on your profile before you can send mass email.</p>
+        {% endif %}
+        <form class="panel-form" data-mass-email-form data-endpoint="{% url 'control:panel_mass_email' %}" data-search-endpoint="{% url 'control:panel_staff_search' %}">
+          <div class="panel-field">
+            <label for="mass-email-subject">Heading</label>
+            <input id="mass-email-subject" type="text" name="subject" maxlength="150" required placeholder="e.g. Scheduled maintenance this weekend">
           </div>
-          <div class="panel-recipient-search" data-recipient-search hidden>
-            <input type="text" placeholder="Search staff by full name..." data-recipient-search-input>
-            <div class="panel-recipient-results" data-recipient-results></div>
+          <div class="panel-field">
+            <label for="mass-email-body">Message</label>
+            <textarea id="mass-email-body" name="body" rows="5" required placeholder="Write the message..."></textarea>
           </div>
-          <div class="panel-recipient-pills" data-recipient-pills></div>
-          <input type="hidden" name="extra_account_ids" data-extra-account-ids value="">
-        </div>
 
-        <div class="panel-form-footer">
-          <span class="panel-sender-note">From: {{ sender_full_name|default:"—" }} &middot; recipient addresses stay hidden</span>
-          <button type="submit" class="panel-primary-btn" data-mass-email-send {% if not sender_full_name %}disabled{% endif %}>Send</button>
-        </div>
-      </form>
+          <div class="panel-field">
+            <label><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="panel-sr">Recipients</span></label>
+            <div class="panel-toggle-row" data-recipient-toggles>
+              <button type="button" class="panel-toggle-chip" data-toggle="member">Member</button>
+              <button type="button" class="panel-toggle-chip" data-toggle="staff">Staff</button>
+              <button type="button" class="panel-toggle-chip" data-toggle="admin">Admin</button>
+              <button type="button" class="panel-toggle-chip panel-toggle-add" data-toggle-add aria-label="Search for a person" title="Search for a person"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></button>
+            </div>
+            <div class="panel-recipient-search" data-recipient-search hidden>
+              <input type="text" placeholder="Full name..." aria-label="Search staff by full name" data-recipient-search-input>
+              <div class="panel-recipient-results" data-recipient-results></div>
+            </div>
+            <div class="panel-recipient-pills" data-recipient-pills></div>
+            <input type="hidden" name="extra_account_ids" data-extra-account-ids value="">
+          </div>
+
+          <div class="panel-form-footer">
+            <span class="panel-sender-note" title="Recipient addresses stay hidden"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg> {{ sender_full_name|default:"-" }}</span>
+            <button type="submit" class="panel-primary-btn" data-mass-email-send aria-label="Send" title="Send" {% if not sender_full_name %}disabled{% endif %}><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg></button>
+          </div>
+        </form>
+      </div></div>
     </section>
 
     <section class="panel-card" id="panel-sessions" aria-label="Active sessions">
-      <div class="panel-card-header">
-        <h2>Active sessions</h2>
-        <span class="panel-eyebrow">{{ sessions_total_people }} logged in</span>
-      </div>
-      <div class="panel-row-list" data-sessions-list
-           data-page="{{ sessions_page_obj.number }}"
-           data-num-pages="{{ sessions_page_obj.paginator.num_pages }}"
-           data-has-next="{{ sessions_page_obj.has_next|yesno:'true,false' }}"
-           data-has-previous="{{ sessions_page_obj.has_previous|yesno:'true,false' }}"
-           data-endpoint="{% url 'control:panel_sessions' %}"
-           data-logout-endpoint="{% url 'control:panel_session_logout' 0 %}">
-        {% for row in sessions_rows %}
-        <div class="panel-row" data-session-row data-account-id="{{ row.id }}">
-          <span class="panel-row-main">
-            <span>{{ row.email_masked }}</span>
-            {% if row.logged_in_at %}<span class="panel-row-sub">Logged in {{ row.logged_in_at }}</span>{% endif %}
-          </span>
-          <button type="button" class="panel-danger-link" data-session-logout>Log out</button>
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg></span>
+        <h2>Sessions</h2>
+        <span class="panel-eyebrow">{{ sessions_total_people }}</span>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Sessions" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
-        {% empty %}
-        <p class="empty-copy">Nobody is currently logged in.</p>
-        {% endfor %}
-      </div>
-      <div class="panel-pager" data-sessions-pager></div>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <div class="panel-row-list" data-sessions-list
+             data-page="{{ sessions_page_obj.number }}"
+             data-num-pages="{{ sessions_page_obj.paginator.num_pages }}"
+             data-has-next="{{ sessions_page_obj.has_next|yesno:'true,false' }}"
+             data-has-previous="{{ sessions_page_obj.has_previous|yesno:'true,false' }}"
+             data-endpoint="{% url 'control:panel_sessions' %}"
+             data-logout-endpoint="{% url 'control:panel_session_logout' 0 %}">
+          {% for row in sessions_rows %}
+          <div class="panel-row" data-session-row data-account-id="{{ row.id }}">
+            <span class="panel-row-main">
+              <span>{{ row.email_masked }}</span>
+              {% if row.logged_in_at %}<span class="panel-row-sub">{{ row.logged_in_at }}</span>{% endif %}
+            </span>
+            <button type="button" class="panel-icon-btn panel-icon-danger" data-session-logout aria-label="Log out" title="Log out"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg></button>
+          </div>
+          {% empty %}
+          <p class="panel-empty">Nobody is currently logged in.</p>
+          {% endfor %}
+        </div>
+        <div class="panel-pager" data-sessions-pager></div>
+      </div></div>
     </section>
 
     <section class="panel-card" id="panel-socials" aria-label="Site socials">
-      <div class="panel-card-header">
-        <h2>Site socials</h2>
-      </div>
-      <form class="panel-form" data-settings-form data-endpoint="{% url 'control:panel_settings' %}">
-        <div class="panel-field">
-          <label for="settings-twitter">Twitter / X URL</label>
-          <input id="settings-twitter" type="url" name="twitter_handle" value="{{ site_settings.twitter_handle }}" placeholder="https://x.com/handle">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg></span>
+        <h2>Socials and contacts</h2>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Socials and contacts" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
-        <div class="panel-field">
-          <label for="settings-facebook">Facebook URL</label>
-          <input id="settings-facebook" type="url" name="facebook_handle" value="{{ site_settings.facebook_handle }}" placeholder="https://facebook.com/page">
-        </div>
-        <div class="panel-field">
-          <label for="settings-whatsapp">WhatsApp channel URL</label>
-          <input id="settings-whatsapp" type="url" name="whatsapp_channel" value="{{ site_settings.whatsapp_channel }}" placeholder="https://www.whatsapp.com/channel/...">
-        </div>
-        <div class="panel-field">
-          <label for="settings-promotion">Promotion email <small>(partnership)</small></label>
-          <input id="settings-promotion" type="email" name="promotion_email" value="{{ site_settings.promotion_email }}" placeholder="partnerships@domain">
-        </div>
-        <div class="panel-field">
-          <label for="settings-tech">Tech expert email <small>(glitches)</small></label>
-          <input id="settings-tech" type="email" name="tech_expert_email" value="{{ site_settings.tech_expert_email }}" placeholder="tech@domain">
-        </div>
-        <div class="panel-field">
-          <label for="settings-support">Support email <small>(customer issues)</small></label>
-          <input id="settings-support" type="email" name="support_email" value="{{ site_settings.support_email }}" placeholder="support@domain">
-        </div>
-        <div class="panel-field">
-          <label for="settings-support-mobile">Customer support mobile</label>
-          <input id="settings-support-mobile" type="tel" name="customer_support_mobile" value="{{ site_settings.customer_support_mobile }}" placeholder="+234xxxxxxxxxx">
-        </div>
-        <div class="panel-form-footer">
-          <span class="panel-sender-note" data-settings-feedback></span>
-          <button type="submit" class="panel-primary-btn">Save</button>
-        </div>
-      </form>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <form class="panel-form" data-settings-form data-endpoint="{% url 'control:panel_settings' %}">
+          <div class="panel-field-grid">
+            <div class="panel-field">
+              <label for="settings-twitter">Twitter / X</label>
+              <input id="settings-twitter" type="url" name="twitter_handle" value="{{ site_settings.twitter_handle }}" placeholder="https://x.com/handle">
+            </div>
+            <div class="panel-field">
+              <label for="settings-facebook">Facebook</label>
+              <input id="settings-facebook" type="url" name="facebook_handle" value="{{ site_settings.facebook_handle }}" placeholder="https://facebook.com/page">
+            </div>
+            <div class="panel-field">
+              <label for="settings-whatsapp">WhatsApp channel</label>
+              <input id="settings-whatsapp" type="url" name="whatsapp_channel" value="{{ site_settings.whatsapp_channel }}" placeholder="https://www.whatsapp.com/channel/...">
+            </div>
+            <div class="panel-field">
+              <label for="settings-support-mobile">Support mobile</label>
+              <input id="settings-support-mobile" type="tel" name="customer_support_mobile" value="{{ site_settings.customer_support_mobile }}" placeholder="+234xxxxxxxxxx">
+            </div>
+            <div class="panel-field">
+              <label for="settings-promotion">Promotion email <small>(partnership)</small></label>
+              <input id="settings-promotion" type="email" name="promotion_email" value="{{ site_settings.promotion_email }}" placeholder="partnerships@domain">
+            </div>
+            <div class="panel-field">
+              <label for="settings-tech">Tech expert email <small>(glitches)</small></label>
+              <input id="settings-tech" type="email" name="tech_expert_email" value="{{ site_settings.tech_expert_email }}" placeholder="tech@domain">
+            </div>
+            <div class="panel-field">
+              <label for="settings-support">Support email <small>(customer issues)</small></label>
+              <input id="settings-support" type="email" name="support_email" value="{{ site_settings.support_email }}" placeholder="support@domain">
+            </div>
+          </div>
+          <div class="panel-form-footer">
+            <span class="panel-sender-note" data-settings-feedback></span>
+            <button type="submit" class="panel-primary-btn" aria-label="Save" title="Save"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></button>
+          </div>
+        </form>
+      </div></div>
     </section>
 
     <section class="panel-card" id="panel-categories" aria-label="News categories">
-      <div class="panel-card-header">
-        <h2>News categories</h2>
-        <span class="panel-eyebrow" data-category-total>{{ category_rows|length }} active</span>
-      </div>
-      <form class="panel-form" data-category-form data-endpoint="{% url 'control:panel_category_create' %}">
-        <div class="panel-field">
-          <label for="category-name">Add a category</label>
-          <input id="category-name" type="text" name="name" maxlength="20" required autocomplete="off" placeholder="e.g. Sports">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg></span>
+        <h2>Categories</h2>
+        <span class="panel-eyebrow" data-category-total>{{ category_rows|length }}</span>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Categories" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
-        <div class="panel-form-footer">
-          <button type="submit" class="panel-primary-btn">Add</button>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <form class="panel-inline-form" data-category-form data-endpoint="{% url 'control:panel_category_create' %}">
+          <div class="panel-field">
+            <label class="panel-sr" for="category-name">Add a category</label>
+            <input id="category-name" type="text" name="name" maxlength="20" required autocomplete="off" placeholder="New category, e.g. Sports">
+          </div>
+          <button type="submit" class="panel-primary-btn" aria-label="Add category" title="Add category"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+        </form>
+        <div class="panel-row-list" data-category-list data-delete-endpoint="{% url 'control:panel_category_delete' 0 %}">
+          {% for category in category_rows %}
+          <div class="panel-row" data-category-row data-category-id="{{ category.id }}" data-category-label="{{ category.label }}" data-story-count="{{ category.story_count }}">
+            <span class="panel-row-main">
+              <span>{{ category.label }}</span>
+              <span class="panel-row-sub" data-category-stories>{{ category.story_count }} stor{{ category.story_count|pluralize:"y,ies" }}</span>
+            </span>
+            <button type="button" class="panel-icon-btn panel-icon-danger" data-category-remove aria-label="Remove {{ category.label }}" title="Remove"><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg></button>
+          </div>
+          {% empty %}
+          <p class="panel-empty" data-category-empty>No categories yet.</p>
+          {% endfor %}
         </div>
-      </form>
-      <div class="panel-row-list" data-category-list data-delete-endpoint="{% url 'control:panel_category_delete' 0 %}">
-        {% for category in category_rows %}
-        <div class="panel-row" data-category-row data-category-id="{{ category.id }}" data-category-label="{{ category.label }}" data-story-count="{{ category.story_count }}">
-          <span class="panel-row-main">
-            <span>{{ category.label }}</span>
-            <span class="panel-row-sub" data-category-stories>{{ category.story_count }} stor{{ category.story_count|pluralize:"y,ies" }}</span>
-          </span>
-          <button type="button" class="panel-danger-link" data-category-remove>Remove</button>
-        </div>
-        {% empty %}
-        <p class="empty-copy" data-category-empty>No categories yet.</p>
-        {% endfor %}
-      </div>
+      </div></div>
     </section>
 
     <section class="panel-card panel-card-wide" id="panel-speciality" aria-label="Search staff by speciality">
-      <div class="panel-card-header">
-        <h2>Search staff by speciality</h2>
-      </div>
-      <div class="panel-field">
-        <input type="search" placeholder="e.g. Politics, Education" data-speciality-input data-endpoint="{% url 'control:panel_speciality' %}">
-      </div>
-      <div class="panel-row-list" data-speciality-list data-page="1"></div>
-      <div class="panel-pager" data-speciality-pager></div>
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span>
+        <h2>Speciality</h2>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Speciality" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+        </div>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <div class="panel-field">
+          <label class="panel-sr" for="speciality-search">Search staff by speciality</label>
+          <input id="speciality-search" type="search" placeholder="e.g. Politics, Education" data-speciality-input data-endpoint="{% url 'control:panel_speciality' %}">
+        </div>
+        <div class="panel-row-list" data-speciality-list data-page="1"></div>
+        <div class="panel-pager" data-speciality-pager></div>
+      </div></div>
     </section>
 
   </div>

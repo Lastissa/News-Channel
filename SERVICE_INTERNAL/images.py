@@ -192,6 +192,22 @@ def upload_news_image(file, quality=ImageQuality.MEDIUM, public_id: str | None =
     return {"secure_url": result.get("secure_url") or result.get("url"), "public_id": result.get("public_id", "")}
 
 
+#   Image adverts (HOME hero side carousel). One fixed preset, no quality
+#   choice: wide enough for the desktop slide, capped so a huge photo never
+#   goes down the wire.
+_ADVERT_IMAGE_PRESET = {"quality": "auto:good", "width": 1200, "crop": "limit"}
+
+
+def upload_advert_image(file, public_id: str | None = None) -> dict:
+    """Panel "Image adverts" upload. `public_id` is the asset an advert
+    ALREADY lives at (`AdvertImage.image_public_id`): pass it when replacing
+    the picture and the new one overwrites it in place, leave it unset for a
+    new advert and save the returned `public_id` on the row."""
+    _validate_image_file(file)
+    result = _run_upload(file, folder="abureport/adverts", preset=_ADVERT_IMAGE_PRESET, tag="advert", public_id=public_id)
+    return {"secure_url": result.get("secure_url") or result.get("url"), "public_id": result.get("public_id", "")}
+
+
 #   NON-IMAGE FILE UPLOAD SECTION (Archive "Add file")
 #   ------------------------------------------------------------
 #   Cloudinary has no transform pipeline for arbitrary files -- they go up

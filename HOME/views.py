@@ -196,27 +196,24 @@ def _page_context(page, user):
 
 
 def _teaser_items():
-    """Data for the hero's side/teaser carousel (HOME/home.html).
+    """Data for the hero's side picture carousel (HOME/home.html). Each item is
+    {heading, body, image, url}. Real data is the live Partner.AdvertImage rows
+    the admin manages in PANEL (active + not expired, newest first). Until at
+    least one exists the old placeholder slides are shown so the carousel is
+    never empty. The template and hero-teaser.js only read those four keys."""
+    from Partner.models import AdvertImage
+    live = AdvertImage.objects.filter(expiry_date__gte=timezone.now(), is_active=True).order_by("-date_created")
+    if live:
+        return [{"heading": row.heading, "body": row.body, "image": row.image_url, "url": row.url or ""} for row in live]
 
-    TODO: no real data source decided yet. Swap this out (a query, a
-    settings list, whatever it ends up being) once that's settled — the
-    template only ever reads heading / body / image off each item, so as
-    long as this keeps returning dicts with that shape (any of the three
-    can be blank/omitted) nothing else needs to change. Until then it just
-    returns enough identical placeholder slots for the carousel to have
-    something to animate between, and the template falls back to a plain
-    "Coming soon" label whenever heading and body are both empty.
-    """
     from django.templatetags.static import static
     curent_dummy_image = [
         static('partner/ad_demo_1.jpg'),
         static('partner/ad_demo_2.png'),
         static('partner/ad_demo_3.jpg'),
-        static('partner/ad_demo_4.jpg'),
-        static('partner/ad_demo_5.jpg'),
     ]
     len_current_dummy = len(curent_dummy_image) -1  if bool(curent_dummy_image) else 0
-    return [{"heading": f"Hello fam {_}", "body": "body", "image": curent_dummy_image[random.randint(0, len_current_dummy)]} for _ in range(TEASER_PLACEHOLDER_COUNT)]
+    return [{"heading": f"Have something to promote? Let’s help you get the word out! Whether it’s your business, product, service, or event, we’d love to help you reach more people.", "body": "Tap the image above to reach us and let’s work together!", "image": curent_dummy_image[random.randint(0, len_current_dummy)], "url": ""} for _ in range(TEASER_PLACEHOLDER_COUNT)]
 
 
 def _resolve_page_number(raw_value, *, default=1):

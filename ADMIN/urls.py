@@ -31,4 +31,7 @@ urlpatterns = [
     path("panel/text-awareness/", views.PanelTextAwarenessCreateView.as_view(), name="panel_text_awareness_create"),
     path("panel/text-awareness/<int:item_id>/update/", views.PanelTextAwarenessUpdateView.as_view(), name="panel_text_awareness_update"),
     path("panel/text-awareness/<int:item_id>/delete/", views.PanelTextAwarenessDeleteView.as_view(), name="panel_text_awareness_delete"),
+    path("panel/image-adverts/", views.PanelImageAdvertCreateView.as_view(), name="panel_image_advert_create"),
+    path("panel/image-adverts/<int:item_id>/update/", views.PanelImageAdvertUpdateView.as_view(), name="panel_image_advert_update"),
+    path("panel/image-adverts/<int:item_id>/delete/", views.PanelImageAdvertDeleteView.as_view(), name="panel_image_advert_delete"),
 ]
