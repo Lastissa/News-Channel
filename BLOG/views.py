@@ -354,6 +354,7 @@ class StoryDetailView(View):
         if author_profile and isinstance(author_profile.speciality, list):
             author_tags = [str(tag).strip() for tag in author_profile.speciality if str(tag).strip()]
 
+        # TODO: ADD ALSO LATEST FROM AUTHOR REMOVING THE CURRENT STORY AND CAP AT 3
         author_most_viewed_stories = (
             Blog.objects.filter(author=blog.author)
             .exclude(pk=blog.pk)
@@ -379,7 +380,7 @@ class StoryDetailView(View):
                 hashlib.sha256,
             ).hexdigest()
             view_dedupe_key = f"story-view:{blog.pk}:{address_hash}"
-            if cache.add(view_dedupe_key, "1", timeout=5):
+            if cache.add(view_dedupe_key, "1", timeout=60):
                 Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
                 blog.refresh_from_db(fields=["views"])
 

@@ -4,45 +4,43 @@
   /* Guest gate: when a signed out visitor taps like, comment, save or follow, the
      server answers 401 and interactions.js calls AbuAuthGate.open(kind). A blurred
      popup then holds the create account / sign in card (an iframe on /auth/gate/).
-     When the iframe reports that a session now exists, the popup closes, the page
-     reloads once so the header and every form match the signed in user, and a
-     success toast tells the reader to go ahead with what they were doing. */
+     When the iframe reports that a session now exists, the popup closes and a
+     success toast tells the reader to go ahead with what they were doing. No page
+     reload: the popup simply goes away. */
 
   var GATE_URL = "/auth/gate/";
-  var TOAST_KEY = "abureport-gate-toast";
-  var DRAFT_KEY = "abureport-gate-comment";
 
   /* Copy per action. Edit the words here, nothing else reads them. */
   var COPY = {
     like: {
-      title: "A like is how an author knows the work is being appreciated.",
-      hook: "Sign in to like story",
+      title: "Sign in to like this story.",
+      hook: "Create an account or sign in.",
       verb: "like this story"
     },
     comment: {
-      title: "writers read every comment, and yours could be the one that keeps them going.",
-      hook: "Sign in to join the conversation",
+      title: "Sign in to post a comment.",
+      hook: "Create an account or sign in.",
       verb: "post your comment"
     },
     "comment-like": {
-      title: "To avoid Spam, SIgnin is required to like a comment.",
-      hook: "The Reader Who Made This Comment Will Notice.",
+      title: "Sign in to like a comment.",
+      hook: "Create an account or sign in.",
       verb: "like this comment"
     },
     bookmark: {
-      title: "Saving a story helps you find it later.",
-      hook: "But how do we know where to attach it if you do not sign up?",
+      title: "Sign in to save this story.",
+      hook: "Create an account or sign in.",
       verb: "save this story"
     },
     follow: {
-      title: "Followers are what let an author Know they have people rooting for their work",
-      hook: "Signup To Follow Author.",
+      title: "Sign in to follow this author.",
+      hook: "Create an account or sign in.",
       verb: "follow this author"
     }
   };
   var FALLBACK = {
-    title: "This Action You Want To Perform Need Authentication.",
-    hook: "signin to continue.",
+    title: "Sign in to continue.",
+    hook: "Create an account or sign in.",
     verb: "continue"
   };
 
@@ -63,7 +61,7 @@
         '<button type="button" class="auth-gate-close" data-gate-close aria-label="Close">' +
           '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
         '</button>' +
-        '<p class="auth-gate-eyebrow">Support the author</p>' +
+        '<p class="auth-gate-eyebrow">Members only</p>' +
         '<h2 class="auth-gate-title" id="auth-gate-title" data-gate-title></h2>' +
         '<p class="auth-gate-hook" data-gate-hook></p>' +
         '<div class="auth-gate-frame-wrap"><iframe class="auth-gate-frame" title="Create an account or sign in" data-gate-frame></iframe></div>' +
@@ -136,37 +134,13 @@
 
     var verb = (current || FALLBACK).verb;
     var message = (data.mode === "register" ? "Account created. " : "Signed in. ") +
-      (verb === "continue" ? "You can continue where you left off." : "You can now " + verb + ".");
+      (verb === "continue" ? "You can continue." : "You can now " + verb + ".");
 
-    /* A comment typed before the popup would vanish in the reload, so keep it. */
-    try {
-      var box = document.querySelector("[data-comment-form] textarea[name='comment']");
-      if (box && box.value.trim()) {
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ path: window.location.pathname, text: box.value }));
-      }
-      sessionStorage.setItem(TOAST_KEY, message);
-    } catch (e) {}
-
+    /* No full page reload: just close the popup and say what happened. The
+       action that opened the gate can be retried right away. */
     close(false);
-    window.setTimeout(function () { window.location.reload(); }, 280);
-  });
-
-  /* After the reload: restore the draft and show the success toast. */
-  document.addEventListener("DOMContentLoaded", function () {
-    var message = null;
-    try {
-      message = sessionStorage.getItem(TOAST_KEY);
-      sessionStorage.removeItem(TOAST_KEY);
-      var raw = sessionStorage.getItem(DRAFT_KEY);
-      sessionStorage.removeItem(DRAFT_KEY);
-      if (raw) {
-        var draft = JSON.parse(raw);
-        var box = document.querySelector("[data-comment-form] textarea[name='comment']");
-        if (box && draft && draft.path === window.location.pathname && !box.value) box.value = draft.text;
-      }
-    } catch (e) {}
-    if (message && typeof window.AbuToast === "function") {
-      window.setTimeout(function () { window.AbuToast(message, "success"); }, 250);
+    if (typeof window.AbuToast === "function") {
+      window.setTimeout(function () { window.AbuToast(message, "success"); }, 120);
     }
   });
 

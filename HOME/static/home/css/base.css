@@ -2066,5 +2066,116 @@ html.nav-locked { overflow: hidden; }
   .comment-header { flex-direction: row; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 }
 
+/* =====================================================================
+   MOBILE HARDENING + HOME BREATHING SPACE + DESKTOP NAV SAFETY
+   Kept at the end of the file so these overrides win regardless of order.
+   ===================================================================== */
+
+/* ---- Desktop: keep the nav link row from ever painting over the search.
+   At 900-1100px the full row is too wide for the header bar, so spacing
+   tightens there (gap + row padding) and the decorative "Soon" chip on the
+   disabled Services link steps aside. The row itself stays intact -- every
+   link, including Logout, remains visible and clickable, and dropdown menus
+   are never clipped because no overflow container is created. */
+@media (min-width: 900px) and (max-width: 1099.98px) {
+  .primary-nav ul { gap: 8px; }
+  .primary-nav > ul > li > a,
+  .primary-nav .dropdown-toggle { padding: 6px 2px; }
+  .primary-nav a.soon .soon-tag { display: none; }
+}
+
+/* ---- Hero teaser (image adverts) on phones: real caption bar + AD chip.
+   Desktop already shows a paper caption bar under each advert picture;
+   mobile used to strip it to a bare 96px image. Now each picture keeps a
+   compact paper bar with an "AD" parallelogram label and a two-line heading,
+   so the ad block reads as a deliberate ad unit. The slides get a little
+   taller to fit picture + bar. */
+@media (max-width: 899.98px) {
+  .hero-teaser { margin-top: 24px; padding: 1px 12px 10px; }
+
+  .teaser-slide { height: 128px; }
+  .teaser-slide.has-image .teaser-slide-inner {
+    display: block; width: 100%; text-align: left;
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 7px 10px 9px;
+    background: var(--paper); border-top: 2px solid var(--brand-deep);
+    border-radius: 0 0 var(--radius-m) var(--radius-m);
+  }
+  .teaser-slide.has-image .teaser-slide-inner::before {
+    content: "AD"; display: block; width: max-content; margin-bottom: 4px;
+    padding: 1px 8px 1px 6px; background: var(--brand-deep); color: var(--paper);
+    font-size: 0.56rem; font-weight: 800; letter-spacing: 0.14em; line-height: 1.7;
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  }
+  .teaser-slide.has-image .teaser-heading {
+    margin: 0; font-size: 0.74rem; line-height: 1.25; color: var(--ink);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+  .teaser-slide.has-image .teaser-body { display: none; }
+
+  /* story grid: a touch more air below the cards */
+  .story-grid-section { padding: 28px 20px 24px; }
+}
+
+/* ---- Footer newsletter form: input and button sit side by side and only
+   wrap to two lines when the row cannot hold both. */
+@media (max-width: 719.98px) {
+  .newsletter-form { flex-wrap: wrap; justify-content: center; }
+  .newsletter-form input { flex: 1 1 170px; min-width: 0; }
+  .newsletter-form button { flex: 0 0 auto; }
+}
+
+/* ---- Phones and small tablets: large, thumb-friendly tap targets across
+   the site. 44px is the comfortable minimum; the icon-only bookmark chips
+   become squares while the labelled ones stay pills but grow to 44px tall. */
+@media (max-width: 899.98px) {
+  .icon-btn { width: 44px; height: 44px; }
+  .search-form input { padding: 12px 14px; }
+
+  .hero-arrow { width: 44px; height: 44px; }
+  .hero-dot { width: 12px; height: 12px; position: relative; }
+  .hero-dot::after { content: ""; position: absolute; inset: -9px; }
+  .hero-bookmark { top: 14px; right: 14px; }
+  .hero-bookmark .bookmark-chip { width: 44px; height: 44px; }
+
+  .password-toggle { width: 44px; height: 44px; }
+  .auth-submit { min-height: 46px; }
+  .auth-form .field-group input { padding: 12px 2px 11px; }
+
+  .tag { padding: 6px 14px; }
+  .story-card-footer .bookmark-chip:not(.has-label) { width: 44px; height: 44px; }
+  .story-card-footer .bookmark-chip.has-label { min-height: 44px; padding: 0 16px; }
+  .story-bookmark-chip { height: 40px; padding: 0 12px; }
+  .comment-submit-btn { width: 100%; min-height: 44px; justify-content: center; }
+  .comment-toolbar .comment-like-btn,
+  .comment-toolbar .comment-delete-btn { height: 44px; min-width: 44px; }
+  .comment-toolbar .comment-like-btn { padding: 0 14px; }
+
+  .newsletter-popup-close { width: 40px; height: 40px; }
+  .newsletter-popup-form input { padding: 13px 14px; }
+  .newsletter-popup-submit,
+  .newsletter-popup-cancel { min-height: 46px; }
+  .newsletter-form input,
+  .newsletter-form button { min-height: 46px; }
+  .auth-gate-close { width: 44px; height: 44px; top: 8px; right: 8px; }
+  .site-toast__close { width: 40px; height: 40px; }
+
+  .footer-categories a { padding: 10px 10px; }
+  .social-row a { width: 44px; height: 44px; }
+  .footer-col .footer-contact-socials a { width: 44px; height: 44px; }
+  .footer-auth-link { min-height: 44px; }
+}
+
+/* ---- Landscape phones: the fixed 45vh hero would be crushed, so let it
+   size to its content with a floor, clear its controls, and pull the
+   advert strip up a little. */
+@media (max-width: 899.98px) and (max-height: 500px) and (orientation: landscape) {
+  .hero { height: auto; min-height: 250px; }
+  .hero-content { padding: 24px 20px 64px; }
+  .hero-controls { bottom: 10px; }
+  .hero-teaser { margin-top: 14px; }
+  .teaser-slide { height: 116px; }
+}
+
 /* purposedly put at the bottom so it only clear when the base.css is fully loaded */
 .dummy-loading{display: none;}
