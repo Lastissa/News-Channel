@@ -40,20 +40,24 @@
     </div>
   </header>
 
-  {# DESCRIPTION SEARCH (key "descr", fuzzy, see ARCHIVE.views._descr_score) and TYPE FILTER (key "kind"). #}
-  {# Both work with htmx (live) and without it (plain GET links and form submit). #}
+  {# DESCRIPTION SEARCH (key "descr", fuzzy, see ARCHIVE.views._descr_score), TYPE FILTER (key "kind"), #}
+  {# CATEGORY FILTER (key "category": picture quality + file-type family, see ARCHIVE_CATEGORIES) and #}
+  {# ADDED BY FILTER (key "uploader": the uploader's pk). All four work with htmx (live) and without it #}
+  {# (plain GET links and form submit). #}
   <div class="archive-toolbar">
     <nav class="archive-tabs" aria-label="Filter by type">
       <a class="archive-tab{% if not kind %} is-active{% endif %}" data-archive-kind-btn="" {% if not kind %}aria-current="true"{% endif %}
-         href="{% url 'archive:gallery' %}{% if descr %}?descr={{ descr|urlencode }}{% endif %}">All</a>
+         href="{% url 'archive:gallery' %}{% if descr %}?descr={{ descr|urlencode }}{% endif %}{% if category %}{% if descr %}&amp;{% else %}?{% endif %}category={{ category }}{% endif %}{% if uploader %}{% if descr or category %}&amp;{% else %}?{% endif %}uploader={{ uploader }}{% endif %}">All</a>
       <a class="archive-tab{% if kind == 'image' %} is-active{% endif %}" data-archive-kind-btn="image" {% if kind == 'image' %}aria-current="true"{% endif %}
-         href="{% url 'archive:gallery' %}?kind=image{% if descr %}&amp;descr={{ descr|urlencode }}{% endif %}">Images</a>
+         href="{% url 'archive:gallery' %}?kind=image{% if descr %}&amp;descr={{ descr|urlencode }}{% endif %}{% if category %}&amp;category={{ category }}{% endif %}{% if uploader %}&amp;uploader={{ uploader }}{% endif %}">Images</a>
       <a class="archive-tab{% if kind == 'file' %} is-active{% endif %}" data-archive-kind-btn="file" {% if kind == 'file' %}aria-current="true"{% endif %}
-         href="{% url 'archive:gallery' %}?kind=file{% if descr %}&amp;descr={{ descr|urlencode }}{% endif %}">Files</a>
+         href="{% url 'archive:gallery' %}?kind=file{% if descr %}&amp;descr={{ descr|urlencode }}{% endif %}{% if category %}&amp;category={{ category }}{% endif %}{% if uploader %}&amp;uploader={{ uploader }}{% endif %}">Files</a>
     </nav>
 
     <form class="archive-search{% if descr %} is-open{% endif %}" role="search" method="get" action="{% url 'archive:gallery' %}" data-archive-search-form>
       <input type="hidden" name="kind" value="{{ kind }}" data-archive-kind>
+      <input type="hidden" name="category" value="{{ category }}" data-archive-grid-category>
+      <input type="hidden" name="uploader" value="{{ uploader }}" data-archive-grid-uploader>
       <div class="archive-search-field">
         <input id="archive-search-descr" class="archive-search-input" type="search" name="descr" value="{{ descr }}"
                maxlength="150" placeholder="Search descriptions" aria-label="Search descriptions" autocomplete="off"
@@ -69,6 +73,31 @@
               aria-expanded="{% if descr %}true{% else %}false{% endif %}" aria-controls="archive-search-descr">
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.6" cy="8.6" r="5.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m12.7 12.7 4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
       </button>
+    </form>
+  </div>
+
+  <div class="archive-filters">
+    <form class="archive-filters-form" method="get" action="{% url 'archive:gallery' %}" data-archive-filters-form>
+      <input type="hidden" name="kind" value="{{ kind }}" data-archive-form-kind>
+      <input type="hidden" name="descr" value="{{ descr }}" data-archive-form-descr>
+      <label class="archive-filter-field">
+        <span class="archive-filter-label">Category</span>
+        <select name="category" class="archive-filter-select" data-archive-category>
+          <option value="">All categories</option>
+          {% for value, label in categories %}
+          <option value="{{ value }}"{% if category == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="archive-filter-field">
+        <span class="archive-filter-label">Added by</span>
+        <select name="uploader" class="archive-filter-select" data-archive-uploader>
+          <option value="">Anyone</option>
+          {% for uploader_option in uploaders %}
+          <option value="{{ uploader_option.pk }}"{% if uploader == uploader_option.pk %} selected{% endif %}>{{ uploader_option.masked }}</option>
+          {% endfor %}
+        </select>
+      </label>
     </form>
   </div>
 

@@ -43,7 +43,28 @@
   var searchToggle = document.querySelector("[data-archive-search-toggle]");
   var kindInput = document.querySelector("[data-archive-kind]");
   var tabs = document.querySelectorAll("[data-archive-kind-btn]");
+  /* category (picture quality + file-type family) and added-by (uploader) filters */
+  var categorySelect = document.querySelector("[data-archive-category]");
+  var uploaderSelect = document.querySelector("[data-archive-uploader]");
+  /* the search form's hidden copy of the two filters, so typing a search keeps them */
+  var gridCategoryInput = document.querySelector("[data-archive-grid-category]");
+  var gridUploaderInput = document.querySelector("[data-archive-grid-uploader]");
+  /* the no-JS GET form's hidden copy of kind + search */
+  var filtersForm = document.querySelector("[data-archive-filters-form]");
+  var formKindInput = document.querySelector("[data-archive-form-kind]");
+  var formDescrInput = document.querySelector("[data-archive-form-descr]");
   var lastOpener = null;
+
+  /* keeps the two hidden copies of the filter/search values in step with the
+     controls the visitor actually changed, so the search input's own hx-post
+     (which serializes the search form) and the no-JS filter form submit both
+     carry the current filters instead of dropping them */
+  function syncFilterCopies() {
+    if (gridCategoryInput) gridCategoryInput.value = categorySelect ? categorySelect.value : "";
+    if (gridUploaderInput) gridUploaderInput.value = uploaderSelect ? uploaderSelect.value : "";
+    if (formKindInput) formKindInput.value = kindInput ? kindInput.value : "";
+    if (formDescrInput) formDescrInput.value = searchInput ? searchInput.value : "";
+  }
 
   function getCookie(name) {
     var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
@@ -114,13 +135,16 @@
     }, 5000);
   }
 
-  /* loads one page of the grid for the current search + type filter */
+  /* loads one page of the grid for the current search + type + category + uploader filter */
   function loadGrid(page) {
     var values = {
       page: page || 1,
       descr: searchInput ? searchInput.value : "",
       kind: kindInput ? kindInput.value : "",
+      category: categorySelect ? categorySelect.value : "",
+      uploader: uploaderSelect ? uploaderSelect.value : "",
     };
+    syncFilterCopies();
     if (window.htmx && galleryEndpoint) {
       window.htmx.ajax("POST", galleryEndpoint, {
         target: "#archive-grid-shell",
@@ -132,6 +156,8 @@
       var query = new URLSearchParams();
       if (values.descr) query.set("descr", values.descr);
       if (values.kind) query.set("kind", values.kind);
+      if (values.category) query.set("category", values.category);
+      if (values.uploader) query.set("uploader", values.uploader);
       if (values.page > 1) query.set("page", values.page);
       window.location.href = galleryEndpoint + (query.toString() ? "?" + query.toString() : "");
     }
@@ -266,34 +292,65 @@
   }
   sweepLoadedImages();
 
-  /* after every swap: tabs, hidden type field and address bar follow what the server actually rendered */
+  /* after every swap: tabs, hidden fields, filter selects and the address bar
+     follow what the server actually rendered */
   function syncFromGrid() {
     var meta = gridShell && gridShell.querySelector("[data-archive-meta]");
     if (!meta) return;
     var kind = meta.dataset.kind || "";
     var page = parseInt(meta.dataset.page, 10) || 1;
     var descr = meta.dataset.descr || "";
+    var category = meta.dataset.category || "";
+    var uploader = meta.dataset.uploader || "";
     if (kindInput) kindInput.value = kind;
+    if (categorySelect) categorySelect.value = category;
+    if (uploaderSelect) uploaderSelect.value = uploader;
+    syncFilterCopies();
     for (var i = 0; i < tabs.length; i++) {
       var active = (tabs[i].dataset.archiveKindBtn || "") === kind;
       tabs[i].classList.toggle("is-active", active);
       if (active) tabs[i].setAttribute("aria-current", "true"); else tabs[i].removeAttribute("aria-current");
-      tabs[i].setAttribute("href", tabHref(tabs[i].dataset.archiveKindBtn || "", descr));
+      tabs[i].setAttribute("href", tabHref(tabs[i].dataset.archiveKindBtn || "", descr, category, uploader));
     }
     var query = new URLSearchParams();
     if (descr) query.set("descr", descr);
     if (kind) query.set("kind", kind);
+    if (category) query.set("category", category);
+    if (uploader) query.set("uploader", uploader);
     if (page > 1) query.set("page", page);
     var qs = query.toString();
     try { window.history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : "")); } catch (err) { /* ignore */ }
   }
 
-  function tabHref(kind, descr) {
+  function tabHref(kind, descr, category, uploader) {
     var query = new URLSearchParams();
     if (kind) query.set("kind", kind);
     if (descr) query.set("descr", descr);
+    if (category) query.set("category", category);
+    if (uploader) query.set("uploader", uploader);
     var qs = query.toString();
     return galleryEndpoint + (qs ? "?" + qs : "");
+  }
+
+  /* ---------- category + added-by filter selects ---------- */
+  function bindFilterSelect(select) {
+    if (!select) return;
+    select.addEventListener("change", function () {
+      syncFilterCopies();
+      loadGrid(1);
+    });
+  }
+  bindFilterSelect(categorySelect);
+  bindFilterSelect(uploaderSelect);
+
+  /* without htmx this is a plain GET form; with it, filter changes go through
+     the same live htmx swap as the tabs */
+  if (filtersForm) {
+    filtersForm.addEventListener("submit", function (event) {
+      if (!window.htmx) return; /* no htmx: plain GET submit keeps kind + search via the hidden copies */
+      event.preventDefault();
+      loadGrid(1);
+    });
   }
 
   /* ---------- type tabs ---------- */

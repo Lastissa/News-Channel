@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.urls import reverse
 
 from AUTHENTICATION.models import Auth
 
@@ -44,3 +45,36 @@ class AuthReturnPathTests(TestCase):
         )
 
         self.assertRedirects(response, "/", fetch_redirect_response=False)
+
+
+class GateConfirmPasswordTests(TestCase):
+    """The guest "Sign in" popup no longer asks for a confirm password (see
+    auth/gate.html); the full register page keeps its confirm box, and the
+    register endpoint still rejects a mismatched confirm when one is sent."""
+
+    def test_gate_popup_has_no_confirm_password_field(self):
+        response = self.client.get(reverse("auth:gate"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Create account")
+        self.assertContains(response, "Sign in")
+        self.assertNotContains(response, "Confirm password")
+        self.assertNotContains(response, "password_confirm")
+
+    def test_registration_without_confirm_password_succeeds(self):
+        response = self.client.post(
+            "/auth/register/",
+            {"email": "no-confirm@example.com", "password": "secret123"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Auth.objects.filter(email="NO-CONFIRM@EXAMPLE.COM").exists())
+
+    def test_registration_with_mismatched_confirm_is_still_rejected(self):
+        response = self.client.post(
+            "/auth/register/",
+            {"email": "mismatch@example.com", "password": "secret123", "password_confirm": "different"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Auth.objects.filter(email="MISMATCH@EXAMPLE.COM").exists())

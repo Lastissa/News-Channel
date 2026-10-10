@@ -209,7 +209,18 @@
     "}"
   ].join("\n");
 
+  var PICKER_TIMEOUT_MS = 5000;
+  var pickerWatchdogTimer = null;
+
+  function clearPickerWatchdog() {
+    if (pickerWatchdogTimer) {
+      window.clearTimeout(pickerWatchdogTimer);
+      pickerWatchdogTimer = null;
+    }
+  }
+
   function styleArchiveFrame() {
+    clearPickerWatchdog();
     if (!archiveFrame) return;
     try {
       var doc = archiveFrame.contentDocument;
@@ -226,13 +237,24 @@
     if (archiveRefreshBtn) archiveRefreshBtn.disabled = false;
   }
 
+  /* Same watchdog the /archive/ page uses: if the picker frame has not
+     loaded within 5 seconds (server down, slow connection), stop the
+     spinner, re-enable refresh and say what happened instead of leaving
+     the frame loading forever. */
   function loadArchiveFrame(force) {
     if (!archiveFrame) return;
     var url = archiveFrame.getAttribute("data-src");
     if (!url) return;
     if (!force && archiveFrame.getAttribute("src")) return;
+    clearPickerWatchdog();
     if (archiveStage) archiveStage.classList.remove("is-loaded");
     archiveFrame.setAttribute("src", url);
+    pickerWatchdogTimer = window.setTimeout(function () {
+      pickerWatchdogTimer = null;
+      if (archiveStage) archiveStage.classList.add("is-loaded");
+      if (archiveRefreshBtn) archiveRefreshBtn.disabled = false;
+      toast("Timeout, please try again.", "error");
+    }, PICKER_TIMEOUT_MS);
   }
 
   function closeArchivePicker() {

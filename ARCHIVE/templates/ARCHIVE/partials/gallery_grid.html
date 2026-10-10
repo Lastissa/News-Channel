@@ -1,11 +1,15 @@
 {% load static %}
 {% load archive_extras %}
-<p class="archive-summary" aria-live="polite" data-archive-meta data-page="{{ page }}" data-kind="{{ kind }}" data-descr="{{ descr }}">
+<p class="archive-summary" aria-live="polite" data-archive-meta data-page="{{ page }}" data-kind="{{ kind }}" data-descr="{{ descr }}" data-category="{{ category }}" data-uploader="{{ uploader }}">
   {% if descr %}
   <span>{{ total }} result{{ total|pluralize }} for &ldquo;{{ descr }}&rdquo;{% if kind == 'image' %} in images{% elif kind == 'file' %} in files{% endif %}</span>
+  {% if category %}<span class="archive-filter-chip">{{ category_label }}</span>{% endif %}
+  {% if uploader %}<span class="archive-filter-chip">Added by {{ uploader_label }}</span>{% endif %}
   <button type="button" class="archive-link-btn" data-archive-clear-search>Clear search</button>
   {% else %}
   <span>{{ total }} {% if kind == 'image' %}image{% elif kind == 'file' %}file{% else %}item{% endif %}{{ total|pluralize }}{% if num_pages > 1 %} &middot; Page {{ page }} of {{ num_pages }}{% endif %}</span>
+  {% if category %}<span class="archive-filter-chip">{{ category_label }}</span>{% endif %}
+  {% if uploader %}<span class="archive-filter-chip">Added by {{ uploader_label }}</span>{% endif %}
   {% endif %}
 </p>
 
@@ -78,7 +82,7 @@
   <nav class="story-pagination archive-pagination" aria-label="Archive pages">
     {% if has_previous %}
     <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ previous_page }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}"}'
+            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ previous_page }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}", "category": "{{ category|escapejs }}", "uploader": "{{ uploader|escapejs }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-target="#archive-grid-shell" hx-swap="innerHTML" aria-label="Previous page">Prev</button>
     {% endif %}
@@ -87,7 +91,7 @@
         <span class="story-page-btn is-ellipsis" aria-hidden="true">…</span>
       {% else %}
         <button type="button" class="story-page-btn {% if page_num == page %}is-active{% endif %}" data-archive-page-btn
-                hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ page_num }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}"}'
+                hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ page_num }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}", "category": "{{ category|escapejs }}", "uploader": "{{ uploader|escapejs }}"}'
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-target="#archive-grid-shell" hx-swap="innerHTML"
                 {% if page_num == page %}aria-current="page"{% endif %}
@@ -96,7 +100,7 @@
     {% endfor %}
     {% if has_next %}
     <button type="button" class="story-page-btn page-nav" data-archive-page-btn
-            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ next_page }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}"}'
+            hx-post="{% url 'archive:gallery' %}" hx-vals='{"page": "{{ next_page }}", "descr": "{{ descr|escapejs }}", "kind": "{{ kind }}", "category": "{{ category|escapejs }}", "uploader": "{{ uploader|escapejs }}"}'
             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
             hx-target="#archive-grid-shell" hx-swap="innerHTML" aria-label="Next page">Next</button>
     {% endif %}

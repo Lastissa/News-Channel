@@ -144,13 +144,16 @@ class RegisterView(View):
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         email = (request.POST.get("email") or "").strip()
         password = (request.POST.get("password") or "").strip()
+        #   The confirm box only exists on the full register page (auth/register.html);
+        #   the guest popup (auth/gate.html) has no confirm field. The match is only
+        #   enforced when a confirm value was actually sent, so both forms stay safe.
         confirm = (request.POST.get("password_confirm") or "").strip()
 
         if not email or not password:
             error = "Email and password are required."
         elif "@" not in email:
             error = "Enter a valid email address."
-        elif password != confirm:
+        elif confirm and password != confirm:
             error = "Passwords do not match."
         elif len(password) < 6:
             error = "Password must be at least 6 characters long."

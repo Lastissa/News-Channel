@@ -59,6 +59,41 @@ KIND_FILTERS = (ArchiveKind.IMAGE, ArchiveKind.FILE)
 #   before the " - ..." blurb in ImageQuality.CHOICES.
 QUALITY_LABELS = {value: label.split(" - ")[0] for value, label in ImageQuality.CHOICES}
 
+#   CATEGORY FILTER ("category" key on the gallery page): every visible
+#   grouping an item can belong to. Pictures group by their stored quality
+#   ("image-low" / "image-medium" / "image-high"), plain files by their type
+#   family below. Anything else a visitor types is ignored ("" == everything).
+ARCHIVE_CATEGORIES = (
+    ("image-low", "Image: Low quality"),
+    ("image-medium", "Image: Medium quality"),
+    ("image-high", "Image: High quality"),
+    ("pdf", "PDF"),
+    ("document", "Document"),
+    ("spreadsheet", "Spreadsheet"),
+    ("presentation", "Presentation"),
+    ("audio", "Audio"),
+    ("video", "Video"),
+    ("archive", "Archive file"),
+    ("data", "Data file"),
+    ("other", "Other file"),
+)
+VALID_CATEGORY_KEYS = {key for key, _label in ARCHIVE_CATEGORIES}
+
+#   File-extension -> family key for the FILE half of the category filter.
+#   Anything not listed lands in "other". The keys are the same "keywords"
+#   ARCHIVE_CATEGORIES uses, and values are uppercase because
+#   _file_extension() always uppercases.
+_EXT_TO_FAMILY = {
+    "PDF": "pdf",
+    "DOC": "document", "DOCX": "document", "RTF": "document", "TXT": "document", "ODT": "document",
+    "XLS": "spreadsheet", "XLSX": "spreadsheet", "CSV": "spreadsheet", "ODS": "spreadsheet",
+    "PPT": "presentation", "PPTX": "presentation", "ODP": "presentation",
+    "MP3": "audio", "WAV": "audio", "OGG": "audio", "M4A": "audio", "AAC": "audio", "FLAC": "audio",
+    "MP4": "video", "MOV": "video", "AVI": "video", "MKV": "video", "WEBM": "video", "M4V": "video",
+    "ZIP": "archive", "RAR": "archive", "7Z": "archive", "TAR": "archive", "GZ": "archive",
+    "JSON": "data", "XML": "data",
+}
+
 #   File sizes are always shown human readable ("2.4 MB"), never as a raw
 #   byte count -- see _human_file_size below.
 _SIZE_UNITS = ("bytes", "KB", "MB", "GB")
@@ -167,19 +202,27 @@ def _descr_score(query_words, description):
     return total / len(query_words)
 
 
-def _descr_ranked_ids(descr, kind=""):
+def _descr_ranked_ids(descr, kind="", category="", uploader=""):
     """Ids of every item whose description matches `descr` (fuzzy, see above),
-    best match first, newest first among equal matches. Only id + alt are
-    read from the database, the comparison itself is done here. `kind`
-    ("" or an ArchiveKind) narrows the candidates before the comparison."""
+    best match first, newest first among equal matches. Only the fields the
+    comparison needs are read from the database. `kind` ("" or an
+    ArchiveKind), `category` ("" or a category key) and `uploader` ("", or
+    an uploader pk) narrow the candidates before the comparison, the same
+    way the plain grid filters narrow it."""
     query_words = _descr_words(descr)
     if not query_words:
         return []
     candidates = ArchiveImage.objects.order_by("-date_created")
     if kind:
         candidates = candidates.filter(kind=kind)
+    if uploader:
+        candidates = candidates.filter(author_id=int(uploader))
     scored = []
-    for item_id, alt in candidates.values_list("id", "alt"):
+    for item_id, alt, item_kind, quality, original_filename in candidates.values_list(
+        "id", "alt", "kind", "quality", "original_filename"
+    ):
+        if category and _row_category(item_kind, quality, original_filename) != category:
+            continue
         score = _descr_score(query_words, alt)
         if score is not None:
             scored.append((score, item_id))
@@ -194,6 +237,94 @@ def _clean_descr(raw_value):
 def _clean_kind(raw_value):
     value = (raw_value or "").strip().lower()
     return value if value in KIND_FILTERS else ""
+
+
+def _row_category(item_kind, quality, original_filename):
+    """The category key a single row belongs to, without building a model.
+    Pictures group by their stored quality ("image-low" / "image-medium" /
+    "image-high"); a picture whose quality value broke somehow has no
+    category (""), so it never shows up under a category filter. Plain
+    files always have one of the FILE half families, with unknown
+    extensions falling into "other"."""
+    if item_kind == ArchiveKind.IMAGE:
+        quality_value = (quality or "").lower()
+        return f"image-{quality_value}" if quality_value in QUALITY_LABELS else ""
+    return _file_category(original_filename)
+
+
+def _file_category(name):
+    """The file-type family key for a plain file by its original filename
+    ("pdf", "document", "spreadsheet", "presentation", "audio", "video",
+    "archive", "data"), or "other" when the extension is not recognized."""
+    return _EXT_TO_FAMILY.get(_file_extension(name), "other")
+
+
+def _category_scan_ids(category, kind="", uploader=""):
+    """Ids of every item that belongs to `category` (quality for pictures,
+    file-type family for files), newest first. Reading only the handful of
+    fields the comparison needs keeps the scan light, the same pattern
+    _descr_ranked_ids uses for the fuzzy search."""
+    candidates = ArchiveImage.objects.order_by("-date_created")
+    if kind:
+        candidates = candidates.filter(kind=kind)
+    if uploader:
+        candidates = candidates.filter(author_id=int(uploader))
+    return [
+        item_id
+        for item_id, item_kind, quality, original_filename in candidates.values_list(
+            "id", "kind", "quality", "original_filename"
+        )
+        if _row_category(item_kind, quality, original_filename) == category
+    ]
+
+
+def _clean_category(raw_value):
+    value = (raw_value or "").strip().lower()
+    return value if value in VALID_CATEGORY_KEYS else ""
+
+
+def _clean_uploader(raw_value):
+    """The pk of an uploader who actually has items in the gallery, or ""
+    for anything else. A stale or hand-typed pk is therefore harmless: it
+    simply shows the same empty result a filter that matches nothing
+    shows, instead of erroring."""
+    value = (raw_value or "").strip()
+    if not value.isdigit():
+        return ""
+    pk = int(value)
+    return value if ArchiveImage.objects.filter(author_id=pk).exists() else ""
+
+
+def _uploader_options():
+    """Uploaders with at least one item, ordered by their email, each shown
+    by the same masked public email the cards use. Only the primary key
+    travels in the query string, so a full email address never leaks
+    through a shared link or the address bar."""
+    rows = (
+        ArchiveImage.objects.select_related("author")
+        .order_by("author__email")
+        .values_list("author_id", "author__email")
+        .distinct()
+    )
+    return [{"pk": str(pk), "masked": _masked_email(email)} for pk, email in rows]
+
+
+def _category_label(category):
+    for key, label in ARCHIVE_CATEGORIES:
+        if key == category:
+            return label
+    return ""
+
+
+def _uploader_label(uploader):
+    if not uploader:
+        return ""
+    email = (
+        ArchiveImage.objects.filter(author_id=int(uploader))
+        .values_list("author__email", flat=True)
+        .first()
+    )
+    return _masked_email(email) if email else ""
 
 
 def _proxy_cloudinary_url(secure_url):
@@ -232,19 +363,23 @@ def _public_id_from_url(url, resource_type):
     return public_id
 
 
-def _paginate(page_number, descr="", kind=""):
+def _paginate(page_number, descr="", kind="", category="", uploader=""):
     if descr:
-        ranked_ids = _descr_ranked_ids(descr, kind)
+        ranked_ids = _descr_ranked_ids(descr, kind, category, uploader)
         paginator = Paginator(ranked_ids, PAGE_SIZE)
+    elif category:
+        paginator = Paginator(_category_scan_ids(category, kind, uploader), PAGE_SIZE)
     else:
         queryset = ArchiveImage.objects.select_related("author").order_by("-date_created")
         if kind:
             queryset = queryset.filter(kind=kind)
+        if uploader:
+            queryset = queryset.filter(author_id=int(uploader))
         paginator = Paginator(queryset, PAGE_SIZE)
     if page_number > paginator.num_pages and paginator.num_pages:
         raise Http404("Page not found.")
     page = paginator.get_page(page_number)
-    if descr:
+    if descr or category:
         by_id = ArchiveImage.objects.select_related("author").in_bulk(list(page.object_list))
         page_items = [by_id[item_id] for item_id in page.object_list if item_id in by_id]
     else:
@@ -253,6 +388,10 @@ def _paginate(page_number, descr="", kind=""):
         "images": _serialize_images(page_items),
         "descr": descr,
         "kind": kind,
+        "category": category,
+        "uploader": uploader,
+        "category_label": _category_label(category),
+        "uploader_label": _uploader_label(uploader),
         #   REAL count of everything the current search + type filter matches,
         #   shown in the summary line above the grid (gallery_grid.html).
         "total": paginator.count,
@@ -293,23 +432,28 @@ def _paginate_own(user, page_number):
 
 @method_decorator(xframe_options_sameorigin, name="dispatch")
 class ArchiveGalleryView(View):
-    """GET: the full /archive/ page. `descr`, `kind` and `page` in the query
-    string are honoured, so a search, a type filter and the page a visitor
-    is on survive a refresh or a shared link (archive.js keeps the address
-    bar in step with the grid). A page number past the end falls back to
-    page 1 instead of a 404, because a stale link should still open.
+    """GET: the full /archive/ page. `descr`, `kind`, `category`, `uploader`
+    and `page` in the query string are honoured, so a search, the type tabs,
+    the category and added-by filters and the page a visitor is on all
+    survive a refresh or a shared link (archive.js keeps the address bar in
+    step with the grid). A page number past the end falls back to page 1
+    instead of a 404, because a stale link should still open.
     POST: the paginated grid only, for the htmx swap, based on whatever
-    page, search and type filter the (still anonymous-allowed) viewer is on."""
+    page, search and filters the (still anonymous-allowed) viewer is on."""
 
     def get(self, request):
         descr = _clean_descr(request.GET.get("descr"))
         kind = _clean_kind(request.GET.get("kind"))
+        category = _clean_category(request.GET.get("category"))
+        uploader = _clean_uploader(request.GET.get("uploader"))
         try:
             page_number = _resolve_page_number(request.GET.get("page"), default=1)
-            context = _paginate(page_number=page_number, descr=descr, kind=kind)
+            context = _paginate(page_number=page_number, descr=descr, kind=kind, category=category, uploader=uploader)
         except Http404:
-            context = _paginate(page_number=1, descr=descr, kind=kind)
+            context = _paginate(page_number=1, descr=descr, kind=kind, category=category, uploader=uploader)
         context["can_upload"] = is_authenticated(request.user)
+        context["categories"] = ARCHIVE_CATEGORIES
+        context["uploaders"] = _uploader_options()
         return render(request, "ARCHIVE/gallery.html", context)
 
     def post(self, request):
@@ -318,6 +462,8 @@ class ArchiveGalleryView(View):
             page_number=page_number,
             descr=_clean_descr(request.POST.get("descr")),
             kind=_clean_kind(request.POST.get("kind")),
+            category=_clean_category(request.POST.get("category")),
+            uploader=_clean_uploader(request.POST.get("uploader")),
         )
         context["can_upload"] = is_authenticated(request.user)
         return render(request, "ARCHIVE/partials/gallery_grid.html", context)

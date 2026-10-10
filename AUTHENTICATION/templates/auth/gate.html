@@ -74,16 +74,6 @@
             </button>
           </div>
         </div>
-        <div class="field-group">
-          <label for="reg-confirm">Confirm password</label>
-          <div class="password-field">
-            <input id="reg-confirm" type="password" name="password_confirm" placeholder="Repeat your password" required autocomplete="new-password">
-            <button type="button" class="password-toggle" data-target="reg-confirm" aria-label="Show password" aria-pressed="false">
-              <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"/><path d="M9.09 5.47A10.96 10.96 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-4.42 5.04"/><path d="M6.61 6.61A17.77 17.77 0 0 0 2 12s3.5 7 10 7a11.47 11.47 0 0 0 4.83-1.1"/></svg>
-            </button>
-          </div>
-        </div>
         <p class="gate-error" role="alert" data-gate-error></p>
         <button type="submit" class="gate-submit">Create account</button>
       </form>
@@ -189,14 +179,10 @@
           errorEl.textContent = '';
           var email = form.querySelector('input[name="email"]');
           var password = form.querySelector('input[name="password"]');
-          var confirm = form.querySelector('input[name="password_confirm"]');
 
           if (!email.value.trim() || !password.value.trim()) { fail('Enter your email and password.'); return; }
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) { fail('Enter a valid email address.'); email.focus(); return; }
-          if (confirm) {
-            if (password.value.length < 6) { fail('Password must be at least 6 characters long.'); password.focus(); return; }
-            if (password.value !== confirm.value) { fail('Passwords do not match.'); confirm.focus(); return; }
-          }
+          if (mode === 'register' && password.value.length < 6) { fail('Password must be at least 6 characters long.'); password.focus(); return; }
 
           busy(true);
           fetch(form.action, {
