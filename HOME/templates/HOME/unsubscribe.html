@@ -25,7 +25,7 @@
       font-size: clamp(1.7rem, 4.4vw, 2.3rem); letter-spacing: -0.01em; line-height: 1.15;
     }
     .unsub-intro {
-      margin: 0; color: var(--slate); font-size: 1rem; font-weight: 500; line-height: 1.55;
+      margin: 0; color: var(--slate); font-size: 0.7rem; font-weight: 500; line-height: 1.55;
     }
     .unsub-email {
       font-family: monospace; font-weight: 700; color: var(--ink);
@@ -37,8 +37,8 @@
     .unsub-card {
       --unsub-accent: var(--amber-deep);
       position: relative; margin-top: 24px;
-      border: 1px solid var(--line); border-top: 4px solid var(--unsub-accent);
-      border-radius: var(--radius-m); background: var(--surface);
+      border: 1px solid var(--line); border-left: 4px solid var(--unsub-accent);
+      border-radius: none; background: var(--surface);
       box-shadow: var(--shadow-card); padding: 24px 22px 22px;
       animation: unsubRise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
@@ -75,28 +75,28 @@
 
     {% if state == "confirm" %}
       <h1>Unsubscribe</h1>
-      <p class="unsub-intro">You are about to stop {{ label }} sent to <span class="unsub-email">{{ masked_email }}</span>.</p>
+      <p class="unsub-intro">Stop {{ label }} sent to <span class="unsub-email">{{ masked_email }}</span>.</p>
     {% elif state == "done" %}
-      <h1>You are unsubscribed</h1>
+      <h1>Unsubscribed</h1>
       <p class="unsub-intro">You will no longer receive {{ label }} at <span class="unsub-email">{{ masked_email }}</span>.</p>
     {% elif state == "limited" %}
       <h1>Please wait a moment</h1>
       <p class="unsub-intro">There have been too many requests from your connection.</p>
     {% else %}
       <h1>Manage How Our Mail Get To You.</h1>
-      <p class="unsub-intro">This unsubscribe link is incomplete or no longer valid.</p>
+      <p class="unsub-intro">invalid unsubscribe url.</p>
     {% endif %}
   </div>
 
   {% if state == "confirm" %}
     <div class="unsub-card">
-      <p>This turns off {{ detail }}. Other emails from {{ project_name }}, such as password resets, are not affected, and you can turn this back on from your profile at any time.</p>
+      <p>Turn off {{ detail }}. Turn this back on from your profile at any time.</p>
       <form method="post" class="unsub-actions">
         {% csrf_token %}
         <input type="hidden" name="type" value="{{ kind }}">
         <input type="hidden" name="email" value="{{ email }}">
-        <button type="submit" class="unsub-btn unsub-btn-danger">Yes, unsubscribe me</button>
-        <a class="unsub-btn" href="{% url 'home:home' %}">Keep receiving them</a>
+        <button type="submit" class="unsub-btn unsub-btn-danger">Yes, unsubscribe</button>
+        <a class="unsub-btn" href="{% url 'home:home' %}">Cancel</a>
       </form>
     </div>
 
@@ -116,10 +116,10 @@
 
   {% else %}
     <div class="unsub-card is-error">
-      <p>Use the Unsubscribe link at the bottom of the email you received, or sign in and switch the email you no longer want off from your profile settings.</p>
+      <p>Did you land here by mistake? <a href="/" style="text-decoration:underline;color:var(--amber-alt);">Back To Home</a>.</p>
       <div class="unsub-actions">
-        <a class="unsub-btn unsub-btn-primary" href="{% url 'home:profile' %}">Open profile settings</a>
-        <a class="unsub-btn" href="{% url 'home:home' %}">Back to {{ project_name }}</a>
+        {% comment %} <a class="unsub-btn unsub-btn-primary" href="{% url 'home:profile' %}">Open profile settings</a> {% endcomment %}
+        {% comment %} <a class="unsub-btn" href="{% url 'home:home' %}">Back to {{ project_name }}</a> {% endcomment %}
       </div>
     </div>
   {% endif %}

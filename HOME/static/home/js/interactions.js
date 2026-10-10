@@ -282,7 +282,7 @@
   
   if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
-        toast("Link copied.");
+        toast("copied.");
       }).catch(function () {
         toast("Could not copy link.", "error");
       });
