@@ -21,7 +21,8 @@
     }
   }
 
-  var toastHost = null;
+  var toastHost = null;         /* up toasts: top-right stack with icon/close */
+  var bottomToastHost = null;   /* quiet toasts: bottom pill that fades out */
 
   function dismissToast(node) {
     if (!node || node.dataset.dismissed === "true") return;
@@ -105,7 +106,49 @@
     scheduleDismissal();
   }
 
+  /* The quiet "bottom toast": an Android/iOS-style pill that sits at the
+     bottom of the screen with small padding and simply fades out. It is
+     meant for notices that don't need to scream (success / info). It takes
+     exactly the same (message, tone, placement) arguments as the up toast,
+     so any call site can switch flavours just by swapping the function name:
+       uptoast("Copied.")        -> top-right, icon/close/progress
+       bottomtoast("Copied.")    -> bottom pill, small padding, fades out  */
+  function bottomToast(message, tone, placement) {
+    if (!bottomToastHost) {
+      bottomToastHost = document.createElement("div");
+      bottomToastHost.className = "site-bottomtoast-stack";
+      bottomToastHost.setAttribute("aria-live", "polite");
+      bottomToastHost.setAttribute("aria-relevant", "additions");
+      bottomToastHost.setAttribute("role", "region");
+      bottomToastHost.setAttribute("aria-label", "Notifications");
+      document.body.appendChild(bottomToastHost);
+    }
+
+    var isError = tone === "error";
+    var isPersistentNotice = placement === "top";
+    var duration = isPersistentNotice ? 8000 : (isError ? 3000 : 2500);
+
+    var node = document.createElement("div");
+    node.className = "site-bottomtoast" + (isError ? " site-bottomtoast--error" : "") + " is-entering";
+    node.setAttribute("role", isError ? "alert" : "status");
+    node.textContent = message;
+    bottomToastHost.appendChild(node);
+    requestAnimationFrame(function () {
+      node.classList.remove("is-entering");
+      node.classList.add("is-visible");
+    });
+    window.setTimeout(function () {
+      node.classList.remove("is-visible");
+      window.setTimeout(function () { node.remove(); }, 260);
+    }, duration);
+  }
+
   window.AbuToast = toast;
+  window.AbuUpToast = toast;
+  window.AbuBottomToast = bottomToast;
+  /* Plain names too, so swapping the function name is a one-word change. */
+  window.uptoast = toast;
+  window.bottomtoast = bottomToast;
 
   /* A 401 means the visitor is signed out. Instead of an error toast, open the
      create account / sign in popup (auth-gate.js). kind picks the wording. */
