@@ -1,0 +1,22 @@
+{% load static %}
+{% comment %}
+  Story card used inside the "Continue reading" popup, both for the pinned
+  last-reads block and for the recommendation feed that loads more pages
+  (HOME/partials/continue_popup.html + HOME/views.py
+  ContinueReadingFeedView). Keep the fields here to exactly what the view's
+  .only(...) queryset selects: id, image_1, image_info, category, slug,
+  date_created, heading.
+{% endcomment %}
+{% static 'home_no_bg.svg' as continue_placeholder %}
+{% for story in continue_items %}
+<article class="continue-popup-card" data-continue-story>
+  <a class="continue-popup-media" href="{% url 'blog:story_detail' story.slug %}">
+    <img src="{{ story.image_1|default:continue_placeholder }}" alt="{% if story.image_info and story.image_info != 'The image is self explanatory.' %}{{ story.image_info }}{% else %}{{ story.heading }}{% endif %}" loading="lazy">
+  </a>
+  <div class="continue-popup-card-body">
+    <a class="tag continue-popup-tag" href="{% url 'home:category' story.category|slugify %}">{{ story.get_category_display|title }}</a>
+    <h4 class="continue-popup-card-title"><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h4>
+    <time class="continue-popup-card-meta" datetime="{{ story.date_created|date:'c' }}">{{ story.date_created|date:"M d, Y" }}</time>
+  </div>
+</article>
+{% endfor %}

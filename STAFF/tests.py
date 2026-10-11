@@ -136,7 +136,7 @@ class EditorialTeamPageTests(TestCase):
         response = self.client.get(reverse("editorial_team"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Meet our editorial team")
+        self.assertContains(response, "Meet Our Editorial Team")
         self.assertContains(response, "Editorial Author")
         self.assertContains(response, "New-Editor")
         self.assertContains(response, "Editorial story 1")
@@ -150,7 +150,7 @@ class EditorialTeamPageTests(TestCase):
         self.assertContains(response, 'alt="Editorial Author"')
         self.assertContains(response, 'class="editorial-standards"')
         self.assertContains(response, "How we report")
-        self.assertContains(response, "editorial_team.css?v=20261011-4")
+        self.assertContains(response, "editorial_team.css?v=20261011-5")
         self.assertContains(response, '"@type": "Organization"')
         self.assertContains(response, "application/ld+json")
         self.assertContains(response, 'name="description"')
@@ -223,7 +223,7 @@ class EditorialTeamPageTests(TestCase):
         portfolio_url = reverse("staff:portfolio", args=[self.profile.slug])
         self.assertContains(response, f'<a class="ef-ph" href="{portfolio_url}"')
 
-    def test_editorial_page_shows_undecided_when_nobody_published_this_week(self):
+    def test_editorial_page_shows_yet_to_decide_when_nobody_published_this_week(self):
         Blog.objects.filter(author=self.author).update(
             date_created=timezone.now() - timedelta(days=10)
         )
@@ -233,7 +233,9 @@ class EditorialTeamPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["highlight"])
         self.assertContains(response, "ef-hero-empty")
-        self.assertContains(response, "Undecided")
+        self.assertContains(response, "Yet to decide")
+        # The unknown-author placeholder image still fills the portrait slot.
+        self.assertContains(response, "gravatar.com/avatar/")
         self.assertEqual(len(response.context["grid_members"]), 2)
 
     def test_editorial_links_are_available_in_navigation_and_footer(self):

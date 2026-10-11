@@ -31,6 +31,7 @@ urlpatterns = [
     path("profile/delete/placard/", views.ProfileDeletePlacardView.as_view(), name="profile_delete_placard"),
     path("profile/delete/", views.ProfileDeleteAccountView.as_view(), name="profile_delete_account"),
     path("load-more/", views.LoadMoreView.as_view(), name="load_more"),
+    path("continue-reading/", views.ContinueReadingFeedView.as_view(), name="continue_feed"),
     path("bookmark/<int:blog_id>/", views.BookmarkView.as_view(), name="bookmark"),
     path("newsletter/", views.NewsletterSubscribeView.as_view(), name="newsletter"),
     path("privacy-policy/", views.PrivacyPolicyView.as_view(), name="privacy_policy"),

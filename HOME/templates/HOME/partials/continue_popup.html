@@ -1,0 +1,85 @@
+{% load static %}
+{% comment %}
+CONTINUE READING POPUP (near full-screen sheet).
+
+Home page only (HOME/home.html, block continue_popup). It opens once per day,
+a few seconds after the page loads (continue-popup.js). The sheet is full
+width, touches the bottom, and has only a small margin at the top; the
+blurred backdrop shows through that strip, and tapping the strip or the
+close button (or pressing Escape) dismisses it.
+
+Guests: a "Sign in to personalize" prompt fills the sheet.
+Signed in: the sheet pins the reader's last three read stories first, then
+shows a recommendation feed built from those stories' categories. Page 1 is
+rendered here; the script asks home:continue_feed for page 2+ as the reader
+scrolls, with a skeleton loader, portfolio-style.
+{% endcomment %}
+<div class="continue-popup" id="continue-popup" data-continue-popup
+     role="dialog" aria-modal="true" aria-labelledby="continue-popup-title"
+     aria-hidden="true"
+     data-feed-url="{% url 'home:continue_feed' %}"
+     data-next-page="{{ continue_next_page }}"
+     {% if continue_popup_guest %}data-guest="true"{% endif %}>
+  <div class="continue-popup-backdrop" data-continue-backdrop></div>
+  <div class="continue-popup-sheet" role="document">
+    <header class="continue-popup-head">
+      <div class="continue-popup-head-copy">
+        <p class="continue-popup-kicker">Continue reading</p>
+        <h2 class="continue-popup-title" id="continue-popup-title">Pick up where you left off</h2>
+      </div>
+      <button type="button" class="continue-popup-close" data-continue-close aria-label="Close">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+
+    {% if continue_popup_guest %}
+    <div class="continue-popup-body continue-popup-body--guest" data-continue-scroll>
+      <div class="continue-popup-guest">
+        <span class="continue-popup-guest-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M2 5a3 3 0 0 1 3-3h5v16H5a3 3 0 0 0-3 3zM22 5a3 3 0 0 0-3-3h-5v16h5a3 3 0 0 1 3 3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <h3 class="continue-popup-guest-title">Sign in to personalize</h3>
+        {% comment %} <p class="continue-popup-guest-copy">Create a free account and this sheet fills with your last three reads, then more news from the topics they belong to.</p> {% endcomment %}
+        <a class="continue-popup-cta" href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}">Sign in to personalize</a>
+      </div>
+
+      {% if continue_items %}
+      <section class="continue-popup-block" aria-label="More to read">
+        <h3 class="continue-popup-subhead">More from {{ continue_guest_category|title }}</h3>
+        <div class="continue-popup-grid continue-popup-grid--guest">
+          {% include "HOME/partials/continue_feed_items.html" with continue_items=continue_items %}
+        </div>
+      </section>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="continue-popup-body" data-continue-scroll>
+      {% if continue_recent %}
+      <section class="continue-popup-block" aria-label="Your last reads">
+        <h3 class="continue-popup-subhead">Your last reads</h3>
+        <div class="continue-popup-grid">
+          {% include "HOME/partials/continue_feed_items.html" with continue_items=continue_recent %}
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="continue-popup-block" aria-label="Recommended for you">
+        <h3 class="continue-popup-subhead">{% if continue_has_history %}More like what you read{% else %}Latest stories{% endif %}</h3>
+        <div class="continue-popup-grid" data-continue-items>
+          {% include "HOME/partials/continue_feed_items.html" with continue_items=continue_items %}
+        </div>
+        <div class="continue-popup-skeleton" data-continue-skeleton hidden aria-hidden="true">
+          <article class="continue-popup-card continue-popup-card--skeleton"><span class="continue-popup-skeleton-media"></span><span class="continue-popup-skeleton-line continue-popup-skeleton-line--short"></span><span class="continue-popup-skeleton-line"></span><span class="continue-popup-skeleton-line continue-popup-skeleton-line--short"></span></article>
+          <article class="continue-popup-card continue-popup-card--skeleton"><span class="continue-popup-skeleton-media"></span><span class="continue-popup-skeleton-line continue-popup-skeleton-line--short"></span><span class="continue-popup-skeleton-line"></span><span class="continue-popup-skeleton-line continue-popup-skeleton-line--short"></span></article>
+          <article class="continue-popup-card continue-popup-card--skeleton"><span class="continue-popup-skeleton-media"></span><span class="continue-popup-skeleton-line continue-popup-skeleton-line--short"></span><span class="continue-popup-skeleton-line"></span><span class="continue-popup-skeleton-line continue-popup-skeleton-line--short"></span></article>
+        </div>
+        <div class="continue-popup-sentinel" data-continue-sentinel {% if not continue_next_page %}hidden{% endif %} aria-hidden="true"></div>
+        <p class="continue-popup-end" data-continue-end {% if continue_next_page %}hidden{% endif %}>That is everything for now.</p>
+        <p class="sr-only" data-continue-status aria-live="polite"></p>
+      </section>
+    </div>
+    {% endif %}
+  </div>
+</div>

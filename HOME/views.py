@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, logout as auth_logout
 from django.contrib.sessions.models import Session
 from django.core.exceptions import BadRequest, ValidationError
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage
 from django.core.validators import URLValidator
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Prefetch
@@ -53,6 +53,14 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE = 25  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
 TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
+
+#   "CONTINUE READING" POPUP (HOME/partials/continue_popup.html). How many
+#   last-read stories get pinned at the top, and how many recommendation
+#   stories load per slice in the feed below them.
+CONTINUE_RECENT_COUNT = 3
+CONTINUE_PAGE_SIZE = 6
+CONTINUE_GUEST_COUNT = 6  #   STORIES IN THE RANDOM-CATEGORY GUEST GRID
+CONTINUE_GUEST_MIN = 3  #   PREFER A RANDOM CATEGORY WITH AT LEAST THIS MANY STORIES
 
 
 NOTFOUND_SUGGESTION_COUNT = 3  #   HOW MANY LATEST STORIES THE 404 PAGES SUGGEST
@@ -216,6 +224,92 @@ def _page_context(page, user):
     }
 
 
+def _continue_recent_stories(user):
+    """The reader's last few opened stories, most recently read first.
+
+    Reads the timestamped HOME.models.ReadingHistory, not the older
+    Blog.non_anonymous_viewer link (which has no time on it).
+    """
+    from HOME.models import ReadingHistory
+
+    rows = (
+        ReadingHistory.objects.filter(user=user)
+        .select_related("blog")
+        .order_by("-read_at", "-pk")[:CONTINUE_RECENT_COUNT]
+    )
+    return [row.blog for row in rows]
+
+
+def _continue_recommendation_queryset(user):
+    """Stories shown under the last-read pins: everything in the categories
+    those pinned stories belong to, newest first. A signed in reader with no
+    history yet gets the latest stories instead, so the popup is never empty.
+    """
+    recent = _continue_recent_stories(user)
+    recent_ids = [story.id for story in recent]
+    categories = {story.category for story in recent if story.category}
+
+    stories = Blog.objects.only(
+        "id", "image_1", "image_info", "category", "slug", "date_created", "heading"
+    ).order_by("-date_created", "-pk")
+    if categories:
+        stories = stories.filter(category__in=categories).exclude(id__in=recent_ids)
+    return stories
+
+
+def _continue_guest_stories():
+    """The latest stories from one randomly chosen category.
+
+    Used by the guest popup. Categories are drawn from the stories that
+    actually exist, and the random pick prefers categories with enough
+    stories to fill the grid (falling back to the biggest category when no
+    category is that deep), so the sheet is never a one-card ghost town.
+    Returns (category, [stories]).
+    """
+    counts = list(Blog.objects.values("category").annotate(n=Count("id")).order_by())
+    rich = [row["category"] for row in counts if row["n"] >= CONTINUE_GUEST_MIN]
+    if rich:
+        category = random.choice(rich)
+    elif counts:
+        category = max(counts, key=lambda row: row["n"])["category"]
+    else:
+        return "", []
+
+    stories = list(
+        Blog.objects.filter(category=category)
+        .only("id", "image_1", "image_info", "category", "slug", "date_created", "heading")
+        .order_by("-date_created", "-pk")[:CONTINUE_GUEST_COUNT]
+    )
+    return category, stories
+
+
+def _continue_popup_context(user):
+    """Context for the home-page "Continue reading" popup.
+
+    Guests get the "sign in to personalize" prompt plus a run of the latest
+    stories from one randomly chosen category, so the sheet is never an empty
+    wall. Signed in readers get their last-read pins and a category feed.
+    """
+    if not user.is_authenticated:
+        category, stories = _continue_guest_stories()
+        return {
+            "continue_popup_guest": True,
+            "continue_guest_category": category,
+            "continue_items": stories,
+        }
+
+    recent = _continue_recent_stories(user)
+    paginator = Paginator(_continue_recommendation_queryset(user), CONTINUE_PAGE_SIZE)
+    page = paginator.get_page(1)
+    return {
+        "continue_popup_guest": False,
+        "continue_recent": recent,
+        "continue_has_history": bool(recent),
+        "continue_items": page.object_list,
+        "continue_next_page": page.next_page_number() if page.has_next() else "",
+    }
+
+
 def _teaser_items():
     """Data for the hero's side picture carousel (HOME/home.html). Each item is
     {heading, body, image, url}. Real data is the live Partner.AdvertImage rows
@@ -369,6 +463,7 @@ class HomeView(View):
             "canonical_url": canonical_url,
             "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
             **_page_context(page, request.user),
+            **_continue_popup_context(request.user),
         }
         return render(request, "HOME/home.html", context)
 
@@ -407,6 +502,37 @@ class LoadMoreView(View):
             "HOME/partials/story_cards.html",
             {**_page_context(page, request.user), "next_page": page.next_page_number() if page.has_next() else None},
         )
+
+
+class ContinueReadingFeedView(View):
+    """The next slice of the personalised "Continue reading" popup feed.
+
+    Mirrors PortfolioStoriesView: the popup renders page 1 server side and the
+    script asks this endpoint for page 2+ as the reader scrolls, reading the
+    next page number from the X-Continue-Next-Page response header.
+    """
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Sign in to personalize your reading."}, status=401)
+
+        page_number = _resolve_page_number(request.GET.get("page"), default=2)
+        if page_number < 2:
+            return JsonResponse({"detail": "Invalid page number."}, status=400)
+
+        paginator = Paginator(_continue_recommendation_queryset(request.user), CONTINUE_PAGE_SIZE)
+        try:
+            page = paginator.page(page_number)
+        except EmptyPage as exc:
+            raise Http404("No more stories.") from exc
+
+        response = render(
+            request,
+            "HOME/partials/continue_feed_items.html",
+            {"continue_items": page.object_list},
+        )
+        response["X-Continue-Next-Page"] = page.next_page_number() if page.has_next() else ""
+        return response
 
 
 def _redirect_legacy_filter(request, query, category):

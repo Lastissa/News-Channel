@@ -1,0 +1,353 @@
+/* ---------- Continue reading popup (continue-popup.js) ---------- */
+
+.continue-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: none;
+}
+
+.continue-popup.is-visible {
+  display: block;
+}
+
+/* The whole page behind the sheet is dimmed and blurred. The sheet only
+   covers everything but a strip at the very top, so that strip is where the
+   blur clearly shows through and where "outside the box" taps land. */
+.continue-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 27, 44, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.continue-popup.is-open .continue-popup-backdrop {
+  opacity: 1;
+}
+
+/*  Sheet: full width, reaches the bottom, small margin at the top only. */
+.continue-popup-sheet {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface, #ffffff);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -24px 70px rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  transform: translateY(14px);
+  transition: transform 0.32s ease, opacity 0.32s ease;
+}
+
+.continue-popup.is-open .continue-popup-sheet {
+  opacity: 1;
+  transform: none;
+}
+
+.continue-popup-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.continue-popup-kicker {
+  margin: 0 0 2px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.continue-popup-title {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.22;
+  color: var(--ink);
+}
+
+.continue-popup-close {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper-dim);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.continue-popup-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.continue-popup-close:hover,
+.continue-popup-close:focus-visible {
+  background: var(--line);
+}
+
+.continue-popup-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 18px 20px 44px;
+}
+
+.continue-popup-block {
+  margin-bottom: 26px;
+}
+
+.continue-popup-block:last-child {
+  margin-bottom: 0;
+}
+
+.continue-popup-subhead {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--slate);
+}
+
+.continue-popup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+/* Guest grid: a fixed, larger three-up run from one category -- deliberately a
+   different setting from the auto-fill personalised feed above. */
+.continue-popup-grid.continue-popup-grid--guest {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.continue-popup-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m, 10px);
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(14, 27, 44, 0.07));
+}
+
+.continue-popup-media {
+  display: block;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--paper-dim);
+}
+
+.continue-popup-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.continue-popup-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px 16px;
+}
+
+.continue-popup-tag {
+  align-self: flex-start;
+}
+
+.continue-popup-card-title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.32;
+}
+
+.continue-popup-card-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.continue-popup-card-title a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--amber);
+  text-underline-offset: 2px;
+}
+
+.continue-popup-card-meta {
+  font-size: 0.76rem;
+  color: var(--slate);
+}
+
+/* Skeleton loaders */
+.continue-popup-card--skeleton {
+  pointer-events: none;
+}
+
+.continue-popup-skeleton-media,
+.continue-popup-skeleton-line {
+  display: block;
+  background: linear-gradient(100deg, var(--paper-dim) 20%, var(--line) 40%, var(--paper-dim) 60%);
+  background-size: 200% 100%;
+  animation: continue-shimmer 1.1s linear infinite;
+}
+
+.continue-popup-skeleton-media {
+  aspect-ratio: 16 / 10;
+}
+
+.continue-popup-skeleton-line {
+  width: 88%;
+  height: 12px;
+  margin: 12px 14px 0;
+  border-radius: 4px;
+}
+
+.continue-popup-skeleton-line--short {
+  width: 46%;
+  height: 9px;
+  margin-top: 8px;
+  margin-bottom: 14px;
+}
+
+@keyframes continue-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.continue-popup-sentinel {
+  height: 1px;
+}
+
+.continue-popup-end {
+  margin: 0;
+  padding: 18px 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--slate);
+}
+
+/* Guest prompt: a banner panel above the random-category news grid. */
+.continue-popup-guest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 20px 15px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l, 16px);
+  background: var(--paper-dim);
+}
+
+.continue-popup-guest-mark {
+  width: 74px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background: var(--paper-dim);
+  color: var(--brand-deep, #0B6E8A);
+}
+
+.continue-popup-guest-mark svg {
+  width: 38px;
+  height: 38px;
+}
+
+.continue-popup-guest-title {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+
+.continue-popup-guest-copy {
+  margin: 0;
+  max-width: 46ch;
+  line-height: 1.55;
+  color: var(--slate);
+}
+
+.continue-popup-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  padding: 11px 26px;
+  border-radius: var(--radius-m, 10px);
+  background: var(--ink);
+  color: var(--nav-fg, #F6F3ED);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.continue-popup-cta:hover,
+.continue-popup-cta:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* While the popup is open, the page behind cannot scroll. */
+html.continue-popup-locked,
+html.continue-popup-locked body {
+  overflow: hidden;
+}
+
+/* Small screens: single column, tighter chrome */
+@media (max-width: 700px) {
+  .continue-popup-sheet {
+    top: 12px;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .continue-popup-head {
+    padding: 12px 14px;
+  }
+
+  .continue-popup-body {
+    padding: 14px 14px 40px;
+  }
+
+  .continue-popup-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .continue-popup-card-title {
+    font-size: 0.92rem;
+  }
+
+  .continue-popup-guest-title {
+    font-size: 1.25rem;
+  }
+}
+
+/* Guest grid breakpoints (kept separate so it never inherits the auto-fill
+   rule above and always reads as the "different" layout). */
+@media (max-width: 1024px) {
+  .continue-popup-grid.continue-popup-grid--guest {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .continue-popup-grid.continue-popup-grid--guest {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

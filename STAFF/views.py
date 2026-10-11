@@ -42,6 +42,14 @@ RHYTHM_MONTHS = 6            #   COLUMNS IN THE PUBLISHING RHYTHM CHART
 RANK_BARS = 8                #   MOST BARS IN THE AUTHOR RANK MINI CHART
 READERSHIP_SLICES = 5        #   NAMED SLICES IN THE DONUT, THE REST FOLD INTO "OTHER"
 
+#   Neutral portrait shown in the "author of the week" slot while no reporter has
+#   published this week. Gravatar's built-in mystery-person image (external, and
+#   the generated gradient silhouette still shows if it cannot load).
+UNKNOWN_PORTRAIT = (
+    "https://www.gravatar.com/avatar/"
+    "00000000000000000000000000000000?d=mp&f=y&s=500"
+)
+
 #   (key, label, StaffProfile field, aria label). The key doubles as the icon
 #   name and as the fab-* class that carries the hover colour.
 SOCIAL_LINKS = (
@@ -524,6 +532,7 @@ class EditorialTeamView(View):
                 ),
                 "team_schema_json": team_schema_json,
                 "page_og_image": highlight["portrait"] if highlight else None,
+                "unknown_portrait": UNKNOWN_PORTRAIT,
             },
         )
 

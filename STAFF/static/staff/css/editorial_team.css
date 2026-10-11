@@ -27,15 +27,21 @@
 
 .ef-intro {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 12px;
-  border-bottom: 4px double var(--ef-ink);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+}
+
+.ef-intro::before {
+  width: 56px;
+  height: 4px;
+  background: var(--ef-accent);
+  content: "";
 }
 
 .ef-intro h1 {
-  color: var(--ef-ink);
+  color: var(--ink);
   margin: 0;
   font: 500 clamp(1.5rem, 3vw, 2rem)/1.1 Georgia, "Times New Roman", serif;
   letter-spacing: -.02em;
@@ -99,6 +105,7 @@
 }
 
 .ef-hero h2 {
+  color: black;
   margin: 0;
   font: 500 clamp(2.4rem, 4.4vw, 4.2rem)/1.02 Georgia, "Times New Roman", serif;
   letter-spacing: -.035em;
@@ -115,18 +122,6 @@
 .ef-hero h2 a:hover,
 .ef-hero h2 a:focus-visible {
   text-decoration-color: var(--ef-accent);
-}
-
-/* Empty hero (nobody published this week) ------------------------------ */
-
-.ef-hero.ef-hero-empty {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.ef-hero.ef-hero-empty .ef-tx {
-  grid-column: 1 / -1;
-  min-height: 260px;
-  justify-content: center;
 }
 
 .ef-bio {
@@ -256,7 +251,7 @@
   display: -webkit-box;
   overflow: hidden;
   margin: 10px 0 0;
-  color: var(--ef-body);
+  color: var(--ink-soft);
   font-size: .95rem;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -274,7 +269,7 @@
 }
 
 .ef-card .ef-m b {
-  color: var(--ef-ink);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -337,8 +332,9 @@
 
 .editorial-standards-lead {
   max-width: 680px;
+  font-weight: 500;
   margin: 14px 0 28px;
-  color: var(--ef-slate);
+  color: var(--ink);
   font-size: 1rem;
   line-height: 1.65;
   white-space: pre-line;
@@ -364,7 +360,7 @@
 
 .editorial-standards-grid h3 {
   margin: 10px 0 7px;
-  color: var(--ef-ink);
+  color: var(--brand-deep);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.35rem;
   font-weight: 500;
@@ -410,6 +406,39 @@
   }
 }
 
+/*  Desktop masthead: the intro sits on the left and the author of the week
+    panel sits on the right. Below 1001px they stack, because the hero itself
+    is already single-column there. */
+@media (min-width: 1001px) {
+  .ef-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2.15fr);
+    gap: clamp(32px, 3.4vw, 56px);
+    align-items: stretch;
+  }
+
+  .ef-top .ef-hero {
+    margin-top: 0;
+  }
+
+  .ef-top .ef-hero .ef-ph {
+    min-height: 480px;
+  }
+
+  .ef-top .ef-tx {
+    gap: 16px;
+    padding: clamp(20px, 2.4vw, 40px);
+  }
+
+  .ef-top .ef-hero h2 {
+    font-size: clamp(1.9rem, 2.9vw, 3rem);
+  }
+
+  .ef-top .ef-fig {
+    gap: 26px;
+  }
+}
+
 @media (max-width: 700px) {
   .editorial-page {
     width: 100%;
@@ -420,12 +449,9 @@
       below it so the top of the page reads as one block. The rest of the page
       keeps the normal paper background. */
   .ef-intro {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    padding: 16px 16px 12px;
+    gap: 6px;
+    padding: 16px 16px 14px;
     background: var(--ef-ink);
-    border-bottom-color: rgba(255, 255, 255, .25);
   }
 
   .ef-intro h1 {
@@ -434,17 +460,6 @@
 
   .ef-count {
     color: rgba(255, 255, 255, .75);
-  }
-
-  .ef-hero.ef-hero-empty {
-    min-height: 0;
-  }
-
-  .ef-hero.ef-hero-empty .ef-tx {
-    width: 100%;
-    min-height: 0;
-    justify-content: flex-start;
-    padding: 28px 16px 32px;
   }
 
   .ef-hero {
@@ -493,6 +508,7 @@
   }
 
   .ef-hero h2 {
+    color: white;
     font-size: 2.5rem;
   }
 
@@ -543,9 +559,8 @@
     position: sticky;
     top: calc(64px + 10px + var(--i) * 9px);
     padding-bottom: 16px;
-    border: 1px solid var(--ef-line);
-    background: #fff;
-    box-shadow: 0 -12px 30px rgba(14, 27, 44, .14);
+    background: var(--paper);
+    box-shadow: 1px 2px 5px var(--ef-slate);
   }
 
   .ef-card > *:not(.ef-ph) {

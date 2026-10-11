@@ -21,65 +21,68 @@
 {% block extra_head %}
   {{ block.super }}
   <script type="application/ld+json">{{ team_schema_json|safe }}</script>
-  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261011-4">
+  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261011-5">
 {% endblock %}
 
 {% block content %}
 <div class="editorial-page">
-  <header class="ef-intro">
-    <h1>Meet Our Editorial Team</h1>
-    <p class="ef-count">
-      {{ team_size }} journalist{{ team_size|pluralize }},
-      {{ team_story_total }} published stor{{ team_story_total|pluralize:"y,ies" }}
-    </p>
-  </header>
+  <div class="ef-top">
+    <header class="ef-intro">
+      <h1>Meet Our Editorial Team</h1>
+      <p class="ef-count">
+        {{ team_size }} journalist{{ team_size|pluralize }},
+        {{ team_story_total }} published stor{{ team_story_total|pluralize:"y,ies" }}
+      </p>
+    </header>
 
-  {% if highlight %}
-  <section class="ef-hero" aria-label="Author Of The Week">
-    {% include "staff/includes/editorial_portrait.html" with portrait=highlight.portrait name=highlight.display_name hue=highlight.hue grad_id=highlight.grad_id loading="eager" href=highlight.portfolio_url %}
-    <div class="ef-tx">
-      <span class="ef-tag">Author Of The Week</span>
-      <h2>
-        {% if highlight.slug %}
-        <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.display_name }}</a>
-        {% else %}
-        {{ highlight.display_name }}
+    {% if highlight %}
+    <section class="ef-hero" aria-label="Author Of The Week">
+      {% include "staff/includes/editorial_portrait.html" with portrait=highlight.portrait name=highlight.display_name hue=highlight.hue grad_id=highlight.grad_id loading="eager" href=highlight.portfolio_url %}
+      <div class="ef-tx">
+        <span class="ef-tag">Author Of The Week</span>
+        <h2>
+          {% if highlight.slug %}
+          <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.display_name }}</a>
+          {% else %}
+          {{ highlight.display_name }}
+          {% endif %}
+        </h2>
+        {% if highlight.profile.bio %}
+        <p class="ef-bio">{{ highlight.profile.bio|truncatechars:240 }}</p>
         {% endif %}
-      </h2>
-      {% if highlight.profile.bio %}
-      <p class="ef-bio">{{ highlight.profile.bio|truncatechars:240 }}</p>
-      {% endif %}
-      <div class="ef-fig">
-        <div>
-          <b>{{ highlight.week_story_count }}</b>
-          <span>this week</span>
+        <div class="ef-fig">
+          <div>
+            <b>{{ highlight.week_story_count }}</b>
+            <span>this week</span>
+          </div>
+          <div>
+            <b>{{ highlight.story_count }}</b>
+            <span>stor{{ highlight.story_count|pluralize:"y,ies" }}</span>
+          </div>
+          <div>
+            <b>{{ highlight.total_views_display }}</b>
+            <span>views</span>
+          </div>
         </div>
-        <div>
-          <b>{{ highlight.story_count }}</b>
-          <span>stor{{ highlight.story_count|pluralize:"y,ies" }}</span>
+        {% if highlight.latest_story %}
+        <div class="ef-latest">
+          <small>Latest story, {{ highlight.latest_story.date_created|date:"M j, Y" }}</small>
+          <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}">{{ highlight.latest_story.heading }}</a>
         </div>
-        <div>
-          <b>{{ highlight.total_views_display }}</b>
-          <span>views</span>
-        </div>
+        {% endif %}
       </div>
-      {% if highlight.latest_story %}
-      <div class="ef-latest">
-        <small>Latest story, {{ highlight.latest_story.date_created|date:"M j, Y" }}</small>
-        <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}">{{ highlight.latest_story.heading }}</a>
+    </section>
+    {% else %}
+    <section class="ef-hero ef-hero-empty" aria-label="Author Of The Week">
+      {% include "staff/includes/editorial_portrait.html" with portrait=unknown_portrait name="No author selected yet" hue=210 grad_id="ef-portrait-grad-unknown" %}
+      <div class="ef-tx">
+        <span class="ef-tag">Author Of The Week</span>
+        <h2>Undecided Yet</h2>
+        <p class="ef-bio">No reporter has published a story this week. The author of the week is decided every Sunday.</p>
       </div>
-      {% endif %}
-    </div>
-  </section>
-  {% else %}
-  <section class="ef-hero ef-hero-empty" aria-label="Author Of The Week">
-    <div class="ef-tx">
-      <span class="ef-tag">Author Of The Week</span>
-      <h2>Undecided</h2>
-      <p class="ef-bio">No reporter has published a story this week. The author of the week is decided every Sunday.</p>
-    </div>
-  </section>
-  {% endif %}
+    </section>
+    {% endif %}
+  </div>
 
   {% if grid_members %}
   <ul class="ef-grid" aria-label="Editorial team">

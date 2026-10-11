@@ -13,6 +13,7 @@ from django.utils import timezone
 from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, Category, refresh_category_cache
+from HOME.models import ReadingHistory
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.config import custom_context_processors
 from STAFF.models import AuthorFollow, StaffProfile
@@ -917,3 +918,116 @@ class SearchAndCategoryPageTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("home:category", args=["news"]))
+
+
+class ContinueReadingPopupTests(QuietTestCase):
+    """The home-page "Continue reading" popup and the signed-in feed behind it
+    (HOME/partials/continue_popup.html, HOME/views.py
+    _continue_popup_context / ContinueReadingFeedView)."""
+
+    def setUp(self):
+        super().setUp()
+        Category.objects.get_or_create(name="NEWS")
+        refresh_category_cache()
+        self.author = make_staff()
+        self.reader = Auth.objects.create_user(email="reader@example.com")
+        self.story_jamb = make_story(self.author, heading="JAMB update story", category="GENERAL")
+        self.story_unilorin = make_story(self.author, heading="UNILORIN admission story", category="NEWS")
+        self.story_scholarship = make_story(self.author, heading="Scholarship window story", category="NEWS")
+
+    def test_anonymous_home_renders_the_sign_in_prompt(self):
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-continue-popup")
+        self.assertContains(response, 'data-guest="true"')
+        self.assertContains(response, "Sign in to personalize")
+        # Guests still get real news from a randomly chosen category.
+        self.assertContains(response, "continue-popup-grid--guest")
+        self.assertContains(response, "More from")
+
+    def test_anonymous_popup_fills_the_grid_from_one_category(self):
+        response = self.client.get(reverse("home:home"))
+
+        self.assertTrue(response.context["continue_popup_guest"])
+        items = list(response.context["continue_items"])
+        self.assertTrue(items)
+        self.assertEqual(len({story.category for story in items}), 1)
+
+    def test_signed_in_home_shows_read_stories_then_same_category_news(self):
+        self.client.force_login(self.reader)
+        ReadingHistory.objects.create(user=self.reader, blog=self.story_jamb)
+
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-guest="true"')
+        self.assertContains(response, "Your last reads")
+        self.assertContains(response, "JAMB update story")
+        self.assertContains(response, "More like what you read")
+
+    def test_signed_in_home_without_history_falls_back_to_latest_stories(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Latest stories")
+        self.assertNotContains(response, "Your last reads")
+
+    def test_opening_a_story_records_a_timestamped_read(self):
+        self.client.force_login(self.reader)
+        before = timezone.now()
+
+        response = self.client.get(reverse("blog:story_detail", args=[self.story_jamb.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        row = ReadingHistory.objects.get(user=self.reader, blog=self.story_jamb)
+        self.assertGreaterEqual(row.read_at, before)
+
+    def test_reopening_a_story_bumps_the_read_time_instead_of_duplicating(self):
+        self.client.force_login(self.reader)
+        ReadingHistory.objects.create(user=self.reader, blog=self.story_jamb)
+        first = ReadingHistory.objects.get(user=self.reader, blog=self.story_jamb).read_at
+
+        self.client.get(reverse("blog:story_detail", args=[self.story_jamb.slug]))
+
+        self.assertEqual(ReadingHistory.objects.filter(user=self.reader, blog=self.story_jamb).count(), 1)
+        self.assertGreater(ReadingHistory.objects.get(user=self.reader, blog=self.story_jamb).read_at, first)
+
+    def test_feed_endpoint_rejects_signed_out_readers(self):
+        response = self.client.get(reverse("home:continue_feed"), {"page": 2})
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_feed_endpoint_paginates_and_reports_the_next_page_header(self):
+        self.client.force_login(self.reader)
+        ReadingHistory.objects.create(user=self.reader, blog=self.story_jamb)
+        for n in range(13):
+            make_story(self.author, heading=f"Feed story {n}", category="GENERAL")
+
+        first = self.client.get(reverse("home:continue_feed"), {"page": 2})
+        second = self.client.get(reverse("home:continue_feed"), {"page": 3})
+
+        self.assertEqual(first.status_code, 200)
+        self.assertContains(first, "Feed story")
+        self.assertTrue(first.headers.get("X-Continue-Next-Page"))
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.headers.get("X-Continue-Next-Page"), "")
+
+    def test_feed_endpoint_rejects_page_one(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("home:continue_feed"), {"page": 1})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_author_handbook_explains_the_weekly_editorial_page(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(reverse("home:author_handbook"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "author-of-the-week")
+        self.assertContains(response, "Author of the Week")
+        self.assertContains(response, reverse("editorial_team"))

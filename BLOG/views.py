@@ -13,6 +13,7 @@ from django.db.models import F, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import escape, linebreaks
 from django.views import View
 
@@ -396,6 +397,17 @@ class StoryDetailView(View):
             ).exists()
             if not already:
                 Blog.non_anonymous_viewer.through.objects.create(blog=blog, auth=request.user)
+
+            #   TIMESTAMPED READ: the M2M above predates this and carries no
+            #   time, so it can only ever be ordered by the story's publish
+            #   date. The "Continue reading" popup needs the true "last read"
+            #   order, so every open bumps one row here too. Imported locally
+            #   to keep BLOG from importing HOME at module load.
+            from HOME.models import ReadingHistory
+
+            ReadingHistory.objects.update_or_create(
+                user=request.user, blog=blog, defaults={"read_at": timezone.now()}
+            )
 
         is_bookmarked = request.user.is_authenticated and blog.bookmarked_by.filter(user=request.user).exists()
 

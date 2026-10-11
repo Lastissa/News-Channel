@@ -222,6 +222,7 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
 {% block extra_head %}
 {{ block.super }}
 <meta name="yandex-verification" content="1093315bd8192b90" />
+<link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261011-8">
 {% comment %} Slow-connection: fetch the first on-screen images before paint so
 the hero/teaser never pop in after the page reveals. {% endcomment %}
 {% if featured_posts and featured_posts.0.image_1 %}
@@ -236,8 +237,13 @@ the hero/teaser never pop in after the page reveals. {% endcomment %}
 {% include "includes/newsletter_popup.html" %}
 {% endblock %}
 
+{% block continue_popup %}
+{% include "HOME/partials/continue_popup.html" %}
+{% endblock %}
+
 {% block extra_scripts %}
 {{ block.super }}
+<script src="{% static 'home/js/continue-popup.js' %}?v=20261011-7" defer></script>
 <script src="{% static 'home/js/headline-ticker.js' %}" defer></script>
 <script src="{% static 'home/js/most-viewed.js' %}" defer></script>
 {% endblock %}
