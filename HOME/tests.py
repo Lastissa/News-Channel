@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
-from BLOG.models import Blog
+from BLOG.models import Blog, Category, refresh_category_cache
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.config import custom_context_processors
 from STAFF.models import AuthorFollow, StaffProfile
@@ -76,15 +76,20 @@ class HomeHeadingSemanticsTests(QuietTestCase):
         h1_text = response.content.decode().split("<h1", 1)[1].split("</h1>", 1)[0]
         self.assertIn(lead_heading, h1_text)
 
-    def test_filtered_results_have_one_h1_for_the_results_title(self):
+    def test_filtered_results_redirect_to_the_search_page(self):
         make_story(self.author, heading="UNILORIN admission update")
 
         response = self.client.get(reverse("home:home"), {"q": "UNILORIN"})
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content.count(b"<h1"), 1)
-        self.assertContains(response, 'id="headline"')
-        self.assertContains(response, 'Results for "UNILORIN"')
+        #   The old /?q= URL permanently moves to the indexable search page.
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], f"{reverse('home:search')}?q=UNILORIN")
+
+        results = self.client.get(reverse("home:search"), {"q": "UNILORIN"})
+        self.assertEqual(results.status_code, 200)
+        self.assertEqual(results.content.count(b"<h1"), 1)
+        self.assertContains(results, 'id="headline"')
+        self.assertContains(results, "UNILORIN")
 
     def test_home_cache_is_invalidated_when_a_story_is_edited(self):
         story = make_story(self.author, heading="Cached headline")
@@ -851,3 +856,64 @@ class ProfileListSearchTests(QuietTestCase):
         self.assertNotContains(response, 'class="profile-header-bar"')
         self.assertContains(response, 'class="profile-last-login-row"')
         self.assertContains(response, 'class="profile-delete-account-btn"')
+
+
+class SearchAndCategoryPageTests(QuietTestCase):
+    """Search and each category now have their own indexable URL instead of
+    living as query strings on the home page."""
+
+    def setUp(self):
+        super().setUp()
+        Category.objects.get_or_create(name="NEWS")
+        refresh_category_cache()
+        self.author = make_staff()
+        make_story(self.author, heading="UNILORIN admission update", category="NEWS")
+        make_story(self.author, heading="JAMB timetable released", category="GENERAL")
+
+    def test_home_query_redirects_permanently_to_the_search_page(self):
+        response = self.client.get(reverse("home:home"), {"q": "JAMB"})
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], f"{reverse('home:search')}?q=JAMB")
+
+    def test_home_category_redirects_to_the_category_landing_page(self):
+        response = self.client.get(reverse("home:home"), {"category": "NEWS"})
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], reverse("home:category", args=["news"]))
+
+    def test_search_page_keeps_the_query_and_is_indexable(self):
+        response = self.client.get(reverse("home:search"), {"q": "JAMB"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "JAMB timetable released")
+        self.assertNotContains(response, "UNILORIN")
+        self.assertContains(response, 'rel="canonical"')
+        self.assertContains(response, "?q=JAMB")
+        self.assertContains(response, '<meta name="robots" content="index, follow">')
+
+    def test_empty_search_page_is_indexable(self):
+        response = self.client.get(reverse("home:search"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'rel="canonical"')
+
+    def test_category_page_is_a_stable_indexable_subpath(self):
+        response = self.client.get(reverse("home:category", args=["news"]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "UNILORIN admission update")
+        self.assertNotContains(response, "JAMB timetable released")
+        self.assertContains(response, '<meta name="robots" content="index, follow">')
+        self.assertContains(response, reverse("home:category", args=["news"]))
+
+    def test_unknown_category_slug_is_a_404(self):
+        response = self.client.get(reverse("home:category", args=["not-a-real-category"]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_sitemap_lists_category_landing_pages(self):
+        response = self.client.get("/sitemap.xml")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("home:category", args=["news"]))

@@ -164,9 +164,9 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
 <section class="story-grid-section">
   <div class="section-heading">
     {% if is_filtered %}
-    <h1 id="headline">
+    <h2 id="headline">
         {% if query %}Results for "{{ query }}"{% elif active_category %} Latest On {{ active_category|title }}{% endif %}
-    </h1>
+    </h2>
     {% else %}
     <h2 id="headline">
       Headlines

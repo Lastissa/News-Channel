@@ -6,10 +6,10 @@ from AUTHENTICATION.models import Auth
 
 class AuthReturnPathTests(TestCase):
     def test_guest_auth_links_preserve_the_current_local_path(self):
-        response = self.client.get("/?q=admissions")
+        response = self.client.get("/search/?q=admissions")
 
-        self.assertContains(response, "/auth/login/?to=/%3Fq%3Dadmissions")
-        self.assertContains(response, "/auth/register/?to=/%3Fq%3Dadmissions")
+        self.assertContains(response, "/auth/login/?to=/search/%3Fq%3Dadmissions")
+        self.assertContains(response, "/auth/register/?to=/search/%3Fq%3Dadmissions")
         self.assertContains(response, "data-category-filter")
         self.assertContains(response, "data-category-option")
 

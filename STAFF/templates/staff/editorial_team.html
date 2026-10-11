@@ -3,6 +3,11 @@
 
 {% block title %}Editorial Team · {{ project_name }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
+{% block og_type %}website{% endblock %}
+{% block og_title %}Editorial Team · {{ project_name }}{% endblock %}
+{% block og_description %}{{ meta_description }}{% endblock %}
+{% block twitter_title %}Editorial Team · {{ project_name }}{% endblock %}
+{% block twitter_description %}{{ meta_description }}{% endblock %}
 
 {% block og_image %}
   {% if page_og_image %}
@@ -15,188 +20,93 @@
 
 {% block extra_head %}
   {{ block.super }}
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="Editorial Team · {{ project_name }}">
-  <meta property="og:description" content="{{ meta_description }}">
   <script type="application/ld+json">{{ team_schema_json|safe }}</script>
-  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261007-2">
+  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261011-3">
 {% endblock %}
 
 {% block content %}
 <div class="editorial-page">
-  <section class="editorial-intro" aria-labelledby="editorial-title">
-    <p class="editorial-eyebrow"><span aria-hidden="true"></span> The people behind the reporting</p>
-    <h1 id="editorial-title">Meet our <em>editorial team.</em></h1>
-    <p class="editorial-lead">
-      Get to know our journalists and explore the stories they bring to {{ project_name }}.
+  <header class="ef-intro">
+    <h1>Meet our editorial team</h1>
+    <p class="ef-count">
+      {{ team_size }} journalist{{ team_size|pluralize }},
+      {{ team_story_total }} published stor{{ team_story_total|pluralize:"y,ies" }}
     </p>
-    <div class="editorial-stats" aria-label="Editorial team statistics">
-      <div class="editorial-stat" aria-label="{{ team_size }} active team members">
-        <strong class="editorial-count" data-count-up="{{ team_size }}">{{ team_size }}</strong>
-        <span class="editorial-stat-label">
-          <svg class="editorial-stat-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          Active {{ team_size|pluralize:"journalist,journalists" }}
-        </span>
-      </div>
-      <span class="editorial-stat-divider" aria-hidden="true"></span>
-      <div class="editorial-stat" aria-label="{{ total_stories }} published stories">
-        <strong class="editorial-count" data-count-up="{{ total_stories }}">{{ total_stories }}</strong>
-        <span class="editorial-stat-label">
-          <svg class="editorial-stat-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5z"></path>
-            <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20M8 6h8M8 9h8"></path>
-          </svg>
-          All published {{ total_stories|pluralize:"story,stories" }}
-        </span>
-      </div>
-    </div>
-  </section>
+  </header>
 
   {% if highlight %}
-  <section class="editorial-spotlight" aria-labelledby="editorial-spotlight-title">
-    <div class="editorial-spotlight-copy">
-      <p class="editorial-spotlight-label">Latest story</p>
-      <h2 id="editorial-spotlight-title">
-        {% if highlight.latest_story.slug %}
-          <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.latest_story.heading }}</a>
-          {% comment %} THIS ONE IS THE NEWS LINKS BUT I AM REPALCING IT WITH THE AUTHOR LINK {% endcomment %}
-          {% comment %} <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}">{{ highlight.latest_story.heading }}</a> {% endcomment %}
+  <section class="ef-hero" aria-label="Lead editor">
+    {% include "staff/includes/editorial_portrait.html" with portrait=highlight.portrait name=highlight.display_name hue=highlight.hue grad_id=highlight.grad_id loading="eager" %}
+    <div class="ef-tx">
+      <span class="ef-tag">Lead editor</span>
+      <h2>
+        {% if highlight.slug %}
+        <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.display_name }}</a>
         {% else %}
-          {{ highlight.latest_story.heading }}
+        {{ highlight.display_name }}
         {% endif %}
       </h2>
-      <p class="editorial-spotlight-byline">
-        By
-        {% if highlight.slug %}
-          <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.display_name }}</a>
-        {% else %}
-          {{ highlight.display_name }}
-        {% endif %}
-        {% if highlight.latest_story.date_created %}
-          <span aria-hidden="true">·</span>
-          <time datetime="{{ highlight.latest_story.date_created|date:'c' }}">
-            {{ highlight.latest_story.date_created|date:"F j, Y" }}
-          </time>
-        {% endif %}
-      </p>
-      {% if highlight.slug %}
-      <a class="editorial-spotlight-link" href="{% url 'staff:portfolio' highlight.slug %}">
-        Explore their stories <span aria-hidden="true">↗</span>
-      </a>
+      {% if highlight.profile.bio %}
+      <p class="ef-bio">{{ highlight.profile.bio|truncatechars:240 }}</p>
       {% endif %}
-    </div>
-    <div class="editorial-spotlight-scene">
-      <div class="editorial-spotlight-art" aria-hidden="true">
-        <span class="editorial-spotlight-art-label">{{ project_name }} / THE NEWSROOM</span>
-        <span class="editorial-spotlight-art-number">01</span>
-        <span class="editorial-spotlight-art-rule"></span>
-        <span class="editorial-spotlight-art-word">REPORT</span>
+      <div class="ef-fig">
+        <div>
+          <b>{{ highlight.story_count }}</b>
+          <span>stor{{ highlight.story_count|pluralize:"y,ies" }}</span>
+        </div>
+        <div>
+          <b>{{ highlight.total_views_display }}</b>
+          <span>views</span>
+        </div>
       </div>
-      <div class="editorial-spotlight-portrait" aria-hidden="true">
-        {% if highlight.latest_story.image_1 %} 
-        <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}"><img src="{{ highlight.latest_story.image_1 }}" alt="" loading="lazy"
-             onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;"></a>
-        <span hidden>{{ highlight.display_name|slice:":1"|upper }}</span>
-        {% else %}
-        <span>{{ highlight.display_name|slice:":1"|upper }}</span>
-        {% endif %}
-      </div>
-      {% if highlight.slug %}
-      <a class="editorial-spotlight-profile" href="{% url 'staff:portfolio' highlight.slug %}">
-      {% else %}
-      <div class="editorial-spotlight-profile">
-      {% endif %}
-        <span class="editorial-profile-avatar" aria-hidden="true">
-          {% if highlight.portrait %}
-          <img src="{{ highlight.portrait }}" alt="" loading="lazy">
-          {% else %}
-          {{ highlight.display_name|slice:":1"|upper }}
-          {% endif %}
-        </span>
-        <span class="editorial-profile-copy">
-          <small>Latest by</small>
-          <strong>{{ highlight.display_name }}</strong>
-        </span>
-        {% if highlight.slug %}
-        <svg class="editorial-profile-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M5 12h14M13 5l7 7-7 7"></path>
-        </svg>
-        {% endif %}
-      {% if highlight.slug %}
-      </a>
-      {% else %}
+      {% if highlight.latest_story %}
+      <div class="ef-latest">
+        <small>Latest story, {{ highlight.latest_story.date_created|date:"M j, Y" }}</small>
+        <a href="{% url 'blog:story_detail' highlight.latest_story.slug %}">{{ highlight.latest_story.heading }}</a>
       </div>
       {% endif %}
     </div>
   </section>
   {% endif %}
 
-  <section class="editorial-roster" aria-labelledby="editorial-roster-title">
-    <header class="editorial-section-heading">
-      <div>
-        <p class="editorial-eyebrow">{{ project_name }}</p>
-        <h2 id="editorial-roster-title">Our Team</h2>
-      </div>
-      {% comment %} <p>Browse their work by name, subject, or story.</p> {% endcomment %}
-    </header>
+  {% if grid_members %}
+  <ul class="ef-grid" aria-label="Editorial team">
+    {% for member in grid_members %}
+    <li class="ef-cell">
+      <article class="ef-card" style="--i: {{ forloop.counter0 }};">
+        {% include "staff/includes/editorial_portrait.html" with portrait=member.portrait name=member.display_name hue=member.hue grad_id=member.grad_id %}
+        <h3>
+          {% if member.slug %}
+          <a href="{% url 'staff:portfolio' member.slug %}">{{ member.display_name }}</a>
+          {% else %}
+          {{ member.display_name }}
+          {% endif %}
+        </h3>
+        {% if member.speciality %}
+        <ul class="ef-t">
+          {% for beat in member.speciality %}<li>{{ beat }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        <p>{{ member.profile.bio|default:"Covers stories that matter to our readers."|truncatechars:170 }}</p>
+        <div class="ef-m">
+          <span><b>{{ member.story_count }}</b> stor{{ member.story_count|pluralize:"y,ies" }}</span>
+          <span><b>{{ member.total_views_display }}</b> views</span>
+        </div>
+      </article>
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif not highlight %}
+  <div class="ef-empty">
+    <h2>Our newsroom is getting ready.</h2>
+    <p>There are no active editorial team members to display yet.</p>
+  </div>
+  {% endif %}
 
-    {% if members %}
-    <div class="editorial-directory-tools">
-      <div class="editorial-search">
-        <span class="editorial-search-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
-        </span>
-        <label class="sr-only" for="editorial-journalist-search">Search journalists</label>
-        <input
-          id="editorial-journalist-search"
-          type="text"
-          data-journalist-search
-          aria-controls="editorial-directory"
-          placeholder="Search journalists, topics, or stories"
-          autocomplete="off"
-          value="{{ search_query }}"
-        >
-        <button type="button" class="editorial-search-clear" data-search-clear aria-label="Clear journalist search" hidden>
-          <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"></path></svg>
-        </button>
-      </div>
-      <p class="editorial-search-status" data-search-status data-total="{{ filtered_count }}" data-page-size="{{ page_size }}" role="status" aria-live="polite">
-        Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ filtered_count }} journalists
-      </p>
-    </div>
-
-    <ul class="editorial-grid" id="editorial-directory">
-      {% include "staff/includes/editorial_cards.html" with members=members %}
-    </ul>
-    <div class="editorial-search-empty" data-search-empty {% if filtered_count %}hidden{% endif %}>
-      <span aria-hidden="true">⌕</span>
-      <h3>No journalists found</h3>
-      <p>Try another name, topic, or story title.</p>
-    </div>
-    {% if page_obj.paginator.num_pages > 1 %}
-    <nav class="editorial-pagination" aria-label="Journalist pages" data-editorial-pagination>
-      <button type="button" data-page-previous {% if not page_obj.has_previous %}disabled{% endif %}>Previous</button>
-      <span data-page-status data-current-page="{{ page_obj.number }}" aria-live="polite">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-      <button type="button" data-page-next {% if not page_obj.has_next %}disabled{% endif %}>Next</button>
-    </nav>
-    {% endif %}
-    {% else %}
-    <div class="editorial-empty">
-      <span aria-hidden="true">✦</span>
-      <h3>Our newsroom is getting ready.</h3>
-      <p>There are no active editorial team members to display yet.</p>
-    </div>
-    {% endif %}
-  </section>
-
-  <section class="editorial-standards" aria-labelledby="editorial-standards-title">
-    <p class="editorial-eyebrow">Our approach</p>
+  <section class="editorial-standards" id="editorial-standards" aria-labelledby="editorial-standards-title">
+    <p class="ef-eyebrow">Our approach</p>
     <h2 id="editorial-standards-title">How we report</h2>
-    <p class="editorial-standards-lead">At AbuReport, we believe news should be clear, accurate, relevant, and easy to understand. We report stories that matter to our readers, with particular attention to education, technology, universities, examinations, scholarships, public institutions, and developments affecting Nigerian students and young people.
+    <p class="editorial-standards-lead">At {{ project_name }}, we believe news should be clear, accurate, relevant, and easy to understand. We report stories that matter to our readers, with particular attention to education, technology, universities, examinations, scholarships, public institutions, and developments affecting Nigerian students and young people.
 
 Our reporting process focuses on facts before speed. We verify information from official sources, institutional announcements, credible documents, and other reliable sources before publishing. Where appropriate, we provide links to the original or primary source so readers can verify the information themselves.
 
@@ -208,25 +118,20 @@ Our goal is simple: to provide reliable reports that help readers understand wha
     <div class="editorial-standards-grid">
       <article>
         <span>01</span>
-        <h3>Start with the facts</h3>
+        <h3>Fact First</h3>
         <p>We keep the headline direct and the opening focused on the essential details.</p>
       </article>
       <article>
         <span>02</span>
-        <h3>Make it clear</h3>
+        <h3>Clarity</h3>
         <p>We organize reports with readable paragraphs, useful context, and attributed information.</p>
       </article>
       <article>
         <span>03</span>
-        <h3>Update with care</h3>
+        <h3>Updates Thats Up To Date</h3>
         <p>When important details change, the report should make the latest information easy to follow.</p>
       </article>
     </div>
   </section>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
-  {{ block.super }}
-  <script src="{% static 'staff/js/editorial-motion.js' %}?v=20261007-2" defer></script>
 {% endblock %}

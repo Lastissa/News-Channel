@@ -25,7 +25,7 @@
               <input id="category-filter" type="search" placeholder="Filter categories" autocomplete="off" data-category-filter>
             </li>
             {% for value, label in nav_categories %}
-            <li data-category-option><a href="{% url 'home:home' %}?category={{ value }}">{{ label|title }}</a></li>
+            <li data-category-option><a href="{% url 'home:category' value|slugify %}">{{ label|title }}</a></li>
             {% endfor %}
           </ul>
         </li>
@@ -64,7 +64,7 @@
     <div class="nav-backdrop" data-nav-backdrop aria-hidden="true"></div>
 
     <div class="header-actions">
-      <form class="search-form" action="{% url 'home:home' %}" method="get" role="search">
+      <form class="search-form" action="{% url 'home:search' %}" method="get" role="search">
         <input type="search" name="q" id="search-input" placeholder="Search Headlines" aria-label="Search Headlines" value="{{ query|default:'' }}">
       </form>
       <button type="button" class="icon-btn" id="search-toggle" aria-label="Toggle search" aria-expanded="false">

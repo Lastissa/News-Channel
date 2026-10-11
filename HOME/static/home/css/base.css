@@ -700,6 +700,25 @@ a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 
 .empty-state { text-align: center; color: var(--slate); padding: 40px 10px; }
 
+/* ---------- Search + category landing pages ---------- */
+.search-page-form { display: flex; gap: 10px; margin: 0 0 24px; max-width: 620px; }
+.search-page-form input {
+  flex: 1; min-width: 0; padding: 11px 14px; border: 1px solid var(--line);
+  background: var(--input-fill); color: var(--ink); font: inherit; border-radius: var(--radius-s);
+}
+.search-page-form input:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.search-page-form button {
+  padding: 11px 24px; border: 0; background: var(--nav-bg); color: var(--nav-fg);
+  font: inherit; font-weight: 700; letter-spacing: 0.04em; cursor: pointer;
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+.search-page-form button:hover { background: var(--ink-soft); }
+.search-page-form button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.category-page-eyebrow {
+  margin: 0 0 8px; color: var(--amber-deep); font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
+}
+
 /* ---------- Load more (3D button) ---------- */
 .load-more-wrap { display: flex; justify-content: center; margin-top: 36px; }
 .load-more-nav {

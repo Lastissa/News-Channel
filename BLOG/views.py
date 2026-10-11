@@ -310,6 +310,7 @@ def _suggested_stories():
 
 class StoryDetailView(View):
     def get(self, request, blog_slug):
+        #   THE BLOG RAISE ERRROR IF THERE IS NO BLOG
         blog = cache_or_run(f"blog-{blog_slug}", lambda: Blog.objects.filter(slug=blog_slug).select_related("author__staffprofile").first(), timeout=100)
         if blog is None:
             return render(

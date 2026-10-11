@@ -17,7 +17,7 @@
     {% for cpost in continue_reading %}
     <article class="continue-card">
       <a class="continue-card-media" href="{% url 'blog:story_detail' cpost.slug %}" tabindex="-1">
-        <img src="{{ cpost.image_1|default:placeholder }}" alt="" loading="lazy">
+        <img src="{{ cpost.image_1|default:placeholder }}" alt="{{ cpost.heading }}" loading="lazy">
       </a>
       <div class="continue-card-body">
         <span class="tag">{{ cpost.get_category_display|title }}</span>

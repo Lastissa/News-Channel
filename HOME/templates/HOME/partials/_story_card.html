@@ -7,7 +7,7 @@
   </a>
   <div class="story-card-body">
     <div class="story-card-meta">
-      <a class="tag" href="{% url 'home:home' %}?category={{ post.category }}">{{ post.get_category_display|title }}</a>
+      <a class="tag" href="{% url 'home:category' post.category|slugify %}">{{ post.get_category_display|title }}</a>
       <span class="meta-divider" aria-hidden="true"></span>
       <time class="meta-time" datetime="{{ post.date_created|date:'c' }}">{{ post.date_created|date:"M d, Y" }}</time>
     </div>

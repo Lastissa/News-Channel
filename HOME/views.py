@@ -14,7 +14,7 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.text import Truncator
+from django.utils.text import Truncator, slugify
 from django.views import View
 
 from AUTHENTICATION.models import Auth, UserSession
@@ -137,6 +137,18 @@ class SitemapXmlView(View):
             #   so the gallery page itself is worth indexing for SEO too.
             {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": "", "changefreq": "daily", "priority": "0.6"},
         ]
+
+        #   PERMANENT CATEGORY PAGES: /category/<slog>/ is a stable landing page
+        #   for each news category, so every one belongs in the sitemap.
+        for name, _ in get_category_choices():
+            urls.append(
+                {
+                    "loc": f"{domain}{reverse('home:category', args=[slugify(name)])}",
+                    "lastmod": "",
+                    "changefreq": "daily",
+                    "priority": "0.7",
+                }
+            )
 
         stories = Blog.objects.exclude(slug__isnull=True).exclude(slug="").only(
             "id", "slug", "date_created", "last_updated"
@@ -310,23 +322,23 @@ class HomeView(View):
         #category = self explatory
         query = request.GET.get("q", "").strip()
         category = request.GET.get("category", "").strip().upper()
-        page_number = _resolve_page_number(request.GET.get("page"), default=1)
-        is_filtered = bool(query or category)
 
-        if is_filtered:
-            base_qs = _home_blog_queryset()
-            if query:
-                base_qs = base_qs.filter(heading__icontains=query)
-            if category:
-                base_qs = base_qs.filter(category=category)
-            featured = []
-            paginator = Paginator(base_qs, PAGE_SIZE)
-        else:
-            home_posts = cache_or_run("home_page_blogs",fn=lambda: {"posts": list(_home_blog_queryset())},timeout=None)["posts"]
-            featured = home_posts[:FEATURED_COUNT]
-            featured_ids = {post.id for post in featured}
-            grid_posts = [post for post in home_posts if post.id not in featured_ids]
-            paginator = Paginator(grid_posts, PAGE_SIZE)
+        #   LEGACY FILTERS: the home page used to answer /?q= and /?category=.
+        #   Search and each category now have their own indexable URL (/search/
+        #   and /category/<slug>/, see SearchView/CategoryView below), so a
+        #   permanent redirect keeps old links and indexed ?category= URLs
+        #   working while moving every crawler onto the canonical page.
+        if query or category:
+            return _redirect_legacy_filter(request, query, category)
+
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
+
+        home_posts = cache_or_run("home_page_blogs",fn=lambda: {"posts": list(_home_blog_queryset())},timeout=None)["posts"]
+        featured = home_posts[:FEATURED_COUNT]
+        featured_ids = {post.id for post in featured}
+        grid_posts = [post for post in home_posts if post.id not in featured_ids]
+        paginator = Paginator(grid_posts, PAGE_SIZE)
+
         if page_number > paginator.num_pages and paginator.num_pages:
             raise Http404("Page not found.")
         page = paginator.get_page(page_number)
@@ -334,13 +346,16 @@ class HomeView(View):
         #   HEADLINE TICKER: same continuous marquee behaviour as the top-of-page
         #   reading ticker on the story page (BLOG.views.build_ticker_text /
         #   BLOG/static/blog/js/story-ticker.js), but fed with the headings of
-        #   whatever stories are actually on this page (hero + grid) instead of
-        #   one story's content. Empty on a filtered/search view, same as the
-        #   hero row above.
-        headline_ticker_text = (
-            " * ".join(post.heading for post in list(featured) + list(page.object_list) if post.heading)
-            if not is_filtered else ""
+        #   whatever stories are actually on this page (hero + grid).
+        headline_ticker_text = " * ".join(
+            post.heading for post in list(featured) + list(page.object_list) if post.heading
         )
+
+        #   Page 1 is the site root; later pages are their own canonical URL so
+        #   pagination does not collapse every page back onto "/".
+        canonical_url = f"{About.domain.rstrip('/')}{reverse('home:home')}"
+        if page.number > 1:
+            canonical_url = f"{canonical_url}?{urlencode({'page': page.number})}"
 
         context = {
             "featured_posts": featured,
@@ -348,9 +363,10 @@ class HomeView(View):
             "ad_center_items": _ad_center_items(),
             "teaser_items": _teaser_items(),
             "categories": get_category_choices(),
-            "query": query,
-            "active_category": category,
-            "is_filtered": is_filtered,
+            "query": "",
+            "active_category": "",
+            "is_filtered": False,
+            "canonical_url": canonical_url,
             "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
             **_page_context(page, request.user),
         }
@@ -391,6 +407,122 @@ class LoadMoreView(View):
             "HOME/partials/story_cards.html",
             {**_page_context(page, request.user), "next_page": page.next_page_number() if page.has_next() else None},
         )
+
+
+def _redirect_legacy_filter(request, query, category):
+    """Permanently move an old home `?q=`/`?category=` URL onto its new home.
+
+    Search results now live at /search/ (the query is kept so the result set is
+    its own indexable page) and each category lives at /category/<slog>/.
+    """
+    if category:
+        target = reverse("home:category", args=[slugify(category)])
+    else:
+        target = reverse("home:search")
+    params = {}
+    if query:
+        params["q"] = query
+    raw_page = request.GET.get("page")
+    if raw_page:
+        params["page"] = raw_page
+    if params:
+        target = f"{target}?{urlencode(params)}"
+    return redirect(target, permanent=True)
+
+
+def _category_slug_lookup():
+    """Map a category URL slug back to the stored category name.
+
+    Built from the cached choices plus any legacy category that only exists on
+    older stories, so a category page never 404s for a value the site still
+    shows on its cards.
+    """
+    names = [name for name, _ in get_category_choices()]
+    for value in Blog.objects.values_list("category", flat=True).distinct():
+        if value and value not in names:
+            names.append(value)
+    return {slugify(name): name for name in names}
+
+
+class SearchView(View):
+    """Indexable search results page at /search/?q=... .
+
+    The query string is part of the page identity here (a search is a search,
+    not a permanent content category), so it is kept in the canonical URL
+    instead of being folded back onto "/".
+    """
+
+    def get(self, request):
+        query = request.GET.get("q", "").strip()
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
+
+        base_qs = _home_blog_queryset()
+        if query:
+            base_qs = base_qs.filter(heading__icontains=query)
+        else:
+            base_qs = base_qs.none()
+
+        paginator = Paginator(base_qs, PAGE_SIZE)
+        if page_number > paginator.num_pages and paginator.num_pages:
+            raise Http404("Page not found.")
+        page = paginator.get_page(page_number)
+
+        canonical_url = f"{About.domain.rstrip('/')}{reverse('home:search')}"
+        if query:
+            canonical_url = f"{canonical_url}?{urlencode({'q': query})}"
+
+        project = About.project_name
+        if query:
+            meta_description = f'Search results for "{query}" across {project} news, reports and updates for Nigerian students and readers.'
+        else:
+            meta_description = f"Search {project} news, reports and updates. Type a keyword to find the education, university and policy stories that matter to you."
+
+        context = {
+            "query": query,
+            "is_filtered": bool(query),
+            "canonical_url": canonical_url,
+            "meta_description": meta_description,
+            "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+            **_page_context(page, request.user),
+        }
+        return render(request, "HOME/search.html", context)
+
+
+class CategoryView(View):
+    """Permanent, indexable landing page for one news category.
+
+    Served at /category/<category-slog>/ (the slug of the category name) so a
+    category is a stable subpath search engines can discover and index, rather
+    than a query parameter on the home page.
+    """
+
+    def get(self, request, slug):
+        value = _category_slug_lookup().get(slug)
+        if not value:
+            raise Http404("Category not found.")
+
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
+        base_qs = _home_blog_queryset().filter(category=value)
+
+        paginator = Paginator(base_qs, PAGE_SIZE)
+        if page_number > paginator.num_pages and paginator.num_pages:
+            raise Http404("Page not found.")
+        page = paginator.get_page(page_number)
+
+        label = value.title()
+        canonical_url = f"{About.domain.rstrip('/')}{reverse('home:category', args=[slug])}"
+
+        context = {
+            "active_category": value,
+            "category_label": label,
+            "category_slug": slug,
+            "is_filtered": True,
+            "canonical_url": canonical_url,
+            "meta_description": f"Latest {label} news and updates from {About.project_name}: verified reports for Nigerian students, universities and readers.",
+            "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+            **_page_context(page, request.user),
+        }
+        return render(request, "HOME/category.html", context)
 
 
 class BookmarkView(View):

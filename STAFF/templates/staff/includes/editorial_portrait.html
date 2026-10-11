@@ -1,0 +1,24 @@
+{% comment %}
+  One editorial portrait. Always draws the generated gradient silhouette the
+  design uses; when the author has a real profile image it is layered on top
+  (and simply hidden by the browser if the file 404s, revealing the silhouette).
+
+  Needs: portrait (url, may be empty), name, hue (integer), grad_id (unique
+  string for the SVG gradient), loading (eager/lazy, default lazy).
+{% endcomment %}
+<div class="ef-ph">
+  <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="{{ grad_id }}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="hsl({{ hue }}, 26%, 34%)"/>
+        <stop offset="1" stop-color="hsl({{ hue }}, 34%, 12%)"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="500" fill="url(#{{ grad_id }})"/>
+    <circle cx="200" cy="190" r="72" fill="hsl({{ hue }}, 16%, 64%)" opacity=".9"/>
+    <path d="M36 500c0-112 72-172 164-172s164 60 164 172z" fill="hsl({{ hue }}, 16%, 54%)" opacity=".85"/>
+  </svg>
+  {% if portrait %}
+  <img src="{{ portrait }}" alt="{{ name }}" loading="{{ loading|default:'lazy' }}" decoding="async" onerror="this.hidden=true;">
+  {% endif %}
+</div>

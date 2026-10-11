@@ -3,22 +3,26 @@
 
 {% block title %}{{ display_name }} · {{ role_label }} · Portfolio · {{ project_name }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
+{% block og_type %}profile{% endblock %}
+{% block og_title %}{{ display_name }} · {{ role_label }} at {{ project_name }}{% endblock %}
+{% block og_description %}{{ meta_description }}. {{ stats.story_count }} stories. {{ stats.total_views }} views.{% endblock %}
+{% block twitter_title %}{{ display_name }} · {{ role_label }} at {{ project_name }}{% endblock %}
+{% block twitter_description %}{{ meta_description }}{% endblock %}
+
+{% block og_image %}
+  {% if staff_image %}
+    <meta property="og:image" content="{{ staff_image }}">
+    <meta name="twitter:image" content="{{ staff_image }}">
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+{% endblock og_image %}
 
 {% block extra_head %}
   {{ block.super }}
   {% comment %} canonical + og:url already come from base.html via site_domain + request.path {% endcomment %}
   <meta name="author" content="{{ display_name }} ({{ author.email }})">
-  <meta property="og:type" content="profile">
-  <meta property="og:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
-  <meta property="og:description" content="{{ meta_description }}. {{ stats.story_count }} stories. {{stats.total_views}} Views.">
   <meta property="profile:username" content="{{ display_name }}">
-  {% if staff_image %}
-    <meta property="og:image" content="{{ staff_image }}">
-  {% else %}
-  {% endif %}<meta property="og:image" content="">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
-  <meta name="twitter:description" content="{{ meta_description }}">
   <script type="application/ld+json">{{ person_schema_json | safe }}</script>
   <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}?v=20261009-1">
 {% endblock %}
@@ -215,7 +219,7 @@
                   {% endif %}
                 </a>
                 <div class="portfolio-popular-copy">
-                  <a class="tag" href="{% url 'home:home' %}?category={{ story.category }}">{{ story.get_category_display|title }}</a>
+                  <a class="tag" href="{% url 'home:category' story.category|slugify %}">{{ story.get_category_display|title }}</a>
                   <h3><a href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a></h3>
                   <span class="portfolio-popular-views">{{ story.views|floatformat:"0g" }} views</span>
                 </div>

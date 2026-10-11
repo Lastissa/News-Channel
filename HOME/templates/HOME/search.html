@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if query %}Search: {{ query|truncatechars:50 }} | {{ project_name }}{% else %}Search | {{ project_name }}{% endif %}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="index, follow">{% endblock %}
+
+{% comment %}
+  SEARCH RESULTS LIVE HERE, not on the home page. /search/?q=... is its own
+  indexable page (the view keeps ?q= in the canonical), so a reader's search
+  never competes with, or gets folded into, the homepage. Reached by the
+  navbar search form and by the permanent redirect from the old /?q= URL.
+{% endcomment %}
+{% block content %}
+<section class="story-grid-section search-page">
+  <div class="section-heading">
+    <h1 id="headline">{% if query %}Search results for &ldquo;{{ query }}&rdquo;{% else %}Search {{ project_name }}{% endif %}</h1>
+  </div>
+
+  <form class="search-page-form" action="{% url 'home:search' %}" method="get" role="search">
+    <label class="visually-hidden" for="search-page-input">Search stories</label>
+    <input id="search-page-input" type="search" name="q" value="{{ query }}" placeholder="Search headlines" autocomplete="off" required>
+    <button type="submit">Search</button>
+  </form>
+
+  <div class="story-grid">
+    {% for post in page_obj.object_list %}
+      {% include "HOME/partials/_story_card.html" with post=post %}
+    {% empty %}
+      <p class="empty-state">
+        {% if query %}No headline matches &ldquo;{{ query }}&rdquo;. Try a different keyword.
+        {% else %}Type a keyword above to search our headlines.{% endif %}
+      </p>
+    {% endfor %}
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="story-pagination" aria-label="Search result pages">
+    {% if page_obj.has_previous %}
+      <a class="story-page-btn page-nav" href="?q={{ query|urlencode }}&amp;page={{ page_obj.previous_page_number }}#headline" aria-label="Go to previous page">Prev</a>
+    {% endif %}
+
+    {% for page_num in page_range %}
+      {% if page_num == page_obj.paginator.ELLIPSIS %}
+        <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+      {% else %}
+        <a class="story-page-btn {% if page_num == page_obj.number %}is-active{% endif %}"
+           href="?q={{ query|urlencode }}&amp;page={{ page_num }}#headline"
+           aria-label="Go to page {{ page_num }}"
+           {% if page_num == page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+      <a class="story-page-btn page-nav" href="?q={{ query|urlencode }}&amp;page={{ page_obj.next_page_number }}#headline" aria-label="Go to next page">Next</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

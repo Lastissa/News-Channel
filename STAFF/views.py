@@ -3,16 +3,13 @@
 import json
 import logging
 import re
-import unicodedata
 from datetime import date, datetime, time
 
-from django.contrib import messages
 from django.core.paginator import EmptyPage, Paginator
 from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.http import Http404, JsonResponse
 from django.shortcuts import render
-from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
@@ -29,7 +26,6 @@ from STAFF.models import AuthorFollow, StaffProfile
 logger = logging.getLogger(__name__)
 
 PORTFOLIO_STORY_LIMIT = 6
-EDITORIAL_PAGE_SIZE = 5
 PORTFOLIO_FEED_FIELDS = (
     "id",
     "slug",
@@ -442,74 +438,31 @@ class EditorialTeamView(View):
                     "joined": author.date_joined,
                     "story_count": author.story_count,
                     "total_views": author.total_views or 0,
+                    "total_views_display": f"{author.total_views or 0:,}",
                     "latest_story": next(iter(author.latest_editorial_stories), None),
                 }
             )
 
         members.sort(key=lambda member: member["display_name"].casefold())
-        all_members = members
-        total_stories = Blog.objects.count()
-        query = request.GET.get("q", "").strip()
-        if query:
-            def normalize_search(value):
-                decomposed = unicodedata.normalize("NFD", value.casefold())
-                return "".join(
-                    character
-                    for character in decomposed
-                    if not unicodedata.combining(character)
-                )
 
-            normalized_query = normalize_search(query)
-            members = [
-                member
-                for member in all_members
-                if normalized_query
-                in normalize_search(
-                    " ".join(
-                        [
-                            member["display_name"],
-                            member["profile"].bio if member["profile"] else "",
-                            " ".join(member["speciality"]),
-                            member["latest_story"].heading
-                            if member["latest_story"]
-                            else "",
-                            member["latest_story"].get_category_display()
-                            if member["latest_story"]
-                            else "",
-                        ]
-                    )
-                )
-            ]
-
-        paginator = Paginator(members, EDITORIAL_PAGE_SIZE)
-        page_obj = paginator.get_page(request.GET.get("page", 1))
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            cards_html = render_to_string(
-                "staff/includes/editorial_cards.html",
-                {"members": page_obj.object_list},
-                request=request,
-            )
-            return JsonResponse(
-                {
-                    "cards_html": cards_html,
-                    "page": page_obj.number,
-                    "pages": paginator.num_pages,
-                    "page_size": EDITORIAL_PAGE_SIZE,
-                    "has_previous": page_obj.has_previous(),
-                    "has_next": page_obj.has_next(),
-                    "total": paginator.count,
-                    "query": query,
-                }
-            )
+        #   Portraits fall back to a generated gradient silhouette. The hue and a
+        #   stable gradient id are decided here so the template only prints them.
+        for position, member in enumerate(members):
+            member["hue"] = 205 + ((position * 9) % 24)
+            member["grad_id"] = f"ef-portrait-grad-{position}"
 
         contributors_with_stories = [
-            member for member in all_members if member["latest_story"] is not None
+            member for member in members if member["latest_story"] is not None
         ]
         highlight = max(
             contributors_with_stories,
             key=lambda member: member["latest_story"].date_created,
             default=None,
         )
+        grid_members = [member for member in members if member is not highlight]
+        team_story_total = sum(member["story_count"] for member in members)
+        writer_word = "writer" if len(members) == 1 else "writers"
+
         person_schema = [
             {
                 "@type": "Person",
@@ -525,7 +478,7 @@ class EditorialTeamView(View):
                     else {}
                 ),
             }
-            for member in all_members
+            for member in members
         ]
         team_schema = {
             "@context": "https://schema.org",
@@ -535,25 +488,21 @@ class EditorialTeamView(View):
             "member": person_schema,
         }
         team_schema_json = json.dumps(team_schema, ensure_ascii=False).replace("<", "\\u003c")
-        messages.info(request, message= "Page still in progress, Please Check Back Later")
         return render(
             request,
             "staff/editorial_team.html",
             {
-                "members": page_obj.object_list,
+                "members": members,
                 "highlight": highlight,
-                "team_size": len(all_members),
-                "total_stories": total_stories,
-                "page_obj": page_obj,
-                "filtered_count": paginator.count,
-                "page_size": EDITORIAL_PAGE_SIZE,
-                "search_query": query,
+                "grid_members": grid_members,
+                "team_size": len(members),
+                "team_story_total": team_story_total,
                 "project_name": About.project_name,
                 "project_cachphrase": About.project_cachphrase,
                 "meta_description": (
-                    f"Meet the writers and editors behind {About.project_name}, "
-                    f"browse their latest work, and explore all {len(all_members)} active "
-                    f"editorial team members."
+                    f"Meet the {len(members)} {writer_word} and editors behind "
+                    f"{About.project_name}. Read each journalist's beat, bio and their "
+                    f"latest education, university and policy reporting."
                 ),
                 "team_schema_json": team_schema_json,
                 "page_og_image": highlight["portrait"] if highlight else None,

@@ -221,6 +221,6 @@ class StoryFormFollowsCategoriesTests(CategoryCacheTestCase):
         self.assertEqual(Blog.objects.filter(category="NECO").count(), 1)
 
     def test_home_menu_lists_a_new_category_only_after_it_is_added(self, _ping):
-        self.assertNotContains(self.client.get(reverse("home:home")), "?category=SPORTS")
+        self.assertNotContains(self.client.get(reverse("home:home")), "/category/sports/")
         self.add_category("sports")
-        self.assertContains(self.client.get(reverse("home:home")), "?category=SPORTS")
+        self.assertContains(self.client.get(reverse("home:home")), "/category/sports/")
