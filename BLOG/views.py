@@ -469,9 +469,19 @@ class StoryDetailView(View):
         #   ReadingHistory above, and offering it back would be odd. Imported
         #   locally to keep BLOG from importing HOME at module load.
         if request.user.is_authenticated:
-            from HOME.views import _continue_popup_context
+            from HOME.views import (
+                CONTINUE_COOLDOWN_STORY_MS,
+                _continue_popup_context,
+            )
 
-            context.update(_continue_popup_context(request.user, exclude_ids=[blog.id]))
+            context.update(
+                _continue_popup_context(
+                    request.user,
+                    exclude_ids=[blog.id],
+                    scope="story",
+                    cooldown_ms=CONTINUE_COOLDOWN_STORY_MS,
+                )
+            )
             context["continue_popup_enabled"] = True
 
         return render(request, "blog/story_detail.html", context)

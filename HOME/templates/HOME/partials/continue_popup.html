@@ -4,8 +4,10 @@ CONTINUE READING POPUP (near full-screen sheet).
 
 Shown on the home page (HOME/home.html) and, for signed in readers only, on a
 story page (blog/story_detail.html), through the base template's
-"continue_popup" block. It opens once per day, a few seconds after the page
-loads (continue-popup.js). The sheet is full width, touches the bottom, and has
+"continue_popup" block. It opens a few seconds after the page loads, then stays
+quiet for a cooldown that depends on the page: 12 hours on the home page and 1
+hour on a story page (continue-popup.js, data-continue-scope /
+data-continue-cooldown). The sheet is full width, touches the bottom, and has
 only a small margin at the top; the blurred backdrop shows through that strip,
 and tapping the strip or the close button (or pressing Escape) dismisses it.
 
@@ -22,6 +24,8 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
      aria-hidden="true"
      data-feed-url="{{ continue_feed_url }}"
      data-next-page="{{ continue_next_page }}"
+     data-continue-scope="{{ continue_scope|default:'home' }}"
+     data-continue-cooldown="{{ continue_cooldown_ms|default:43200000 }}"
      {% if continue_popup_guest %}data-guest="true"{% endif %}>
   <div class="continue-popup-backdrop" data-continue-backdrop></div>
   <div class="continue-popup-sheet" role="document">

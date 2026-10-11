@@ -198,7 +198,7 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Check today")
         self.assertContains(response, "news first")
-        self.assertContains(response, "https://abureport.com.ng")
+        self.assertContains(response, "abureport.com.ng")
         self.assertContains(
             response,
             "If we have not published that news yet, go ahead and write it.",
@@ -1136,3 +1136,53 @@ class ContinueReadingPopupTests(QuietTestCase):
         self.assertContains(response, "blog/file/2023_Facebook_icon.svg")
         self.assertContains(response, "blog/file/X_logo_2023.svg")
         self.assertNotContains(response, "Tap To Share Story")
+
+    def test_home_popup_cooldown_is_twelve_hours(self):
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.context["continue_scope"], "home")
+        self.assertEqual(response.context["continue_cooldown_ms"], 12 * 60 * 60 * 1000)
+        self.assertContains(response, 'data-continue-scope="home"')
+        self.assertContains(response, 'data-continue-cooldown="43200000"')
+
+    def test_story_popup_cooldown_is_one_hour(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("blog:story_detail", args=[self.story_jamb.slug]))
+
+        self.assertEqual(response.context["continue_scope"], "story")
+        self.assertEqual(response.context["continue_cooldown_ms"], 60 * 60 * 1000)
+        self.assertContains(response, 'data-continue-scope="story"')
+        self.assertContains(response, 'data-continue-cooldown="3600000"')
+
+
+class LlmsTxtTests(QuietTestCase):
+    """/llms.txt: the AI-facing description of the site
+    (HOME/views.LlmsTxtView)."""
+
+    def setUp(self):
+        super().setUp()
+        Category.objects.get_or_create(name="SPORTS")
+        refresh_category_cache()
+
+    def test_llms_txt_describes_the_project(self):
+        response = self.client.get("/llms.txt")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("text/plain"))
+        self.assertContains(response, "# AbuReport")
+        self.assertContains(response, "Reliable Source, Trusted News.")
+        self.assertContains(response, "## What we cover")
+        self.assertContains(response, "## How we report")
+        self.assertContains(response, "## Key pages")
+        self.assertContains(response, "## Notes for AI systems")
+
+    def test_llms_txt_links_categories_and_key_pages(self):
+        response = self.client.get("/llms.txt")
+
+        self.assertContains(response, "/category/sports/")
+        self.assertContains(response, "/sitemap.xml")
+        self.assertContains(response, "/robots.txt")
+        self.assertContains(response, reverse("home:author_handbook"))
+        self.assertContains(response, reverse("home:privacy_policy"))
+        self.assertContains(response, "Story URLs look like")

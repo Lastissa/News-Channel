@@ -2,7 +2,9 @@
   "use strict";
 
   /* Continue reading popup (HOME/partials/continue_popup.html, home page).
-     Opens once per day, a short delay after the page loads. Near full-screen
+     Opens a short delay after the page loads, then stays quiet for this page's
+     cooldown: 12 hours on the home page and 1 hour on a story page, tracked in
+     localStorage under a per-scope key. Near full-screen
      sheet: full width, touches the bottom, small margin at the top. The
      blurred backdrop shows through that strip; tapping the strip, the close
      button or Escape dismisses it.
@@ -16,8 +18,14 @@
   var popup = document.querySelector("[data-continue-popup]");
   if (!popup) return;
 
-  var STORAGE_KEY = "abureport-continue-popup-state";
-  var ONCE_PER_DAY_MS = 24 * 60 * 60 * 1000;
+  /* The cooldown and the storage key both depend on the page: home shows at
+     most every 12 hours, a story page at most every hour (set by the view on
+     data-continue-cooldown, in milliseconds). The scope is part of the key so
+     one context's cooldown never suppresses the other. */
+  var SCOPE = popup.getAttribute("data-continue-scope") || "home";
+  var COOLDOWN_MS = parseInt(popup.getAttribute("data-continue-cooldown"), 10);
+  if (!isFinite(COOLDOWN_MS) || COOLDOWN_MS <= 0) COOLDOWN_MS = 12 * 60 * 60 * 1000;
+  var STORAGE_KEY = "abureport-continue-popup-state:" + SCOPE;
   var DELAY_MS = 6000;
   var isGuest = popup.hasAttribute("data-guest");
   var isOpen = false;
@@ -30,7 +38,7 @@
   }
 
   var state = readState();
-  if (state && Number(state) > Date.now()) return; // asked within the last 24h
+  if (state && Number(state) > Date.now()) return; // still inside this page's cooldown
 
   var closeBtn = popup.querySelector("[data-continue-close]");
   var backdrop = popup.querySelector("[data-continue-backdrop]");
@@ -56,7 +64,7 @@
     void popup.offsetWidth;
     popup.classList.add("is-open");
     if (closeBtn) closeBtn.focus({ preventScroll: true });
-    writeState(String(Date.now() + ONCE_PER_DAY_MS));
+    writeState(String(Date.now() + COOLDOWN_MS));
     startFeed();
   }
 

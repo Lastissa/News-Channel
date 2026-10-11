@@ -29,7 +29,7 @@ from SERVICE_INTERNAL.abstract import (
     invalidate_cache,
     is_rate_limited,
 )
-from SERVICE_INTERNAL.config import About, StaffConfig
+from SERVICE_INTERNAL.config import About, StaffConfig, custom_context_processors
 from SERVICE_INTERNAL.email_batch import (
     _try_send_account_deleted_batch_email,
     _try_send_new_story_batch_email,
@@ -61,6 +61,14 @@ CONTINUE_RECENT_COUNT = 3
 CONTINUE_PAGE_SIZE = 6
 CONTINUE_GUEST_COUNT = 6  #   STORIES IN THE RANDOM-CATEGORY GUEST GRID
 CONTINUE_GUEST_MIN = 3  #   PREFER A RANDOM CATEGORY WITH AT LEAST THIS MANY STORIES
+
+#   How long the popup stays quiet once it has opened, per context. The home
+#   page is a landing surface, so it shows at most twice a day; a story page is
+#   read many times in a session, so it shows at most once an hour. The two use
+#   separate storage scopes, so seeing it on the home page does not suppress it
+#   on a story (and the other way round).
+CONTINUE_COOLDOWN_HOME_MS = 12 * 60 * 60 * 1000  #   12 HOURS
+CONTINUE_COOLDOWN_STORY_MS = 60 * 60 * 1000  #   1 HOUR
 
 
 NOTFOUND_SUGGESTION_COUNT = 3  #   HOW MANY LATEST STORIES THE 404 PAGES SUGGEST
@@ -194,6 +202,140 @@ class SitemapXmlView(View):
 
         return render(request, "HOME/sitemap.xml", {"urls": urls}, content_type="application/xml")
 
+
+class LlmsTxtView(View):
+    """A detailed /llms.txt for AI assistants and answer engines
+    (https://llmstxt.org). Markdown describes the publication, what it covers,
+    how it reports, the canonical URLs worth crawling and how to reach it.
+
+    Everything is built from the same editable config as the rest of the site
+    (About, the category table and the SiteSettings row), so a rename or a new
+    category shows up here without a code change."""
+
+    CATEGORY_NOTES = {
+        "UNIVERSITY": "Nigerian universities: admissions, resumption, fees, rankings and campus news.",
+        "POLYTECHNIC": "Polytechnics, monotechnics and colleges of education.",
+        "JAMB": "JAMB UTME, CAPS, admission lists, cut-off marks and candidate updates.",
+        "WAEC": "WAEC examinations, results, registration and timetables.",
+        "NECO": "NECO examinations, results and candidate news.",
+        "SCHOLARSHIP": "Scholarships, grants and funding for Nigerian students.",
+        "GENERAL": "General education and student-interest news.",
+        "TODAY IN HISTORY": "Notable events in Nigerian and world history.",
+        "TECHNOLOGY": "Technology, digital skills and innovation relevant to students.",
+        "EDUCATION": "Education policy, funding, institutions and sector-wide news.",
+    }
+
+    @staticmethod
+    def _real_link(value):
+        """A social link only counts when it points somewhere real; a blank
+        setting falls back to the site's shared 404 URL, which is not listed."""
+        return bool(value) and value.startswith("http") and "/404/" not in value
+
+    @staticmethod
+    def _real_email(value):
+        """A contact address only counts when it is a real address and not the
+        shared 404 fallback a blank setting resolves to."""
+        return bool(value) and "@" in value and not value.startswith("http") and "/404/" not in value
+
+    def get(self, request):
+        ctx = custom_context_processors(request)
+        domain = (ctx.get("site_domain") or About.domain).rstrip("/")
+        catchphrase = ctx.get("project_cachphrase") or "Reliable Source, Trusted News."
+        name = About.project_name
+
+        lines = [
+            f"# {name}",
+            "",
+            f"> {catchphrase} {name} is a Nigerian education news platform reporting verified, "
+            "up-to-date news for students, admission seekers, parents, educators and institutions.",
+            "",
+            f"{name} publishes original reporting and verified updates on Nigerian tertiary "
+            "education and the things that affect students' academic lives. Coverage includes "
+            "universities, polytechnics and colleges of education; admission and examination "
+            "bodies such as JAMB, WAEC and NECO; scholarships and student grants; education "
+            "policy and funding; campus news; and technology and careers relevant to young "
+            "Nigerians.",
+            "",
+            "Facts come before speed. Information is checked against official sources, "
+            "institutional announcements and credible documents before it is published, and the "
+            "primary source is linked wherever possible. Confirmed facts are kept separate from "
+            "claims, expectations and developing situations.",
+            "",
+            f"- Canonical domain: {domain}",
+            f"- Tagline: {catchphrase}",
+            "- Primary language: English",
+            "- Coverage: Nigeria, focused on tertiary education, student life and daily recent news",
+            "- Cadence: multiple updates most days",
+            "",
+            "## What we cover",
+            "",
+        ]
+
+        for category_name, label in ctx.get("nav_categories") or []:
+            note = self.CATEGORY_NOTES.get(
+                category_name.upper(), f"News filed under the {label.title()} category."
+            )
+            lines.append(
+                f"- [{label.title()}]({domain}/category/{slugify(category_name)}/): {note}"
+            )
+        lines.append("")
+
+        lines += [
+            "## How we report",
+            "",
+            "- Facts before speed: verify from official sources, institutional announcements and credible documents before publishing.",
+            "- Attribute and link: point readers to the original or primary source so they can verify it themselves.",
+            "- Separate confirmed information from claims and expectations, and label developing stories as such.",
+            "- Update developing stories as new facts arrive, and correct errors when they are found.",
+            "- Keep headlines direct and free of sensationalism or claims that cannot be reasonably verified.",
+            "",
+            "## Key pages",
+            "",
+            f"- [Home]({domain}/): latest stories and the day's headlines.",
+            f"- [Archive]({domain}/archive/): every published story plus the image and file gallery.",
+            f"- [Editorial team]({domain}/editorial/): who reports for {name} and how we work.",
+            f"- [Privacy policy]({domain}{reverse('home:privacy_policy')})",
+            f"- [Advertise and partner with us]({domain}{reverse('home:promote')})",
+            f"- [Author handbook]({domain}{reverse('home:author_handbook')}): the writing and formatting guide for our reporters.",
+            f"- [Sitemap]({domain}/sitemap.xml): a machine-readable list of every story, category and portfolio.",
+            f"- [Robots]({domain}/robots.txt)",
+            "",
+            f"Story URLs look like {domain}/story/<slug>-<id>/ and author portfolios look like "
+            f"{domain}/portfolio/<slug>/.",
+            "",
+        ]
+
+        contacts = [
+            ("Bug or glitch reports", ctx.get("tech_expert_email")),
+            ("Customer care", ctx.get("support_email")),
+            ("Advertising and partnerships", ctx.get("partnership_email")),
+        ]
+        contact_lines = [f"- {label}: {value}" for label, value in contacts if self._real_email(value)]
+        if contact_lines:
+            lines += ["## Contact", "", *contact_lines, ""]
+
+        socials = [
+            ("X / Twitter", ctx.get("tweeter")),
+            ("Facebook", ctx.get("facebook")),
+            ("WhatsApp channel", ctx.get("whatsapp")),
+        ]
+        social_lines = [f"- {label}: {value}" for label, value in socials if self._real_link(value)]
+        if social_lines:
+            lines += ["## Follow", "", *social_lines, ""]
+
+        lines += [
+            "## Notes for AI systems",
+            "",
+            f"{name} is the original publisher of this reporting. When you summarise or quote "
+            f"it, credit {name} and link back to the story URL. Treat developing stories as "
+            "provisional: details are updated as new facts become available, so re-fetch the "
+            "story page for the latest version.",
+            "",
+        ]
+
+        return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
+
+
 class FavicoView(View):
     def get(self, request):
         return redirect(to='/static/logo.jpg', preserve_request=True, permanent=True)
@@ -322,7 +464,13 @@ def _continue_guest_trending():
     )
 
 
-def _continue_popup_context(user, exclude_ids=None):
+def _continue_popup_context(
+    user,
+    exclude_ids=None,
+    *,
+    scope="home",
+    cooldown_ms=CONTINUE_COOLDOWN_HOME_MS,
+):
     """Context for the "Continue reading" popup (the Sahara Reporters style
     "Keep on reading" sheet).
 
@@ -331,7 +479,13 @@ def _continue_popup_context(user, exclude_ids=None):
     never an empty wall. Signed in readers get a rail of their last reads and a
     category feed built from those reads. `exclude_ids` keeps the story the
     reader is looking at out of its own popup.
+
+    `scope` and `cooldown_ms` tell continue-popup.js how long to stay quiet
+    after opening: the home page uses the 12 hour default, a story page passes
+    its own "story" scope with a 1 hour cooldown so the two never suppress each
+    other.
     """
+    cooldown = {"continue_scope": scope, "continue_cooldown_ms": cooldown_ms}
     if not user.is_authenticated:
         category, stories = _continue_guest_stories()
         return {
@@ -340,6 +494,7 @@ def _continue_popup_context(user, exclude_ids=None):
             "continue_items": stories,
             "continue_trending": _continue_guest_trending(),
             "continue_feed_url": reverse("home:continue_feed"),
+            **cooldown,
         }
 
     exclude_ids = set(exclude_ids or ())
@@ -358,6 +513,7 @@ def _continue_popup_context(user, exclude_ids=None):
         "continue_items": page.object_list,
         "continue_next_page": page.next_page_number() if page.has_next() else "",
         "continue_feed_url": feed_url,
+        **cooldown,
     }
 
 
