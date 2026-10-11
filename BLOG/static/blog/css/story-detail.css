@@ -50,6 +50,39 @@
 }
 .copy-link-icon { width: 14px; height: 14px; flex-shrink: 0; }
 
+/* ---------- share row: copy button + WhatsApp / Facebook / X ---------- */
+.story-share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* border: 1px solid var(--line); */
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 7px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.share-btn .share-icon { width: 22px; height: 22px; flex-shrink: 0; object-fit: contain; }
+/* The X mark ships as a black glyph; flip it on the dark theme so it stays visible. */
+html[data-theme="dark"] .share-btn-twitter .share-icon { filter: invert(1); }
+.share-btn:hover { background: var(--paper-dim); }
+.share-btn-copy { color: var(--brand-deep); border-color: var(--brand-deep); }
+.share-btn-whatsapp { color: #128c42; border-color: #128c42; }
+.share-btn-facebook { color: #1467c4; border-color: #1467c4; }
+.share-btn-twitter { color: var(--ink); border-color: var(--ink); }
+
 @media (max-width: 768px) {
     .story-metrics-group {
         width: 100%;
@@ -62,6 +95,7 @@
 
     .story-copy-link-row {
         width: 100%;
+        justify-content: center;
     }
 
     .copy-link-btn {

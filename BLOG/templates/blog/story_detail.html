@@ -50,7 +50,10 @@
     "wordCount": {{ blog.word_count }}
   }
   </script>
-  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261006-4">
+  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261011-2">
+  {% if request.user.is_authenticated %}
+  <link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261011-10">
+  {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -138,25 +141,48 @@
               <span data-story-like-metric-count>{{ blog.likes }}</span>
             </button>
           </div>
-          <div class="story-copy-link-row">
-            <button type="button" class="copy-link-btn" data-share-btn data-share-url="{{ site_domain }}{{ request.path }}"
-            data-copy-extra="
-{{blog.heading}}
+          <div class="story-copy-link-row story-share-row" data-story-share>
+            {% comment %}
+              Share formats differ per network on purpose: WhatsApp gets the
+              WhatsApp ready recap (heading + the "JUST IN" lead + byline +
+              site line), Facebook takes the bare link, X takes the heading and
+              link, and the plain Share button copies the link. Social links
+              are opened by interactions.js from the data attributes so the
+              encoding of each text lives in one place.
+            {% endcomment %}
+            <button type="button" class="share-btn share-btn-copy" data-share-btn
+                    data-share-url="{{ site_domain }}{{ request.path }}"
+                    data-copy-extra="{{ blog.heading }}">
+              <img class="share-icon" src="{% static 'blog/file/share-icon.svg' %}" alt="" width="16" height="16" loading="lazy">
+              {% comment %} <span>Share</span> {% endcomment %}
+            </button>
+            <button type="button" class="share-btn share-btn-whatsapp" data-share-platform="whatsapp"
+                    data-share-url="{{ site_domain }}{{ request.path }}"
+                    data-share-title="{{ blog.heading }}"
+                    data-share-text="{{ blog.heading }}
 
-{{blog_content_html | filter_copy_btn_text}}
+{{ blog_content_html|filter_copy_btn_text }}
 
-Written by {{blog.author_name}} | ABUREPORT TEAM
+Written by {{ blog.author_name }} | ABUREPORT TEAM
 
-visit https://www.abureport.com.ng for more up to date news.
-
-">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-  <!-- Back/Underlying Page -->
-  <path d="M19 2H9c-1.1 0-2 .9-2 2v2h2V4h10v10h-2v2h2c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-  <!-- Front/Main Page -->
-  <path d="M15 6H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 14H5V8h10v12z"/>
-</svg>
-              <span style="font-weight:900;word-spacing:2px;letter-spacing:1px;">Tap To Share Story</span>
+visit https://www.abureport.com.ng for more up to date news."
+                    aria-label="Share on WhatsApp">
+              <img class="share-icon" src="{% static 'blog/file/WhatsApp-icon.svg' %}" alt="" width="16" height="16" loading="lazy">
+              {% comment %} <span>WhatsApp</span> {% endcomment %}
+            </button>
+            <button type="button" class="share-btn share-btn-facebook" data-share-platform="facebook"
+                    data-share-url="{{ site_domain }}{{ request.path }}"
+                    data-share-title="{{ blog.heading }}"
+                    aria-label="Share on Facebook">
+              <img class="share-icon" src="{% static 'blog/file/2023_Facebook_icon.svg' %}" alt="" width="16" height="16" loading="lazy">
+              {% comment %} <span>Facebook</span> {% endcomment %}
+            </button>
+            <button type="button" class="share-btn share-btn-twitter" data-share-platform="twitter"
+                    data-share-url="{{ site_domain }}{{ request.path }}"
+                    data-share-title="{{ blog.heading }}"
+                    aria-label="Share on X">
+              <img class="share-icon" src="{% static 'blog/file/X_logo_2023.svg' %}" alt="" width="16" height="16" loading="lazy">
+              {% comment %} <span>X</span> {% endcomment %}
             </button>
           </div>
         </div>
@@ -414,6 +440,13 @@ visit https://www.abureport.com.ng for more up to date news.
   {{ block.super }}
   <script src="{% static 'blog/js/story-ticker.js' %}" defer></script>
   <script src="{% static 'blog/js/category-recommendations.js' %}?v=20261006-4" defer></script>
+  {% if continue_popup_enabled %}
+  <script src="{% static 'home/js/continue-popup.js' %}?v=20261011-8" defer></script>
+  {% endif %}
+{% endblock %}
+
+{% block continue_popup %}
+{% if continue_popup_enabled %}{% include "HOME/partials/continue_popup.html" %}{% endif %}
 {% endblock %}
 
 {% block newsletter_popup %}

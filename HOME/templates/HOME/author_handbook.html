@@ -8,6 +8,12 @@
 {% block extra_head %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'home/css/author-handbook.css' %}">
+  <style>
+    a {
+      color:red;
+      text-decoration:underline;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -15,7 +21,7 @@
   <header class="handbook-hero">
     {% comment %} <span class="handbook-kicker">Staff only</span> {% endcomment %}
     <h1>Author handbook</h1>
-    <p>The whole thing on one page: how publishing works, what we expect from every story, and exactly where AI fits in. Read it once before you publish, and come back whenever a check surprises you.</p>
+    <p>how publishing works, what we expect from every story, and exactly where AI fits in.</p>
     <div class="handbook-hero-actions">
       <a class="handbook-back" href="{% url 'home:add_news' %}">Back to the editor</a>
       <a class="handbook-back" href="{% url 'home:profile' %}#publish-stories">My published stories</a>
@@ -45,12 +51,13 @@
         <h2>1. The publishing workflow</h2>
         <p class="hb-lead">Every story follows the same path. Skipping a step is what usually causes a rejected publish or a correction later.</p>
         <ol class="hb-steps">
-          <li><strong>Open the editor.</strong> Add news lives in the header for every staff account.</li>
-          <li><strong>Write a headline you can defend.</strong> It is limited to 100 characters, it must say what actually happened, and you cannot change it later.</li>
+          <li><strong>Check what we have already published.</strong> Open <a href="https://abureport.com.ng" target="_blank" rel="noopener noreferrer">abureport.com.ng</a> and read today's news first. If we have not published that story yet, go ahead and write it. If we already have, do not publish it again.</li>
+          <li><strong>Opening the editor.</strong> '+ news' button in the header for every staff account.</li>
+          <li><strong>Write a headline that matches the article.</strong> Limited to 100 characters and you cannot change it later.</li>
           <li><strong>Add a banner.</strong> Paste an image link, upload a file, or pick one from the archive. Add an image description so the picture is accessible and explained.</li>
-          <li><strong>Write the body.</strong> Lead with the facts: who, what, where and when. Then add detail in short sections with headings.</li>
-          <li><strong>Pick a category.</strong> It decides where the story is listed and which similar stories readers are offered.</li>
-          <li><strong>Review before you publish.</strong> The editor runs the checks below and blocks a story that cannot go out. Warnings you can read and confirm.</li>
+          <li><strong>Write the report body.</strong> First paragraph should be a quick overview for short tempered reders. Then add detail in short sections with headings.</li>          <li><strong>Pick a category.</strong> It decides where the story is listed and which similar stories readers are offered.</li>
+          <li><strong>Pick a category.</strong> The category change based on what the admins set but try to choose the category that best match the article.</li>
+          <li><strong>Review before you publish.</strong> The editor runs the checks below and blocks a story that cannot go out. You get warning if the story can be still be published but it will affect reachability, you can read and confirm.</li>
           <li><strong>Publish.</strong> The story goes live immediately and is announced to newsletter readers.</li>
         </ol>
       </section>
@@ -61,6 +68,7 @@
 
         <h3>Do</h3>
         <ul class="hb-check hb-do">
+          <li>Check today's news on <a href="https://abureport.com.ng" target="_blank" rel="noopener noreferrer">abureport.com.ng</a> before you write. If we have not published that news yet, go ahead. If we have, do not publish it again.</li>
           <li>Check every fact, name, date and figure before you publish.</li>
           <li>Open with new information. The first paragraph should not repeat the headline.</li>
           <li>Say each fact once, then move on. Repetition hurts trust and reach.</li>

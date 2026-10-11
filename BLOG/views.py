@@ -462,6 +462,18 @@ class StoryDetailView(View):
                 ("WhatsApp", author_profile.whatsapp_handle if author_profile else "#"),
             ],
         }
+
+        #   CONTINUE READING ON A STORY PAGE: signed in readers only, so the
+        #   bookmarked reader gets the "keep on reading" sheet here too. The
+        #   story they are on is excluded -- it was just written to their
+        #   ReadingHistory above, and offering it back would be odd. Imported
+        #   locally to keep BLOG from importing HOME at module load.
+        if request.user.is_authenticated:
+            from HOME.views import _continue_popup_context
+
+            context.update(_continue_popup_context(request.user, exclude_ids=[blog.id]))
+            context["continue_popup_enabled"] = True
+
         return render(request, "blog/story_detail.html", context)
 
 

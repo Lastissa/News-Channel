@@ -140,7 +140,7 @@
        action that opened the gate can be retried right away. */
     close(false);
     if (typeof window.AbuToast === "function") {
-      window.setTimeout(function () { window.AbuToast(message, "success"); }, 120);
+      window.setTimeout(function () { window.bottomtoast(message, "success"); }, 120);
     }
   });
 

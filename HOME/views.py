@@ -224,7 +224,7 @@ def _page_context(page, user):
     }
 
 
-def _continue_recent_stories(user):
+def _continue_recent_stories(user, exclude_ids=None):
     """The reader's last few opened stories, most recently read first.
 
     Reads the timestamped HOME.models.ReadingHistory. Readers who were active
@@ -232,23 +232,27 @@ def _continue_recent_stories(user):
     Blog.non_anonymous_viewer link, so we fall back to it (most recently
     linked first, by through-row id) and their popup is personalised at once
     instead of dropping to the generic "Latest stories" feed.
+
+    `exclude_ids` drops stories the popup should not offer again (the one the
+    reader is looking at right now on a story page).
     """
     from HOME.models import ReadingHistory
 
-    rows = (
-        ReadingHistory.objects.filter(user=user)
-        .select_related("blog")
-        .order_by("-read_at", "-pk")[:CONTINUE_RECENT_COUNT]
-    )
+    exclude_ids = set(exclude_ids or ())
+    rows = ReadingHistory.objects.filter(user=user).select_related("blog")
+    if exclude_ids:
+        rows = rows.exclude(blog_id__in=exclude_ids)
+    rows = rows.order_by("-read_at", "-pk")[:CONTINUE_RECENT_COUNT]
     stories = [row.blog for row in rows]
     if stories:
         return stories
 
     through = Blog.non_anonymous_viewer.through
+    links = through.objects.filter(auth=user)
+    if exclude_ids:
+        links = links.exclude(blog_id__in=exclude_ids)
     blog_ids = list(
-        through.objects.filter(auth=user)
-        .order_by("-id")
-        .values_list("blog_id", flat=True)[:CONTINUE_RECENT_COUNT]
+        links.order_by("-id").values_list("blog_id", flat=True)[:CONTINUE_RECENT_COUNT]
     )
     if not blog_ids:
         return []
@@ -261,12 +265,15 @@ def _continue_recent_stories(user):
     return [found[blog_id] for blog_id in blog_ids if blog_id in found]
 
 
-def _continue_recommendation_queryset(user):
+def _continue_recommendation_queryset(user, exclude_ids=None):
     """Stories shown under the last-read pins: everything in the categories
     those pinned stories belong to, newest first. A signed in reader with no
     history yet gets the latest stories instead, so the popup is never empty.
+    `exclude_ids` also drops stories that must not be offered (the one being
+    read).
     """
-    recent = _continue_recent_stories(user)
+    exclude_ids = set(exclude_ids or ())
+    recent = _continue_recent_stories(user, exclude_ids=exclude_ids)
     recent_ids = [story.id for story in recent]
     categories = {story.category for story in recent if story.category}
 
@@ -275,6 +282,8 @@ def _continue_recommendation_queryset(user):
     ).order_by("-date_created", "-pk")
     if categories:
         stories = stories.filter(category__in=categories).exclude(id__in=recent_ids)
+    if exclude_ids:
+        stories = stories.exclude(id__in=exclude_ids)
     return stories
 
 
@@ -313,14 +322,15 @@ def _continue_guest_trending():
     )
 
 
-def _continue_popup_context(user):
-    """Context for the home-page "Continue reading" popup (the Sahara Reporters
-    style "Keep on reading" sheet).
+def _continue_popup_context(user, exclude_ids=None):
+    """Context for the "Continue reading" popup (the Sahara Reporters style
+    "Keep on reading" sheet).
 
     Guests get a compact sign-in bar plus a "Just in" rail and a magazine grid
     of the latest stories from one randomly chosen category, so the sheet is
     never an empty wall. Signed in readers get a rail of their last reads and a
-    category feed built from those reads.
+    category feed built from those reads. `exclude_ids` keeps the story the
+    reader is looking at out of its own popup.
     """
     if not user.is_authenticated:
         category, stories = _continue_guest_stories()
@@ -329,17 +339,25 @@ def _continue_popup_context(user):
             "continue_guest_category": category,
             "continue_items": stories,
             "continue_trending": _continue_guest_trending(),
+            "continue_feed_url": reverse("home:continue_feed"),
         }
 
-    recent = _continue_recent_stories(user)
-    paginator = Paginator(_continue_recommendation_queryset(user), CONTINUE_PAGE_SIZE)
+    exclude_ids = set(exclude_ids or ())
+    recent = _continue_recent_stories(user, exclude_ids=exclude_ids)
+    paginator = Paginator(
+        _continue_recommendation_queryset(user, exclude_ids=exclude_ids), CONTINUE_PAGE_SIZE
+    )
     page = paginator.get_page(1)
+    feed_url = reverse("home:continue_feed")
+    if exclude_ids:
+        feed_url += "?exclude=" + ",".join(str(pk) for pk in sorted(exclude_ids))
     return {
         "continue_popup_guest": False,
         "continue_recent": recent,
         "continue_has_history": bool(recent),
         "continue_items": page.object_list,
         "continue_next_page": page.next_page_number() if page.has_next() else "",
+        "continue_feed_url": feed_url,
     }
 
 
@@ -553,7 +571,13 @@ class ContinueReadingFeedView(View):
         if page_number < 2:
             return JsonResponse({"detail": "Invalid page number."}, status=400)
 
-        paginator = Paginator(_continue_recommendation_queryset(request.user), CONTINUE_PAGE_SIZE)
+        raw_exclude = request.GET.get("exclude", "")
+        exclude_ids = [int(token) for token in raw_exclude.split(",") if token.strip().isdigit()][:20]
+
+        paginator = Paginator(
+            _continue_recommendation_queryset(request.user, exclude_ids=exclude_ids),
+            CONTINUE_PAGE_SIZE,
+        )
         try:
             page = paginator.page(page_number)
         except EmptyPage as exc:

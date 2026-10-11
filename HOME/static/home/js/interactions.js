@@ -334,6 +334,33 @@
     }
   });
 
+  /* ---------- share: WhatsApp / Facebook / X, each its own text format ---------- */
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-share-platform]");
+    if (!btn) return;
+    event.preventDefault();
+
+    var platform = btn.dataset.sharePlatform;
+    var url = btn.dataset.shareUrl || window.location.href;
+    var title = btn.dataset.shareTitle || document.title;
+    var text = btn.dataset.shareText || title;
+    var target = "";
+
+    if (platform === "whatsapp") {
+      /* WhatsApp keeps the current full recap: link, then heading, lead and byline. */
+      target = "https://wa.me/?text=" + encodeURIComponent(url + "\n\n" + text);
+    } else if (platform === "facebook") {
+      /* Facebook sharer only honours the link; extra copy is ignored. */
+      target = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url);
+    } else if (platform === "twitter") {
+      /* X takes a short heading plus the link. */
+      target = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(title) +
+        "&url=" + encodeURIComponent(url);
+    }
+
+    if (target) window.open(target, "_blank", "noopener,noreferrer");
+  });
+
   /* ---------- newsletter: optimistic submit, revert on failure ---------- */
   var newsletterForm = document.getElementById("newsletter-form");
   if (newsletterForm) {

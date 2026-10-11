@@ -119,7 +119,10 @@
     if (skeleton) skeleton.hidden = false;
     if (status) status.textContent = "Loading more stories.";
 
-    fetch(feedUrl + "?page=" + encodeURIComponent(nextPage), {
+    var pageQuery = "page=" + encodeURIComponent(nextPage);
+    var requestUrl = feedUrl + (feedUrl.indexOf("?") === -1 ? "?" : "&") + pageQuery;
+
+    fetch(requestUrl, {
       credentials: "same-origin",
       headers: { "X-Requested-With": "XMLHttpRequest" },
       cache: "no-store"

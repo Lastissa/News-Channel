@@ -192,6 +192,18 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "position: sticky")
         self.assertContains(response, "top: var(--header-h, 64px)")
 
+    def test_formatting_guide_tells_authors_to_check_todays_news_first(self, _ping):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Check today")
+        self.assertContains(response, "news first")
+        self.assertContains(response, "https://abureport.com.ng")
+        self.assertContains(
+            response,
+            "If we have not published that news yet, go ahead and write it.",
+        )
+
     def test_headline_copy_in_first_paragraph_is_blocked_server_side(self, _ping):
         heading = "UNILORIN Announces New Academic Calendar"
         content = (
@@ -941,7 +953,8 @@ class ContinueReadingPopupTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "data-continue-popup")
         self.assertContains(response, 'data-guest="true"')
-        self.assertContains(response, "Sign in to personalize")
+        self.assertContains(response, "stories of interest")
+        self.assertContains(response, reverse("auth:login"))
         # Guests still get real news from a randomly chosen category.
         self.assertContains(response, "continue-popup-grid--guest")
         self.assertContains(response, "More from")
@@ -1044,3 +1057,82 @@ class ContinueReadingPopupTests(QuietTestCase):
         self.assertContains(response, "author-of-the-week")
         self.assertContains(response, "Author of the Week")
         self.assertContains(response, reverse("editorial_team"))
+
+    def test_author_handbook_tells_authors_to_check_todays_news_first(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(reverse("home:author_handbook"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "https://abureport.com.ng")
+        self.assertContains(response, "Check what we have already published")
+        self.assertContains(
+            response,
+            "If we have not published that story yet, go ahead and write it.",
+        )
+
+    def test_story_page_shows_the_popup_only_to_signed_in_readers(self):
+        url = reverse("blog:story_detail", args=[self.story_jamb.slug])
+
+        guest = self.client.get(url)
+        self.assertNotContains(guest, "data-continue-popup")
+
+        self.client.force_login(self.reader)
+        signed = self.client.get(url)
+        self.assertEqual(signed.status_code, 200)
+        self.assertContains(signed, "data-continue-popup")
+        self.assertNotContains(signed, 'data-guest="true"')
+
+    def test_story_page_popup_does_not_offer_the_story_being_read(self):
+        self.client.force_login(self.reader)
+        ReadingHistory.objects.create(user=self.reader, blog=self.story_jamb)
+
+        response = self.client.get(reverse("blog:story_detail", args=[self.story_jamb.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        item_ids = {story.id for story in response.context["continue_items"]}
+        recent_ids = {story.id for story in response.context["continue_recent"]}
+        self.assertNotIn(self.story_jamb.id, item_ids)
+        self.assertNotIn(self.story_jamb.id, recent_ids)
+
+    def test_story_page_feed_url_carries_the_excluded_story(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("blog:story_detail", args=[self.story_jamb.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        expected = f'{reverse("home:continue_feed")}?exclude={self.story_jamb.id}'
+        self.assertContains(response, f'data-feed-url="{expected}"')
+
+    def test_feed_endpoint_honours_the_exclude_param(self):
+        self.client.force_login(self.reader)
+        ReadingHistory.objects.create(user=self.reader, blog=self.story_jamb)
+        for n in range(8):
+            make_story(self.author, heading=f"Excludable feed story {n}", category="GENERAL")
+
+        page_two = self.client.get(reverse("home:continue_feed"), {"page": 2})
+        self.assertEqual(page_two.status_code, 200)
+        rendered = page_two.content.decode()
+        candidates = Blog.objects.filter(heading__startswith="Excludable feed story")
+        present = next(story for story in candidates if story.heading in rendered)
+
+        filtered = self.client.get(
+            reverse("home:continue_feed"),
+            {"page": 2, "exclude": str(present.id)},
+        )
+        self.assertEqual(filtered.status_code, 200)
+        self.assertNotContains(filtered, present.heading)
+
+    def test_story_page_offers_a_share_button_and_each_network(self):
+        response = self.client.get(reverse("blog:story_detail", args=[self.story_jamb.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "share-btn-copy")
+        self.assertContains(response, 'data-share-platform="whatsapp"')
+        self.assertContains(response, 'data-share-platform="facebook"')
+        self.assertContains(response, 'data-share-platform="twitter"')
+        # The brand art is the bought SVG files, not hand written inline paths.
+        self.assertContains(response, "blog/file/WhatsApp-icon.svg")
+        self.assertContains(response, "blog/file/2023_Facebook_icon.svg")
+        self.assertContains(response, "blog/file/X_logo_2023.svg")
+        self.assertNotContains(response, "Tap To Share Story")

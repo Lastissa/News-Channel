@@ -11,7 +11,7 @@
   {% comment %} <meta name="viewport" content="initial-scale=0.5, width=1200"> {% endcomment %}
   <style>
     /* Skeleton only: the polish lives in add-news.css (loaded by the light script below). */
-    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }
+    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; font-weight:700;}
     .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
     .editor-toolbar { margin-bottom: 14px; }
     .editor-toolbar-main { display: flex; align-items: center; gap: 12px; }
@@ -86,6 +86,8 @@
     </div>
   </div>
 
+  <p class="prompt">Clcik <a href="{% url "home:author_handbook" %}" target="_blank" rel="noopener noreferrer">HERE</a> for detailed guide.</p>
+
   <div class="editor-workspace">
     <div class="editor-pane editor-preview-pane">
       <div class="editor-pane-header">Preview</div>
@@ -110,6 +112,13 @@
             <div class="fg-body-wrap" id="format-guide-body">
               <div class="fg-body">
                 <p class="fg-intro">The review checks decide whether your story will be accepted. The formatting codes are optional, but they split the article into sections and help our online visibility. Plain paragraphs works but they are not advisable.</p>
+
+                <section class="fg-block fg-block-key" data-guide-section="Check today's news first">
+                  <h3>Check today&rsquo;s news first</h3>
+                  <ol class="fg-rules fg-rules-key">
+                    <li data-guide-item="Before you write, open abureport.com.ng and check today's news. If we have not published that news yet, go ahead and write it. If we have already published it, do not publish it again.">Before you write, open abureport.com.ng and check today&rsquo;s news. If we have not published that news yet, go ahead and write it. If we have already published it, do not publish it again.</li>
+                  </ol>
+                </section>
 
                 <section class="fg-block fg-block-key" data-guide-section="Review before you publish">
                   <h3>Review before you publish</h3>

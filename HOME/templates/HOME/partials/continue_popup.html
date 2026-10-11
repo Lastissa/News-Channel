@@ -2,11 +2,12 @@
 {% comment %}
 CONTINUE READING POPUP (near full-screen sheet).
 
-Home page only (HOME/home.html, block continue_popup). It opens once per day,
-a few seconds after the page loads (continue-popup.js). The sheet is full
-width, touches the bottom, and has only a small margin at the top; the
-blurred backdrop shows through that strip, and tapping the strip or the
-close button (or pressing Escape) dismisses it.
+Shown on the home page (HOME/home.html) and, for signed in readers only, on a
+story page (blog/story_detail.html), through the base template's
+"continue_popup" block. It opens once per day, a few seconds after the page
+loads (continue-popup.js). The sheet is full width, touches the bottom, and has
+only a small margin at the top; the blurred backdrop shows through that strip,
+and tapping the strip or the close button (or pressing Escape) dismisses it.
 
 Layout follows the Sahara Reporters / Taboola "Keep on reading" overlay: a
 slim header, then a dense magazine mix -- a horizontally scrolling rail plus a
@@ -19,7 +20,7 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
 <div class="continue-popup" id="continue-popup" data-continue-popup
      role="dialog" aria-modal="true" aria-labelledby="continue-popup-title"
      aria-hidden="true"
-     data-feed-url="{% url 'home:continue_feed' %}"
+     data-feed-url="{{ continue_feed_url }}"
      data-next-page="{{ continue_next_page }}"
      {% if continue_popup_guest %}data-guest="true"{% endif %}>
   <div class="continue-popup-backdrop" data-continue-backdrop></div>
