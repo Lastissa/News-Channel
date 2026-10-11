@@ -35,6 +35,7 @@
 }
 
 .ef-intro h1 {
+  color: var(--ef-ink);
   margin: 0;
   font: 500 clamp(1.5rem, 3vw, 2rem)/1.1 Georgia, "Times New Roman", serif;
   letter-spacing: -.02em;
@@ -56,6 +57,7 @@
 }
 
 .ef-ph {
+  display: block;
   position: relative;
   overflow: hidden;
   background: var(--ef-ink);
@@ -76,6 +78,7 @@
 
 .ef-hero .ef-ph {
   min-height: 540px;
+  max-height: 100vh;
 }
 
 .ef-tx {
@@ -112,6 +115,18 @@
 .ef-hero h2 a:hover,
 .ef-hero h2 a:focus-visible {
   text-decoration-color: var(--ef-accent);
+}
+
+/* Empty hero (nobody published this week) ------------------------------ */
+
+.ef-hero.ef-hero-empty {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ef-hero.ef-hero-empty .ef-tx {
+  grid-column: 1 / -1;
+  min-height: 260px;
+  justify-content: center;
 }
 
 .ef-bio {
@@ -401,8 +416,35 @@
     padding: 0 0 64px;
   }
 
+  /*  Match the "Meet our editorial team" strip to the hero panel directly
+      below it so the top of the page reads as one block. The rest of the page
+      keeps the normal paper background. */
   .ef-intro {
-    padding: 16px 16px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 16px 16px 12px;
+    background: var(--ef-ink);
+    border-bottom-color: rgba(255, 255, 255, .25);
+  }
+
+  .ef-intro h1 {
+    color: #fff;
+  }
+
+  .ef-count {
+    color: rgba(255, 255, 255, .75);
+  }
+
+  .ef-hero.ef-hero-empty {
+    min-height: 0;
+  }
+
+  .ef-hero.ef-hero-empty .ef-tx {
+    width: 100%;
+    min-height: 0;
+    justify-content: flex-start;
+    padding: 28px 16px 32px;
   }
 
   .ef-hero {

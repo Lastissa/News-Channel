@@ -21,13 +21,13 @@
 {% block extra_head %}
   {{ block.super }}
   <script type="application/ld+json">{{ team_schema_json|safe }}</script>
-  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261011-3">
+  <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261011-4">
 {% endblock %}
 
 {% block content %}
 <div class="editorial-page">
   <header class="ef-intro">
-    <h1>Meet our editorial team</h1>
+    <h1>Meet Our Editorial Team</h1>
     <p class="ef-count">
       {{ team_size }} journalist{{ team_size|pluralize }},
       {{ team_story_total }} published stor{{ team_story_total|pluralize:"y,ies" }}
@@ -35,10 +35,10 @@
   </header>
 
   {% if highlight %}
-  <section class="ef-hero" aria-label="Lead editor">
-    {% include "staff/includes/editorial_portrait.html" with portrait=highlight.portrait name=highlight.display_name hue=highlight.hue grad_id=highlight.grad_id loading="eager" %}
+  <section class="ef-hero" aria-label="Author Of The Week">
+    {% include "staff/includes/editorial_portrait.html" with portrait=highlight.portrait name=highlight.display_name hue=highlight.hue grad_id=highlight.grad_id loading="eager" href=highlight.portfolio_url %}
     <div class="ef-tx">
-      <span class="ef-tag">Lead editor</span>
+      <span class="ef-tag">Author Of The Week</span>
       <h2>
         {% if highlight.slug %}
         <a href="{% url 'staff:portfolio' highlight.slug %}">{{ highlight.display_name }}</a>
@@ -50,6 +50,10 @@
       <p class="ef-bio">{{ highlight.profile.bio|truncatechars:240 }}</p>
       {% endif %}
       <div class="ef-fig">
+        <div>
+          <b>{{ highlight.week_story_count }}</b>
+          <span>this week</span>
+        </div>
         <div>
           <b>{{ highlight.story_count }}</b>
           <span>stor{{ highlight.story_count|pluralize:"y,ies" }}</span>
@@ -67,6 +71,14 @@
       {% endif %}
     </div>
   </section>
+  {% else %}
+  <section class="ef-hero ef-hero-empty" aria-label="Author Of The Week">
+    <div class="ef-tx">
+      <span class="ef-tag">Author Of The Week</span>
+      <h2>Undecided</h2>
+      <p class="ef-bio">No reporter has published a story this week. The author of the week is decided every Sunday.</p>
+    </div>
+  </section>
   {% endif %}
 
   {% if grid_members %}
@@ -74,7 +86,7 @@
     {% for member in grid_members %}
     <li class="ef-cell">
       <article class="ef-card" style="--i: {{ forloop.counter0 }};">
-        {% include "staff/includes/editorial_portrait.html" with portrait=member.portrait name=member.display_name hue=member.hue grad_id=member.grad_id %}
+        {% include "staff/includes/editorial_portrait.html" with portrait=member.portrait name=member.display_name hue=member.hue grad_id=member.grad_id href=member.portfolio_url %}
         <h3>
           {% if member.slug %}
           <a href="{% url 'staff:portfolio' member.slug %}">{{ member.display_name }}</a>

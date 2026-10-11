@@ -1,7 +1,10 @@
 from unittest import mock
 
+from datetime import timedelta
+
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog
@@ -147,7 +150,7 @@ class EditorialTeamPageTests(TestCase):
         self.assertContains(response, 'alt="Editorial Author"')
         self.assertContains(response, 'class="editorial-standards"')
         self.assertContains(response, "How we report")
-        self.assertContains(response, "editorial_team.css?v=20261011-3")
+        self.assertContains(response, "editorial_team.css?v=20261011-4")
         self.assertContains(response, '"@type": "Organization"')
         self.assertContains(response, "application/ld+json")
         self.assertContains(response, 'name="description"')
@@ -176,9 +179,11 @@ class EditorialTeamPageTests(TestCase):
         )
         member_by_name = {member["display_name"]: member for member in members}
         self.assertEqual(member_by_name["Editorial Author"]["story_count"], 2)
+        self.assertEqual(member_by_name["Editorial Author"]["week_story_count"], 2)
         self.assertEqual(member_by_name["Editorial Author"]["total_views"], 10)
         self.assertEqual(member_by_name["Editorial Author"]["total_views_display"], "10")
         self.assertEqual(member_by_name["New-Editor"]["story_count"], 0)
+        self.assertEqual(member_by_name["New-Editor"]["week_story_count"], 0)
         self.assertIsNone(member_by_name["New-Editor"]["latest_story"])
 
         # Each portrait carries a distinct gradient id, and the lead editor sits
@@ -211,6 +216,25 @@ class EditorialTeamPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "1,234,567")
+
+    def test_editorial_portraits_link_to_the_author_portfolio(self):
+        response = self.client.get(reverse("editorial_team"))
+
+        portfolio_url = reverse("staff:portfolio", args=[self.profile.slug])
+        self.assertContains(response, f'<a class="ef-ph" href="{portfolio_url}"')
+
+    def test_editorial_page_shows_undecided_when_nobody_published_this_week(self):
+        Blog.objects.filter(author=self.author).update(
+            date_created=timezone.now() - timedelta(days=10)
+        )
+
+        response = self.client.get(reverse("editorial_team"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["highlight"])
+        self.assertContains(response, "ef-hero-empty")
+        self.assertContains(response, "Undecided")
+        self.assertEqual(len(response.context["grid_members"]), 2)
 
     def test_editorial_links_are_available_in_navigation_and_footer(self):
         response = self.client.get(reverse("editorial_team"))

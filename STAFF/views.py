@@ -3,7 +3,7 @@
 import json
 import logging
 import re
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from django.core.paginator import EmptyPage, Paginator
 from django.db.models import Count, Max, Prefetch, Q, Sum
@@ -402,12 +402,21 @@ class EditorialTeamView(View):
     def get(self, request):
         from SERVICE_INTERNAL.config import About
 
+        today = timezone.localdate()
+        #   The week runs Sunday to Saturday, so the "author of the week" is
+        #   recalculated every Sunday. On a Sunday the window is just today.
+        week_start = today - timedelta(days=(today.weekday() + 1) % 7)
+
         authors = list(
             Auth.objects.filter(is_active=True)
             .filter(Q(is_staff=True) | Q(is_admin=True) | Q(is_superuser=True))
             .annotate(
                 story_count=Count("blogs"),
                 total_views=Sum("blogs__views"),
+                week_story_count=Count(
+                    "blogs",
+                    filter=Q(blogs__date_created__date__gte=week_start),
+                ),
             )
             .prefetch_related(
                 Prefetch(
@@ -427,16 +436,19 @@ class EditorialTeamView(View):
         members = []
         for author in authors:
             profile = profiles.get(author.pk)
+            slug = profile.slug if profile else ""
             speciality = profile.speciality if profile and isinstance(profile.speciality, list) else []
             members.append(
                 {
                     "display_name": _display_name(profile, author),
                     "portrait": author.profile_img or "",
-                    "slug": profile.slug if profile else "",
+                    "slug": slug,
+                    "portfolio_url": reverse("staff:portfolio", args=[slug]) if slug else "",
                     "profile": profile,
                     "speciality": [str(beat).strip() for beat in speciality if str(beat).strip()],
                     "joined": author.date_joined,
                     "story_count": author.story_count,
+                    "week_story_count": author.week_story_count,
                     "total_views": author.total_views or 0,
                     "total_views_display": f"{author.total_views or 0:,}",
                     "latest_story": next(iter(author.latest_editorial_stories), None),
@@ -451,12 +463,18 @@ class EditorialTeamView(View):
             member["hue"] = 205 + ((position * 9) % 24)
             member["grad_id"] = f"ef-portrait-grad-{position}"
 
-        contributors_with_stories = [
-            member for member in members if member["latest_story"] is not None
+        #   Author of the week: the reporter who has published the most stories
+        #   since the most recent Sunday. Nobody qualifies early in the week, so
+        #   the hero stays empty and the template shows "Undecided" instead.
+        weekly_contributors = [
+            member for member in members if member["week_story_count"] > 0
         ]
         highlight = max(
-            contributors_with_stories,
-            key=lambda member: member["latest_story"].date_created,
+            weekly_contributors,
+            key=lambda member: (
+                member["week_story_count"],
+                member["latest_story"].date_created,
+            ),
             default=None,
         )
         grid_members = [member for member in members if member is not highlight]
@@ -501,7 +519,7 @@ class EditorialTeamView(View):
                 "project_cachphrase": About.project_cachphrase,
                 "meta_description": (
                     f"Meet the {len(members)} {writer_word} and editors behind "
-                    f"{About.project_name}. Read each journalist's beat, bio and their "
+                    f"{About.project_name}. Read each journalist's bio and their "
                     f"latest education, university and policy reporting."
                 ),
                 "team_schema_json": team_schema_json,

@@ -4,9 +4,10 @@
   (and simply hidden by the browser if the file 404s, revealing the silhouette).
 
   Needs: portrait (url, may be empty), name, hue (integer), grad_id (unique
-  string for the SVG gradient), loading (eager/lazy, default lazy).
+  string for the SVG gradient), loading (eager/lazy, default lazy), href
+  (optional author portfolio URL; the portrait links when one is supplied).
 {% endcomment %}
-<div class="ef-ph">
+{% if href %}<a class="ef-ph" href="{{ href }}" aria-label="{{ name }}'s portfolio">{% else %}<div class="ef-ph">{% endif %}
   <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id="{{ grad_id }}" x1="0" y1="0" x2="1" y2="1">
@@ -21,4 +22,4 @@
   {% if portrait %}
   <img src="{{ portrait }}" alt="{{ name }}" loading="{{ loading|default:'lazy' }}" decoding="async" onerror="this.hidden=true;">
   {% endif %}
-</div>
+{% if href %}</a>{% else %}</div>{% endif %}
