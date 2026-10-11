@@ -38,7 +38,7 @@
           <ul class="dropdown-menu">
             {% if request.user.is_authenticated and request.user.is_admin %}<li><a href="{% url 'control:panel' %}">Panel</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
-            <li><a href="{% url 'home:profile' %}#publish-stories">Published stories</a></li>
+            {% if request.user.is_staff %}<li><a href="{% url 'home:profile' %}#publish-stories">Published stories</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
             <li><a href="{% url 'home:profile' %}#reading-history">Stories history</a></li>
             <li><a href="{% url 'home:profile' %}#recent-comments">Comment history</a></li>

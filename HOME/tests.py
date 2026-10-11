@@ -975,6 +975,19 @@ class ContinueReadingPopupTests(QuietTestCase):
         self.assertContains(response, "Latest stories")
         self.assertNotContains(response, "Your last reads")
 
+    def test_history_predating_readinghistory_still_personalizes_the_popup(self):
+        # Readers who were active before ReadingHistory existed only have the
+        # older Blog.non_anonymous_viewer link.
+        self.story_jamb.non_anonymous_viewer.add(self.reader)
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your last reads")
+        self.assertContains(response, "More like what you read")
+        self.assertNotContains(response, "Latest stories")
+
     def test_opening_a_story_records_a_timestamped_read(self):
         self.client.force_login(self.reader)
         before = timezone.now()

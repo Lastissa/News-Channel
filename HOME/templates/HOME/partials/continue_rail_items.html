@@ -1,0 +1,20 @@
+{% load static %}
+{% comment %}
+  Compact card for the horizontally scrolling rails inside the "Continue
+  reading" popup ("Your last reads", guest "Just in"). Small square thumbnail,
+  title, category and date. Keep the fields to exactly what the view's
+  .only(...) queryset selects: id, image_1, image_info, category, slug,
+  date_created, heading.
+{% endcomment %}
+{% static 'home_no_bg.svg' as continue_placeholder %}
+{% for story in continue_items %}
+<a class="continue-popup-rail-card" href="{% url 'blog:story_detail' story.slug %}" data-continue-story>
+  <span class="continue-popup-rail-thumb">
+    <img src="{{ story.image_1|default:continue_placeholder }}" alt="" loading="lazy">
+  </span>
+  <span class="continue-popup-rail-text">
+    <span class="continue-popup-rail-title">{{ story.heading }}</span>
+    <span class="continue-popup-rail-meta">{{ story.get_category_display|title }} &middot; {{ story.date_created|date:"M d" }}</span>
+  </span>
+</a>
+{% endfor %}

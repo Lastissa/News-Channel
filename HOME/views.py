@@ -227,8 +227,11 @@ def _page_context(page, user):
 def _continue_recent_stories(user):
     """The reader's last few opened stories, most recently read first.
 
-    Reads the timestamped HOME.models.ReadingHistory, not the older
-    Blog.non_anonymous_viewer link (which has no time on it).
+    Reads the timestamped HOME.models.ReadingHistory. Readers who were active
+    before that model existed only have the older, untimed
+    Blog.non_anonymous_viewer link, so we fall back to it (most recently
+    linked first, by through-row id) and their popup is personalised at once
+    instead of dropping to the generic "Latest stories" feed.
     """
     from HOME.models import ReadingHistory
 
@@ -237,7 +240,25 @@ def _continue_recent_stories(user):
         .select_related("blog")
         .order_by("-read_at", "-pk")[:CONTINUE_RECENT_COUNT]
     )
-    return [row.blog for row in rows]
+    stories = [row.blog for row in rows]
+    if stories:
+        return stories
+
+    through = Blog.non_anonymous_viewer.through
+    blog_ids = list(
+        through.objects.filter(auth=user)
+        .order_by("-id")
+        .values_list("blog_id", flat=True)[:CONTINUE_RECENT_COUNT]
+    )
+    if not blog_ids:
+        return []
+    found = {
+        story.id: story
+        for story in Blog.objects.filter(id__in=blog_ids).only(
+            "id", "image_1", "image_info", "category", "slug", "date_created", "heading"
+        )
+    }
+    return [found[blog_id] for blog_id in blog_ids if blog_id in found]
 
 
 def _continue_recommendation_queryset(user):
@@ -283,12 +304,23 @@ def _continue_guest_stories():
     return category, stories
 
 
-def _continue_popup_context(user):
-    """Context for the home-page "Continue reading" popup.
+def _continue_guest_trending():
+    """The newest stories overall, for the guest rail ("Just in")."""
+    return list(
+        Blog.objects.only(
+            "id", "image_1", "image_info", "category", "slug", "date_created", "heading"
+        ).order_by("-date_created", "-pk")[:CONTINUE_GUEST_COUNT]
+    )
 
-    Guests get the "sign in to personalize" prompt plus a run of the latest
-    stories from one randomly chosen category, so the sheet is never an empty
-    wall. Signed in readers get their last-read pins and a category feed.
+
+def _continue_popup_context(user):
+    """Context for the home-page "Continue reading" popup (the Sahara Reporters
+    style "Keep on reading" sheet).
+
+    Guests get a compact sign-in bar plus a "Just in" rail and a magazine grid
+    of the latest stories from one randomly chosen category, so the sheet is
+    never an empty wall. Signed in readers get a rail of their last reads and a
+    category feed built from those reads.
     """
     if not user.is_authenticated:
         category, stories = _continue_guest_stories()
@@ -296,6 +328,7 @@ def _continue_popup_context(user):
             "continue_popup_guest": True,
             "continue_guest_category": category,
             "continue_items": stories,
+            "continue_trending": _continue_guest_trending(),
         }
 
     recent = _continue_recent_stories(user)

@@ -1,4 +1,10 @@
-/* ---------- Continue reading popup (continue-popup.js) ---------- */
+/* ---------- Continue reading popup (continue-popup.js) ----------
+
+   Layout follows the Sahara Reporters / Taboola "Keep on reading" overlay:
+   a slim header, then a magazine mix of a horizontal rail and a grid whose
+   every seventh card is a full-width horizontal banner. Mobile keeps two
+   columns with small thumbnails so the sheet reads as a grid, not one long
+   scroll. */
 
 .continue-popup {
   position: fixed;
@@ -51,36 +57,37 @@
   transform: none;
 }
 
+/* Slim header */
 .continue-popup-head {
   flex: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px 14px;
+  gap: 12px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--line);
 }
 
 .continue-popup-kicker {
-  margin: 0 0 2px;
-  font-size: 0.74rem;
+  margin: 0 0 1px;
+  font-size: 0.66rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--slate);
 }
 
 .continue-popup-title {
   margin: 0;
-  font-size: 1.35rem;
-  line-height: 1.22;
+  font-size: 1.1rem;
+  line-height: 1.2;
   color: var(--ink);
 }
 
 .continue-popup-close {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   border: 0;
@@ -91,8 +98,8 @@
 }
 
 .continue-popup-close svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .continue-popup-close:hover,
@@ -105,11 +112,11 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding: 18px 20px 44px;
+  padding: 16px 18px 40px;
 }
 
 .continue-popup-block {
-  margin-bottom: 26px;
+  margin-bottom: 22px;
 }
 
 .continue-popup-block:last-child {
@@ -117,30 +124,172 @@
 }
 
 .continue-popup-subhead {
-  margin: 0 0 12px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--slate);
 }
 
-.continue-popup-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 16px;
+.continue-popup-why {
+  margin: -4px 0 12px;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: var(--slate);
 }
 
-/* Guest grid: a fixed, larger three-up run from one category -- deliberately a
-   different setting from the auto-fill personalised feed above. */
-.continue-popup-grid.continue-popup-grid--guest {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+/* Compact sign-in bar (guests) -- one line, no full-height prompt. */
+.continue-popup-signin {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m, 10px);
+  background: var(--paper-dim);
+}
+
+.continue-popup-signin-icon {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--brand-deep, #0B6E8A);
+}
+
+.continue-popup-signin-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.continue-popup-signin-text {
+  flex: 1 1 auto;
+  margin: 0;
+  min-width: 0;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: var(--slate);
+}
+
+.continue-popup-signin-text strong {
+  color: var(--ink);
+}
+
+.continue-popup-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: var(--radius-m, 10px);
+  background: var(--ink);
+  color: var(--nav-fg, #F6F3ED);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.continue-popup-cta:hover,
+.continue-popup-cta:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Horizontal rails (last reads / just in) */
+.continue-popup-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.continue-popup-rail-card {
+  flex: 0 0 auto;
+  width: 208px;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m, 10px);
+}
+
+.continue-popup-rail-card:hover,
+.continue-popup-rail-card:focus-visible {
+  border-color: var(--amber);
+}
+
+.continue-popup-rail-thumb {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--paper-dim);
+}
+
+.continue-popup-rail-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.continue-popup-rail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.continue-popup-rail-title {
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.continue-popup-rail-meta {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+/* Magazine grid: vertical thumbnail cards, with every seventh card promoted
+   to a full-width horizontal banner. This is the "horizontal, vertical and
+   mixed in one" rhythm, and it keeps applying to items loaded further down. */
+.continue-popup-grid {
+  display: grid;
+}
+
+.continue-popup-grid--feed {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .continue-popup-card {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius-m, 10px);
@@ -164,8 +313,9 @@
 .continue-popup-card-body {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 12px 14px 16px;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px 12px;
 }
 
 .continue-popup-tag {
@@ -174,8 +324,8 @@
 
 .continue-popup-card-title {
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.32;
+  font-size: 0.9rem;
+  line-height: 1.3;
 }
 
 .continue-popup-card-title a {
@@ -190,11 +340,43 @@
 }
 
 .continue-popup-card-meta {
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   color: var(--slate);
 }
 
+/* Full-width horizontal banner: image left, copy right. */
+.continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-media {
+  flex: 0 0 42%;
+  aspect-ratio: auto;
+  min-height: 126px;
+}
+
+.continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-card-body {
+  justify-content: center;
+  padding: 12px 14px;
+}
+
+.continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-card-title {
+  font-size: 1rem;
+}
+
 /* Skeleton loaders */
+.continue-popup-skeleton {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.continue-popup-skeleton[hidden] {
+  display: none;
+}
+
 .continue-popup-card--skeleton {
   pointer-events: none;
 }
@@ -214,7 +396,7 @@
 .continue-popup-skeleton-line {
   width: 88%;
   height: 12px;
-  margin: 12px 14px 0;
+  margin: 10px 12px 0;
   border-radius: 4px;
 }
 
@@ -222,7 +404,7 @@
   width: 46%;
   height: 9px;
   margin-top: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 @keyframes continue-shimmer {
@@ -236,71 +418,10 @@
 
 .continue-popup-end {
   margin: 0;
-  padding: 18px 0;
+  padding: 16px 0;
   text-align: center;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--slate);
-}
-
-/* Guest prompt: a banner panel above the random-category news grid. */
-.continue-popup-guest {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 28px;
-  padding: 20px 15px;
-  text-align: center;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-l, 16px);
-  background: var(--paper-dim);
-}
-
-.continue-popup-guest-mark {
-  width: 74px;
-  height: 74px;
-  display: grid;
-  place-items: center;
-  border-radius: 22px;
-  background: var(--paper-dim);
-  color: var(--brand-deep, #0B6E8A);
-}
-
-.continue-popup-guest-mark svg {
-  width: 38px;
-  height: 38px;
-}
-
-.continue-popup-guest-title {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--ink);
-}
-
-.continue-popup-guest-copy {
-  margin: 0;
-  max-width: 46ch;
-  line-height: 1.55;
-  color: var(--slate);
-}
-
-.continue-popup-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 6px;
-  padding: 11px 26px;
-  border-radius: var(--radius-m, 10px);
-  background: var(--ink);
-  color: var(--nav-fg, #F6F3ED);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.continue-popup-cta:hover,
-.continue-popup-cta:focus-visible {
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 /* While the popup is open, the page behind cannot scroll. */
@@ -309,45 +430,80 @@ html.continue-popup-locked body {
   overflow: hidden;
 }
 
-/* Small screens: single column, tighter chrome */
+/* Tablet and up: more columns, roomier rhythm. */
+@media (min-width: 768px) {
+  .continue-popup-grid--feed {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .continue-popup-skeleton {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-media {
+    flex-basis: 34%;
+  }
+}
+
+@media (min-width: 1080px) {
+  .continue-popup-grid--feed {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Phones: keep two columns with small thumbnails, tighten the chrome. */
 @media (max-width: 700px) {
   .continue-popup-sheet {
-    top: 12px;
+    top: 10px;
     border-radius: 14px 14px 0 0;
   }
 
   .continue-popup-head {
-    padding: 12px 14px;
+    padding: 10px 14px;
+  }
+
+  .continue-popup-title {
+    font-size: 1rem;
   }
 
   .continue-popup-body {
-    padding: 14px 14px 40px;
+    padding: 12px 12px 36px;
   }
 
-  .continue-popup-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 12px;
+  .continue-popup-grid--feed {
+    gap: 10px;
   }
 
   .continue-popup-card-title {
-    font-size: 0.92rem;
+    font-size: 0.84rem;
   }
 
-  .continue-popup-guest-title {
-    font-size: 1.25rem;
+  .continue-popup-card-body {
+    padding: 8px 10px 10px;
+  }
+
+  .continue-popup-signin {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .continue-popup-signin-text {
+    flex: 1 1 60%;
+  }
+
+  .continue-popup-rail-card {
+    width: 176px;
   }
 }
 
-/* Guest grid breakpoints (kept separate so it never inherits the auto-fill
-   rule above and always reads as the "different" layout). */
-@media (max-width: 1024px) {
-  .continue-popup-grid.continue-popup-grid--guest {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 560px) {
+  .continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-media {
+    flex-basis: 38%;
+    min-height: 104px;
   }
-}
 
-@media (max-width: 640px) {
-  .continue-popup-grid.continue-popup-grid--guest {
-    grid-template-columns: minmax(0, 1fr);
+  .continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-card-title {
+    font-size: 0.95rem;
   }
 }

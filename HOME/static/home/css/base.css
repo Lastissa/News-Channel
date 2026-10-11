@@ -133,7 +133,6 @@ button { font-family: inherit; cursor: pointer; }
   min-height: 2.65rem;
   padding: 0.5rem 0.8rem;
   border: 1px solid var(--paginator-border);
-  /* border-radius: 0.4rem; */
   background: var(--paginator-bg);
   color: var(--paginator-color);
   text-decoration: none;
@@ -2290,7 +2289,7 @@ a:focus:not(:focus-visible) {
 }
 
 /* --- 2. Round the buttons that were still rectangular --- */
-.story-page-btn { border-radius: 11px; }
+.story-page-btn { border-radius: 4px; }
 .glass-btn { border-radius: 999px; }
 .glass-btn-icon { border-radius: 50%; }
 
