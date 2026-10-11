@@ -19,7 +19,7 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="{{ display_name }} · {{ role_label }} at {{ project_name }}">
   <meta name="twitter:description" content="{{ meta_description }}">
-  <script type="application/ld+json">{{ person_schema_json }}</script>
+  <script type="application/ld+json">{{ person_schema_json | safe }}</script>
   <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}?v=20261009-1">
 {% endblock %}
 
@@ -189,7 +189,7 @@
         <div class="portfolio-feed-sentinel" data-feed-sentinel
              {% if not stories_page.has_next %}hidden{% endif %} aria-hidden="true"></div>
         <p class="portfolio-feed-end" data-feed-end {% if stories_page.has_next %}hidden{% endif %}>
-          You're all caught up.
+          Thats Currently All From This Author.
         </p>
         <p class="sr-only" data-feed-status aria-live="polite"></p>
       {% else %}

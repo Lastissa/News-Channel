@@ -1,6 +1,6 @@
 .editorial-page {
-  --editorial-ink: #102638;
-  --editorial-muted: #2f3840;
+  --editorial-ink: #0b1722;
+  --editorial-muted: #212b34;
   --editorial-paper: #f7f6f1;
   --editorial-white: #fff;
   --editorial-line: #cbd3d5;
@@ -642,7 +642,7 @@
   min-height: 100%;
   flex-direction: column;
   padding: 23px;
-  border: 1px solid #c6d0d2;
+  /* border: 1px solid #c6d0d2; */
   border-radius: 4px;
   background: var(--editorial-white);
   opacity: 1;

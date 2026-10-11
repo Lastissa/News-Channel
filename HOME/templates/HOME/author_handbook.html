@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Author handbook | {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block meta_description %}The {{ project_name }} author handbook: the full manual, the do's and don'ts, and the rules for using AI, all on one page.{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'home/css/author-handbook.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="handbook-shell">
+  <header class="handbook-hero">
+    {% comment %} <span class="handbook-kicker">Staff only</span> {% endcomment %}
+    <h1>Author handbook</h1>
+    <p>The whole thing on one page: how publishing works, what we expect from every story, and exactly where AI fits in. Read it once before you publish, and come back whenever a check surprises you.</p>
+    <div class="handbook-hero-actions">
+      <a class="handbook-back" href="{% url 'home:add_news' %}">Back to the editor</a>
+      <a class="handbook-back" href="{% url 'home:profile' %}#publish-stories">My published stories</a>
+    </div>
+  </header>
+
+  <div class="handbook-grid">
+    <nav class="handbook-toc" aria-label="On this page">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#workflow">The publishing workflow</a></li>
+        <li><a href="#dos-donts">Do's and don'ts</a></li>
+        <li><a href="#formatting">Formatting codes</a></li>
+        <li><a href="#review">What the review checks</a></li>
+        <li><a href="#pictures">Pictures and captions</a></li>
+        <li><a href="#editing">Editing a published story</a></li>
+        <li><a href="#deleting">Deleting a story</a></li>
+        <li><a href="#archive">Reusing pictures from the archive</a></li>
+        <li><a href="#ai">Using AI</a></li>
+      </ol>
+    </nav>
+
+    <div class="handbook-main">
+
+      <section class="hb-section" id="workflow">
+        <h2>1. The publishing workflow</h2>
+        <p class="hb-lead">Every story follows the same path. Skipping a step is what usually causes a rejected publish or a correction later.</p>
+        <ol class="hb-steps">
+          <li><strong>Open the editor.</strong> Add news lives in the header for every staff account.</li>
+          <li><strong>Write a headline you can defend.</strong> It is limited to 100 characters, it must say what actually happened, and you cannot change it later.</li>
+          <li><strong>Add a banner.</strong> Paste an image link, upload a file, or pick one from the archive. Add an image description so the picture is accessible and explained.</li>
+          <li><strong>Write the body.</strong> Lead with the facts: who, what, where and when. Then add detail in short sections with headings.</li>
+          <li><strong>Pick a category.</strong> It decides where the story is listed and which similar stories readers are offered.</li>
+          <li><strong>Review before you publish.</strong> The editor runs the checks below and blocks a story that cannot go out. Warnings you can read and confirm.</li>
+          <li><strong>Publish.</strong> The story goes live immediately and is announced to newsletter readers.</li>
+        </ol>
+      </section>
+
+      <section class="hb-section" id="dos-donts">
+        <h2>2. Do's and don'ts</h2>
+        <p class="hb-lead">If you remember nothing else, remember these.</p>
+
+        <h3>Do</h3>
+        <ul class="hb-check hb-do">
+          <li>Check every fact, name, date and figure before you publish.</li>
+          <li>Open with new information. The first paragraph should not repeat the headline.</li>
+          <li>Say each fact once, then move on. Repetition hurts trust and reach.</li>
+          <li>Use short sections with real headings so readers can scan.</li>
+          <li>Give the banner a clear description. It is shown beneath the picture.</li>
+          <li>Credit the source when a story is based on another outlet's reporting.</li>
+          <li>Write for people first, then for search engines.</li>
+        </ul>
+
+        <h3>Don't</h3>
+        <ul class="hb-check hb-dont">
+          <li>Do not publish a fact you have not confirmed.</li>
+          <li>Do not copy another writer's work. Plagiarism is a removal offence.</li>
+          <li>Do not start the body with a heading that repeats the headline.</li>
+          <li>Do not separate sections with lines of symbols such as <span class="hb-code">------</span> or <span class="hb-code">=====</span>. Use a blank line or a real heading.</li>
+          <li>Do not leave empty headings such as a lone <span class="hb-code">#</span>.</li>
+          <li>Do not pad a story with filler. A very short story is a warning, a padded one reads as noise.</li>
+          <li>Do not pass off an AI generated image as a real news photograph.</li>
+        </ul>
+      </section>
+
+      <section class="hb-section" id="formatting">
+        <h2>3. Formatting codes</h2>
+        <p class="hb-lead">The codes are optional, but they are what turn a wall of text into a readable story. Everything below is typed on its own line.</p>
+        <table class="hb-table">
+          <thead>
+            <tr><th>You type</th><th>You get</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>A blank line</td><td>A new paragraph</td></tr>
+            <tr><td><span class="hb-code">#</span> Text</td><td>A subheading</td></tr>
+            <tr><td><span class="hb-code">##</span> Text</td><td>A smaller subheading</td></tr>
+            <tr><td><span class="hb-code">###</span> Text</td><td>The smallest subheading</td></tr>
+            <tr><td><span class="hb-code">*</span> Text</td><td>A bullet point</td></tr>
+            <tr><td><span class="hb-code">1.</span> Text</td><td>A numbered point, then 2., 3. and so on</td></tr>
+            <tr><td><span class="hb-code">**text**</span></td><td><strong>Bold</strong></td></tr>
+            <tr><td><span class="hb-code">__text__</span></td><td><em>Italic</em></td></tr>
+            <tr><td>A URL on its own</td><td>A clickable link</td></tr>
+            <tr><td><span class="hb-code">imgl</span> URL description</td><td>An image on the left, text wraps around it</td></tr>
+            <tr><td><span class="hb-code">imgr</span> URL description</td><td>An image on the right, text wraps around it</td></tr>
+            <tr><td><span class="hb-code">imgc</span> URL description</td><td>An image in the centre on its own line</td></tr>
+            <tr><td><span class="hb-code">filel</span> URL link text</td><td>A download link for a file</td></tr>
+          </tbody>
+        </table>
+        <div class="hb-callout">
+          <p><strong>Captions:</strong> the description you type after an image URL becomes that image's caption. Without one, no caption is shown.</p>
+        </div>
+      </section>
+
+      <section class="hb-section" id="review">
+        <h2>4. What the review checks</h2>
+        <p class="hb-lead">The editor inspects the story as readers will see it. A blocked story will not publish. A warning asks you to confirm before it goes out.</p>
+        <table class="hb-table">
+          <thead>
+            <tr><th>Check</th><th>Result</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>No body text, or a body that is only a heading</td><td>Blocked</td></tr>
+            <tr><td>An empty heading, such as a lone <span class="hb-code">#</span></td><td>Blocked</td></tr>
+            <tr><td>A heading that is only symbols</td><td>Blocked</td></tr>
+            <tr><td>A decorative separator line such as <span class="hb-code">------</span></td><td>Blocked</td></tr>
+            <tr><td>A long run of repeated symbols</td><td>Blocked</td></tr>
+            <tr><td>Filler content with no real information</td><td>Blocked</td></tr>
+            <tr><td>The body opens with a heading that repeats the headline</td><td>Blocked at a very close match, warned from a strong match</td></tr>
+            <tr><td>The first paragraph repeats the headline</td><td>Blocked at a very close match, warned from a strong match</td></tr>
+            <tr><td>A body under 40 words</td><td>Warning, you can confirm it</td></tr>
+            <tr><td>The body starts with any heading at all</td><td>Warning, a normal opening paragraph reads better</td></tr>
+          </tbody>
+        </table>
+        <div class="hb-callout hb-callout-warn">
+          <p><strong>Heads up:</strong> "blocked at a very close match" means 90% or more similar, and "warned from a strong match" means from 75%. The full text of the finding is shown in the editor, so read it before you change anything.</p>
+        </div>
+      </section>
+
+      <section class="hb-section" id="pictures">
+        <h2>5. Pictures and captions</h2>
+        <ul class="hb-list">
+          <li>A banner can be a pasted image link, an uploaded file, or a picture from the archive.</li>
+          <li>An uploaded file gets a quality setting. Low loads fastest, high shows the most detail and is the heaviest.</li>
+          <li>The image description (<span class="hb-code">image_info</span>) is shown under the picture. Write what the picture shows, not a copy of the headline.</li>
+          <li>Replacing an uploaded banner overwrites the same stored file, so a swapped picture does not leave a duplicate behind.</li>
+          <li>Pasted links stay exactly as you typed them. The site does not take ownership of, or delete, an image that only lives on someone else's server.</li>
+        </ul>
+      </section>
+
+      <section class="hb-section" id="editing">
+        <h2>6. Editing a published story</h2>
+        <p class="hb-lead">You can edit your own stories from your profile. Some edits carry more weight than others.</p>
+        <ul class="hb-list">
+          <li><strong>The headline is locked.</strong> Changing it after publishing would break the story's link, so it is not editable. Get it right the first time.</li>
+          <li><strong>A category or body change is a real update.</strong> It refreshes the "last updated" notice readers see and the date search engines are told about.</li>
+          <li><strong>A picture or caption change is cosmetic.</strong> It updates the banner on the page but leaves the "last updated" date exactly where it was.</li>
+          <li><strong>Switching from an uploaded picture to a pasted link</strong> releases the old uploaded file, unless another story still shares it.</li>
+        </ul>
+      </section>
+
+      <section class="hb-section" id="deleting">
+        <h2>7. Deleting a story</h2>
+        <p class="hb-lead">Deleting a story removes it from the site for good. Do it from your profile's published list, and treat it as final.</p>
+        <ul class="hb-list">
+          <li>The story page, its comments and its bookmarks go with it.</li>
+          <li>An <strong>uploaded banner is released from storage</strong> at the same time, so deleting a story no longer leaves its picture behind forever.</li>
+          <li>A <strong>pasted external link is never touched.</strong> The file was never ours to delete.</li>
+          <li>If <strong>another story still shares</strong> the same uploaded picture, the picture is kept so the surviving story does not lose its banner.</li>
+          <li>Deleting your whole account cleans up every story banner the same way.</li>
+        </ul>
+      </section>
+
+      <section class="hb-section" id="archive">
+        <h2>8. Reusing pictures from the archive</h2>
+        <ul class="hb-list">
+          <li>The archive holds pictures and files that are cleared and described, ready to drop into any story. Use <strong>Browse archive</strong> in the editor.</li>
+          <li>An archived picture can be inserted left, right or centred with <span class="hb-code">imgl</span>, <span class="hb-code">imgr</span> or <span class="hb-code">imgc</span>, or as a download with <span class="hb-code">filel</span>.</li>
+          <li>Reuse is encouraged. A good, relevant picture is better than a borrowed screenshot that might disappear.</li>
+          <li>Give the picture a description that fits your story, rather than reusing the old caption word for word.</li>
+        </ul>
+      </section>
+
+      <section class="hb-section" id="ai">
+        <h2>9. Using AI</h2>
+        <p class="hb-lead">AI is allowed. Publishing something you have not checked is not. The rule is simple: the tool can help you write, but the name on the story is yours, and so is the responsibility for every word in it.</p>
+
+        <h3>What AI is good for</h3>
+        <ul class="hb-list">
+          <li>Brainstorming angles and headline options.</li>
+          <li>Turning rough notes into a clean first draft.</li>
+          <li>Tightening a paragraph or cutting repetition.</li>
+          <li>Translating, or explaining a technical term in plain language.</li>
+          <li>Summarising a long document you have already read and understood.</li>
+        </ul>
+
+        <h3>What you must never do</h3>
+        <ul class="hb-check hb-dont">
+          <li>Publish a fact, figure, date, name, quote or link you have not confirmed against a primary source. AI invents all of these with total confidence.</li>
+          <li>Publish without reading every line and checking it against the source material.</li>
+          <li>Present an AI generated image as a real photograph of a real event.</li>
+          <li>Paste private, personal or embargoed material into a third party AI tool.</li>
+          <li>Use AI to rewrite another outlet's story and pass it off as original reporting.</li>
+        </ul>
+
+        <h3>Writing a full report with AI</h3>
+        <p>Writing a whole story with AI is allowed, under three conditions. It is a draft for you to work from, not a finished article.</p>
+        <ol class="hb-steps">
+          <li><strong>Verify every fact independently.</strong> If AI says a meeting happened on a date, confirm that date against a real source. Remove anything you cannot confirm.</li>
+          <li><strong>Edit it into our voice.</strong> Rewrite the parts that read like a machine. Make sure the story leads with what actually happened.</li>
+          <li><strong>Tell the desk.</strong> If a story was written largely by AI, say so when you send it. It is not a secret, and hiding it is a breach of trust.</li>
+        </ol>
+
+        <div class="hb-callout hb-callout-warn">
+          <p><strong>The bottom line:</strong> if the story contains a claim you cannot defend in a correction, do not publish it. A writer who checks is worth more than a writer who is fast.</p>
+        </div>
+
+        <h3>Before you publish anything AI helped with</h3>
+        <ul class="hb-check hb-do">
+          <li>Every fact checked against a source outside the AI tool.</li>
+          <li>No fabricated quotes, sources or statistics.</li>
+          <li>The opening paragraph written or rewritten by you, not copied from the headline.</li>
+          <li>The story reads in our voice and follows the same review checks as any other.</li>
+        </ul>
+      </section>
+
+    </div>
+  </div>
+
+  <p class="handbook-foot">Questions about a rule? Ask the desk before you publish, not after.</p>
+</main>
+{% endblock %}

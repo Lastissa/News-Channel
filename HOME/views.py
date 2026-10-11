@@ -35,7 +35,13 @@ from SERVICE_INTERNAL.email_batch import (
     _try_send_new_story_batch_email,
 )
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
-from SERVICE_INTERNAL.images import ImageQuality, ImageUploadError, upload_news_image, upload_profile_image
+from SERVICE_INTERNAL.images import (
+    ImageQuality,
+    ImageUploadError,
+    destroy_archive_asset,
+    upload_news_image,
+    upload_profile_image,
+)
 from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for
@@ -105,7 +111,7 @@ class RobotsTxtView(View):
                 "Disallow: /_admin/",
                 "Disallow: /control/",
                 "Disallow: /sy/",
-                # "Disallow: /auth/",
+                # "Disallow: /auth/", i will use noindex follow in the meta so it wont get index but itcan be crawled cos of othr pages linkage
                 "Disallow: /profile/",
                 "Disallow: /load-more/",
                 "",
@@ -659,15 +665,22 @@ class EditNewsView(View):
         def normalised(text):
             return (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
 
-        changed = bool(
+        #   WHAT KIND OF EDIT IS THIS? A "content" edit (category or body) is a
+        #   real update and moves the public "last updated" clock. A "banner"
+        #   edit (the picture, its Cloudinary id or the caption under it) is
+        #   cosmetic and must NOT move that clock, so swapping a picture no
+        #   longer tells readers (and search engines) the story was updated.
+        changed_content = bool(
+            category != blog.category
+            or normalised(content) != normalised(blog.content)
+        )
+        changed_banner = bool(
             image_file
             or (new_image_url or "") != (blog.image_1 or "")
             or new_public_id != blog.image_public_id
             or image_info != blog.image_info
-            or category != blog.category
-            or normalised(content) != normalised(blog.content)
         )
-        if not changed:
+        if not (changed_content or changed_banner):
             return _response({"detail": "No changes to save.", "changed": False, "story_url": story_path, "id": blog.pk}, status=200)
 
         #   AN UPLOADED FILE ALWAYS WINS OVER A PASTED URL, same rule as Add.
@@ -686,42 +699,45 @@ class EditNewsView(View):
                 return _response({"detail": str(exc)}, status=400)
             new_image_url = uploaded_image["secure_url"]
             new_public_id = uploaded_image["public_id"]
-        elif blog.image_public_id and not new_public_id:
-            #   THE BANNER MOVED FROM AN UPLOADED FILE TO A PASTED LINK (or was
-            #   removed). Same as deleting a story today, the old Cloudinary
-            #   asset is not destroyed, it is only logged so it can be cleaned
-            #   by hand.
-            info_logger(msg=f"EDIT STORY {blog.pk}: banner no longer uses Cloudinary asset {blog.image_public_id}")
+        #   Reminder of where the banner pointed before this save, so an asset
+        #   we are about to orphan can be released after the row is updated.
+        previous_public_id = blog.image_public_id
 
         blog.image_1 = new_image_url
         blog.image_public_id = new_public_id
         blog.image_info = image_info
         blog.category = category
         blog.content = content
-        blog.last_edited = timezone.now()
 
         #   update_fields, not a bare save(): a full save would write back the
         #   `views` / `likes` this request loaded and wipe any that came in while
         #   the author was editing. "heading" is intentionally absent from the
-        #   list. "last_updated" must be listed for its auto_now to fire (it
-        #   feeds the sitemap lastmod and the dateModified JSON-LD).
+        #   list.
+        #
+        #   "last_edited" and "last_updated" are only listed when the CATEGORY
+        #   or the BODY changed. A banner only save (new picture, new caption)
+        #   is cosmetic, so it leaves both untouched: the reader facing "last
+        #   updated" notice stays put and the sitemap lastmod / dateModified
+        #   JSON-LD do not move for a swapped picture.
+        update_fields = ["image_1", "image_public_id", "image_info", "category", "content"]
+        if changed_content:
+            blog.last_edited = timezone.now()
+            update_fields += ["last_edited", "last_updated"]
         try:
-            blog.save(
-                update_fields=[
-                    "image_1",
-                    "image_public_id",
-                    "image_info",
-                    "category",
-                    "content",
-                    "last_edited",
-                    "last_updated",
-                ]
-            )
+            blog.save(update_fields=update_fields)
         except IntegrityError:
             return _response(
                 {"detail": "You already have a story with this exact heading in that category. Choose a different category."},
                 status=400,
             )
+
+        #   IF THE BANNER MOVED FROM OUR OWN UPLOAD TO A PASTED LINK (or was
+        #   cleared), the old Cloudinary asset is now unreferenced, so release
+        #   it (best effort; an asset another story still shares is kept). An
+        #   upload overwrites the same public id in place, so there is nothing
+        #   to release in that case.
+        if previous_public_id and previous_public_id != new_public_id:
+            _release_story_image(previous_public_id)
 
         #   TELL BING/INDEXNOW THE PAGE CHANGED, same fire-and-forget ping Add uses
         ping_indexnow(f"{About.domain.rstrip('/')}{story_path}")
@@ -730,6 +746,24 @@ class EditNewsView(View):
             {"detail": "Story updated.", "changed": True, "story_url": story_path, "id": blog.pk},
             status=200,
         )
+
+
+class AuthorHandbookView(View):
+    """Staff only author handbook.
+
+    One page holds the whole thing at once: the publishing manual, the do's
+    and don'ts, and the guidelines for using AI. It follows the same access
+    rule as the editor itself (is_staff), so a member can never open it.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if not staff_only(request.user):
+            messages.error(request, "Sorry, The author handbook is for staff accounts.")
+            return redirect("home:home")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        return render(request, "HOME/author_handbook.html")
 
 
 class NewsletterSubscribeView(View):
@@ -1279,8 +1313,36 @@ class ProfilePublishedView(View):
         )
 
 
+def _release_story_image(public_id):
+    """Best effort removal of a story's banner from Cloudinary, called after
+    the story row itself is gone.
+
+    Only our own uploads are ever sent here: a pasted external link keeps
+    `Blog.image_public_id` blank, so a copied link is left completely alone
+    (it was never ours to delete).
+
+    The asset is only destroyed when NO other story still points at the same
+    public id. Two stories can legitimately share one asset (an author pastes
+    their own upload link), and the reader facing pages of the survivor must
+    not lose its picture. Any Cloudinary failure is logged rather than raised,
+    so a hiccup can never turn a successful story delete into an error.
+    """
+    if not public_id:
+        return
+    if Blog.objects.filter(image_public_id=public_id).exists():
+        info_logger(msg=f"STORY IMAGE KEPT: {public_id} is still used by another story")
+        return
+    if not destroy_archive_asset(public_id, "image"):
+        info_logger(msg=f"STORY IMAGE LEFT ON CLOUDINARY: could not delete {public_id}")
+
+
 class ProfilePublishedDeleteView(View):
-    """Delete a story from its author's profile dashboard."""
+    """Delete a story from its author's profile dashboard.
+
+    The uploaded banner is released too (see _release_story_image): what used
+    to be left behind in Cloudinary forever is now cleaned up, unless another
+    story still shares the same asset.
+    """
 
     def post(self, request, blog_id):
         if not staff_only(request.user):
@@ -1290,7 +1352,9 @@ class ProfilePublishedDeleteView(View):
         if blog is None:
             return JsonResponse({"detail": "Story not found."}, status=404)
 
+        image_public_id = blog.image_public_id
         blog.delete()
+        _release_story_image(image_public_id)
         return JsonResponse({"detail": "Story deleted.", "id": blog_id}, status=200)
 
 
@@ -1504,9 +1568,20 @@ class ProfileDeleteAccountView(View):
             deleted_full_name = deleted_profile.full_name.strip() if deleted_profile else ""
         deleted_at = timezone.now()
 
+        #   COLLECT THE STORY BANNERS BEFORE THE CASCADE REMOVES THE ROWS, so the
+        #   uploaded assets can be released afterwards (see _release_story_image).
+        #   Pasted links carry a blank public id and are skipped there.
+        story_image_ids = set(
+            Blog.objects.filter(author=account)
+            .exclude(image_public_id="")
+            .values_list("image_public_id", flat=True)
+        )
+
         dropped = drop_sessions_for(account)
         with transaction.atomic():
             account.delete()
+        for image_public_id in story_image_ids:
+            _release_story_image(image_public_id)
 
         #   EVERY ACTIVE ADMIN GETS THE BATCH MAIL (ACCOUNT TYPE, EMAIL, STAFF FULL NAME, DATETIME)
         _try_send_account_deleted_batch_email(deleted_email, deleted_account_type, deleted_full_name, deleted_at)

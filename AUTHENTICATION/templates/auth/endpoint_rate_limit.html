@@ -4,6 +4,8 @@
 {% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block meta_description %}Your authentication page has been temporarily rate-limited to prevent excessive refreshes and automated traffic.{% endblock %}
 
+{% block meta_robots %}<meta name="robots" content="noindex, follow">{% endblock meta_robots %}
+
 {% block content %}
 <section class="legal-page">
   <div class="legal-wrap" style="text-align:center; max-width: 680px;">

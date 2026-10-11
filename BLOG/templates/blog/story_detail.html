@@ -175,7 +175,8 @@ visit https://www.abureport.com.ng for more up to date news.
       </figure>
       
       <hr style="color:red;height:4px;width:100%;">
-      
+
+      <div class="story-body" data-story-body>
         {{ blog_content_html|safe }}
       </div>
 
@@ -357,6 +358,7 @@ visit https://www.abureport.com.ng for more up to date news.
           <div class="story-rail-heading">
             <h2 id="read-also-title">Read similar stories</h2>
           </div>
+          <hr style="color:var(--ink);height:4px;width:100%;">
           <ul class="read-also-list" data-read-also-list aria-live="polite">
             {% for item in "123" %}
               <li class="read-also-skeleton" aria-hidden="true">

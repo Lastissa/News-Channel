@@ -9,6 +9,7 @@ urlpatterns = [
     path("", views.HomeView.as_view(), name="home"),
     path("profile/", views.ProfileView.as_view(), name="profile"),
     path("add-news/", views.AddNewsView.as_view(), name="add_news"),
+    path("author-handbook/", views.AuthorHandbookView.as_view(), name="author_handbook"),
     path("profile/bookmarks/", views.ProfileBookmarksView.as_view(), name="profile_bookmarks"),
     path("profile/history/", views.ProfileHistoryView.as_view(), name="profile_history"),
     path("profile/comments/", views.ProfileCommentsView.as_view(), name="profile_comments"),

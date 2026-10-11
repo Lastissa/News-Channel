@@ -131,7 +131,7 @@ class Blog(models.Model):
     #   instead of leaving it behind as an orphan while a brand new file
     #   gets created for the replacement picture -- same pattern already
     #   used by upload_profile_image for avatars.
-    image_public_id = models.CharField(max_length=255, blank=True, default="")
+    image_public_id = models.CharField(max_length=255, blank=True, default="", help_text = "this let me know the picture used in this story is uploaded, its empty when its copied link")
     image_info = models.CharField(max_length=100, default="The image is self explanatory.")    #   THE ABOUT PICTURE THHAT WILL SHOW SLIGHTLY BELOW THE PICTURE IN IMAGE 
     author = models.ForeignKey('AUTHENTICATION.Auth', on_delete=models.CASCADE, related_name='blogs', limit_choices_to= {'is_staff':True})
     category = models.CharField(max_length=20, choices=get_category_choices, blank=False, null=False)

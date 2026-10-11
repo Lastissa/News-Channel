@@ -494,6 +494,7 @@ class EditNewsViewTests(QuietTestCase):
 
     #   ------------------------------------------------------------ POST: banner handling
     def test_uploaded_file_overwrites_the_same_cloudinary_asset(self, _ping):
+        before = self.blog.last_updated
         Blog.objects.filter(pk=self.blog.pk).update(image_public_id="abureport/news/abc123")
         upload = SimpleUploadedFile("pic.jpg", b"fake-bytes", content_type="image/jpeg")
         with mock.patch(
@@ -511,7 +512,20 @@ class EditNewsViewTests(QuietTestCase):
         self.blog.refresh_from_db()
         self.assertEqual(self.blog.image_1, "https://res.cloudinary.com/x/image/upload/v2/abureport/news/abc123.jpg")
         self.assertEqual(self.blog.image_public_id, "abureport/news/abc123")
-        self.assertIsNotNone(self.blog.last_edited)
+        #   BANNER ONLY: the picture changed but category and body did not, so the
+        #   "last updated" clock must not move.
+        self.assertIsNone(self.blog.last_edited)
+        self.assertEqual(self.blog.last_updated, before)
+
+    def test_caption_only_change_does_not_move_the_last_updated_clock(self, _ping):
+        before = self.blog.last_updated
+        response = self.post(image_info="A brand new caption.")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["changed"])
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.image_info, "A brand new caption.")
+        self.assertIsNone(self.blog.last_edited)
+        self.assertEqual(self.blog.last_updated, before)
 
     def test_first_upload_on_a_story_with_a_pasted_link_saves_the_new_public_id(self, _ping):
         upload = SimpleUploadedFile("pic.png", b"fake-bytes", content_type="image/png")
@@ -557,10 +571,13 @@ class EditNewsViewTests(QuietTestCase):
     def test_switching_an_uploaded_banner_to_a_pasted_link_clears_the_public_id(self, _ping):
         Blog.objects.filter(pk=self.blog.pk).update(image_public_id="abureport/news/abc123")
         self.blog.refresh_from_db()
-        self.post(image_1="https://example.com/external.jpg")
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset:
+            self.post(image_1="https://example.com/external.jpg")
         self.blog.refresh_from_db()
         self.assertEqual(self.blog.image_1, "https://example.com/external.jpg")
         self.assertEqual(self.blog.image_public_id, "")
+        #   the uploaded asset is now unreferenced, so it is released
+        destroy_asset.assert_called_once_with("abureport/news/abc123", "image")
 
     def test_clearing_the_link_removes_the_banner(self, _ping):
         self.post(image_1="")
@@ -580,6 +597,87 @@ class EditNewsViewTests(QuietTestCase):
     def test_no_change_does_not_ping_indexnow(self, ping):
         self.post()
         ping.assert_not_called()
+
+
+@mock.patch("HOME.views.ping_indexnow")
+class StoryDeleteReleasesImageTests(QuietTestCase):
+    """Deleting a story (or a whole account) must not leave an uploaded banner
+    behind in Cloudinary, but must never touch a pasted link or an asset that
+    another story still shares."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = make_staff()
+        self.blog = make_story(self.author)
+        self.url = reverse("home:profile_published_delete", args=[self.blog.id])
+        self.client.force_login(self.author)
+
+    def test_deleting_a_story_releases_its_uploaded_banner(self, _ping):
+        Blog.objects.filter(pk=self.blog.pk).update(image_public_id="abureport/news/abc123")
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset:
+            response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Blog.objects.filter(pk=self.blog.pk).exists())
+        destroy_asset.assert_called_once_with("abureport/news/abc123", "image")
+
+    def test_a_pasted_link_is_never_sent_to_cloudinary(self, _ping):
+        with mock.patch("HOME.views.destroy_archive_asset") as destroy_asset:
+            response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 200)
+        destroy_asset.assert_not_called()
+
+    def test_a_shared_asset_is_kept_for_the_surviving_story(self, _ping):
+        Blog.objects.filter(pk=self.blog.pk).update(image_public_id="abureport/news/shared")
+        survivor = make_story(self.author, heading="Survivor", image_public_id="abureport/news/shared")
+        with mock.patch("HOME.views.destroy_archive_asset") as destroy_asset:
+            response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 200)
+        survivor.refresh_from_db()
+        self.assertEqual(survivor.image_public_id, "abureport/news/shared")
+        destroy_asset.assert_not_called()
+
+    def test_a_non_owner_cannot_delete_or_release(self, _ping):
+        Blog.objects.filter(pk=self.blog.pk).update(image_public_id="abureport/news/abc123")
+        intruder = make_staff("intruder@example.com")
+        self.client.force_login(intruder)
+        with mock.patch("HOME.views.destroy_archive_asset") as destroy_asset:
+            response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Blog.objects.filter(pk=self.blog.pk).exists())
+        destroy_asset.assert_not_called()
+
+    def test_account_deletion_releases_every_story_banner(self, _ping):
+        Blog.objects.filter(pk=self.blog.pk).update(image_public_id="abureport/news/abc123")
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
+            "HOME.views.drop_sessions_for", return_value=0
+        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
+            response = self.client.post(reverse("home:profile_delete_account"), {"email": self.author.email})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Auth.objects.filter(pk=self.author.pk).exists())
+        destroy_asset.assert_called_once_with("abureport/news/abc123", "image")
+
+
+class AuthorHandbookViewTests(QuietTestCase):
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("home:author_handbook")
+
+    def test_staff_can_open_the_handbook(self):
+        self.client.force_login(make_staff())
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Author handbook")
+        self.assertContains(response, "Using AI")
+
+    def test_members_are_sent_away(self):
+        member = Auth.objects.create_user(email="member@example.com")
+        self.client.force_login(member)
+        response = self.client.get(self.url)
+        self.assertRedirects(response, reverse("home:home"), fetch_redirect_response=False)
+
+    def test_anonymous_visitors_are_sent_away(self):
+        response = self.client.get(self.url)
+        self.assertRedirects(response, reverse("home:home"), fetch_redirect_response=False)
 
 
 @mock.patch("HOME.views.ping_indexnow")

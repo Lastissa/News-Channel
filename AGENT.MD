@@ -20,8 +20,11 @@ AVOID:
 -   cursor animation
 -   fake counters
 -   minimize rounded border constant usage as round edge borders for buttons & parallelogram shaped borders for label should be considered
+-   do not put any stupid or irelevant eyebrow above my carousel
+
 OTHERS:
     -   Remove "made with AI tag"
+    - AVOID THIS AI WIRITNGS : (1)overexplaining simple terms (2) unnnecessary praise
 ## GENERAL PAGE FIX - MOBILE
 -   remove horizontal scrolling
 -   increase tap target size

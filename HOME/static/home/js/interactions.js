@@ -1001,7 +1001,7 @@
           list.innerHTML = '<p class="empty-copy">No stories published yet.</p>';
         }
 
-        var total = document.querySelector("#published-stories .panel-tag");
+        var total = document.querySelector("#publish-stories .panel-tag");
         if (total) {
           var count = Number((total.textContent || "").trim().split(" ")[0]);
           if (!isNaN(count)) total.textContent = Math.max(0, count - 1) + " total";

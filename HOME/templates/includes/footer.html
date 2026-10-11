@@ -34,12 +34,25 @@
     </div>
     {% endif %}
 
+    <div class="footer-categories-block">
+      <div class="footer-categories-head">
+        <h3>Browse by category</h3>
+        <a class="footer-categories-all" href="{% url 'home:home' %}">All stories</a>
+      </div>
+      <ul class="footer-categories" role="list">
+        {% for value, label in nav_categories %}
+        <li><a href="{% url 'home:home' %}?category={{ value }}">{{ label|title }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+
     <div class="footer-columns">
       <div class="footer-col">
         <h3>Company</h3>
         <ul>
           <li><a href="{% url 'editorial_team' %}">Editorial team</a></li>
           <li><a href="{% url 'home:privacy_policy' %}">Privacy policy</a></li>
+          <li><a href="{% url 'home:author_handbook' %}">author Handbook</a></li>
         </ul>
       </div>
 
