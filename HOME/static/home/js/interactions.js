@@ -1501,7 +1501,7 @@
         textarea.value = "";
         refreshCommentCount();
         ensureEmptyCommentPlaceholder();
-        toast(payload.detail || "Comment posted.");
+        bottomboast(payload.detail || "Comment posted.");
       })
       .catch(function () {
         if (submitBtn) {
@@ -1550,7 +1550,7 @@
         if (countNode) countNode.textContent = String(likes);
         var summaryNode = likeForm.closest("[data-comment-item]")?.querySelector("[data-comment-like-summary]");
         if (summaryNode) summaryNode.textContent = likes + " like" + (likes === 1 ? "" : "s");
-        toast(payload.detail || (liked ? "Comment liked." : "Like removed."));
+        bottomtoast(payload.detail || (liked ? "Comment liked." : "Like removed."));
       })
       .catch(function () {
         button.dataset.pending = "false";
