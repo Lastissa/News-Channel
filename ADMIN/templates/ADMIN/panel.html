@@ -45,6 +45,7 @@
 
   <nav class="panel-nav" aria-label="Panel sections" data-panel-nav>
     <a class="panel-nav-link" href="#panel-staff-gallery" aria-label="Staff" title="Staff"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></a>
+    <a class="panel-nav-link" href="#panel-users" aria-label="Users" title="Users"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></a>
     <a class="panel-nav-link" href="#panel-text-awareness" aria-label="Text awareness" title="Text awareness"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></a>
     <a class="panel-nav-link" href="#panel-image-adverts" aria-label="Image adverts" title="Image adverts"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg></a>
     <a class="panel-nav-link" href="#panel-mass-email" aria-label="Mass email" title="Mass email"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg></a>
@@ -90,6 +91,39 @@
             <button type="button" class="panel-gallery-load-more" data-gallery-load-more aria-label="Load more staff" title="Load more"{% if not gallery_has_next %} hidden{% endif %}><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
           </div>
         </div>
+      </div></div>
+    </section>
+
+    <section class="panel-card panel-card-wide" id="panel-users" aria-label="User directory">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></span>
+        <h2>Users</h2>
+        <span class="panel-eyebrow" data-user-total></span>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Users" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+        </div>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        {% comment %}
+          The directory is NEVER rendered into this shell. panel.js issues the
+          GET the moment the page arrives and swaps the skeleton below for the
+          real rows, so the first paint only ever shows the shape of the list.
+        {% endcomment %}
+        <div class="panel-row-list" data-user-directory
+             data-endpoint="{% url 'control:panel_user_directory' %}"
+             aria-busy="true" aria-live="polite">
+          {% for _ in "123456" %}
+          <div class="panel-row panel-skeleton-row" aria-hidden="true">
+            <span class="panel-skeleton-avatar"></span>
+            <span class="panel-row-main">
+              <span class="panel-skeleton-bar"></span>
+              <span class="panel-skeleton-bar panel-skeleton-bar--sub"></span>
+            </span>
+            <span class="panel-skeleton-chip"></span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="panel-pager" data-user-pager></div>
       </div></div>
     </section>
 

@@ -380,7 +380,7 @@ class StoryDetailView(View):
                 hashlib.sha256,
             ).hexdigest()
             view_dedupe_key = f"story-view:{blog.pk}:{address_hash}"
-            if cache.add(view_dedupe_key, "1", timeout=60):
+            if cache.add(view_dedupe_key, "1", timeout=10):
                 Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
                 blog.refresh_from_db(fields=["views"])
 

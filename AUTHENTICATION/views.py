@@ -96,7 +96,7 @@ class LoginView(View):
         user = get_user_model().objects.filter(email__iexact = email).first()
         if user is None or not user.check_password(password):
             if is_ajax:
-                return _response({"detail": "Invalid email or password."}, status=401)
+                return _response({"detail": "Invalid Email Or Password!"}, status=401)
             return render(request, "auth/login.html", _auth_context(request, error="Invalid email or password."), status=401)
 
 

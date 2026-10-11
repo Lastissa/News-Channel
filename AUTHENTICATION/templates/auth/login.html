@@ -79,7 +79,8 @@
 
       var serverError = form.dataset.serverError;
       if (serverError) {
-        showAuthToast(serverError);
+        bottomtoast(serverError);
+        /*showAuthToast(serverError);*/
       }
 
       document.querySelectorAll('.password-toggle').forEach(function (toggle) {
@@ -136,13 +137,13 @@
         var password = form.querySelector('input[type="password"]');
 
         if (!email.value.trim() || !password.value.trim()) {
-          showAuthToast('Please fill in both email and password.');
+          bottomtoast('Email & password required.');
           if (!email.value.trim()) email.focus(); else password.focus();
           return;
         }
 
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
-          showAuthToast('Please enter a valid email address.');
+          bottomtoast('Invalid Email Address.');
           email.focus();
           return;
         }
@@ -176,7 +177,7 @@
               armRedirectWatchdog();
               return;
             }
-            showAuthToast(payload.detail || (result.ok ? 'Signed in. Redirecting...' : 'Could not sign in.'), result.ok ? 'success' : 'error');
+            bottomtoast(payload.detail || (result.ok ? 'Signed in. Redirecting...' : 'Could not sign in.'), result.ok ? 'success' : 'error');
             if (!result.ok) {
               setSubmitBusy(false);
               return;
@@ -187,7 +188,7 @@
           .catch(function () {
             window.clearTimeout(requestTimeout);
             setSubmitBusy(false);
-            showAuthToast('Connection issue. Please try again.', 'error');
+            bottomtoast('Network timeout. Try again.', 'error');
           });
       });
 

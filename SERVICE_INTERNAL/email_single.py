@@ -230,7 +230,7 @@ def _try_send_story_views_alert_email(user: object, blog: object):
         title="Story Views Alert",
         main_content=main_content,
         end_note=f"Keep up the great work,<br>{About.project_name} Team",
-        unsubscribe_query=f"type=story_views_alert&email={quote(user.email)}",
+        unsubscribe_query=None,
         preference_note="You can turn these alerts off from your profile settings at any time.",
     )
     _dispatch_email(user.email, subject, html_message)

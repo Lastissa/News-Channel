@@ -423,7 +423,7 @@ class AddNewsView(View):
     def dispatch(self, request, *args, **kwargs):
         if not staff_only(request.user):
             messages.info(request, "Sign in to open the editor.")
-            url = reverse("auth:login") + "?" + urlencode({"to": "/profile/add-news"})
+            url = reverse("auth:login") + "?" + urlencode({"to": "/add-news"})
             return redirect(url)
         return super().dispatch(request, *args, **kwargs)
 

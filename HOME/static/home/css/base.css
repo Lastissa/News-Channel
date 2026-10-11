@@ -596,6 +596,7 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 }
 
 .headline-ticker-track {
+  height: 20px;
   display: inline-flex;
   width: max-content;
   animation: headline-ticker-scroll 30s linear infinite;
@@ -686,7 +687,7 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 }
 a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 .meta-divider { width: 1px; height: 12px; background: var(--line); }
-.story-card-title { font-size: 20px; line-height: 1.3; margin-bottom: 0; }
+.story-card-title { font-size: 18.5px; line-height: 1.3; margin-bottom: 0; }
 .story-card-title a:hover { text-decoration: underline; text-decoration-color: var(--amber); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .story-card-excerpt { color: var(--slate); font-size: 0.92rem; margin-bottom: 0; flex: 1; }
 .story-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
@@ -1252,7 +1253,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 @media (max-width: 768px) {
-  .story-article-shell { padding-left: 12px; padding-right: 12px; }
+  .story-article-shell { padding-left: 12px; padding-right: 12px;}
   .story-article { max-width: 100%; padding: 22px 0 18px; }
   .story-meta-row { align-items: flex-start; }
   .author-card { width: min(95vw, 100%); margin-left: auto; margin-right: auto; }
@@ -1360,9 +1361,8 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   padding: 10px 18px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--toast-bg);
-  color: var(--toast-fg);
-  box-shadow: 0 10px 26px rgba(14, 27, 44, 0.18), 0 2px 6px rgba(14, 27, 44, 0.08);
+  background: var(--toast-fg);
+  color: var(--toast-bg);
   font-size: 0.85rem;
   font-weight: 600;
   line-height: 1.35;
@@ -1378,8 +1378,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   transform: translateY(0);
 }
 .site-bottomtoast--error {
-  border-color: color-mix(in srgb, var(--toast-accent-error) 45%, var(--line));
-  background: var(--toast-bg-error);
+  background: var(--danger);
 }
 @media (prefers-reduced-motion: reduce) {
   .site-bottomtoast { transition: none; }
@@ -2135,8 +2134,11 @@ html.nav-locked { overflow: hidden; }
    so the ad block reads as a deliberate ad unit. The slides get a little
    taller to fit picture + bar. */
 @media (max-width: 899.98px) {
-  .hero-teaser { margin-top: 24px; padding: 1px 12px 10px; }
-
+  .hero{
+    background-color: transparent;
+    padding-right: 2px;
+  }
+  .hero-teaser { margin-top: 24px; padding: 1px 12px 10px;}
   .teaser-slide { height: 128px; }
   .teaser-slide.has-image .teaser-slide-inner {
     display: block; width: 100%; text-align: left;

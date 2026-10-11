@@ -262,6 +262,31 @@ html { scroll-behavior: smooth; }
 .panel-row-link:hover { background: var(--paper-dim); }
 .panel-row-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--paginator-bg); flex: 0 0 auto; overflow: hidden; }
 .panel-row-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.panel-row-avatar-initial { display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: var(--ink); text-transform: uppercase; }
+
+/* User directory rows: avatar + two lines on the left, status on the right. */
+[data-user-directory] .panel-row-main { flex: 1 1 auto; }
+.panel-status {
+  flex: 0 0 auto; padding: 2px 10px; border-radius: 999px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  border: 1px solid var(--line); color: var(--slate);
+}
+.panel-status.is-active { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
+.panel-status.is-suspended { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+
+/* Skeleton: shown by the panel shell until the user directory GET lands.
+   Same geometry as the real rows so the swap does not jump. */
+.panel-skeleton-row { pointer-events: none; }
+.panel-skeleton-avatar,
+.panel-skeleton-bar,
+.panel-skeleton-chip {
+  background: var(--paginator-bg); animation: panelPulse 1.4s var(--panel-ease) infinite;
+}
+.panel-skeleton-avatar { width: 30px; height: 30px; border-radius: 50%; flex: 0 0 auto; }
+.panel-skeleton-bar { height: 9px; border-radius: 5px; }
+[data-user-directory] .panel-skeleton-bar { width: 46%; }
+[data-user-directory] .panel-skeleton-bar--sub { width: 28%; height: 7px; }
+.panel-skeleton-chip { width: 62px; height: 20px; border-radius: 999px; flex: 0 0 auto; }
 
 .panel-pager { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.8rem; color: var(--slate); }
 .panel-pager:empty { display: none; }
@@ -379,5 +404,6 @@ html { scroll-behavior: smooth; }
   html { scroll-behavior: auto; }
   .panel-js .panel-card { opacity: 1; transform: none; }
   .panel-card, .panel-collapse, .panel-collapse-btn .ic, .panel-nav-link::after,
-  .ta-item, .panel-row, .panel-recipient-search, .panel-recipient-pill, .ad-drop-preview, .panel-tip { animation: none; transition: none; }
+  .ta-item, .panel-row, .panel-recipient-search, .panel-recipient-pill, .ad-drop-preview, .panel-tip,
+  .panel-skeleton-avatar, .panel-skeleton-bar, .panel-skeleton-chip { animation: none; transition: none; }
 }

@@ -173,8 +173,9 @@ visit https://www.abureport.com.ng for more up to date news.
           <figcaption>404 - caption not found </figcaption>
         {% endif %}
       </figure>
-
-      <div class="story-body" data-story-body>
+      
+      <hr style="color:red;height:4px;width:100%;">
+      
         {{ blog_content_html|safe }}
       </div>
 
@@ -370,7 +371,6 @@ visit https://www.abureport.com.ng for more up to date news.
           </ul>
         </section>
       </aside>
-
       {% if author_most_viewed_stories %}
         <aside class="story-rail story-rail-author" aria-label="More stories from {{ blog.author_name }}">
           <section class="author-more-stories" aria-labelledby="author-most-viewed-title">

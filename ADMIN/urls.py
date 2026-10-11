@@ -26,6 +26,7 @@ urlpatterns = [
     path("panel/categories/", views.PanelCategoryCreateView.as_view(), name="panel_category_create"),
     path("panel/categories/<int:category_id>/delete/", views.PanelCategoryDeleteView.as_view(), name="panel_category_delete"),
     path("panel/staff-search/", views.PanelStaffSearchView.as_view(), name="panel_staff_search"),
+    path("panel/users/", views.PanelUserDirectoryView.as_view(), name="panel_user_directory"),
     path("panel/mass-email/", views.PanelMassEmailView.as_view(), name="panel_mass_email"),
     path("panel/speciality/", views.PanelSpecialityView.as_view(), name="panel_speciality"),
     path("panel/text-awareness/", views.PanelTextAwarenessCreateView.as_view(), name="panel_text_awareness_create"),

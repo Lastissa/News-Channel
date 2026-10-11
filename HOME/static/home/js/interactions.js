@@ -169,7 +169,7 @@
       if (!text) return;
       var classes = node.className ? node.className.split(" ") : [];
       var tone = classes.indexOf("error") !== -1 || classes.indexOf("danger") !== -1 ? "error" : "success";
-      toast(text, tone, classes.indexOf("story-edited") !== -1 ? "top" : "bottom");
+      bottomToast(text, tone, classes.indexOf("story-edited") !== -1 ? "bottom" : "top");
     });
   });
 
@@ -325,7 +325,7 @@
   
   if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
-        toast("copied.");
+        bottomToast("copied.");
       }).catch(function () {
         toast("Could not copy link.", "error");
       });
@@ -1320,7 +1320,7 @@
         var liked = typeof payload.liked === "boolean" ? payload.liked : button.dataset.liked !== "true";
         var likes = typeof payload.likes === "number" ? payload.likes : Number((document.querySelector("[data-story-like-count]") || {}).textContent) || 0;
         setStoryLikeVisual(liked, likes);
-        toast(payload.detail || (liked ? "Story liked." : "Like removed."));
+        bottomToast(payload.detail || (liked ? "Story liked." : "Like removed."));
       })
       .catch(function () {
         button.dataset.pending = "false";

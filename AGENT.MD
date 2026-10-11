@@ -4,6 +4,7 @@ INSTRUCTION FOR ANY AI TOUCHING THIS PROJECT TO ALWAYS FOLLOW
     -   look for useful resources at https://www.vanguardngr.com/ first then https://honorableupdates.com.ng/ before going to other nigerian website
     -   do not ever assume , ask question first
     -   utilize django template tags efficiently in this project e.g escapejs, linebreaker etc
+    -   avoid overbuildingg features beyond realistic scope, creativity is allowed but only essentials
 
 ## FRONTEND GUIDE
 AVOID:
