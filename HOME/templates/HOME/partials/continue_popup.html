@@ -27,7 +27,7 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
     <header class="continue-popup-head">
       <div class="continue-popup-head-copy">
         <p class="continue-popup-kicker">Continue reading</p>
-        <h2 class="continue-popup-title" id="continue-popup-title">Pick up where you left off</h2>
+        {% comment %} <h2 class="continue-popup-title" id="continue-popup-title">Pick up where you left off</h2> {% endcomment %}
       </div>
       <button type="button" class="continue-popup-close" data-continue-close aria-label="Close">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -37,12 +37,12 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
     {% if continue_popup_guest %}
     <div class="continue-popup-body" data-continue-scroll>
       <div class="continue-popup-signin">
-        <span class="continue-popup-signin-icon" aria-hidden="true">
+        {% comment %} <span class="continue-popup-signin-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
             <path d="M2 5a3 3 0 0 1 3-3h5v16H5a3 3 0 0 0-3 3zM22 5a3 3 0 0 0-3-3h-5v16h5a3 3 0 0 1 3 3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
           </svg>
-        </span>
-        <p class="continue-popup-signin-text"><strong>Sign in to personalize.</strong> Get recent news based on your stories of interest.</p>
+        </span> {% endcomment %}
+        <p class="continue-popup-signin-text">Get recent news based on your stories of interest.</p>
         <a class="continue-popup-cta" href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}">Sign in</a>
       </div>
 
