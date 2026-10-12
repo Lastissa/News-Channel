@@ -1455,6 +1455,10 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .auth-logo {
   width: min(68%, 220px); height: auto; object-fit: contain; filter: drop-shadow(0 18px 30px rgba(0,0,0,0.18));
+  /*  The logo sits on the auth-visual panel, which is always the dark navy
+      gradient above, independent of the page theme. Pin the SVG image to its
+      dark palette so the mark reads on that surface in light mode too. */
+  color-scheme: dark;
 }
 .auth-panel {
   display: flex; flex-direction: column; justify-content: center; padding: clamp(24px, 4vw, 52px) clamp(18px, 3vw, 36px);
