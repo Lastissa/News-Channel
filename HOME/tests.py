@@ -953,7 +953,7 @@ class ContinueReadingPopupTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "data-continue-popup")
         self.assertContains(response, 'data-guest="true"')
-        self.assertContains(response, "stories of interest")
+        self.assertContains(response, "personalized news")
         self.assertContains(response, reverse("auth:login"))
         # Guests still get real news from a randomly chosen category.
         self.assertContains(response, "continue-popup-grid--guest")

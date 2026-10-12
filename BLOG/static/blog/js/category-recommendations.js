@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  function watchAuthorMostViewed() {
-    var list = document.querySelector(".author-most-viewed-list");
+  function watchAuthorLatest() {
+    var list = document.querySelector(".author-latest-list");
     if (!list) return;
     if (!("IntersectionObserver" in window)) {
       list.classList.add("is-inview");
@@ -22,7 +22,7 @@
   }
 
   function init() {
-    watchAuthorMostViewed();
+    watchAuthorLatest();
     var panel = document.querySelector("[data-read-also]");
     if (!panel) return;
 

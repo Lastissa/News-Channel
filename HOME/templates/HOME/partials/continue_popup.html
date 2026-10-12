@@ -7,9 +7,10 @@ story page (blog/story_detail.html), through the base template's
 "continue_popup" block. It opens a few seconds after the page loads, then stays
 quiet for a cooldown that depends on the page: 12 hours on the home page and 1
 hour on a story page (continue-popup.js, data-continue-scope /
-data-continue-cooldown). The sheet is full width, touches the bottom, and has
-only a small margin at the top; the blurred backdrop shows through that strip,
-and tapping the strip or the close button (or pressing Escape) dismisses it.
+data-continue-cooldown). The sheet is full width and touches the bottom on
+phones; on tablet/desktop (768px and up) it becomes a centered panel with the
+blurred page dimmed around it (continue-popup.css). Tapping the backdrop, the
+close button, or pressing Escape dismisses it.
 
 Layout follows the Sahara Reporters / Taboola "Keep on reading" overlay: a
 slim header, then a dense magazine mix -- a horizontally scrolling rail plus a
@@ -47,7 +48,7 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
             <path d="M2 5a3 3 0 0 1 3-3h5v16H5a3 3 0 0 0-3 3zM22 5a3 3 0 0 0-3-3h-5v16h5a3 3 0 0 1 3 3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
           </svg>
         </span> {% endcomment %}
-        <p class="continue-popup-signin-text">Get recent news based on your stories of interest.</p>
+        <p class="continue-popup-signin-text">Get personalized news and stories.</p>
         <a class="continue-popup-cta" href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}">Sign in</a>
       </div>
 

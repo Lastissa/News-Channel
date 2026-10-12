@@ -1,10 +1,10 @@
 /* ---------- Continue reading popup (continue-popup.js) ----------
 
-   Layout follows the Sahara Reporters / Taboola "Keep on reading" overlay:
-   a slim header, then a magazine mix of a horizontal rail and a grid whose
-   every seventh card is a full-width horizontal banner. Mobile keeps two
-   columns with small thumbnails so the sheet reads as a grid, not one long
-   scroll. */
+   Layout follows the Sahara Reporters / Taboola "Keep on reading" overlay.
+   On phones it is a bottom sheet that touches the bottom; on tablet/desktop
+   it becomes a centered panel with the blurred page visible around it. Inside
+   either shape it is a magazine mix of a horizontal rail and a grid whose
+   every seventh card is a full-width horizontal banner. */
 
 .continue-popup {
   position: fixed;
@@ -34,7 +34,9 @@
   opacity: 1;
 }
 
-/*  Sheet: full width, reaches the bottom, small margin at the top only. */
+/*  Sheet: full width, reaches the bottom, small margin at the top only
+    (phones). The @media (min-width: 768px) block below turns this into a
+    centered panel that is inset from every edge. */
 .continue-popup-sheet {
   position: absolute;
   top: 16px;
@@ -44,7 +46,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--surface, #ffffff);
+  background: var(--surface);
   border-radius: 18px 18px 0 0;
   box-shadow: 0 -24px 70px rgba(0, 0, 0, 0.38);
   opacity: 0;
@@ -104,7 +106,7 @@
 
 .continue-popup-close:hover,
 .continue-popup-close:focus-visible {
-  background: var(--line);
+  background: var(--input-fill);
 }
 
 .continue-popup-body {
@@ -159,7 +161,7 @@
   place-items: center;
   border-radius: 50%;
   background: var(--paper);
-  color: var(--brand-deep, #0B6E8A);
+  color: var(--brand-deep);
 }
 
 .continue-popup-signin-icon svg {
@@ -188,7 +190,7 @@
   padding: 8px 14px;
   border-radius: var(--radius-m, 10px);
   background: var(--ink);
-  color: var(--nav-fg, #F6F3ED);
+  color: var(--paper);
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
@@ -229,7 +231,7 @@
 
 .continue-popup-rail-card:hover,
 .continue-popup-rail-card:focus-visible {
-  border-color: var(--amber);
+  border-color: var(--amber-deep);
 }
 
 .continue-popup-rail-thumb {
@@ -335,7 +337,7 @@
 
 .continue-popup-card-title a:hover {
   text-decoration: underline;
-  text-decoration-color: var(--amber);
+  text-decoration-color: var(--amber-deep);
   text-underline-offset: 2px;
 }
 
@@ -430,8 +432,29 @@ html.continue-popup-locked body {
   overflow: hidden;
 }
 
-/* Tablet and up: more columns, roomier rhythm. */
+/* Tablet and up: a centered panel (not a full-bleed sheet), with the dimmed,
+   blurred page visible all around it, plus more columns and a roomier rhythm.
+   Phones keep the bottom sheet above. */
 @media (min-width: 768px) {
+  .continue-popup.is-visible {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+  }
+
+  .continue-popup-sheet {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: min(1080px, 100%);
+    max-height: 100%;
+    border-radius: 16px;
+    box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42);
+  }
+
   .continue-popup-grid--feed {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;

@@ -4,10 +4,9 @@
   /* Continue reading popup (HOME/partials/continue_popup.html, home page).
      Opens a short delay after the page loads, then stays quiet for this page's
      cooldown: 12 hours on the home page and 1 hour on a story page, tracked in
-     localStorage under a per-scope key. Near full-screen
-     sheet: full width, touches the bottom, small margin at the top. The
-     blurred backdrop shows through that strip; tapping the strip, the close
-     button or Escape dismisses it.
+     localStorage under a per-scope key. A bottom sheet on phones; a centered
+     panel with the dimmed, blurred page around it on tablet/desktop. Tapping
+     outside, the close button or Escape dismisses it.
 
      Signed in readers get the personalised feed. Page 1 is server rendered;
      this script loads page 2+ from home:continue_feed as the reader scrolls
@@ -18,10 +17,14 @@
   var popup = document.querySelector("[data-continue-popup]");
   if (!popup) return;
 
-  /* The cooldown and the storage key both depend on the page: home shows at
-     most every 12 hours, a story page at most every hour (set by the view on
-     data-continue-cooldown, in milliseconds). The scope is part of the key so
-     one context's cooldown never suppresses the other. */
+  /* Run with one of two settings, kept apart by scope so neither suppresses
+     the other:
+       - "home"  : opens at most every 12 hours, for guests and signed in
+                   readers alike (HOME/views.py).
+       - "story" : opens at most every hour, signed in readers only; the story
+                   view does not render the sheet for guests at all.
+     The cooldown comes from data-continue-cooldown (milliseconds), set by the
+     view, and the scope is part of the storage key. */
   var SCOPE = popup.getAttribute("data-continue-scope") || "home";
   var COOLDOWN_MS = parseInt(popup.getAttribute("data-continue-cooldown"), 10);
   if (!isFinite(COOLDOWN_MS) || COOLDOWN_MS <= 0) COOLDOWN_MS = 12 * 60 * 60 * 1000;
@@ -36,9 +39,6 @@
   function writeState(value) {
     try { localStorage.setItem(STORAGE_KEY, value); } catch (e) { /* storage off, ignore */ }
   }
-
-  var state = readState();
-  if (state && Number(state) > Date.now()) return; // still inside this page's cooldown
 
   var closeBtn = popup.querySelector("[data-continue-close]");
   var backdrop = popup.querySelector("[data-continue-backdrop]");
@@ -78,6 +78,7 @@
     if (lastFocus && typeof lastFocus.focus === "function") {
       try { lastFocus.focus({ preventScroll: true }); } catch (e) {}
     }
+    scheduleOpen(); // bring it back on cadence while the page stays open
   }
 
   popup.addEventListener("click", function (event) {
@@ -180,5 +181,23 @@
     }
   }
 
-  window.setTimeout(open, DELAY_MS);
+  /* Keep re-arming, so a page that stays open still brings the sheet back on
+     its own cadence: roughly every hour on a story page and every twelve hours
+     on the home page. If a cooldown is already running (say the reader reloads
+     inside the window), wait it out before showing again; when the sheet is
+     open, close() arms the next cycle instead. */
+  function scheduleOpen() {
+    if (isOpen) return;
+    var delay = DELAY_MS;
+    var stored = readState();
+    if (stored) {
+      var remaining = Number(stored) - Date.now();
+      if (remaining > 0) delay = remaining + DELAY_MS;
+    }
+    window.setTimeout(function () {
+      open();
+      scheduleOpen();
+    }, delay);
+  }
+  scheduleOpen();
 })();

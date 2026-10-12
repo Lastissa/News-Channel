@@ -52,11 +52,12 @@
   </script>
   <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261011-2">
   {% if request.user.is_authenticated %}
-  <link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261011-10">
+  <link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261012-1">
   {% endif %}
 {% endblock %}
 
 {% block content %}
+{% static '404.jpg' as image_fallback %}
 {% if ticker_text %}
 <div class="story-ticker" aria-hidden="true">
   <div class="story-ticker-track" data-ticker-track>
@@ -67,7 +68,7 @@
 {% endif %}
 <section class="story-article-shell">
   <article class="story-article no-inner-shell" aria-labelledby="story-heading">
-    <div class="story-reading-layout has-read-also-rail{% if author_most_viewed_stories %} has-author-rail{% endif %}">
+    <div class="story-reading-layout has-read-also-rail{% if author_latest_stories %} has-author-rail{% endif %}">
       <div class="story-reading-column">
     <header class="story-header">
       <div class="story-kicker-row">
@@ -94,7 +95,7 @@
       <div class="story-meta-row">
         <div class="author-pill">
           <a href="{{ author_portfolio_url|default:'#' }}" class="author-avatar" aria-label="Author profile">
-              <img src="{{ blog.author.profile_img }}" alt="{{ blog.author_name }} profile picture" loading="lazy" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+              <img src="{{ blog.author.profile_img|default:image_fallback }}" alt="{{ blog.author_name }} profile picture" loading="lazy" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
           </a>
           <div>
             <p class="meta-label">By</p>
@@ -190,7 +191,7 @@ visit https://www.abureport.com.ng for more up to date news."
     </header>
 
       <figure class="story-hero-figure">
-        <img src="{{ blog.image_1 }}" alt="{{ blog.heading }}" loading="eager">
+        <img src="{{ blog.image_1|default:image_fallback }}" alt="{{ blog.heading }}" loading="eager">
         {% if blog.image_info %}
           <figcaption>{{ blog.image_info }}</figcaption>
         {% else %}
@@ -261,7 +262,7 @@ visit https://www.abureport.com.ng for more up to date news."
       <a href="{{ author_portfolio_url|default:'#' }}" class="author-card-main" aria-label="View {{ blog.author_name }} profile">
         <div class="author-card-inner">
           <div class="author-card-image-wrap">
-              <img src="{{ blog.author.profile_img }}" alt="{{ blog.author_name }}" class="author-card-image" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+              <img src="{{ blog.author.profile_img|default:image_fallback }}" alt="{{ blog.author_name }}" class="author-card-image" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
           </div>
           <div class="author-card-copy">
             <p class="author-card-label">Author profile</p>
@@ -397,14 +398,14 @@ visit https://www.abureport.com.ng for more up to date news."
           </ul>
         </section>
       </aside>
-      {% if author_most_viewed_stories %}
+      {% if author_latest_stories %}
         <aside class="story-rail story-rail-author" aria-label="More stories from {{ blog.author_name }}">
-          <section class="author-more-stories" aria-labelledby="author-most-viewed-title">
+          <section class="author-more-stories" aria-labelledby="author-latest-title">
             <div class="story-rail-heading">
-              <h2 id="author-most-viewed-title">Most viewed by {{ blog.author_name }}</h2>
+              <h2 id="author-latest-title">Most recent from {{ blog.author_name }}</h2>
             </div>
-            <ol class="trending-list author-most-viewed-list">
-              {% for story in author_most_viewed_stories %}
+            <ol class="trending-list author-latest-list">
+              {% for story in author_latest_stories %}
                 <li class="trending-item">
                   <span class="trending-rank" aria-label="Rank {{ forloop.counter }}">{{ forloop.counter }}</span>
                   <a class="trending-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1" aria-hidden="true">
@@ -439,9 +440,9 @@ visit https://www.abureport.com.ng for more up to date news."
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'blog/js/story-ticker.js' %}" defer></script>
-  <script src="{% static 'blog/js/category-recommendations.js' %}?v=20261006-4" defer></script>
+  <script src="{% static 'blog/js/category-recommendations.js' %}?v=20261012-1" defer></script>
   {% if continue_popup_enabled %}
-  <script src="{% static 'home/js/continue-popup.js' %}?v=20261011-9" defer></script>
+  <script src="{% static 'home/js/continue-popup.js' %}?v=20261012-1" defer></script>
   {% endif %}
 {% endblock %}
 

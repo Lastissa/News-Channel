@@ -15,6 +15,9 @@
           hx-target="#archive-manage-list" hx-swap="outerHTML"
           hx-encoding="multipart/form-data"
           hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      {# keep the current name/date search applied after this row is saved #}
+      <input type="hidden" name="descr" value="{{ descr }}">
+      <input type="hidden" name="date" value="{{ date }}">
       <input type="text" name="alt" value="{{ item.alt }}" maxlength="150" required aria-label="Description">
       {% if item.kind == 'image' %}
       <label class="archive-manage-quality">
@@ -43,6 +46,7 @@
   <button type="button" class="archive-manage-row-delete"
           hx-post="{% url 'archive:item_delete' item.id %}"
           hx-target="#archive-manage-list" hx-swap="outerHTML"
+          hx-vals='{"descr": "{{ descr|escapejs }}", "date": "{{ date|escapejs }}"}'
           hx-confirm="Delete this item and its source file from the archive? This can't be undone."
           hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
           aria-label="Delete this item" title="Delete">

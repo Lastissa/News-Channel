@@ -9,7 +9,9 @@
      gets the same "Save" lock + progress bar treatment as the Add modal so
      the two upload paths behave consistently, and both forms fire the
      "archive:refresh" event on success (via an HX-Trigger response
-     header) to keep the public grid behind the popup in sync.
+     header) to keep the public grid behind the popup in sync. A name/date
+     search at the top of that popup swaps only its list (manage_list.html /
+     manage_rows_page.html), debounced as you type.
    - Prev/page-number/Next (gallery_grid.html) and the manage popup's
      "Load more" button are plain hx-post + hx-target, but every htmx
      paginator on this page gets a loading state (skeleton cards sized to
@@ -470,6 +472,8 @@
     if (!overlayHost || event.detail.target !== overlayHost) return;
     if (!overlayHost.querySelector("[data-archive-modal]")) return;
     lockScroll(true);
+    var manageForm = overlayHost.querySelector(".archive-manage-filters");
+    if (manageForm) syncManageClear(manageForm);
     var first = overlayHost.querySelector('input:not([type="hidden"]):not([type="file"]), select, button[data-archive-modal-close]');
     var fileInput = overlayHost.querySelector("[data-archive-upload-file]");
     var target = fileInput || first;
@@ -713,6 +717,39 @@
      on the element that made the request, which bubbles up to here. ---------- */
   document.body.addEventListener("archive:refresh", function () {
     refreshGridToPage1();
+  });
+
+  /* ---------- Manage my uploads: name/date search ----------
+     The filter form swaps only #archive-manage-rows (see manage_list.html),
+     so the inputs keep focus while typing. This keeps the "Clear" button in
+     step with whether a filter is set, and clears + re-runs the search when
+     it is pressed. */
+  function syncManageClear(form) {
+    var clear = form.querySelector("[data-archive-manage-clear]");
+    if (!clear) return;
+    var descr = form.querySelector('input[name="descr"]');
+    var date = form.querySelector('input[name="date"]');
+    var hasValue = (descr && descr.value.trim()) || (date && date.value);
+    clear.hidden = !hasValue;
+  }
+
+  document.body.addEventListener("input", function (event) {
+    var form = event.target.closest && event.target.closest(".archive-manage-filters");
+    if (form) syncManageClear(form);
+  });
+
+  document.body.addEventListener("click", function (event) {
+    var clear = event.target.closest("[data-archive-manage-clear]");
+    if (!clear) return;
+    var form = clear.closest(".archive-manage-filters");
+    if (!form) return;
+    var descr = form.querySelector('input[name="descr"]');
+    var date = form.querySelector('input[name="date"]');
+    if (descr) descr.value = "";
+    if (date) date.value = "";
+    syncManageClear(form);
+    if (form.requestSubmit) form.requestSubmit();
+    else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   });
 
   /* ---------- shared upload-progress-bar helpers: both the Add modal

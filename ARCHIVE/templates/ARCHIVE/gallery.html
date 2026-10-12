@@ -6,7 +6,7 @@
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}">
+<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}?v=20261011-1">
 <script>document.documentElement.classList.add("archive-js");</script>
 {% endblock %}
 
@@ -151,5 +151,5 @@
 {% block extra_scripts %}
 {{ block.super }}
 <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'archive/js/archive.js' %}" defer></script>
+<script src="{% static 'archive/js/archive.js' %}?v=20261011-1" defer></script>
 {% endblock %}

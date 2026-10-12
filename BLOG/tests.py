@@ -475,10 +475,10 @@ class StoryDetailRecommendationsMarkupTests(TestCase):
         self.assertContains(response, "data-read-also")
         self.assertContains(response, "Read similar stories")
         self.assertContains(response, 'class="read-also-skeleton"')
-        self.assertContains(response, "Most viewed by Story Page Author")
+        self.assertContains(response, "Most recent from Story Page Author")
         self.assertContains(response, "Another story from the same author")
         self.assertContains(response, "Most viewed author story")
-        self.assertContains(response, 'class="trending-list author-most-viewed-list"')
+        self.assertContains(response, 'class="trending-list author-latest-list"')
         self.assertContains(response, "blog/js/category-recommendations.js")
         self.assertContains(response, 'class="story-like-icon"')
         self.assertContains(response, 'aria-label="Like this story"')
@@ -488,12 +488,42 @@ class StoryDetailRecommendationsMarkupTests(TestCase):
         self.assertLess(content.index("First paragraph.</p>"), content.index("<p>Second paragraph.</p>"))
         self.assertLess(content.index("<p>Second paragraph.</p>"), content.index("comments-title"))
         self.assertLess(content.index("comments-title"), content.index('data-read-also'))
-        self.assertLess(content.index('data-read-also'), content.index("Most viewed by Story Page Author"))
+        self.assertLess(content.index('data-read-also'), content.index("Most recent from Story Page Author"))
+        # The rail is newest first now, so the last-created story leads.
+        self.assertLess(content.index("Third author story"), content.index("Most viewed author story"))
         self.assertLess(content.index("Most viewed author story"), content.index("Another story from the same author"))
-        self.assertLess(content.index("Another story from the same author"), content.index("Third author story"))
-        self.assertNotIn(story.heading, content[content.index("author-most-viewed-list"):])
+        self.assertNotIn(story.heading, content[content.index("author-latest-list"):])
         self.assertIn("story-rail-read-also", content)
         self.assertIn("story-rail-author", content)
+
+
+class StoryHeroImageFallbackTests(TestCase):
+    def test_story_without_a_lead_image_uses_the_placeholder(self):
+        from django.templatetags.static import static
+
+        author = Auth.objects.create_user(email="hero-fallback@example.com", is_staff=True)
+        StaffProfile.objects.create(
+            auth=author,
+            gender="M",
+            full_name="Hero Fallback Author",
+            get_blog_notification=False,
+        )
+        story = Blog.objects.create(
+            author=author,
+            category="GENERAL",
+            heading="Story with no lead image",
+            content="Body copy for the hero fallback test.",
+        )
+
+        response = self.client.get(reverse("blog:story_detail", args=[story.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn('src="None"', content)
+        self.assertIn(
+            f'<img src="{static("404.jpg")}" alt="{story.heading}" loading="eager">',
+            content,
+        )
 
 
 class Bug1ViewCountUnitExplorationTest(TestCase):

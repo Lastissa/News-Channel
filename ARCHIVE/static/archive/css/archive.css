@@ -909,7 +909,7 @@ html.archive-locked { overflow: hidden; }
 
 /* ---------- Manage my uploads modal ---------- */
 .archive-manage-card {
-  width: min(94vw, 560px);
+  width: min(94vw, 620px);
 }
 
 .archive-manage-hint {
@@ -923,6 +923,62 @@ html.archive-locked { overflow: hidden; }
   color: var(--amber-deep);
   font-weight: 700;
   font-size: 0.86rem;
+}
+
+/* Name + date search, one horizontal row. */
+.archive-manage-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.archive-manage-filter {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+.archive-manage-filter input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--paper-dim, transparent);
+  color: var(--ink);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.archive-manage-filter input:focus {
+  outline: none;
+  border-color: var(--amber-alt);
+}
+
+.archive-manage-filters .archive-action-btn {
+  flex: none;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+}
+
+.archive-manage-filter-clear {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--slate);
+  padding: 8px 4px;
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.archive-manage-filter-clear[hidden] { display: none; }
+
+.archive-manage-filter-clear:hover,
+.archive-manage-filter-clear:focus-visible {
+  color: var(--ink);
 }
 
 .archive-manage-rows {

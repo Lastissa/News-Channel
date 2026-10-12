@@ -1,9 +1,11 @@
+from datetime import datetime
 from unittest import mock
 
 from AUTHENTICATION.models import Auth
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from ARCHIVE.models import ArchiveImage, ArchiveKind
 from ARCHIVE.views import _masked_email
@@ -238,3 +240,118 @@ class ArchiveFilterTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Other file")
+
+
+@override_settings(CLOUDINARY_CLOUD_NAME="test-cloud")
+class ArchiveManageSearchTests(TestCase):
+    """The "Manage my uploads" name/date search: it only ever looks at the
+    signed in user's own rows, filters by description substring and by the
+    day the item was added, and both filters combine."""
+
+    def setUp(self):
+        self.user = Auth.objects.create_user(email="manage-search@example.com")
+        self.other = Auth.objects.create_user(email="other-uploader@example.com")
+        with mock.patch("AUTHENTICATION.signals._try_send_login_email"):
+            self.client.force_login(self.user)
+
+        self.old_photo = ArchiveImage.objects.create(
+            kind=ArchiveKind.IMAGE,
+            url="/archive/cdn/image/upload/v123/abureport/archive/sunset.jpg",
+            alt="Sunset at the beach",
+            quality="medium",
+            width=100,
+            height=100,
+            public_id="abureport/archive/sunset",
+            author=self.user,
+        )
+        self.new_report = ArchiveImage.objects.create(
+            kind=ArchiveKind.FILE,
+            url="/archive/cdn/raw/upload/v123/abureport/archive/budget.pdf",
+            alt="Budget report",
+            original_filename="budget.pdf",
+            file_size=1024,
+            public_id="abureport/archive/budget",
+            author=self.user,
+        )
+        #   the same word as one of the user's own items, but owned by someone
+        #   else -- the manage search must never surface it
+        self.other_item = ArchiveImage.objects.create(
+            kind=ArchiveKind.IMAGE,
+            url="/archive/cdn/image/upload/v123/abureport/archive/budget-photo.jpg",
+            alt="Budget photo",
+            quality="high",
+            width=100,
+            height=100,
+            public_id="abureport/archive/budget-photo",
+            author=self.other,
+        )
+        ArchiveImage.objects.filter(pk=self.old_photo.pk).update(
+            date_created=timezone.make_aware(datetime(2026, 1, 5, 10, 0))
+        )
+        ArchiveImage.objects.filter(pk=self.new_report.pk).update(
+            date_created=timezone.make_aware(datetime(2026, 2, 9, 10, 0))
+        )
+
+    def test_manage_modal_renders_name_and_date_inputs(self):
+        response = self.client.get(reverse("archive:manage_modal"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="descr"')
+        self.assertContains(response, 'name="date"')
+        self.assertContains(response, "Search by name")
+
+    def test_manage_search_filters_by_name(self):
+        response = self.client.get(reverse("archive:manage_modal"), {"descr": "budget"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Budget report")
+        self.assertNotContains(response, "Sunset at the beach")
+
+    def test_manage_search_never_shows_another_persons_uploads(self):
+        response = self.client.get(reverse("archive:manage_modal"), {"descr": "budget"})
+
+        self.assertNotContains(response, "Budget photo")
+
+    def test_manage_search_filters_by_date(self):
+        response = self.client.get(reverse("archive:manage_modal"), {"date": "2026-01-05"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sunset at the beach")
+        self.assertNotContains(response, "Budget report")
+
+    def test_manage_search_combines_name_and_date(self):
+        excluded = self.client.get(
+            reverse("archive:manage_modal"), {"descr": "report", "date": "2026-01-05"}
+        )
+        self.assertNotContains(excluded, "Budget report")
+
+        included = self.client.get(
+            reverse("archive:manage_modal"), {"descr": "report", "date": "2026-02-09"}
+        )
+        self.assertContains(included, "Budget report")
+
+    def test_manage_search_ignores_a_malformed_date(self):
+        response = self.client.get(reverse("archive:manage_modal"), {"date": "not-a-date"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sunset at the beach")
+        self.assertContains(response, "Budget report")
+
+    def test_load_more_keeps_the_active_search(self):
+        for index in range(13):
+            ArchiveImage.objects.create(
+                kind=ArchiveKind.IMAGE,
+                url=f"/archive/cdn/image/upload/v1/abureport/archive/team-{index}.jpg",
+                alt=f"Team event {index}",
+                quality="low",
+                width=100,
+                height=100,
+                author=self.user,
+            )
+
+        response = self.client.post(reverse("archive:manage_list"), {"page": "1", "descr": "Team"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Load more")
+        self.assertContains(response, '"descr": "Team"')
+

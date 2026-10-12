@@ -1,6 +1,27 @@
 <div class="archive-manage-list" id="archive-manage-list">
   {% if error %}<p class="archive-modal-error" data-archive-manage-error>{{ error }}</p>{% endif %}
   {% if notice %}<p class="archive-manage-notice" data-archive-manage-notice>{{ notice }}</p>{% endif %}
+  {# Name + date search. Submits through htmx (live as you type, and on
+     Enter/the button); only #archive-manage-rows is swapped, so the inputs
+     keep focus. Values ride along on each row's edit/delete form and on
+     "Load more", so the current search survives them. #}
+  <form class="archive-manage-filters"
+        hx-post="{% url 'archive:manage_list' %}"
+        hx-target="#archive-manage-rows" hx-swap="innerHTML"
+        hx-trigger="submit, input delay:350ms"
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <input type="hidden" name="page" value="1">
+    <label class="archive-manage-filter">
+      <span class="sr-only">Search by name</span>
+      <input type="search" name="descr" value="{{ descr }}" placeholder="Search by name" autocomplete="off">
+    </label>
+    <label class="archive-manage-filter">
+      <span class="sr-only">Filter by date added</span>
+      <input type="date" name="date" value="{{ date }}">
+    </label>
+    <button type="submit" class="archive-action-btn">Search</button>
+    <button type="button" class="archive-manage-filter-clear" data-archive-manage-clear hidden>Clear</button>
+  </form>
   <div class="archive-manage-rows" id="archive-manage-rows">
     {% include "ARCHIVE/partials/manage_rows_page.html" %}
   </div>

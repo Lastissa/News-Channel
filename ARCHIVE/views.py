@@ -14,6 +14,7 @@ from django.db import IntegrityError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils.dateparse import parse_date
 from django.views import View
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -234,6 +235,19 @@ def _clean_descr(raw_value):
     return (raw_value or "").strip()[:ALT_MAX_LENGTH]
 
 
+def _clean_date(raw_value):
+    """The normalized ISO date string plus the date object for the "manage
+    my uploads" date filter, or ("", None) for empty/unparseable input, so a
+    hand-typed ?date= is simply ignored instead of erroring."""
+    value = (raw_value or "").strip()
+    if not value:
+        return "", None
+    parsed = parse_date(value)
+    if parsed is None:
+        return "", None
+    return parsed.isoformat(), parsed
+
+
 def _clean_kind(raw_value):
     value = (raw_value or "").strip().lower()
     return value if value in KIND_FILTERS else ""
@@ -409,11 +423,17 @@ def _paginate(page_number, descr="", kind="", category="", uploader=""):
     }
 
 
-def _paginate_own(user, page_number):
+def _paginate_own(user, page_number, descr="", on_date=None):
     """Same shape as _paginate above, but scoped to *this* user's own
     uploads only, and with its own (smaller) page size -- backs the "Edit
-    Added Images" htmx list (see ArchiveManageModalView)."""
+    Added Images" htmx list (see ArchiveManageModalView). `descr` filters by
+    the item's description and `on_date` (a date) by the day it was added,
+    both narrowing the same newest-first queryset."""
     qs = ArchiveImage.objects.filter(author=user).order_by("-date_created")
+    if descr:
+        qs = qs.filter(alt__icontains=descr)
+    if on_date:
+        qs = qs.filter(date_created__date=on_date)
     paginator = Paginator(qs, MANAGE_PAGE_SIZE)
     if page_number > paginator.num_pages and paginator.num_pages:
         raise Http404("Page not found.")
@@ -421,6 +441,8 @@ def _paginate_own(user, page_number):
     return {
         "items": _serialize_images(page.object_list),
         "quality_choices": ImageQuality.CHOICES,
+        "descr": descr,
+        "date": on_date.isoformat() if on_date else "",
         "page": page.number,
         "num_pages": paginator.num_pages,
         "has_next": page.has_next(),
@@ -617,19 +639,24 @@ class ArchiveManageModalView(View):
         if not is_authenticated(request.user):
             return JsonResponse({"detail": "Please sign in to manage your uploads."}, status=401)
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
-        context = _paginate_own(request.user, page_number)
+        descr = _clean_descr(request.GET.get("descr"))
+        _date_value, on_date = _clean_date(request.GET.get("date"))
+        context = _paginate_own(request.user, page_number, descr=descr, on_date=on_date)
         return render(request, "ARCHIVE/partials/manage_modal.html", context)
 
 
 class ArchiveManageListView(View):
     """POST: same list ArchiveManageModalView renders, for the "load more"
-    button inside the manage popup -- mirrors ArchiveGalleryView.post."""
+    button inside the manage popup and for the search/date filter form --
+    mirrors ArchiveGalleryView.post."""
 
     def post(self, request):
         if not is_authenticated(request.user):
             return JsonResponse({"detail": "Please sign in to manage your uploads."}, status=401)
         page_number = _resolve_page_number(request.POST.get("page"), default=1)
-        context = _paginate_own(request.user, page_number)
+        descr = _clean_descr(request.POST.get("descr"))
+        _date_value, on_date = _clean_date(request.POST.get("date"))
+        context = _paginate_own(request.user, page_number, descr=descr, on_date=on_date)
         return render(request, "ARCHIVE/partials/manage_rows_page.html", context)
 
 
@@ -664,6 +691,8 @@ class ArchiveItemEditView(View):
         alt = (request.POST.get("alt") or "").strip()
         replacement_file = request.FILES.get("upload_file")
         requested_quality = (request.POST.get("quality") or item.quality).strip().lower()
+        descr = _clean_descr(request.POST.get("descr"))
+        _date_value, on_date = _clean_date(request.POST.get("date"))
 
         error = None
         if not alt:
@@ -764,7 +793,7 @@ class ArchiveItemEditView(View):
             except IntegrityError:
                 error = "Another item already uses this exact description."
 
-        context = _paginate_own(request.user, page_number=1)
+        context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date)
         context["error"] = error
         if not error:
             context["notice"] = "Picture/file updated." if replacement_file else (
@@ -787,13 +816,15 @@ class ArchiveItemDeleteView(View):
             return JsonResponse({"detail": "Please sign in to manage your uploads."}, status=401)
 
         item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
+        descr = _clean_descr(request.POST.get("descr"))
+        _date_value, on_date = _clean_date(request.POST.get("date"))
         public_id = item.public_id or _public_id_from_url(item.url, item.resource_type)
         if not public_id or not destroy_archive_asset(public_id, item.resource_type):
-            context = _paginate_own(request.user, page_number=1)
+            context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date)
             context["error"] = "The Cloudinary image could not be deleted, so the archive item was kept. Please try again."
             return render(request, "ARCHIVE/partials/manage_list.html", context)
         item.delete()
-        context = _paginate_own(request.user, page_number=1)
+        context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date)
         context["notice"] = "Item deleted."
         response = render(request, "ARCHIVE/partials/manage_list.html", context)
         response["HX-Trigger"] = "archive:refresh"

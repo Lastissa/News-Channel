@@ -356,11 +356,12 @@ class StoryDetailView(View):
         if author_profile and isinstance(author_profile.speciality, list):
             author_tags = [str(tag).strip() for tag in author_profile.speciality if str(tag).strip()]
 
-        # TODO: ADD ALSO LATEST FROM AUTHOR REMOVING THE CURRENT STORY AND CAP AT 3
-        author_most_viewed_stories = (
+        #   The author's latest stories for the sidebar rail, newest first, the
+        #   story being read excluded and the list capped at three.
+        author_latest_stories = (
             Blog.objects.filter(author=blog.author)
             .exclude(pk=blog.pk)
-            .order_by("-views", "-date_created", "-pk")[:3]
+            .order_by("-date_created", "-pk")[:3]
         )
 
 
@@ -445,7 +446,7 @@ class StoryDetailView(View):
             "comments": comments,
             "author_profile": author_profile,
             "author_tags": author_tags,
-            "author_most_viewed_stories": author_most_viewed_stories,
+            "author_latest_stories": author_latest_stories,
             "is_bookmarked": is_bookmarked,
             "is_liked": is_liked,
             "liked_comment_ids": request.session.get("liked_comments", []) if request.user.is_authenticated else [],

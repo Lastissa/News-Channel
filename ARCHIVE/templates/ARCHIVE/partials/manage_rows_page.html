@@ -2,11 +2,12 @@
   {% include "ARCHIVE/partials/manage_row.html" %}
 {% endfor %}
 {% if not items and page == 1 %}
-<p class="archive-empty" data-archive-manage-empty>You haven't added anything yet.</p>
+<p class="archive-empty" data-archive-manage-empty>{% if descr or date %}No uploads match this search.{% else %}You haven't added anything yet.{% endif %}</p>
 {% endif %}
 {% if has_next %}
 <button type="button" class="archive-action-btn archive-manage-more"
-        hx-post="{% url 'archive:manage_list' %}" hx-vals='{"page": "{{ next_page }}"}'
+        hx-post="{% url 'archive:manage_list' %}"
+        hx-vals='{"page": "{{ next_page }}", "descr": "{{ descr|escapejs }}", "date": "{{ date|escapejs }}"}'
         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
         hx-target="this" hx-swap="outerHTML">Load more</button>
 {% endif %}
