@@ -405,6 +405,59 @@
   color: var(--ink);
 }
 
+/* ---------- video tile ----------
+   A video item in the gallery plays itself (muted, looped) behind one
+   pause/play button. The clip is NOT cropped or letterboxed into the
+   shared 4/3 picture frame: the media box drops that aspect ratio and lets
+   the video set its own height, so the whole clip shows at its exact
+   dimensions with no black bars and no extra padding. The button glyph
+   swaps on the .is-paused class kept in step by
+   ARCHIVE/static/archive/js/archive.js. */
+.archive-card-media-video { display: block; aspect-ratio: auto; background: transparent; }
+.archive-js .archive-card-media-video { animation: none; background: transparent; }
+
+.archive-videotile {
+  position: relative;
+  width: 100%;
+  display: block;
+}
+
+.archive-card-media-video video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.archive-video-toggle {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(14, 27, 44, 0.62);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  transition: background 0.15s ease;
+}
+
+.archive-video-toggle:hover,
+.archive-video-toggle:focus-visible { background: rgba(14, 27, 44, 0.85); }
+.archive-video-toggle:focus-visible { outline: 2px solid var(--amber-alt); outline-offset: 2px; }
+
+.archive-video-icon { display: block; width: 16px; height: 16px; }
+.archive-video-icon-play { display: none; }
+.archive-videotile.is-paused .archive-video-icon-play { display: block; }
+.archive-videotile.is-paused .archive-video-icon-pause { display: none; }
+
 /* ---------- card body ---------- */
 .archive-card-body {
   padding: 16px 18px 18px;
@@ -853,7 +906,6 @@ html.archive-locked { overflow: hidden; }
   width: 100%;
   max-height: 220px;
   object-fit: contain;
-  background: #000;
 }
 
 .archive-modal-note {
@@ -864,6 +916,16 @@ html.archive-locked { overflow: hidden; }
 }
 
 .archive-modal-note[hidden] { display: none; }
+
+/* live readout of what the width/height boxes will actually store */
+.archive-modal-size {
+  margin: 6px 0 0;
+  color: var(--amber-deep);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.archive-modal-size[hidden] { display: none; }
 
 .archive-modal-preview-file {
   display: flex;

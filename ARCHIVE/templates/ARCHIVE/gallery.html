@@ -1,13 +1,33 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Archive · {{ project_name }} Images & Files{% endblock %}
-{% block meta_description %}Browse, upload and download the shared {{ project_name }} picture and file archive.{% endblock %}
+{% block title %}Archive · {{ project_name }} images and files{% endblock %}
+{% block meta_description %}Browse the {{ project_name }} archive: pictures, videos and documents uploaded by readers, each with its exact size, uploader and a direct download link.{% endblock %}
+{% block og_title %}Archive · {{ project_name }} images and files{% endblock %}
+{% block og_description %}Browse the {{ project_name }} archive: pictures, videos and documents uploaded by readers, each with its real size, uploader and a direct download link.{% endblock %}
+{% block twitter_card %}summary_large_image{% endblock %}
+{% block twitter_title %}Archive · {{ project_name }} images and files{% endblock %}
+{% block twitter_description %}Browse the {{ project_name }} archive of pictures, videos and documents, each with a direct download link.{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}?v=20261011-1">
+<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}?v=20261012-3">
 <script>document.documentElement.classList.add("archive-js");</script>
+{# Structured data so a crawler reads /archive/ as a browsable collection #}
+{# rather than a loose list of links. The sitewide NewsMediaOrganization #}
+{# JSON-LD in base.html stays, this is the extra page-level hint. #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "Archive · {{ project_name|escapejs }} images and files",
+  "description": "{{ project_name|escapejs }} archive of pictures, videos and documents uploaded by readers, each with its exact size, uploader and a direct download link.",
+  "url": "{{ site_domain|escapejs }}{% url 'archive:gallery' %}",
+  "isPartOf": {"@type": "WebSite", "name": "{{ project_name|escapejs }}", "url": "{{ site_domain|escapejs }}/"},
+  "numberOfItems": {{ total|default:0 }},
+  "inLanguage": "en-NG"
+}
+</script>
 {% endblock %}
 
 {% block content %}
@@ -151,5 +171,5 @@
 {% block extra_scripts %}
 {{ block.super }}
 <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'archive/js/archive.js' %}?v=20261012-1" defer></script>
+<script src="{% static 'archive/js/archive.js' %}?v=20261012-4" defer></script>
 {% endblock %}

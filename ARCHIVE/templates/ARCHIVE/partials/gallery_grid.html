@@ -65,6 +65,7 @@
           <li>{{ image.quality_label }} quality</li>
           {% else %}
           <li>{{ image.file_size_label }}</li>
+          {% if image.is_video and image.width and image.height %}<li>{{ image.width }} &times; {{ image.height }}</li>{% endif %}
           {% if image.original_filename %}<li class="archive-card-filename" title="{{ image.original_filename }}">{{ image.original_filename }}</li>{% endif %}
           {% endif %}
         </ul>

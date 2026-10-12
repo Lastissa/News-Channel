@@ -61,6 +61,87 @@ class ArchiveAssetManagementTests(TestCase):
         )
         self.assertNotIn("res.cloudinary.com", item.url)
 
+    def test_video_without_a_size_stays_on_the_raw_pipeline(self):
+        upload_result = {
+            "secure_url": "https://res.cloudinary.com/test-cloud/raw/upload/v123/abureport/archive/clip.mp4",
+            "public_id": "abureport/archive/clip",
+            "resource_type": "raw",
+            "bytes": 2048,
+            "original_filename": "clip.mp4",
+        }
+        with (
+            mock.patch("ARCHIVE.views.is_rate_limited", return_value=(0, False)),
+            mock.patch("ARCHIVE.views.upload_archive_file", return_value=upload_result) as raw_upload,
+            mock.patch("ARCHIVE.views.upload_archive_video") as video_upload,
+        ):
+            response = self.client.post(
+                reverse("archive:upload"),
+                {
+                    "alt": "A short clip",
+                    "upload_file": SimpleUploadedFile("clip.mp4", b"video", content_type="video/mp4"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        raw_upload.assert_called_once()
+        video_upload.assert_not_called()
+        item = ArchiveImage.objects.get()
+        self.assertEqual(item.kind, ArchiveKind.FILE)
+        self.assertEqual(item.width, 0)
+        self.assertEqual(item.height, 0)
+
+    def test_video_with_a_size_is_resized_through_the_video_pipeline(self):
+        upload_result = {
+            "secure_url": "https://res.cloudinary.com/test-cloud/video/upload/v123/abureport/archive/clip.mp4",
+            "public_id": "abureport/archive/clip",
+            "resource_type": "video",
+            "bytes": 2048,
+            "original_filename": "clip.mp4",
+            "width": 640,
+            "height": 360,
+        }
+        with (
+            mock.patch("ARCHIVE.views.is_rate_limited", return_value=(0, False)),
+            mock.patch("ARCHIVE.views.upload_archive_video", return_value=upload_result) as video_upload,
+            mock.patch("ARCHIVE.views.upload_archive_file") as raw_upload,
+        ):
+            response = self.client.post(
+                reverse("archive:upload"),
+                {
+                    "alt": "A short clip",
+                    "width": "640",
+                    "height": "360",
+                    "upload_file": SimpleUploadedFile("clip.mp4", b"video", content_type="video/mp4"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        video_upload.assert_called_once()
+        _, kwargs = video_upload.call_args
+        self.assertEqual(kwargs.get("width"), 640)
+        self.assertEqual(kwargs.get("height"), 360)
+        raw_upload.assert_not_called()
+        item = ArchiveImage.objects.get()
+        self.assertEqual(item.width, 640)
+        self.assertEqual(item.height, 360)
+        self.assertEqual(item.url, "/archive/cdn/video/upload/v123/abureport/archive/clip.mp4")
+
+    def test_video_grid_renders_an_autoplaying_tile_with_a_fallback(self):
+        ArchiveImage.objects.create(
+            kind=ArchiveKind.FILE,
+            url="/archive/cdn/raw/upload/v123/abureport/archive/clip.mp4",
+            alt="A short clip",
+            original_filename="clip.mp4",
+            file_size=2048,
+            public_id="abureport/archive/clip",
+            author=self.user,
+        )
+        response = self.client.get(reverse("archive:gallery"))
+        self.assertContains(response, 'class="archive-video-el"')
+        self.assertContains(response, "data-archive-video-toggle")
+        self.assertContains(response, "/static/404_video.mp4")
+        self.assertContains(response, "archive-card-media-video")
+
     def test_description_and_quality_can_be_updated_without_reupload(self):
         item = ArchiveImage.objects.create(
             kind=ArchiveKind.IMAGE,

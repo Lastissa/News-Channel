@@ -144,6 +144,16 @@ class SitemapXmlView(View):
 
     def get(self, request):
         domain = About.domain.rstrip("/")
+        #   The archive gallery entry gets a real lastmod from the newest item
+        #   (deferred import: HOME does not otherwise depend on ARCHIVE).
+        from ARCHIVE.models import ArchiveImage
+
+        newest_item = ArchiveImage.objects.order_by("-date_created").only("date_created").first()
+        archive_lastmod = (
+            newest_item.date_created.date().isoformat()
+            if newest_item and newest_item.date_created
+            else ""
+        )
         urls = [
             {"loc": f"{domain}/", "lastmod": "", "changefreq": "hourly", "priority": "1.0"},
             {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": "", "changefreq": "yearly", "priority": "0.3"},
@@ -151,7 +161,7 @@ class SitemapXmlView(View):
             #   /archive/ now also carries every image/file's own real,
             #   same-domain cdn/ URL (see ARCHIVE.views.CloudinaryProxyView),
             #   so the gallery page itself is worth indexing for SEO too.
-            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": "", "changefreq": "daily", "priority": "0.6"},
+            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod, "changefreq": "daily", "priority": "0.6"},
         ]
 
         #   PERMANENT CATEGORY PAGES: /category/<slog>/ is a stable landing page

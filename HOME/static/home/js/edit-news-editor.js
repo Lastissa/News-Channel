@@ -286,7 +286,7 @@
     var aria = caption || "Story video";
     return '<figure class="story-inline-fig story-inline-video ' + figClass + '">' +
       '<div class="story-inline-video-frame">' +
-      '<video onerror="this.style.display=none;" class="story-inline-video-el" src="' + escapeAttr(url) + '" muted loop playsinline autoplay preload="metadata" aria-label="' + escapeAttr(aria) + '"></video>' +
+      '<video onerror="this.onerror=null;this.src=\'/static/404_video.mp4\';" class="story-inline-video-el" src="' + escapeAttr(url) + '" muted loop playsinline autoplay preload="metadata" aria-label="' + escapeAttr(aria) + '"></video>' +
       '<button type="button" class="story-inline-video-toggle" data-video-toggle aria-label="Pause video">' +
       '<svg class="story-inline-video-icon story-inline-video-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>' +
       '<svg class="story-inline-video-icon story-inline-video-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>' +

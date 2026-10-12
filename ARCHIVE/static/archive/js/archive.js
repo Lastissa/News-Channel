@@ -451,6 +451,81 @@
     }
   }
 
+  /* ---------- live preview size ----------
+     While a picture or video is chosen in the Add Image / File popup, the
+     width/height boxes drive the preview itself: every keystroke rescales the
+     preview to the size Cloudinary will actually store. Its `limit` cap keeps
+     the media's own ratio and never upscales, so the shape you see is the
+     shape you get -- type 800 x 600 over a 4000 x 2000 photo and the preview
+     becomes 800 x 400, exactly what lands in the archive. */
+  function previewMediaAndSize(form) {
+    var img = form.querySelector("[data-archive-upload-preview-img]");
+    var video = form.querySelector("[data-archive-upload-preview-video]");
+    var media = video && !video.hidden ? video : (img && !img.hidden ? img : null);
+    if (!media) return null;
+    var natW =
+      media.naturalWidth || media.videoWidth || parseInt(media.getAttribute("data-nat-w") || "0", 10) || 0;
+    var natH =
+      media.naturalHeight || media.videoHeight || parseInt(media.getAttribute("data-nat-h") || "0", 10) || 0;
+    return { media: media, natW: natW, natH: natH };
+  }
+
+  function updateArchivePreviewSize(form) {
+    if (!form) return;
+    var info = previewMediaAndSize(form);
+    var readout = form.querySelector("[data-archive-size-readout]");
+    if (!info || !info.natW || !info.natH) {
+      if (readout) readout.hidden = true;
+      return;
+    }
+
+    var widthInput = form.querySelector("#archive-upload-width");
+    var heightInput = form.querySelector("#archive-upload-height");
+    var wrap = form.querySelector("[data-archive-upload-preview]");
+    var requestedW = Math.max(0, parseInt(widthInput && widthInput.value, 10) || 0);
+    var requestedH = Math.max(0, parseInt(heightInput && heightInput.value, 10) || 0);
+
+    /* `limit` only ever shrinks and keeps the ratio, so the stored size is the
+       media's own size scaled down until it fits the requested cap. */
+    var outW = info.natW;
+    var outH = info.natH;
+    if (requestedW || requestedH) {
+      var capW = requestedW || info.natW;
+      var capH = requestedH || info.natH;
+      var ratio = Math.min(capW / info.natW, capH / info.natH);
+      if (ratio < 1) {
+        outW = Math.round(info.natW * ratio);
+        outH = Math.round(info.natH * ratio);
+      }
+    }
+    if (outW < 1 || outH < 1) {
+      if (readout) readout.hidden = true;
+      return;
+    }
+
+    var maxW = wrap && wrap.clientWidth ? wrap.clientWidth : 320;
+    var maxH = 220;
+    /* Draw at the natural fit, then shrink by however much the requested size
+       shrinks the media, so the frame visibly tracks the numbers instead of
+       sitting at one fixed size. */
+    var natFitH = Math.min(maxH, (maxW * info.natH) / info.natW);
+    var natFitW = (natFitH * info.natW) / info.natH;
+    var shrink = outW / info.natW;
+    var dispW = Math.max(72, Math.round(natFitW * shrink));
+    var dispH = Math.round((dispW * outH) / outW);
+    info.media.style.width = dispW + "px";
+    info.media.style.height = dispH + "px";
+
+    if (readout) {
+      if (requestedW || requestedH) {
+        readout.textContent = "Archive size: " + outW + " \u00d7 " + outH + " px";
+        readout.hidden = false;
+      } else {
+        readout.hidden = true;
+      }
+    }
+  }
+
   function closeModal() {
     revokePreviewObjectUrl();
     if (!overlayHost) return;
@@ -528,13 +603,24 @@
     }
 
     function hidePreviews() {
-      if (previewImg) { previewImg.hidden = true; previewImg.removeAttribute("src"); }
+      if (previewImg) {
+        previewImg.hidden = true;
+        previewImg.removeAttribute("src");
+        previewImg.style.width = "";
+        previewImg.style.height = "";
+        previewImg.removeAttribute("data-nat-w");
+        previewImg.removeAttribute("data-nat-h");
+      }
       if (previewVideo) {
         try { previewVideo.pause(); } catch (err) { /* not playing */ }
         previewVideo.hidden = true;
         previewVideo.removeAttribute("src");
+        previewVideo.style.width = "";
+        previewVideo.style.height = "";
       }
       if (previewFile) previewFile.hidden = true;
+      var sizeReadout = form.querySelector("[data-archive-size-readout]");
+      if (sizeReadout) sizeReadout.hidden = true;
     }
 
     revokePreviewObjectUrl();
@@ -568,6 +654,11 @@
       probe.onload = function () {
         if (widthInput && !widthInput.value) widthInput.value = probe.naturalWidth;
         if (heightInput && !heightInput.value) heightInput.value = probe.naturalHeight;
+        if (previewImg) {
+          previewImg.setAttribute("data-nat-w", probe.naturalWidth);
+          previewImg.setAttribute("data-nat-h", probe.naturalHeight);
+        }
+        updateArchivePreviewSize(form);
       };
       probe.src = currentPreviewObjectUrl;
       return;
@@ -579,13 +670,35 @@
 
     if (isVideo) {
       currentPreviewObjectUrl = URL.createObjectURL(file);
-      if (previewVideo) { previewVideo.src = currentPreviewObjectUrl; previewVideo.hidden = false; }
+      if (previewVideo) {
+        previewVideo.src = currentPreviewObjectUrl;
+        previewVideo.hidden = false;
+        /* the clip's own pixel size only shows up once the metadata lands,
+           so wait for it before drawing the first size-accurate preview */
+        previewVideo.onloadedmetadata = function () {
+          if (previewVideo.videoWidth) {
+            previewVideo.setAttribute("data-nat-w", previewVideo.videoWidth);
+            previewVideo.setAttribute("data-nat-h", previewVideo.videoHeight);
+          }
+          updateArchivePreviewSize(form);
+        };
+      }
       if (previewWrap) previewWrap.hidden = false;
+      updateArchivePreviewSize(form);
     } else {
       if (previewFile) previewFile.hidden = false;
       if (previewFilename) previewFilename.textContent = file.name;
       if (previewWrap) previewWrap.hidden = false;
     }
+  });
+
+  /* the width/height boxes redraw the preview on every keystroke */
+  document.addEventListener("input", function (event) {
+    var input = event.target;
+    if (!input || !input.id) return;
+    if (input.id !== "archive-upload-width" && input.id !== "archive-upload-height") return;
+    var form = input.closest("[data-archive-upload-form]");
+    if (form) updateArchivePreviewSize(form);
   });
 
   /* ---------- Add Image/File + Edit Added Images: blur the page while
