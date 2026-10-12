@@ -77,6 +77,38 @@ __Please note:__ deadlines are strict.
         self.assertIn('<ul>', html)
         self.assertIn('<ol>', html)
 
+    def test_story_content_renders_an_inline_video_with_a_single_play_pause_control(self):
+        content = (
+            "vidl https://cdn.example.com/clip.mp4 Crowd at the rally\n\n"
+            "vidr https://cdn.example.com/clip2.mp4 The damaged bridge\n\n"
+            "vidc https://cdn.example.com/clip3.mp4 Flood water rising\n"
+        )
+
+        html = parse_story_content(content)
+
+        #   left / right / centre placement reuses the image figure float classes
+        self.assertIn("story-inline-fig-left", html)
+        self.assertIn("story-inline-fig-right", html)
+        self.assertIn("story-inline-fig-center", html)
+        #   the video autoplays muted on a loop and carries no native controls
+        self.assertIn('<video class="story-inline-video-el"', html)
+        self.assertIn("autoplay", html)
+        self.assertIn("muted", html)
+        self.assertIn("loop", html)
+        self.assertNotIn("controls", html)
+        #   the only control is our own play/pause button
+        self.assertIn("data-video-toggle", html)
+        #   the trailing text becomes the caption
+        self.assertIn("<figcaption>Crowd at the rally</figcaption>", html)
+
+    def test_a_video_token_alone_does_not_count_as_body_text(self):
+        from SERVICE_INTERNAL.story_validation import validate_story
+
+        result = validate_story("Rally update", "vidc https://cdn.example.com/clip.mp4 Crowd at the rally")
+
+        codes = [item["code"] for item in result["errors"]]
+        self.assertIn("no_body_text", codes)
+
     def _like(self, blog):
         return self.client.post(f"/story/{blog.id}/like/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
 

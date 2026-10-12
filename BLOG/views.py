@@ -52,6 +52,24 @@ IMG_FIG_CLASSES = {
     "imgc": "story-inline-fig-center",
 }
 
+#   INLINE VIDEO TOKEN: "vidl URL caption" / "vidr URL caption" (floated,
+#   text wraps around it) / "vidc URL caption" (centered, blocking -- the
+#   surrounding text does NOT wrap it). Same shape as the image token above
+#   but renders a self-playing <video> whose only control is a play/pause
+#   button (see _render_inline_video below). Must be checked with the image
+#   token, before headings/bold/italic, so the URL + caption are never
+#   consumed by those markers (see DOCS/NEWS_CONTENT_CONVENTION.MD).
+VID_TOKEN_RE = re.compile(r"^(vidl|vidr|vidc)\s+(\S+)(?:\s+(.*))?$")
+
+#   Which floated/blocking CSS class each video keyword puts on the <figure>
+#   wrapper. The float/centre behaviour is shared with the image figures --
+#   see _render_inline_video below.
+VID_FIG_CLASSES = {
+    "vidl": "story-inline-fig-left",
+    "vidr": "story-inline-fig-right",
+    "vidc": "story-inline-fig-center",
+}
+
 #   INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
 #   the image token above (keyword, URL, optional trailing text) but
 #   renders as a downloadable link in the normal flow of the paragraph
@@ -169,6 +187,43 @@ def _render_inline_file(url, display_text):
     )
 
 
+def _render_inline_video(direction, url, caption_text):
+    """Build the inline <figure> for a vidl/vidr/vidc token.
+
+    Placement is identical to the image token: vidl/vidr float left/right so
+    surrounding text wraps around the video, vidc is centered and blocking.
+    The <video> autoplays muted on a loop -- browsers only allow a video to
+    autoplay while it is muted -- and carries NO native control bar: the only
+    control is the single play/pause button drawn on top of the video, wired
+    with `data-video-toggle` in HOME/static/home/js/interactions.js.
+
+    Caption: the trailing text is shown beneath the video in a <figcaption>,
+    exactly like the image token. With no trailing text no caption is drawn
+    (the accessible name falls back to a plain "Story video" label)."""
+    caption = (caption_text or "").strip()
+    fig_class = VID_FIG_CLASSES.get(direction, "story-inline-fig-left")
+    safe_url = html.escape(url, quote=True)
+    safe_aria = html.escape(caption or "Story video", quote=True)
+    caption_html = f"<figcaption>{html.escape(caption)}</figcaption>" if caption else ""
+    return (
+        f'<figure class="story-inline-fig story-inline-video {fig_class}">'
+        f'<div class="story-inline-video-frame">'
+        f'<video class="story-inline-video-el" src="{safe_url}" muted loop playsinline '
+        f'autoplay preload="metadata" aria-label="{safe_aria}"></video>'
+        f'<button type="button" class="story-inline-video-toggle" data-video-toggle '
+        f'aria-label="Pause video">'
+        f'<svg class="story-inline-video-icon story-inline-video-icon-pause" width="16" height="16" '
+        f'viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+        f'<rect x="6" y="5" width="4" height="14" rx="1"></rect>'
+        f'<rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>'
+        f'<svg class="story-inline-video-icon story-inline-video-icon-play" width="16" height="16" '
+        f'viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+        f'<path d="M8 5v14l11-7z"></path></svg>'
+        f'</button></div>'
+        f"{caption_html}</figure>"
+    )
+
+
 def parse_story_content(content):
     """Render story text into a readable article structure with SEO-friendly blocks."""
     if not content:
@@ -195,6 +250,13 @@ def parse_story_content(content):
         if file_match:
             url, display_text = file_match.groups()
             blocks.append(_render_inline_file(url, display_text))
+            i += 1
+            continue
+
+        vid_match = VID_TOKEN_RE.match(line)
+        if vid_match:
+            direction, url, caption_text = vid_match.groups()
+            blocks.append(_render_inline_video(direction, url, caption_text))
             i += 1
             continue
 
@@ -237,7 +299,7 @@ def parse_story_content(content):
             current = lines[i].strip()
             if not current:
                 break
-            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|filel\s+)", current):
+            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+)", current):
                 break
             paragraph_lines.append(current)
             i += 1
@@ -258,11 +320,12 @@ def _clean_content_block(block):
     """Plain-text rendering of one content block (one paragraph/heading/list
     chunk, i.e. the text between blank lines): strips this project's
     markdown-style markers (#, *, __, **) and replaces an inline
-    imgl/imgr/imgc token with its alt text and a filel token with its link
-    text, so nothing but readable prose survives. Shared by build_ticker_text
-    (the whole story, for the reading marquee) and the og/meta excerpt built
-    in StoryDetailView.get (just the story's first block) -- neither should
-    ever leak a raw imgl/imgr/imgc/filel token, or a leftover #/*/**/__
+    imgl/imgr/imgc token with its alt text, a vidl/vidr/vidc token with its
+    caption and a filel token with its link text, so nothing but readable
+    prose survives. Shared by build_ticker_text (the whole story, for the
+    reading marquee) and the og/meta excerpt built in StoryDetailView.get
+    (just the story's first block) -- neither should ever leak a raw
+    imgl/imgr/imgc/vidl/vidr/vidc/filel token, or a leftover #/*/**/__
     marker, into what a reader (or a search engine's snippet/the page's own
     <head> tags) sees."""
     lines = []
@@ -275,13 +338,18 @@ def _clean_content_block(block):
             _, img_url, img_alt = img_match.groups()
             line = (img_alt or "").strip() or _image_filename_from_url(img_url)
         else:
-            file_match = FILE_TOKEN_RE.match(line)
-            if file_match:
-                file_url, file_text = file_match.groups()
-                line = (file_text or "").strip() or _image_filename_from_url(file_url)
+            vid_match = VID_TOKEN_RE.match(line)
+            if vid_match:
+                _, vid_url, vid_caption = vid_match.groups()
+                line = (vid_caption or "").strip() or _image_filename_from_url(vid_url)
             else:
-                line = TICKER_MARKER_RE.sub("", line)
-                line = line.replace("**", "").replace("__", "")
+                file_match = FILE_TOKEN_RE.match(line)
+                if file_match:
+                    file_url, file_text = file_match.groups()
+                    line = (file_text or "").strip() or _image_filename_from_url(file_url)
+                else:
+                    line = TICKER_MARKER_RE.sub("", line)
+                    line = line.replace("**", "").replace("__", "")
         if line:
             lines.append(line)
     return " ".join(lines).strip()

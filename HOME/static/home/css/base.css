@@ -1098,11 +1098,43 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .story-inline-fig-center > .story-inline-img { max-height: 320px; }
 .story-inline-fig-center figcaption { text-align: center; }
+/*  vidl / vidr / vidc: an inline autoplaying video with a single play/pause
+    control and no native control bar. The <figure> reuses the
+    .story-inline-fig float/frame/caption rules above; only the <video>
+    sizing, the black letterbox fill and the toggle button are new. The
+    button is wired in HOME/static/home/js/interactions.js (data-video-toggle)
+    and the `is-paused` class it toggles swaps the pause/play glyphs. */
+.story-inline-video-frame {
+  position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto;
+}
+.story-inline-fig .story-inline-video-el {
+  float: none; display: block; width: auto; max-width: 100%; max-height: 260px; height: auto;
+  margin: 0 auto; border: 0; border-radius: 0; box-shadow: none; background: #000;
+}
+.story-inline-fig-center .story-inline-video-el { max-height: 320px; }
+.story-inline-video-toggle {
+  position: absolute; left: 8px; bottom: 8px; z-index: 2;
+  width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  color: #fff; background: rgba(14, 27, 44, 0.62);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.story-inline-video-toggle:hover,
+.story-inline-video-toggle:focus-visible { background: rgba(14, 27, 44, 0.85); }
+.story-inline-video-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.story-inline-video-icon { display: block; }
+.story-inline-video-icon-play { display: none; }
+.story-inline-video.is-paused .story-inline-video-icon-play { display: block; }
+.story-inline-video.is-paused .story-inline-video-icon-pause { display: none; }
 @media (max-width: 599.98px) {
   .story-inline-fig { max-width: min(55%, 200px); }
   .story-inline-fig > .story-inline-img { max-height: 190px; }
   .story-inline-fig-center { max-width: min(85%, 320px); }
   .story-inline-fig-center > .story-inline-img { max-height: 260px; }
+  .story-inline-fig .story-inline-video-el { max-height: 190px; }
+  .story-inline-fig-center .story-inline-video-el { max-height: 260px; }
   .story-inline-fig figcaption { font-size: 0.72rem; padding: 6px 8px 7px; }
 }
 /*  filel: inline downloadable file link (never floated -- a file has no

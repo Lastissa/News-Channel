@@ -63,7 +63,7 @@
          id="editor-shell"
          data-view="write"
          data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261012-1"
-         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261012-1"
+         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261012-2"
          data-draft-key="abureport-add-news-draft-{{ request.user.pk }}">
   <div class="editor-toolbar" data-editor-toolbar>
     <div class="editor-toolbar-main">
@@ -166,15 +166,18 @@
                   </dl>
                 </section>
 
-                <section class="fg-block" data-guide-section="Images and files (each on its own line)">
-                  <h3>Images and files <span>each on its own line</span></h3>
+                <section class="fg-block" data-guide-section="Images, videos and files (each on its own line)">
+                  <h3>Images, videos and files <span>each on its own line</span></h3>
                   <dl class="fg-table">
                     <div class="fg-row" data-guide-item="imgl URL description = image on the left, text wraps around it"><dt><code>imgl</code> URL description</dt><dd>Image on the left, text wraps around it</dd></div>
                     <div class="fg-row" data-guide-item="imgr URL description = image on the right, text wraps around it"><dt><code>imgr</code> URL description</dt><dd>Image on the right, text wraps around it</dd></div>
                     <div class="fg-row" data-guide-item="imgc URL description = image in the centre on its own line"><dt><code>imgc</code> URL description</dt><dd>Image in the centre on its own line</dd></div>
+                    <div class="fg-row" data-guide-item="vidl URL description = video on the left, text wraps around it (plays automatically, with a play/pause button)"><dt><code>vidl</code> URL description</dt><dd>Video on the left, text wraps around it (plays automatically, with a play/pause button)</dd></div>
+                    <div class="fg-row" data-guide-item="vidr URL description = video on the right, text wraps around it (plays automatically, with a play/pause button)"><dt><code>vidr</code> URL description</dt><dd>Video on the right, text wraps around it (plays automatically, with a play/pause button)</dd></div>
+                    <div class="fg-row" data-guide-item="vidc URL description = video in the centre on its own line (plays automatically, with a play/pause button)"><dt><code>vidc</code> URL description</dt><dd>Video in the centre on its own line (plays automatically, with a play/pause button)</dd></div>
                     <div class="fg-row" data-guide-item="filel URL link text = download link for a file"><dt><code>filel</code> URL link text</dt><dd>Download link for a file</dd></div>
                   </dl>
-                  <p class="fg-note" data-guide-item="The description you type after an image URL is shown beneath that image as a caption. Without one, no caption is shown.">The description you type after an image URL is shown beneath that image as a caption. Without one, no caption is shown.</p>
+                  <p class="fg-note" data-guide-item="The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.">The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.</p>
                 </section>
               </div>
             </div>
@@ -240,6 +243,11 @@
               <button type="button" class="editor-insert-btn" data-insert="imgc " data-insert-kind="line" title="Centered image">imgc</button>
               <button type="button" class="editor-insert-btn" data-insert="filel " data-insert-kind="line" title="Downloadable file">filel</button>
             </div>
+            <div class="editor-insert-group">
+              <button type="button" class="editor-insert-btn" data-insert="vidl " data-insert-kind="line" title="Video on the left">vidl</button>
+              <button type="button" class="editor-insert-btn" data-insert="vidr " data-insert-kind="line" title="Video on the right">vidr</button>
+              <button type="button" class="editor-insert-btn" data-insert="vidc " data-insert-kind="line" title="Centered video">vidc</button>
+            </div>
           </div>
           <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content..."></textarea>
           </div>
@@ -274,7 +282,7 @@
       <div class="archive-picker-header">
         <div class="archive-picker-heading">
           <h2 class="editor-modal-title" id="archive-picker-title">Choose an image or file</h2>
-          <p class="archive-picker-hint">Copy an item's link, then paste it into the Image URL field or after imgl, imgr, imgc or filel.</p>
+          <p class="archive-picker-hint">Copy an item's link, then paste it into the Image URL field or after imgl, imgr, imgc, vidl, vidr, vidc or filel.</p>
         </div>
         <div class="archive-picker-header-actions">
           <button type="button" class="editor-modal-btn" data-archive-refresh aria-label="Refresh archive">Refresh</button>

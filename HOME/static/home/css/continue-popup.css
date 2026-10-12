@@ -432,10 +432,12 @@ html.continue-popup-locked body {
   overflow: hidden;
 }
 
-/* Tablet and up: a centered placard the width of a phone (not a wide panel
-   and not a full-bleed sheet), so the dimmed, blurred page stays visible all
-   around it and the feed keeps its phone rhythm. Phones keep the bottom sheet
-   above. */
+/* Tablet and up: a centered placard a good deal wider than a phone -- it
+   must fill well over half the viewport on a normal desktop (the old
+   phone-width card felt too small) while the dimmed, blurred page stays
+   visible all around it. The feed inside switches to three columns so the
+   extra width becomes three magazine cards instead of two stretched ones.
+   Phones keep the bottom sheet above. */
 @media (min-width: 768px) {
   .continue-popup.is-visible {
     display: flex;
@@ -450,21 +452,22 @@ html.continue-popup-locked body {
     left: auto;
     right: auto;
     bottom: auto;
-    width: min(430px, 100%);
-    max-height: min(760px, 90%);
+    width: min(980px, 92vw);
+    max-height: min(800px, 90%);
     border-radius: 16px;
     box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42);
   }
 
-  /* The placard is phone-width, so it keeps the two-column feed rather than
-     spreading into the wide-screen grid. */
+  /* Three columns so the wider placard stays a magazine rather than a
+     stretched phone feed. The every-seventh full-width banner still spans
+     the whole grid. */
   .continue-popup-grid--feed {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
   }
 
   .continue-popup-skeleton {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

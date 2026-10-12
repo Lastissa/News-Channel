@@ -2169,4 +2169,61 @@
       });
     }
   })();
+
+  /* ---------- inline story videos (vidl / vidr / vidc) ----------
+     The <video> autoplays muted on a loop and carries no native control bar;
+     the button rendered over it (data-video-toggle) is the ONLY control. This
+     keeps the figure's `is-paused` class in sync so CSS swaps the play/pause
+     glyphs -- even when autoplay was blocked, or the reader pauses with the
+     keyboard or a screen reader. */
+  (function initStoryVideos() {
+    function sync(video) {
+      var figure = video.closest(".story-inline-video");
+      if (!figure) return;
+      var paused = video.paused;
+      figure.classList.toggle("is-paused", paused);
+      var button = figure.querySelector("[data-video-toggle]");
+      if (button) button.setAttribute("aria-label", paused ? "Play video" : "Pause video");
+    }
+
+    function syncAll() {
+      document.querySelectorAll(".story-inline-video video").forEach(function (video) {
+        sync(video);
+      });
+    }
+
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+      var button = target && target.closest ? target.closest("[data-video-toggle]") : null;
+      if (!button) return;
+      var figure = button.closest(".story-inline-video");
+      var video = figure && figure.querySelector("video");
+      if (!video) return;
+      event.preventDefault();
+      if (video.paused) {
+        var played = video.play();
+        if (played && played.catch) played.catch(function () { /* autoplay blocked */ });
+      } else {
+        video.pause();
+      }
+    });
+
+    /* media events do not bubble, so listen during the capture phase */
+    document.addEventListener("play", function (event) {
+      if (event.target && event.target.tagName === "VIDEO") sync(event.target);
+    }, true);
+    document.addEventListener("pause", function (event) {
+      if (event.target && event.target.tagName === "VIDEO") sync(event.target);
+    }, true);
+
+    /* the editor live preview rebuilds its markup on every save, so re-sync
+       whenever it asks us to (see renderPreview in the editor scripts) */
+    document.addEventListener("story-video:sync", syncAll);
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", syncAll);
+    } else {
+      syncAll();
+    }
+  })();
 })();

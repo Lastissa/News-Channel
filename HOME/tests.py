@@ -975,7 +975,7 @@ class ContinueReadingPopupTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'data-guest="true"')
-        self.assertContains(response, "Your last reads")
+        self.assertContains(response, "The last 3 article you read.")
         self.assertContains(response, "JAMB update story")
         self.assertContains(response, "More like what you read")
 
@@ -986,7 +986,7 @@ class ContinueReadingPopupTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Latest stories")
-        self.assertNotContains(response, "Your last reads")
+        self.assertNotContains(response, "The last 3 article you read.")
 
     def test_history_predating_readinghistory_still_personalizes_the_popup(self):
         # Readers who were active before ReadingHistory existed only have the
@@ -997,7 +997,7 @@ class ContinueReadingPopupTests(QuietTestCase):
         response = self.client.get(reverse("home:home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Your last reads")
+        self.assertContains(response, "The last 3 article you read.")
         self.assertContains(response, "More like what you read")
         self.assertNotContains(response, "Latest stories")
 

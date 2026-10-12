@@ -136,6 +136,28 @@ Rule:
 - Do not introduce an alternate syntax for inline files.
 - The easiest way to get a filel line: upload the file to /archive/ (Add Image / File), then use its "Copy url" button, which copies a ready `filel <url> <description>` line straight to the clipboard.
 
+### 9) INLINE VIDEOS
+
+Any line that starts with vidl, vidr, or vidc should be treated as an inline video.
+
+Example:
+
+vidl https://a.com/clip.mp4 Crowd at the rally
+vidr https://a.com/clip.mp4 The damaged bridge
+vidc https://a.com/clip.mp4 Flood water rising
+
+Rule:
+- The first word on the line is the keyword: vidl, vidr, or vidc.
+- The second word is the video URL.
+- Everything after the URL, on the same line, is the caption shown beneath the video.
+- vidl floats the video left. vidr floats the video right. In both cases the surrounding paragraph text wraps around the video; it is never rendered as its own full-width block.
+- vidc centers the video and blocks -- it sits on its own line, and unlike vidl/vidr nothing wraps around it.
+- The video plays on its own (autoplay), muted, on a loop, and shows only one control: a play/pause button. There is no native control bar, no seek bar, no volume, and no fullscreen.
+- If no caption is given after the URL, no caption is drawn beneath the video.
+- The inline video (vidl, vidr, or vidc) is always rendered smaller than the page's top-level (hero) image.
+- This token is parsed before headings, bold, and italic, so a video URL or its caption is never partially consumed by #, **, or __.
+- Do not introduce an alternate syntax for inline videos.
+
 ---
 
 ## WRITING STYLE FOR AUTHORS
@@ -153,6 +175,8 @@ Recommended guidance for writers:
 - Use bold or italic only when needed, using the allowed markers.
 - Start a new line with imgl or imgr, followed by the image URL and optional alt text, to place a small inline image that floats left or right.
 - Start a new line with imgc, followed by the image URL and optional alt text, to place a small inline image that is centered and blocking instead of floated.
+- Start a new line with vidl or vidr, followed by the video URL and optional caption, to place a small inline video that floats left or right and plays on its own with a single play/pause button.
+- Start a new line with vidc, followed by the video URL and optional caption, to place a small inline video that is centered and blocking instead of floated.
 
 ---
 
@@ -161,11 +185,13 @@ Recommended guidance for writers:
 To avoid conflict, the parser should process content in this order:
 
 1. Detect inline image tokens (imgl/imgr/imgc) first, so their URL and alt text are never consumed by another marker
-2. Detect heading blocks next
-3. Detect unordered and ordered list blocks next
-4. Detect URL links in text
-5. Detect bold and italic inline markup
-6. Treat remaining text as normal paragraphs
+2. Detect inline video tokens (vidl/vidr/vidc) next, for the same reason
+3. Detect inline file tokens (filel) next
+4. Detect heading blocks next
+5. Detect unordered and ordered list blocks next
+6. Detect URL links in text
+7. Detect bold and italic inline markup
+8. Treat remaining text as normal paragraphs
 
 This order prevents a line from being misread as ordinary copy when it is actually a heading, list, or link.
 
@@ -182,6 +208,8 @@ This is the most important rule:
 - Bold: ** only
 - Link: http:// or https:// only
 - Inline image: imgl (left), imgr (right), or imgc (centered, blocking) only
+- Inline video: vidl (left), vidr (right), or vidc (centered, blocking) only
+- Inline file: filel only
 
 Do not introduce alternate patterns for the same purpose. This keeps the editor simple and the parser reliable.
 

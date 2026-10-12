@@ -14,7 +14,7 @@ register = template.Library()
 
 #   WRITER MARKUP (see DOCS/NEWS_CONTENT_CONVENTION.MD) THAT MUST NEVER LEAK
 #   INTO A CARD EXCERPT: image directives, filel lines, headings, bullets, bold.
-_DIRECTIVE = re.compile(r"^(imgl|imgr|imgc|filel)\s+", re.IGNORECASE)
+_DIRECTIVE = re.compile(r"^(imgl|imgr|imgc|vidl|vidr|vidc|filel)\s+", re.IGNORECASE)
 _HEADING = re.compile(r"^#{1,6}\s*")
 _BULLET = re.compile(r"^([*\-]|\d+[.)])\s+")
 _URL = re.compile(r"https?://\S+")

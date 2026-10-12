@@ -346,6 +346,19 @@
     imgc: "story-inline-fig-center"
   };
 
+  /* INLINE VIDEO TOKEN: "vidl URL caption" / "vidr URL caption" (floated,
+     text wraps around it) / "vidc URL caption" (centered, blocking). Same
+     shape as the image token above but renders a self-playing <video> whose
+     only control is a play/pause button -- mirrors VID_TOKEN_RE /
+     _render_inline_video in BLOG/views.py. */
+  var vidTokenRe = /^(vidl|vidr|vidc)\s+(\S+)(?:\s+(.*))?$/;
+
+  var VID_SIDE_CLASSES = {
+    vidl: "story-inline-fig-left",
+    vidr: "story-inline-fig-right",
+    vidc: "story-inline-fig-center"
+  };
+
   function imageFilenameFromUrl(url) {
     var withoutQuery = url.split(/[?#]/)[0];
     var parts = withoutQuery.split("/");
@@ -372,6 +385,23 @@
       '<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>' + escapeHtml(label) + "</a>";
   }
 
+  /* Mirrors _render_inline_video in BLOG/views.py: the same autoplay/muted/
+     loop <video> with no native controls, plus the single play/pause button. */
+  function renderInlineVideo(direction, url, captionText) {
+    var caption = (captionText || "").trim();
+    var figClass = VID_SIDE_CLASSES[direction] || "story-inline-fig-left";
+    var aria = caption || "Story video";
+    return '<figure class="story-inline-fig story-inline-video ' + figClass + '">' +
+      '<div class="story-inline-video-frame">' +
+      '<video class="story-inline-video-el" src="' + escapeAttr(url) + '" muted loop playsinline autoplay preload="metadata" aria-label="' + escapeAttr(aria) + '"></video>' +
+      '<button type="button" class="story-inline-video-toggle" data-video-toggle aria-label="Pause video">' +
+      '<svg class="story-inline-video-icon story-inline-video-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>' +
+      '<svg class="story-inline-video-icon story-inline-video-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>' +
+      '</button></div>' +
+      (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
+      "</figure>";
+  }
+
   function parseStoryContent(content) {
     if (!content) return "";
     var normalized = String(content).replace(/\r\n?/g, "\n").trim();
@@ -381,7 +411,7 @@
     var headingRe = /^(#+)\s*(.*)$/;
     var bulletRe = /^\*\s+/;
     var orderedRe = /^\d+\.\s+/;
-    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|filel\s+)/;
+    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+)/;
 
     while (i < lines.length) {
       var line = lines[i].trim();
@@ -397,6 +427,13 @@
       var fileMatch = line.match(fileTokenRe);
       if (fileMatch) {
         blocks.push(renderInlineFile(fileMatch[1], fileMatch[2]));
+        i += 1;
+        continue;
+      }
+
+      var vidMatch = line.match(vidTokenRe);
+      if (vidMatch) {
+        blocks.push(renderInlineVideo(vidMatch[1], vidMatch[2], vidMatch[3]));
         i += 1;
         continue;
       }
@@ -496,6 +533,9 @@
     var previewScrollTop = output.scrollTop;
     output.innerHTML = html;
     if (previewScrollTop) output.scrollTop = previewScrollTop;
+
+    /* freshly built <video> elements need their play/pause glyph synced */
+    document.dispatchEvent(new CustomEvent("story-video:sync"));
   }
 
   function schedulePreview() {
