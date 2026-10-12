@@ -31,7 +31,11 @@ html.editor-modal-open { overflow: hidden; }
   overflow-y: auto;
   min-height: 0;
   overscroll-behavior: contain;
-  scroll-behavior: smooth;
+  /* No smooth scrolling and no scroll anchoring inside the editor: the
+     preview is re-rendered as the author types, and either of these would
+     make the pane appear to scroll to the top on its own. */
+  scroll-behavior: auto;
+  overflow-anchor: none;
 }
 
 .editor-form-scroll { padding: 16px; }

@@ -1394,6 +1394,57 @@ class ProfileFollowerNotificationToggleView(View):
         )
 
 
+class ProfileLikeAlertToggleView(View):
+    """Toggle like alerts (Auth.receive_like_alert). Every account carries the
+    flag: staff get alerted when their story is liked, members when their
+    comment is liked."""
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Please sign in to update settings.", "enabled": False}, status=401)
+
+        new_state = not bool(getattr(request.user, "receive_like_alert", True))
+        request.user.receive_like_alert = new_state
+        request.user.save(update_fields=["receive_like_alert"])
+
+        return JsonResponse(
+            {
+                "detail": "Like alerts enabled." if new_state else "Like alerts disabled.",
+                "enabled": new_state,
+                "status": "on" if new_state else "off",
+            },
+            status=200,
+        )
+
+
+class ProfileCommentNotificationToggleView(View):
+    """Toggle comment-on-post alerts for staff (StaffProfile.get_comment_notification)."""
+
+    def post(self, request):
+        if not staff_only(request.user):
+            return JsonResponse({"detail": "Staff access is required.", "enabled": False}, status=403)
+
+        profile = StaffProfile.objects.filter(auth=request.user).first()
+        if profile is None:
+            return JsonResponse(
+                {"detail": "No staff profile on this account yet. Save your staff profile first.", "enabled": False},
+                status=409,
+            )
+
+        new_state = not profile.get_comment_notification
+        profile.get_comment_notification = new_state
+        profile.save(update_fields=["get_comment_notification"])
+
+        return JsonResponse(
+            {
+                "detail": "Comment alerts enabled." if new_state else "Comment alerts disabled.",
+                "enabled": new_state,
+                "status": "on" if new_state else "off",
+            },
+            status=200,
+        )
+
+
 class ProfileLogoutAllSessionsView(View):
     """End every session the signed in user holds, the current one included.
 

@@ -36,10 +36,10 @@
 
 /*  Sheet: full width, reaches the bottom, small margin at the top only
     (phones). The @media (min-width: 768px) block below turns this into a
-    centered panel that is inset from every edge. */
+    centered, phone-width placard that floats clear of every edge. */
 .continue-popup-sheet {
   position: absolute;
-  top: 16px;
+  top: 24px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -432,15 +432,16 @@ html.continue-popup-locked body {
   overflow: hidden;
 }
 
-/* Tablet and up: a centered panel (not a full-bleed sheet), with the dimmed,
-   blurred page visible all around it, plus more columns and a roomier rhythm.
-   Phones keep the bottom sheet above. */
+/* Tablet and up: a centered placard the width of a phone (not a wide panel
+   and not a full-bleed sheet), so the dimmed, blurred page stays visible all
+   around it and the feed keeps its phone rhythm. Phones keep the bottom sheet
+   above. */
 @media (min-width: 768px) {
   .continue-popup.is-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 24px;
   }
 
   .continue-popup-sheet {
@@ -449,36 +450,28 @@ html.continue-popup-locked body {
     left: auto;
     right: auto;
     bottom: auto;
-    width: min(1080px, 100%);
-    max-height: 100%;
+    width: min(430px, 100%);
+    max-height: min(760px, 90%);
     border-radius: 16px;
     box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42);
   }
 
+  /* The placard is phone-width, so it keeps the two-column feed rather than
+     spreading into the wide-screen grid. */
   .continue-popup-grid--feed {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .continue-popup-skeleton {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-media {
-    flex-basis: 34%;
-  }
-}
-
-@media (min-width: 1080px) {
-  .continue-popup-grid--feed {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 /* Phones: keep two columns with small thumbnails, tighten the chrome. */
 @media (max-width: 700px) {
   .continue-popup-sheet {
-    top: 10px;
+    top: 16px;
     border-radius: 14px 14px 0 0;
   }
 

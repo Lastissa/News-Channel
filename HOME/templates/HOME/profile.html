@@ -98,6 +98,28 @@
         </div>
       </div>
 
+      <div class="profile-setting-block">
+        <div class="setting-row">
+          <div class="setting-copy">
+            <span class="setting-label">Receive likes on post</span>
+            <small>Email alerts when a reader likes your story or your comment.</small>
+          </div>
+          <div class="newsletter-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-switch {% if user.receive_like_alert %}is-on{% endif %}"
+              aria-pressed="{{ user.receive_like_alert|yesno:'true,false' }}"
+              data-newsletter-toggle
+              data-enable-url="{% url 'home:profile_like_alert_toggle' %}"
+              data-enabled="{{ user.receive_like_alert|yesno:'true,false' }}"
+              data-on-text="Receiving like alerts"
+              data-off-text="Not receiving like alerts">
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {% if is_staff_user and profile %}
       <div class="profile-setting-block">
         <div class="setting-row">
@@ -136,6 +158,28 @@
               data-enabled="{{ profile.get_follower_notification|yesno:'true,false' }}"
               data-on-text="Receiving new follower alerts"
               data-off-text="Not receiving new follower alerts">
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-setting-block">
+        <div class="setting-row">
+          <div class="setting-copy">
+            <span class="setting-label">Comment on post alert</span>
+            <small>Email alerts when a reader comments on one of your stories.</small>
+          </div>
+          <div class="newsletter-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-switch {% if profile.get_comment_notification %}is-on{% endif %}"
+              aria-pressed="{{ profile.get_comment_notification|yesno:'true,false' }}"
+              data-newsletter-toggle
+              data-enable-url="{% url 'home:profile_comment_notification_toggle' %}"
+              data-enabled="{{ profile.get_comment_notification|yesno:'true,false' }}"
+              data-on-text="Receiving comment alerts"
+              data-off-text="Not receiving comment alerts">
               <span class="toggle-thumb"></span>
             </button>
           </div>

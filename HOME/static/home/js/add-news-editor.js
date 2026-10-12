@@ -490,7 +490,12 @@
     html += "</div>";
     html += "</article></div>";
 
+    /* The preview pane IS the scroll container, so replacing its html would
+       otherwise snap it back to the top on every keystroke. Keep the reader's
+       place in the preview. */
+    var previewScrollTop = output.scrollTop;
     output.innerHTML = html;
+    if (previewScrollTop) output.scrollTop = previewScrollTop;
   }
 
   function schedulePreview() {
@@ -859,6 +864,13 @@
   tabButtons.forEach(function (tab) {
     tab.addEventListener("click", function () { setView(tab.getAttribute("data-editor-tab")); });
   });
+
+  /* The site sets `html { scroll-behavior: smooth }`. On the editor that
+     fights the browser's own "keep the caret in view" scrolling while the
+     author types, so the page looks like it scrolls on its own. Force instant
+     scrolling for this tool page; the Write/Preview tab switch still asks for
+     smooth explicitly. */
+  document.documentElement.style.scrollBehavior = "auto";
 
   /* the sticky insert bar sits right under the sticky toolbar */
   function syncToolbarHeight() {

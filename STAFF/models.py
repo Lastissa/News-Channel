@@ -32,6 +32,7 @@ class StaffProfile(models.Model):
     last_promotion = models.DateField(blank=True, null=True, help_text="DIFFERENT FROM THEN THEY CREATED ACCOUNT, THIS CAN BE USED TO SHOW THEY HAVE BEEN PROMOTED WITHING A TIME SPA")
     get_blog_notification = models.BooleanField(default=True, help_text="WETHER TO BEEP THE STAFF WHEN THEIR BLOG GET VIEWWED") #   
     get_follower_notification = models.BooleanField(default=True, help_text="WETHER TO EMAIL THE AUTHOR WHEN SOMEONE STARTS FOLLOWING THEM")
+    get_comment_notification = models.BooleanField(default=True, help_text="WETHER TO EMAIL THE AUTHOR WHEN SOMEONE COMMENTS ON THEIR STORY")
 
     class Meta:
         verbose_name = "Staff profile"

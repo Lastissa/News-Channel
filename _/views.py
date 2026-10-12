@@ -54,10 +54,41 @@ def superuser_logger(msg, debug = getattr(settings, 'DEBUG', False)):
     logger.error(msg=msg)
     if debug:print(msg)
     else:logger.info(msg=msg)
-    send_alert()
+    send_alert(msg)
     
     
-def send_alert():
+def send_alert(msg):
     #Only for this SUPERUSER USAGE TO NOTIFY OF POTENTIAL BREACH
-    """TODO: Configure email to be sent to only user with the superuser true stating a potential breach and called each time the superuser_loger is beign called"""
-    pass
+    """Email every active superuser that the backdoor guard just recorded an
+    event. Called from superuser_logger() on every invocation, so a breach is
+    reported to the people who can act on it even if nobody is watching the
+    server console. Runs on the shared background email pool, so the request
+    that tripped the guard never waits on the mail provider."""
+    recipients = list(
+        get_user_model().objects.filter(is_superuser=True, is_active=True)
+        .exclude(email__isnull=True)
+        .exclude(email="")
+        .values_list("email", flat=True)
+    )
+    if not recipients:
+        return
+
+    from django.utils.html import escape
+    from SERVICE_INTERNAL.config import About
+    from SERVICE_INTERNAL.email_single import _build_email_html, _dispatch_email
+
+    subject = f"Security alert: potential breach on {About.project_name}"
+    main_content = (
+        "<p>The backdoor guard recorded the following event:</p>"
+        f"<p><code>{escape(msg)}</code></p>"
+        "<p>If you did not trigger this, treat it as a potential breach and review "
+        "the server logs immediately.</p>"
+    )
+    html_message = _build_email_html(
+        title="Potential breach detected",
+        main_content=main_content,
+        end_note=f"{About.project_name} security",
+        unsubscribe_query="",
+    )
+    for email in recipients:
+        _dispatch_email(email, subject, html_message)

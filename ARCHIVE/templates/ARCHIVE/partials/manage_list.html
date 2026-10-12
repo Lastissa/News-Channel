@@ -1,10 +1,10 @@
 <div class="archive-manage-list" id="archive-manage-list">
   {% if error %}<p class="archive-modal-error" data-archive-manage-error>{{ error }}</p>{% endif %}
   {% if notice %}<p class="archive-manage-notice" data-archive-manage-notice>{{ notice }}</p>{% endif %}
-  {# Name + date search. Submits through htmx (live as you type, and on
+  {% comment %} Name + date search. Submits through htmx (live as you type, and on
      Enter/the button); only #archive-manage-rows is swapped, so the inputs
      keep focus. Values ride along on each row's edit/delete form and on
-     "Load more", so the current search survives them. #}
+     "Load more", so the current search survives them.  {% endcomment %}
   <form class="archive-manage-filters"
         hx-post="{% url 'archive:manage_list' %}"
         hx-target="#archive-manage-rows" hx-swap="innerHTML"

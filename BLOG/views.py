@@ -21,7 +21,14 @@ from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from ARCHIVE.models import ArchiveImage
 from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
-from SERVICE_INTERNAL.email_single import _build_email_html, _dispatch_email, _try_send_story_views_alert_email
+from SERVICE_INTERNAL.email_single import (
+    _build_email_html,
+    _dispatch_email,
+    _try_send_comment_like_email,
+    _try_send_new_comment_email,
+    _try_send_story_like_email,
+    _try_send_story_views_alert_email,
+)
 from STAFF.models import AuthorFollow, StaffProfile
 from .models import Blog, BlogLike, Comment
 
@@ -534,6 +541,17 @@ def _authenticated_user(request):
     return None
 
 
+def _actor_label(user):
+    """How a liker/commenter is named in an alert email: their staff full name
+    when they have one, otherwise a masked email so a reader's address is
+    never handed out in full."""
+    profile = StaffProfile.objects.filter(auth=user).only("full_name").first()
+    if profile and profile.full_name and profile.full_name.strip():
+        return profile.full_name.strip()
+    local, _, domain = (user.email or "").partition("@")
+    return f"{local[:1]}***@{domain}" if domain else "A reader"
+
+
 class BookmarkNotFoundView(View):
     """Bookmark endpoint for the decoy 404 story page. It must never succeed:
     there is no story to attach a Bookmark row to, so every attempt gets the
@@ -553,6 +571,7 @@ class BlogLikeView(View):
                 return JsonResponse({"detail": "Please sign in to like this story."}, status=401)
             return redirect("auth:login")
 
+        new_like = False
         with transaction.atomic():
             blog = get_object_or_404(Blog.objects.select_for_update(), pk=blog_id)
             existing_like = BlogLike.objects.filter(blog=blog, user=user).first()
@@ -571,7 +590,7 @@ class BlogLikeView(View):
             else:
                 BlogLike.objects.create(blog=blog, user=user)
                 Blog.objects.filter(pk=blog.pk).update(likes=F("likes") + 1)
-                liked, detail = True, "Thank You"
+                liked, detail, new_like = True, "Thank You", True
 
             if had_legacy_like:
                 request.session["liked_blogs"] = [
@@ -580,6 +599,14 @@ class BlogLikeView(View):
                 request.session.modified = True
 
         likes = Blog.objects.values_list("likes", flat=True).get(pk=blog.pk)
+
+        #   Tell the author, unless the like is their own or they switched
+        #   like alerts off. The fresh count is stitched on so the email is
+        #   never one behind.
+        if new_like and blog.author_id != user.id and getattr(blog.author, "receive_like_alert", False):
+            blog.likes = likes
+            _try_send_story_like_email(blog.author, blog, _actor_label(user))
+
         return JsonResponse({"detail": detail, "likes": likes, "liked": liked}, status=200)
 
 
@@ -686,6 +713,18 @@ class CommentCreateView(View):
             return JsonResponse({"detail": "You can only post one comment per story."}, status=400)
 
         comment = Comment.objects.create(blog=blog, author=user, content=content)
+
+        #   Tell the story's author, unless the comment is their own or they
+        #   switched comment alerts off (StaffProfile.get_comment_notification).
+        if blog.author_id and comment.author_id != blog.author_id:
+            author_profile = (
+                StaffProfile.objects.filter(auth=blog.author)
+                .only("get_comment_notification")
+                .first()
+            )
+            if author_profile is not None and author_profile.get_comment_notification:
+                _try_send_new_comment_email(blog.author, blog, comment, _actor_label(user))
+
         if _is_ajax(request):
             return JsonResponse({"detail": "Comment posted.", "comment_id": comment.id, "comment_count": blog.comments.count(), "content": comment.content}, status=201)
         return redirect("blog:story_detail", blog_slug=blog.slug)
@@ -712,7 +751,9 @@ class CommentDeleteView(View):
 
 
 class CommentLikeView(View):
-    """TODO: send a notification to the poster of that comment that their comment have been like by the likee with time and which story and adiitional relevant details"""
+    """Toggle a comment like. On a new like the comment's author is emailed
+    (unless it is their own comment or they switched like alerts off)."""
+
     def post(self, request, comment_id):
         comment = get_object_or_404(Comment, pk=comment_id)
         user = _authenticated_user(request)
@@ -736,4 +777,11 @@ class CommentLikeView(View):
 
         #   READ THE REAL TOTAL BACK: other readers may have liked meanwhile.
         likes = Comment.objects.values_list("likes", flat=True).get(pk=comment.pk)
+
+        #   Tell the comment's author, unless it is their own comment or they
+        #   switched like alerts off (Auth.receive_like_alert).
+        if liked and comment.author_id != user.id and getattr(comment.author, "receive_like_alert", False):
+            comment.likes = likes
+            _try_send_comment_like_email(comment.author, comment.blog, comment, _actor_label(user))
+
         return JsonResponse({"detail": detail, "likes": likes, "liked": liked}, status=200)

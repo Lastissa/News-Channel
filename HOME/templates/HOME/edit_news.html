@@ -7,34 +7,53 @@
 
 {% block extra_head %}
   {{ block.super }}
-  <meta name="viewport" content="initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   {% comment %} <meta name="viewport" content="initial-scale=0.5, width=1200"> {% endcomment %}
   <style>
-    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; }
+    /* Skeleton only: the polish lives in add-news.css (loaded by the light script below). Kept identical to add_news.html so both editors wear the same UI. */
+    .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; font-weight:700;}
     .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
-      @media (max-width: 899.98px) {
-        .editor-shell {padding: 0;}
-      }
-    .editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-    .editor-toolbar h1 { margin: 0; font-size: 1.5rem; color: var(--ink); }
-    .editor-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .editor-loading-note { color: var(--slate); font-size: 0.82rem; }
-    .editor-preview-toggle, .editor-publish-btn {
-      border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--nav-bg);
-      color: var(--nav-fg); font: inherit; font-weight: 700; font-size: 0.85rem; padding: 9px 14px; cursor: pointer;
+    .editor-toolbar { margin-bottom: 14px; }
+    .editor-toolbar-main { display: flex; align-items: center; gap: 12px; }
+    .editor-toolbar-main h1 { margin: 0; font-size: 1.5rem; color: var(--ink); flex: 0 0 auto; }
+    .editor-status { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .editor-toolbar-sub { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .editor-tabs { display: none; }
+    .editor-loading-note { color: var(--slate); font-size: 0.8rem; }
+    .editor-draft-status { color: var(--slate); font-size: 0.78rem; }
+    .editor-btn, .editor-publish-btn {
+      border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface);
+      color: var(--ink); font: inherit; font-weight: 700; font-size: 0.8rem; line-height: 1.2;
+      padding: 7px 12px; cursor: pointer; white-space: nowrap;
     }
-    .editor-publish-btn { background: var(--amber-alt); }
-    .editor-workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+    .editor-publish-btn { background: var(--amber-alt); border-color: var(--amber-alt); color: #fff; padding: 8px 18px; flex: 0 0 auto; }
+    .editor-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
     .editor-pane {
-      border: 1px solid var(--line); border-radius: var(--radius-l); background: var(--surface);
+      border: 1px solid var(--line); background: var(--surface); min-width: 0;
       height: calc(100vh - 150px); min-height: 420px; display: flex; flex-direction: column; overflow: hidden;
     }
     .editor-shell.preview-off .editor-preview-pane { display: none; }
-    .editor-shell.preview-off .editor-workspace { grid-template-columns: 1fr; }
+    .editor-shell.preview-off .editor-workspace { grid-template-columns: minmax(0, 1fr); }
     .editor-shell.is-loading .editor-workspace { filter: blur(7px); pointer-events: none; user-select: none; }
     @media (max-width: 899.98px) {
-      .editor-workspace { grid-template-columns: 1fr; }
-      .editor-pane { height: auto; min-height: 0; }
+      .editor-shell { padding: 0 0 28px; }
+      .editor-workspace { grid-template-columns: minmax(0, 1fr); gap: 0; }
+      /* overflow must stay visible here or the sticky insert bar stops sticking */
+      .editor-pane { height: auto; min-height: 0; overflow: visible; border-left: 0; border-right: 0; }
+      .editor-shell.preview-off[data-view="preview"] .editor-preview-pane { display: flex; }
+      .editor-toolbar {
+        position: sticky; top: var(--header-h, 64px); z-index: 40; margin-bottom: 0;
+        padding: 8px 12px 8px; border-bottom: 1px solid var(--line); background: var(--surface);
+        box-shadow: 0 4px 12px rgba(14, 27, 44, 0.07);
+      }
+      .editor-toolbar-main h1 { font-size: 1.15rem; }
+      .editor-toolbar-sub { margin-top: 8px; justify-content: space-between; }
+      .editor-tabs { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-s); overflow: hidden; }
+      .editor-tab { border: 0; background: var(--surface); color: var(--slate); font: inherit; font-size: 0.8rem; font-weight: 700; padding: 7px 18px; cursor: pointer; }
+      .editor-tab.is-active { background: var(--ink); color: var(--surface); }
+      .editor-shell[data-view="write"] .editor-preview-pane { display: none; }
+      .editor-shell[data-view="preview"] .editor-form-pane { display: none; }
+      [data-editor-preview-toggle] { display: none !important; }
     }
   </style>
 {% endblock %}
@@ -42,18 +61,32 @@
 {% block content %}
 <section class="editor-shell is-loading"
          id="editor-shell"
+         data-view="write"
          data-published="{{ blog.date_created|date:'j M Y' }}"
-         data-heavy-css="{% static 'home/css/add-news.css' %}"
-         data-heavy-js="{% static 'home/js/edit-news-editor.js' %}">
-  <div class="editor-toolbar">
-    <h1>edit news</h1>
-    <div class="editor-actions">
-      <span class="editor-loading-note" data-editor-loading-note>Preparing editor...</span>
-      <button type="button" class="editor-preview-toggle" data-editor-preview-toggle hidden>Hide preview</button>
+         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261012-1"
+         data-heavy-js="{% static 'home/js/edit-news-editor.js' %}?v=20261012-1">
+  <div class="editor-toolbar" data-editor-toolbar>
+    <div class="editor-toolbar-main">
+      <h1>edit news</h1>
+      <div class="editor-status">
+        <span class="editor-loading-note" data-editor-loading-note>Preparing editor...</span>
+      </div>
       <button type="submit" form="edit-news-form" class="editor-publish-btn" data-editor-publish disabled>Save changes</button>
     </div>
+    <div class="editor-toolbar-sub">
+      <div class="editor-tabs" role="tablist" aria-label="Editor view">
+        <button type="button" class="editor-tab is-active" role="tab" aria-selected="true" data-editor-tab="write">Write</button>
+        <button type="button" class="editor-tab" role="tab" aria-selected="false" data-editor-tab="preview">Preview</button>
+      </div>
+      <div class="editor-actions">
+        <button type="button" class="editor-btn" data-archive-open>Browse archive</button>
+        <button type="button" class="editor-btn" data-editor-preview-toggle hidden>Hide preview</button>
+      </div>
+    </div>
   </div>
-  
+
+  <p class="prompt">Clcik <a href="{% url "home:author_handbook" %}" target="_blank" rel="noopener noreferrer">HERE</a> for detailed guide.</p>
+
   <div class="editor-workspace">
     <div class="editor-pane editor-preview-pane">
       <div class="editor-pane-header">Preview</div>
@@ -64,6 +97,73 @@
       <div class="editor-form-scroll">
         <form id="edit-news-form" class="editor-form" method="post" action="{% url 'home:edit_news' blog.id %}" data-editor-form data-endpoint="{% url 'home:edit_news' blog.id %}" novalidate>
           {% csrf_token %}
+          <aside class="format-guide is-collapsed" id="formatting-guide" data-format-guide aria-labelledby="format-guide-title">
+            <div class="fg-head">
+              <div class="fg-head-text">
+                <h2 class="fg-title" id="format-guide-title">Formatting guide</h2>
+                <p class="fg-sub">Review checks and formatting codes for your story.</p>
+              </div>
+              <div class="fg-head-actions">
+                <button type="button" class="fg-copy" data-guide-copy-all>Copy instruction</button>
+                <button type="button" class="fg-toggle" data-guide-toggle aria-expanded="false" aria-controls="format-guide-body">Click To Read Before Publishing</button>
+              </div>
+            </div>
+            <div class="fg-body-wrap" id="format-guide-body">
+              <div class="fg-body">
+                <p class="fg-intro">The review checks decide whether your story will be accepted. The formatting codes are optional, but they split the article into sections and help our online visibility. Plain paragraphs works but they are not advisable.</p>
+
+                <section class="fg-block fg-block-key" data-guide-section="Check today's news first">
+                  <h3>Check today&rsquo;s news first</h3>
+                  <ol class="fg-rules fg-rules-key">
+                    <li data-guide-item="Before you write, open abureport.com.ng and check today's news. If we have not published that news yet, go ahead and write it. If we have already published it, do not publish it again.">Before you write, open abureport.com.ng and check today&rsquo;s news. If we have not published that news yet, go ahead and write it. If we have already published it, do not publish it again.</li>
+                  </ol>
+                </section>
+
+                <section class="fg-block fg-block-key" data-guide-section="Edit rules">
+                  <h3>Edit rules</h3>
+                  <ol class="fg-rules fg-rules-key">
+                    <li data-guide-item="The heading cannot be changed once a story is published, because the story link is built from it. Only the image, category and content can be edited.">The heading cannot be changed once a story is published, because the story link is built from it. Only the image, category and content can be edited.</li>
+                    <li data-guide-item="Re-review your content and make sure it aligns with {{ project_name }} guidelines before saving.">Re-review your content and make sure it aligns with {{ project_name }} guidelines before saving.</li>
+                    <li data-guide-item="Keep the content SEO friendly: a clear headline, an opening paragraph that states what happened, with facts ,who, where and/or when and if necessary short sections with heading.">Keep the content SEO friendly: a clear headline, an opening paragraph that states what happened, with facts ,who, where and/or when and if necessary short sections with heading.</li>
+                    <li data-guide-item="Avoid frequent repetition of content in the article. Say each fact once.">Avoid frequent repetition of content in the article. Say each fact once.</li>
+                  </ol>
+                </section>
+
+                <section class="fg-block" data-guide-section="Layout">
+                  <h3>Layout GUIDE</h3>
+                  <dl class="fg-table">
+                    <div class="fg-row" data-guide-item="Blank line = new paragraph"><dt>Blank line</dt><dd>Starts a new paragraph</dd></div>
+                    <div class="fg-row" data-guide-item="# Text = subheading"><dt><code>#</code> Text</dt><dd>Subheading</dd></div>
+                    <div class="fg-row" data-guide-item="## Text = smaller subheading"><dt><code>##</code> Text</dt><dd>Smaller subheading</dd></div>
+                    <div class="fg-row" data-guide-item="### Text = smallest subheading"><dt><code>###</code> Text</dt><dd>Smallest subheading</dd></div>
+                    <div class="fg-row" data-guide-item="* Text = bullet point"><dt><code>*</code> Text</dt><dd>Bullet point</dd></div>
+                    <div class="fg-row" data-guide-item="1. Text = numbered point, then 2., 3. and so on"><dt><code>1.</code> Text</dt><dd>Numbered point (then 2., 3. and so on)</dd></div>
+                  </dl>
+                </section>
+
+                <section class="fg-block" data-guide-section="Text style">
+                  <h3>Text style</h3>
+                  <dl class="fg-table">
+                    <div class="fg-row" data-guide-item="**text** = bold"><dt><code>**text**</code></dt><dd>Bold</dd></div>
+                    <div class="fg-row" data-guide-item="__text__ = italic"><dt><code>__text__</code></dt><dd>Italic</dd></div>
+                    <div class="fg-row" data-guide-item="https://... = becomes a clickable link by itself"><dt><code>https://...</code></dt><dd>Becomes a clickable link by itself</dd></div>
+                  </dl>
+                </section>
+
+                <section class="fg-block" data-guide-section="Images and files (each on its own line)">
+                  <h3>Images and files <span>each on its own line</span></h3>
+                  <dl class="fg-table">
+                    <div class="fg-row" data-guide-item="imgl URL description = image on the left, text wraps around it"><dt><code>imgl</code> URL description</dt><dd>Image on the left, text wraps around it</dd></div>
+                    <div class="fg-row" data-guide-item="imgr URL description = image on the right, text wraps around it"><dt><code>imgr</code> URL description</dt><dd>Image on the right, text wraps around it</dd></div>
+                    <div class="fg-row" data-guide-item="imgc URL description = image in the centre on its own line"><dt><code>imgc</code> URL description</dt><dd>Image in the centre on its own line</dd></div>
+                    <div class="fg-row" data-guide-item="filel URL link text = download link for a file"><dt><code>filel</code> URL link text</dt><dd>Download link for a file</dd></div>
+                  </dl>
+                  <p class="fg-note" data-guide-item="The description you type after an image URL is shown beneath that image as a caption. Without one, no caption is shown.">The description you type after an image URL is shown beneath that image as a caption. Without one, no caption is shown.</p>
+                </section>
+              </div>
+            </div>
+          </aside>
+
           <div class="editor-field">
             <label for="editor-heading">Heading <small>(locked)</small></label>
             {% comment %} NO name ATTRIBUTE ON PURPOSE: the heading is never sent to the server, and EditNewsView never reads one. {% endcomment %}
@@ -77,10 +177,11 @@
             <input id="editor-image-file" type="file" name="image_file" data-editor-image-file accept="image/jpeg,image/png" hidden>
             <div class="editor-image-actions">
               <button type="button" class="editor-upload-btn" data-editor-upload-btn>Upload file</button>
+              <button type="button" class="editor-upload-btn" data-archive-open>Browse archive</button>
               <span class="editor-image-filename" data-editor-image-filename hidden></span>
               <button type="button" class="editor-upload-btn editor-image-clear-btn" data-editor-image-clear hidden>Remove File</button>
             </div>
-              <small class="editor-convention-hint">Clear the link and pick no file to remove the image. A newly picked file stays on your device until you save, then it replaces the current one.</small>
+            <small class="editor-convention-hint">Clear the link and pick no file to remove the image. A newly picked file stays on your device until you save, then it replaces the current one.</small>
           </div>
 
           <div class="editor-field" data-editor-image-quality-field hidden>
@@ -93,7 +194,7 @@
           </div>
 
           <div class="editor-field">
-            <label for="editor-image-info">Image description <small>(optional)</small></label>
+            <label for="editor-image-info">Image description <small>(optional, shown beneath the image)</small></label>
             <input id="editor-image-info" type="text" name="image_info" maxlength="100" value="{{ blog.image_info }}" data-editor-image-info placeholder="The image is self explanatory." autocomplete="off">
           </div>
 
@@ -112,41 +213,27 @@
 
           <div class="editor-field">
           <label for="editor-content">Content</label>
+          <div class="editor-insert-bar" role="toolbar" aria-label="Insert formatting" data-insert-bar>
+            <span class="editor-insert-label">Insert</span>
+            <div class="editor-insert-group">
+              <button type="button" class="editor-insert-btn" data-insert="# " data-insert-kind="line" title="Subheading">Heading</button>
+              <button type="button" class="editor-insert-btn" data-insert="## " data-insert-kind="line" title="Smaller subheading">Heading 2</button>
+              <button type="button" class="editor-insert-btn" data-insert="### " data-insert-kind="line" title="Smallest subheading">Heading 3</button>
+            </div>
+            <div class="editor-insert-group">
+              <button type="button" class="editor-insert-btn" data-insert="* " data-insert-kind="line" title="Bullet point">Bullet</button>
+              <button type="button" class="editor-insert-btn" data-insert="1. " data-insert-kind="line" title="Numbered point">Numbered</button>
+            </div>
+            <div class="editor-insert-group">
+              <button type="button" class="editor-insert-btn" data-insert="imgl " data-insert-kind="line" title="Image on the left">imgl</button>
+              <button type="button" class="editor-insert-btn" data-insert="imgr " data-insert-kind="line" title="Image on the right">imgr</button>
+              <button type="button" class="editor-insert-btn" data-insert="imgc " data-insert-kind="line" title="Centered image">imgc</button>
+              <button type="button" class="editor-insert-btn" data-insert="filel " data-insert-kind="line" title="Downloadable file">filel</button>
+            </div>
+          </div>
           <textarea id="editor-content" name="content" rows="16" data-editor-content placeholder="News / Story Content...">{{ blog.content }}</textarea>
+          </div>
 
-          <b class="prompt">FORMATTING GUIDE — OPTIONAL</b>
-
-          <small class="editor-convention-hint">
-            You may write the entire content as plain text without using any formatting syntax.
-          </small>
-
-          <small class="editor-convention-hint">
-            The first paragraph should preferably - NOT A MUST - remain plain text, without headings, bullets, numbering, bold, or italic formatting.
-          </small>
-
-          <small class="editor-convention-hint">
-            Leave a blank line between paragraphs.
-          </small>
-
-          <small class="editor-convention-hint"><b>#</b> = subheading.</small>
-          <small class="editor-convention-hint"><b>##</b> = smaller subheading.</small>
-          <small class="editor-convention-hint"><b>###</b> = smaller subheading.</small>
-          <small class="editor-convention-hint"><b>*</b> = bullet point.</small>
-          <small class="editor-convention-hint"><b>1.</b>, <b>2.</b>, etc. = numbered points.</small>
-          <small class="editor-convention-hint"><b>**text**</b> = bold.</small>
-          <small class="editor-convention-hint"><b>__text__</b> = italic.</small>
-          <small class="editor-convention-hint"><b>imgl URL alt text</b> = inline image, floated left, text wraps around it.</small>
-          <small class="editor-convention-hint"><b>imgr URL alt text</b> = inline image, floated right, text wraps around it.</small>
-          <small class="editor-convention-hint"><b>imgc URL alt text</b> = inline image, floated center, text wraps around it.</small>
-          <small class="editor-convention-hint"><b>filel URL alt text</b> = inline downloadable file <svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>, text wraps around it.</small>
-          <small class="editor-convention-hint">
-            For imgl/imgr, alt text is optional; if left out, the image filename from the URL is used instead.
-          </small>
-
-          <small class="editor-convention-hint">
-            Use these formatting rules only when they improve the structure or readability of the content.
-          </small>
-        </div>
         </form>
       </div>
     </div>
@@ -155,6 +242,26 @@
       <div class="editor-pane-header">Preview</div>
       <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
     </div> {% endcomment %}
+  </div>
+
+  <div class="editor-modal archive-picker-modal" data-archive-modal hidden>
+    <div class="editor-modal-backdrop" data-archive-close></div>
+    <section class="editor-modal-card archive-picker-card" role="dialog" aria-modal="true" aria-labelledby="archive-picker-title">
+      <div class="archive-picker-header">
+        <div class="archive-picker-heading">
+          <h2 class="editor-modal-title" id="archive-picker-title">Choose an image or file</h2>
+          <p class="archive-picker-hint">Copy an item's link, then paste it into the Image URL field or after imgl, imgr, imgc or filel.</p>
+        </div>
+        <div class="archive-picker-header-actions">
+          <button type="button" class="editor-modal-btn" data-archive-refresh aria-label="Refresh archive">Refresh</button>
+          <button type="button" class="editor-modal-btn" data-archive-close aria-label="Close archive">Close</button>
+        </div>
+      </div>
+      <div class="archive-picker-stage">
+        <div class="archive-picker-loading" data-archive-loading role="status">Loading archive...</div>
+        <iframe class="archive-picker-frame" data-src="{% url 'archive:gallery' %}" title="Image and file archive"></iframe>
+      </div>
+    </section>
   </div>
 </section>
 

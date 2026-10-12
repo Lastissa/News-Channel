@@ -51,6 +51,10 @@ class Auth(AbstractBaseUser):
     is_active = models.BooleanField(default=True)
     receive_email_login_alert = models.BooleanField(default=True)#  login alert sent every time user login
     send_newsletter = models.BooleanField(default=False)    #   permission to send news alert
+    #   Email this user when someone likes their story (authors) or their
+    #   comment (any signed in reader). Sits on Auth, not StaffProfile, so
+    #   regular members get the same control as staff.
+    receive_like_alert = models.BooleanField(default=True)
     profile_img = models.URLField(blank=True, null=True)    #   profile picture for each and every users
     
     USERNAME_FIELD = 'email'

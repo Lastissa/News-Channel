@@ -112,17 +112,17 @@ def _try_send_new_story_batch_email(blog: object):
         info_logger(msg=f"BATCH EMAIL: no eligible recipients for new story by {author.email}")
         return
 
-    subject = f"New story from {blog.author_name} on {About.project_name}"
+    safe_heading = " ".join(blog.heading.splitlines())
+    subject = f"New from {blog.author_name}: {safe_heading}"
     story_url = f"{About.domain}/story/{blog.slug}/"
 
     def build_html_for(email):
         main_content = (
-            "<p>Hi,</p>"
-            f"<p>{blog.author_name} just published a new story: <strong>{blog.heading}</strong>.</p>"
+            f"<p>{escape(blog.author_name)} just published a new story.</p>"
             f'<p><a href="{story_url}">Read it here</a></p>'
         )
         return _build_email_html(
-            title="New Story Published",
+            title=escape(blog.heading),
             main_content=main_content,
             end_note=f"{About.project_name} Team",
             unsubscribe_query=f"type=author_post&email={quote(email)}",

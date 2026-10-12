@@ -218,16 +218,18 @@ def _try_send_story_views_alert_email(user: object, blog: object):
     is responsible for checking the StaffProfile 'get_blog_notification'
     preference and the interval before calling this -- this function only
     builds and sends.
+
+    The story heading is the email's headline so it is the first thing the
+    author reads; the view count sits right under it.
     """
     subject = f"Your story just crossed {blog.views} views"
     main_content = (
-        "<p>Hi,</p>"
-        f"<p>Your story <strong>{blog.heading}</strong> on {About.project_name} just reached "
+        f"<p>Your story on {About.project_name} just reached "
         f"<strong>{blog.views}</strong> views.</p>"
         f'<p><a href="{About.domain}/story/{blog.slug}/">View the story</a></p>'
     )
     html_message = _build_email_html(
-        title="Story Views Alert",
+        title=escape(blog.heading),
         main_content=main_content,
         end_note=f"Keep up the great work,<br>{About.project_name} Team",
         unsubscribe_query=None,
@@ -235,6 +237,90 @@ def _try_send_story_views_alert_email(user: object, blog: object):
     )
     _dispatch_email(user.email, subject, html_message)
     info_logger(msg=f"EMAIL: story views alert sent to {user.email} for blog={blog.pk} views={blog.views}")
+
+
+def _try_send_story_like_email(author: object, blog: object, liker_label: str):
+    """
+    Tells a story's author that a signed in reader just liked it. The caller
+    (BLOG.views.BlogLikeView) checks the author's `receive_like_alert`
+    preference and skips self-likes before calling this. `liker_label` is the
+    reader's full name when they have a staff profile, otherwise a masked
+    email, so no reader address is handed out in full.
+
+    The story heading is the email's headline so the author sees which story
+    was liked before any filler copy.
+    """
+    safe_heading = " ".join(blog.heading.splitlines())
+    subject = f"{safe_heading} was liked on {About.project_name}"
+    main_content = (
+        f"<p><strong>{escape(liker_label)}</strong> liked your story. "
+        f"It now has <strong>{blog.likes}</strong> like{'' if blog.likes == 1 else 's'}.</p>"
+        f'<p><a href="{About.domain}/story/{blog.slug}/">Open the story</a></p>'
+    )
+    html_message = _build_email_html(
+        title=escape(blog.heading),
+        main_content=main_content,
+        end_note=f"Keep up the great work,<br>{About.project_name} Team",
+        unsubscribe_query=None,
+        preference_note="You can turn like alerts off from your profile settings at any time.",
+    )
+    _dispatch_email(author.email, subject, html_message)
+    info_logger(msg=f"EMAIL: story like alert sent to {author.email} for blog={blog.pk}")
+
+
+def _try_send_comment_like_email(comment_author: object, blog: object, comment: object, liker_label: str):
+    """
+    Tells a reader that their comment was liked. The caller
+    (BLOG.views.CommentLikeView) checks the comment author's
+    `receive_like_alert` preference and skips self-likes. `liker_label` is the
+    reader's full name or a masked email.
+    """
+    safe_heading = " ".join(blog.heading.splitlines())
+    subject = f"Your comment on {safe_heading} was liked"
+    main_content = (
+        f"<p><strong>{escape(liker_label)}</strong> liked your comment on "
+        f"<strong>{escape(blog.heading)}</strong>. It now has "
+        f"<strong>{comment.likes}</strong> like{'' if comment.likes == 1 else 's'}.</p>"
+        f'<p><a href="{About.domain}/story/{blog.slug}/">Open the story</a></p>'
+    )
+    html_message = _build_email_html(
+        title="Your comment was liked",
+        main_content=main_content,
+        end_note=f"{About.project_name} Team",
+        unsubscribe_query=None,
+        preference_note="You can turn like alerts off from your profile settings at any time.",
+    )
+    _dispatch_email(comment_author.email, subject, html_message)
+    info_logger(msg=f"EMAIL: comment like alert sent to {comment_author.email} for comment={comment.pk}")
+
+
+def _try_send_new_comment_email(author: object, blog: object, comment: object, commenter_label: str):
+    """
+    Tells a story's author that a reader just commented. The caller
+    (BLOG.views.CommentCreateView) checks the author's StaffProfile
+    'get_comment_notification' preference and skips self-comments.
+
+    The story heading is the email's headline, then the commenter and the
+    comment itself, so the author knows at a glance which story got the
+    comment.
+    """
+    safe_heading = " ".join(blog.heading.splitlines())
+    subject = f"New comment on {safe_heading}"
+    excerpt = comment.content if len(comment.content) <= 240 else comment.content[:237] + "..."
+    main_content = (
+        f"<p><strong>{escape(commenter_label)}</strong> commented on your story:</p>"
+        f"<blockquote>{escape(excerpt)}</blockquote>"
+        f'<p><a href="{About.domain}/story/{blog.slug}/">Open the story</a></p>'
+    )
+    html_message = _build_email_html(
+        title=escape(blog.heading),
+        main_content=main_content,
+        end_note=f"{About.project_name} Team",
+        unsubscribe_query=None,
+        preference_note="You can turn comment alerts off from your profile settings at any time.",
+    )
+    _dispatch_email(author.email, subject, html_message)
+    info_logger(msg=f"EMAIL: new comment alert sent to {author.email} for blog={blog.pk}")
 
 
 def _try_send_newsletter_subscribe_email(email: str):
