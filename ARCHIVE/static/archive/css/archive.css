@@ -844,14 +844,26 @@ html.archive-locked { overflow: hidden; }
 
 .archive-modal-preview[hidden],
 .archive-modal-preview img[hidden],
+.archive-modal-preview video[hidden],
 .archive-modal-preview-file[hidden] { display: none; }
 
-.archive-modal-preview img {
+.archive-modal-preview img,
+.archive-modal-preview-video {
   display: block;
   width: 100%;
   max-height: 220px;
   object-fit: contain;
+  background: #000;
 }
+
+.archive-modal-note {
+  margin: 6px 0 0;
+  color: var(--slate);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.archive-modal-note[hidden] { display: none; }
 
 .archive-modal-preview-file {
   display: flex;

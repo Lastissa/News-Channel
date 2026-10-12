@@ -500,9 +500,11 @@
 
   /* ---------- Add Image / File: show a preview of whatever was chosen
      before it uploads. A picture gets the usual thumbnail + pre-filled
-     width/height (still editable) and shows the image-only fields; any
-     other file gets a plain file icon + its name, and the image-only
-     fields (width/height/quality) are hidden since they don't apply. ---------- */
+     width/height (still editable) and shows the image-only quality field; a
+     video gets an autoplaying muted preview and shows the width/height
+     resize boxes (optional for a video); any other file gets a plain file
+     icon + its name, and both the resize and quality fields are hidden
+     since they don't apply. ---------- */
   document.addEventListener("change", function (event) {
     var fileInput = event.target;
     if (!fileInput.matches || !fileInput.matches("[data-archive-upload-file]")) return;
@@ -512,33 +514,54 @@
 
     var previewWrap = form.querySelector("[data-archive-upload-preview]");
     var previewImg = form.querySelector("[data-archive-upload-preview-img]");
+    var previewVideo = form.querySelector("[data-archive-upload-preview-video]");
     var previewFile = form.querySelector("[data-archive-upload-preview-file]");
     var previewFilename = form.querySelector("[data-archive-upload-preview-filename]");
     var widthInput = form.querySelector("#archive-upload-width");
     var heightInput = form.querySelector("#archive-upload-height");
     var imageOnlyFields = form.querySelectorAll("[data-archive-image-only]");
+    var resizableFields = form.querySelectorAll("[data-archive-resizable]");
+    var videoOnlyNotes = form.querySelectorAll("[data-archive-video-only]");
+
+    function setGroup(nodes, visible) {
+      for (var n = 0; n < nodes.length; n++) nodes[n].style.display = visible ? "" : "none";
+    }
+
+    function hidePreviews() {
+      if (previewImg) { previewImg.hidden = true; previewImg.removeAttribute("src"); }
+      if (previewVideo) {
+        try { previewVideo.pause(); } catch (err) { /* not playing */ }
+        previewVideo.hidden = true;
+        previewVideo.removeAttribute("src");
+      }
+      if (previewFile) previewFile.hidden = true;
+    }
 
     revokePreviewObjectUrl();
 
     var file = fileInput.files && fileInput.files[0];
     if (!file) {
       if (previewWrap) previewWrap.hidden = true;
-      if (previewImg) { previewImg.hidden = true; previewImg.removeAttribute("src"); }
-      if (previewFile) previewFile.hidden = true;
-      for (var i = 0; i < imageOnlyFields.length; i++) imageOnlyFields[i].style.display = "";
+      hidePreviews();
+      setGroup(imageOnlyFields, true);
+      setGroup(resizableFields, true);
+      setGroup(videoOnlyNotes, false);
       return;
     }
 
-    var isImage = (file.type || "").indexOf("image/") === 0;
+    var type = (file.type || "").toLowerCase();
+    var isImage = type.indexOf("image/") === 0;
+    var isVideo = type.indexOf("video/") === 0 || /\.(mp4|mov)$/i.test(file.name);
 
-    for (var j = 0; j < imageOnlyFields.length; j++) {
-      imageOnlyFields[j].style.display = isImage ? "" : "none";
-    }
+    setGroup(imageOnlyFields, isImage);
+    setGroup(resizableFields, isImage || isVideo);
+    setGroup(videoOnlyNotes, isVideo);
+
+    hidePreviews();
 
     if (isImage) {
       currentPreviewObjectUrl = URL.createObjectURL(file);
       if (previewImg) { previewImg.src = currentPreviewObjectUrl; previewImg.hidden = false; }
-      if (previewFile) previewFile.hidden = true;
       if (previewWrap) previewWrap.hidden = false;
 
       var probe = new Image();
@@ -547,13 +570,21 @@
         if (heightInput && !heightInput.value) heightInput.value = probe.naturalHeight;
       };
       probe.src = currentPreviewObjectUrl;
+      return;
+    }
+
+    /* A picture's numbers must never carry over onto a file or video. */
+    if (widthInput) widthInput.value = "";
+    if (heightInput) heightInput.value = "";
+
+    if (isVideo) {
+      currentPreviewObjectUrl = URL.createObjectURL(file);
+      if (previewVideo) { previewVideo.src = currentPreviewObjectUrl; previewVideo.hidden = false; }
+      if (previewWrap) previewWrap.hidden = false;
     } else {
-      if (previewImg) previewImg.hidden = true;
       if (previewFile) previewFile.hidden = false;
       if (previewFilename) previewFilename.textContent = file.name;
       if (previewWrap) previewWrap.hidden = false;
-      if (widthInput) widthInput.value = "";
-      if (heightInput) heightInput.value = "";
     }
   });
 
@@ -710,6 +741,46 @@
     }, { passive: true });
   }
 
+  /* ---------- archive video tiles ----------
+     A video item in the gallery autoplays muted on a loop behind one
+     overlaid pause/play button (see gallery_grid.html). Delegated on the
+     document so it keeps working after every htmx grid swap, and the
+     capture-phase play/pause listeners keep the button glyph in step even
+     when autoplay was blocked or the reader uses a screen reader. ---------- */
+  function syncArchiveVideo(video) {
+    var tile = video.closest(".archive-videotile");
+    if (!tile) return;
+    tile.classList.toggle("is-paused", video.paused);
+    var btn = tile.querySelector("[data-archive-video-toggle]");
+    if (btn) btn.setAttribute("aria-label", video.paused ? "Play video" : "Pause video");
+  }
+
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest && event.target.closest("[data-archive-video-toggle]");
+    if (!btn) return;
+    var tile = btn.closest(".archive-videotile");
+    var video = tile && tile.querySelector("video");
+    if (!video) return;
+    event.preventDefault();
+    if (video.paused) {
+      var played = video.play();
+      if (played && played.catch) played.catch(function () { /* autoplay blocked */ });
+    } else {
+      video.pause();
+    }
+  });
+
+  document.addEventListener("play", function (event) {
+    if (event.target && event.target.tagName === "VIDEO" && event.target.closest(".archive-videotile")) {
+      syncArchiveVideo(event.target);
+    }
+  }, true);
+  document.addEventListener("pause", function (event) {
+    if (event.target && event.target.tagName === "VIDEO" && event.target.closest(".archive-videotile")) {
+      syncArchiveVideo(event.target);
+    }
+  }, true);
+
   /* ---------- Edit Added Images: an edit/save or a delete inside the
      manage popup re-renders the manage list itself via plain htmx (see
      manage_row.html) and, on success, sends back an "HX-Trigger:
@@ -778,12 +849,43 @@
      fetch, and not htmx) so real upload-progress events are available --
      fetch has no reliable cross-browser upload progress, and this is a
      multipart file upload like every other upload form in this project. ---------- */
+  /*  Per-kind size caps for archive uploads, kept in step with
+      SERVICE_INTERNAL.images (_validate_archive_file): videos (mp4/mov) up
+      to data-video-max-mb, every other file much smaller at
+      data-file-max-mb, JPEG/PNG handled by the image pipeline's own
+      data-image-max-mb. */
+  function archiveFileSizeError(form) {
+    var input = form.querySelector("[data-archive-upload-file]");
+    var file = input && input.files && input.files[0];
+    if (!file || !file.size) return "";
+    var type = (file.type || "").toLowerCase();
+    var isImage = type.indexOf("image/") === 0;
+    var isVideo = type.indexOf("video/") === 0 || /\.(mp4|mov)$/i.test(file.name);
+    var cap = isImage ? form.dataset.imageMaxMb : (isVideo ? form.dataset.videoMaxMb : form.dataset.fileMaxMb);
+    var limitMb = parseFloat(cap || "");
+    if (!limitMb || file.size <= limitMb * 1024 * 1024) return "";
+    var sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+    var kind = isVideo ? "Videos" : "Files";
+    return kind + " are limited to " + limitMb + "MB. This " + (isVideo ? "video" : "file") + " is " + sizeMb + "MB.";
+  }
+
   document.addEventListener("submit", function (event) {
     var form = event.target;
     if (!form.matches || !form.matches("[data-archive-upload-form]")) return;
     event.preventDefault();
 
     if (form.dataset.submitting === "true") return; //   already uploading, ignore a second Enter/click
+
+    /* Reject an oversized file right here, before any network request: an
+       11MB video used to pass the old app check and then die at Cloudinary's
+       raw ceiling, surfacing as a vague "could not upload" error. */
+    var sizeError = archiveFileSizeError(form);
+    if (sizeError) {
+      var sizeErrorNode = form.parentElement.querySelector("[data-archive-upload-error]");
+      if (sizeErrorNode) { sizeErrorNode.textContent = sizeError; sizeErrorNode.hidden = false; }
+      return;
+    }
+
     form.dataset.submitting = "true";
 
     var endpoint = form.dataset.endpoint;

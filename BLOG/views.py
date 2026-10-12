@@ -193,9 +193,12 @@ def _render_inline_video(direction, url, caption_text):
     Placement is identical to the image token: vidl/vidr float left/right so
     surrounding text wraps around the video, vidc is centered and blocking.
     The <video> autoplays muted on a loop -- browsers only allow a video to
-    autoplay while it is muted -- and carries NO native control bar: the only
-    control is the single play/pause button drawn on top of the video, wired
-    with `data-video-toggle` in HOME/static/home/js/interactions.js.
+    autoplay while it is muted -- and carries NO native control bar. Two
+    controls are drawn on top of the video: the play/pause button
+    (`data-video-toggle`) and a sound button (`data-video-sound`). Sound is
+    off by default, and the reader can only hear a video while it is on
+    screen (HOME/static/home/js/interactions.js enforces the in-view rule).
+    Both buttons are wired in that same script.
 
     Caption: the trailing text is shown beneath the video in a <figcaption>,
     exactly like the image token. With no trailing text no caption is drawn
@@ -219,6 +222,19 @@ def _render_inline_video(direction, url, caption_text):
         f'<svg class="story-inline-video-icon story-inline-video-icon-play" width="16" height="16" '
         f'viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
         f'<path d="M8 5v14l11-7z"></path></svg>'
+        f'</button>'
+        f'<button type="button" class="story-inline-video-toggle story-inline-video-sound" '
+        f'data-video-sound aria-label="Unmute video">'
+        f'<svg class="story-inline-video-icon story-inline-video-icon-sound-on" width="16" height="16" '
+        f'viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+        f'<path d="M11 5L6 9H3v6h3l5 4V5z"></path>'
+        f'<path d="M15.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>'
+        f'<path d="M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>'
+        f'<svg class="story-inline-video-icon story-inline-video-icon-sound-off" width="16" height="16" '
+        f'viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+        f'<path d="M11 5L6 9H3v6h3l5 4V5z"></path>'
+        f'<line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>'
+        f'<line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line></svg>'
         f'</button></div>'
         f"{caption_html}</figure>"
     )

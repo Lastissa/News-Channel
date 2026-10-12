@@ -77,7 +77,7 @@ __Please note:__ deadlines are strict.
         self.assertIn('<ul>', html)
         self.assertIn('<ol>', html)
 
-    def test_story_content_renders_an_inline_video_with_a_single_play_pause_control(self):
+    def test_story_content_renders_an_inline_video_with_play_pause_and_sound_controls(self):
         content = (
             "vidl https://cdn.example.com/clip.mp4 Crowd at the rally\n\n"
             "vidr https://cdn.example.com/clip2.mp4 The damaged bridge\n\n"
@@ -96,8 +96,11 @@ __Please note:__ deadlines are strict.
         self.assertIn("muted", html)
         self.assertIn("loop", html)
         self.assertNotIn("controls", html)
-        #   the only control is our own play/pause button
+        #   the two overlaid controls are our own play/pause and sound buttons;
+        #   sound starts off, so the sound button promises to unmute
         self.assertIn("data-video-toggle", html)
+        self.assertIn("data-video-sound", html)
+        self.assertIn('aria-label="Unmute video"', html)
         #   the trailing text becomes the caption
         self.assertIn("<figcaption>Crowd at the rally</figcaption>", html)
 

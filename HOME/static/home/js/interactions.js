@@ -2172,18 +2172,41 @@
 
   /* ---------- inline story videos (vidl / vidr / vidc) ----------
      The <video> autoplays muted on a loop and carries no native control bar;
-     the button rendered over it (data-video-toggle) is the ONLY control. This
-     keeps the figure's `is-paused` class in sync so CSS swaps the play/pause
-     glyphs -- even when autoplay was blocked, or the reader pauses with the
-     keyboard or a screen reader. */
+     two buttons are rendered over it -- the play/pause button
+     (data-video-toggle) and the sound button (data-video-sound). This keeps
+     the figure's `is-paused` / `is-muted` classes in sync so CSS swaps the
+     glyphs, even when autoplay was blocked or the reader pauses via the
+     keyboard or a screen reader.
+
+     SOUND RULE: sound is off by default, and the reader can only hear a
+     video while that video is actually on screen. When the reader switches
+     sound on, the video unmutes and plays aloud while at least some of it is
+     visible; as soon as it scrolls out of view it goes silent again (the
+     reader's choice to hear it is remembered, so sound returns when the
+     video comes back into view, until the reader mutes it). An
+     IntersectionObserver enforces this; the check is repeated in the click
+     handler and in sync() so near-the-fold states are correct immediately. */
   (function initStoryVideos() {
+    var IN_VIEW_RATIO = 0.15;
+
+    function isVideoInView(video) {
+      var rect = video.getBoundingClientRect();
+      var height = rect.height;
+      if (!height) return false;
+      var viewportH = window.innerHeight || document.documentElement.clientHeight;
+      var visible = Math.min(rect.bottom, viewportH) - Math.max(rect.top, 0);
+      return visible > 0 && (visible / height) >= IN_VIEW_RATIO;
+    }
+
     function sync(video) {
       var figure = video.closest(".story-inline-video");
       if (!figure) return;
-      var paused = video.paused;
-      figure.classList.toggle("is-paused", paused);
-      var button = figure.querySelector("[data-video-toggle]");
-      if (button) button.setAttribute("aria-label", paused ? "Play video" : "Pause video");
+      figure.classList.toggle("is-paused", video.paused);
+      var playButton = figure.querySelector("[data-video-toggle]");
+      if (playButton) playButton.setAttribute("aria-label", video.paused ? "Play video" : "Pause video");
+      figure.classList.toggle("is-muted", !!video.muted);
+      var soundButton = figure.querySelector("[data-video-sound]");
+      if (soundButton) soundButton.setAttribute("aria-label", video.muted ? "Unmute video" : "Mute video");
     }
 
     function syncAll() {
@@ -2192,20 +2215,62 @@
       });
     }
 
+    /* Watch every inline video and keep the sound rule honest: a video the
+       reader chose to hear only plays aloud while it is on screen. The
+       observer is rebuilt on story-video:sync because the editor live
+       preview replaces its markup on every save. */
+    var observer = null;
+
+    function observeAll() {
+      if (observer) observer.disconnect();
+      if (!("IntersectionObserver" in window)) return;
+      observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          var video = entry.target;
+          var figure = video.closest(".story-inline-video");
+          if (!figure || figure.dataset.videoSound !== "on") return;
+          video.muted = !entry.isIntersecting;
+          sync(video);
+        });
+      }, { threshold: IN_VIEW_RATIO });
+      document.querySelectorAll(".story-inline-video video").forEach(function (video) {
+        observer.observe(video);
+      });
+    }
+
     document.addEventListener("click", function (event) {
       var target = event.target;
-      var button = target && target.closest ? target.closest("[data-video-toggle]") : null;
-      if (!button) return;
-      var figure = button.closest(".story-inline-video");
-      var video = figure && figure.querySelector("video");
-      if (!video) return;
-      event.preventDefault();
-      if (video.paused) {
-        var played = video.play();
-        if (played && played.catch) played.catch(function () { /* autoplay blocked */ });
-      } else {
-        video.pause();
+      var playButton = target && target.closest ? target.closest("[data-video-toggle]") : null;
+      if (playButton) {
+        var figure = playButton.closest(".story-inline-video");
+        var video = figure && figure.querySelector("video");
+        if (!video) return;
+        event.preventDefault();
+        if (video.paused) {
+          var played = video.play();
+          if (played && played.catch) played.catch(function () { /* autoplay blocked */ });
+        } else {
+          video.pause();
+        }
+        return;
       }
+
+      var soundButton = target && target.closest ? target.closest("[data-video-sound]") : null;
+      if (!soundButton) return;
+      var soundFigure = soundButton.closest(".story-inline-video");
+      var soundVideo = soundFigure && soundFigure.querySelector("video");
+      if (!soundVideo) return;
+      event.preventDefault();
+      var wantsSound = !!soundVideo.muted; /* currently muted -> turning sound on */
+      soundFigure.dataset.videoSound = wantsSound ? "on" : "off";
+      if (wantsSound && !isVideoInView(soundVideo)) {
+        /* sound may only play for a video that is on screen; keep it silent
+           until it scrolls into view, the observer picks it up from here */
+        soundVideo.muted = true;
+      } else {
+        soundVideo.muted = !wantsSound;
+      }
+      sync(soundVideo);
     });
 
     /* media events do not bubble, so listen during the capture phase */
@@ -2217,13 +2282,21 @@
     }, true);
 
     /* the editor live preview rebuilds its markup on every save, so re-sync
-       whenever it asks us to (see renderPreview in the editor scripts) */
-    document.addEventListener("story-video:sync", syncAll);
+       and re-observe whenever it asks us to (see renderPreview in the
+       editor scripts) */
+    document.addEventListener("story-video:sync", function () {
+      syncAll();
+      observeAll();
+    });
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", syncAll);
+      document.addEventListener("DOMContentLoaded", function () {
+        syncAll();
+        observeAll();
+      });
     } else {
       syncAll();
+      observeAll();
     }
   })();
 })();

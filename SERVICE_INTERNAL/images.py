@@ -214,8 +214,18 @@ def upload_advert_image(file, public_id: str | None = None) -> dict:
 #   as a `resource_type="raw"` asset, bytes in, bytes out, same as a plain
 #   object store would do it. Kept in its own block since it shares almost
 #   nothing with the image presets above beyond the Cloudinary client.
+#
+#   Two separate size caps, not one: videos are allowed up to ARCHIVE_VIDEO
+#   _UPLOAD_MAX_MB (default 10 -- also the Cloudinary raw-upload ceiling, so
+#   an oversized video can never pass our check and then die at Cloudinary
+#   with a cryptic "File size too large" error), while every other file kind
+#   is held to the much smaller ARCHIVE_FILE_UPLOAD_MAX_MB (default 3). Both
+#   are overridable with the matching environment variables.
 
-ARCHIVE_FILE_MAX_BYTES = getattr(settings, "ARCHIVE_FILE_UPLOAD_MAX_MB", 20) * 1024 * 1024
+VIDEO_FILE_EXTENSIONS = {"mp4", "mov"}
+
+ARCHIVE_VIDEO_MAX_BYTES = getattr(settings, "ARCHIVE_VIDEO_UPLOAD_MAX_MB", 10) * 1024 * 1024
+ARCHIVE_FILE_MAX_BYTES = getattr(settings, "ARCHIVE_FILE_UPLOAD_MAX_MB", 3) * 1024 * 1024
 
 #   Deliberately an allow list, not a block list: anything not on here is
 #   rejected, including anything executable. Extend this set rather than
@@ -227,6 +237,11 @@ ALLOWED_ARCHIVE_FILE_EXTENSIONS = {
 }
 
 
+def _human_mb(num_bytes: int) -> str:
+    """A readable size for the upload limits/errors, e.g. "2.7MB"."""
+    return f"{num_bytes / (1024 * 1024):.1f}MB"
+
+
 def _archive_file_extension(original_name: str) -> str:
     return original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ""
 
@@ -234,18 +249,32 @@ def _archive_file_extension(original_name: str) -> str:
 def _validate_archive_file(file, original_name: str) -> str:
     """Raises ImageUploadError for a bad archive file upload, otherwise
     returns the lowercase extension it validated against
-    ALLOWED_ARCHIVE_FILE_EXTENSIONS."""
+    ALLOWED_ARCHIVE_FILE_EXTENSIONS.
+
+    Size is checked per kind BEFORE anything reaches Cloudinary: videos
+    (mp4/mov) are limited to ARCHIVE_VIDEO_MAX_BYTES, everything else to
+    ARCHIVE_FILE_MAX_BYTES. Doing it here with a clear message is what keeps
+    an oversized video from sailing past the app and dying at Cloudinary's
+    raw ceiling (10MB) with a cryptic "file size too large" error."""
     if file is None:
         raise ImageUploadError("No file was received.")
-
-    size = getattr(file, "size", None)
-    if size is not None and size > ARCHIVE_FILE_MAX_BYTES:
-        raise ImageUploadError(f"File is too large. Max allowed size is {ARCHIVE_FILE_MAX_BYTES // (1024 * 1024)}MB.")
 
     ext = _archive_file_extension(original_name)
     if ext not in ALLOWED_ARCHIVE_FILE_EXTENSIONS:
         allowed = ", ".join(sorted(ALLOWED_ARCHIVE_FILE_EXTENSIONS))
         raise ImageUploadError(f'Unsupported file type ".{ext or "?"}". Allowed types: {allowed}.')
+
+    size = getattr(file, "size", None)
+    if size is not None:
+        is_video = ext in VIDEO_FILE_EXTENSIONS
+        max_bytes = ARCHIVE_VIDEO_MAX_BYTES if is_video else ARCHIVE_FILE_MAX_BYTES
+        if size > max_bytes:
+            kind_label = "Videos" if is_video else "Files"
+            noun = "video" if is_video else "file"
+            raise ImageUploadError(
+                f"{kind_label} are limited to {max_bytes // (1024 * 1024)}MB. "
+                f"This {noun} is {_human_mb(size)}."
+            )
     return ext
 
 
@@ -297,6 +326,69 @@ def upload_archive_file(file, public_id: str | None = None) -> dict:
         "bytes": result.get("bytes") or getattr(file, "size", 0) or 0,
         "original_filename": original_name,
         "format": ext,
+    }
+
+
+def upload_archive_video(file, width=None, height=None, public_id: str | None = None) -> dict:
+    """Public /archive/ gallery upload for a VIDEO (mp4/mov) that the
+    uploader asked to RESIZE -- the one non-image kind Cloudinary can
+    transform. A video with no requested width/height never comes here: it
+    stays on the plain raw pipeline in upload_archive_file above, exactly as
+    before, so an ordinary video upload is untouched.
+
+    The clip goes up as `resource_type="video"` with an incoming
+    `crop: "limit"` transformation -- the same "cap the box, never upscale,
+    keep the aspect ratio" behaviour upload_archive_image gives pictures --
+    and the real dimensions Cloudinary reports back are returned so the
+    caller can store them. Because `crop: limit` only ever shrinks, storing
+    those returned numbers can't reserve a box larger than the video.
+
+    `public_id` behaves exactly as in upload_archive_file: pass an existing
+    ArchiveImage row's own id to overwrite that asset in place (a replace),
+    leave it unset for a brand new upload."""
+    original_name = getattr(file, "name", "") or "video"
+    ext = _validate_archive_file(file, original_name)
+    if ext not in VIDEO_FILE_EXTENSIONS:
+        raise ImageUploadError("Unsupported video type. Please upload an MP4 or MOV file.")
+
+    preset = {"crop": "limit"}
+    if width:
+        preset["width"] = width
+    if height:
+        preset["height"] = height
+
+    if public_id:
+        placement = {"public_id": public_id, "unique_filename": False, "overwrite": True, "invalidate": True}
+    else:
+        placement = {"folder": "abureport/archive", "use_filename": True, "unique_filename": True, "overwrite": False}
+
+    try:
+        result = cloudinary.uploader.upload(
+            file,
+            resource_type="video",
+            transformation=[preset],
+            tags=["archive", "archive-video"],
+            **placement,
+        )
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY UPLOAD FAILED (archive-video): {exc}")
+        raise ImageUploadError("Could not upload the video right now. Please try again.") from exc
+
+    secure_url = result.get("secure_url") or result.get("url")
+    if not secure_url:
+        error_logger(msg=f"CLOUDINARY UPLOAD (archive-video) RETURNED NO URL: {result}")
+        raise ImageUploadError("Cloudinary did not return a video URL.")
+
+    info_logger(msg=f"CLOUDINARY UPLOAD OK (archive-video): {secure_url}")
+    return {
+        "secure_url": secure_url,
+        "public_id": result.get("public_id", ""),
+        "resource_type": "video",
+        "bytes": result.get("bytes") or getattr(file, "size", 0) or 0,
+        "original_filename": original_name,
+        "format": result.get("format") or ext,
+        "width": result.get("width") or width or 0,
+        "height": result.get("height") or height or 0,
     }
 
 

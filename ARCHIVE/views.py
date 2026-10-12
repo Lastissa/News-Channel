@@ -23,13 +23,16 @@ from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import error_logger, is_rate_limited
 from SERVICE_INTERNAL.images import (
     ARCHIVE_FILE_MAX_BYTES,
+    ARCHIVE_VIDEO_MAX_BYTES,
     MAX_UPLOAD_BYTES,
+    VIDEO_FILE_EXTENSIONS,
     ImageQuality,
     ImageUploadError,
     archive_image_delivery_url,
     destroy_archive_asset,
     upload_archive_file,
     upload_archive_image,
+    upload_archive_video,
 )
 from SERVICE_INTERNAL.permissions import is_authenticated
 
@@ -159,6 +162,11 @@ def _serialize_images(images):
             "quality_label": QUALITY_LABELS.get(image.quality, image.quality.title()),
             "original_filename": image.original_filename,
             "file_extension": _file_extension(image.original_filename),
+            #   A plain file whose extension is a video one (mp4/mov) is
+            #   drawn as an inline autoplaying player, not the generic file
+            #   sheet (see ARCHIVE/templates/ARCHIVE/partials/gallery_grid.html).
+            "is_video": image.kind == ArchiveKind.FILE
+            and _file_extension(image.original_filename).lower() in VIDEO_FILE_EXTENSIONS,
             "file_size_label": _human_file_size(image.file_size),
             "uploader_email": _masked_email(image.author.email),
             "date_created": image.date_created,
@@ -508,6 +516,7 @@ class ArchiveUploadModalView(View):
                 #   the real limits enforced in SERVICE_INTERNAL.images, so the
                 #   hint under the file picker can never drift from them
                 "image_max_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
+                "video_max_mb": ARCHIVE_VIDEO_MAX_BYTES // (1024 * 1024),
                 "file_max_mb": ARCHIVE_FILE_MAX_BYTES // (1024 * 1024),
             },
         )
@@ -519,10 +528,12 @@ class ArchiveUploadView(View):
     type, not by anything the visitor picked in a dropdown: a JPEG/PNG
     always goes through the existing Cloudinary image transform pipeline
     (SERVICE_INTERNAL.images.upload_archive_image, width/height/quality
-    required), anything else goes through the plain file pipeline
-    (SERVICE_INTERNAL.images.upload_archive_file, no transform, no
-    width/height/quality). Nothing is written to the database until
-    Cloudinary has confirmed the upload."""
+    required), an mp4/mov video goes through the video pipeline when the
+    uploader gave a width/height to resize it (upload_archive_video) and
+    otherwise stays a plain raw file, and anything else goes through the
+    plain file pipeline (SERVICE_INTERNAL.images.upload_archive_file, no
+    transform, no width/height/quality). Nothing is written to the database
+    until Cloudinary has confirmed the upload."""
 
     def post(self, request):
         if not is_authenticated(request.user):
@@ -540,6 +551,7 @@ class ArchiveUploadView(View):
 
         content_type = (getattr(upload_file, "content_type", "") or "").lower()
         is_image = content_type in {"image/jpeg", "image/png"}
+        is_video = _file_extension(upload_file.name).lower() in VIDEO_FILE_EXTENSIONS
 
         #   RATE LIMIT BEFORE CLOUDINARY: a blocked request must never touch the upload.
         remaining_time, is_limited = is_rate_limited(request, 30, 5)
@@ -579,8 +591,24 @@ class ArchiveUploadView(View):
                 "height": uploaded["height"],
             }
         else:
+            #   For a VIDEO, width/height are an OPTIONAL resize: an empty box
+            #   means "leave the clip as it is" and it goes up untouched on the
+            #   plain raw pipeline, exactly as every file did before. When the
+            #   uploader does fill one in, the clip is resized through
+            #   Cloudinary's video transform (see upload_archive_video).
+            width = _parse_dimension(request.POST.get("width"))
+            height = _parse_dimension(request.POST.get("height"))
+            if is_video and (width == "invalid" or height == "invalid"):
+                return JsonResponse(
+                    {"detail": f"Width and height must be whole numbers between {MIN_DIMENSION} and {MAX_DIMENSION}.", "valid": False},
+                    status=400,
+                )
+
             try:
-                uploaded = upload_archive_file(upload_file)
+                if is_video and (width or height):
+                    uploaded = upload_archive_video(upload_file, width=width, height=height)
+                else:
+                    uploaded = upload_archive_file(upload_file)
             except ImageUploadError as exc:
                 return JsonResponse({"detail": str(exc), "valid": False}, status=400)
 
@@ -589,6 +617,9 @@ class ArchiveUploadView(View):
                 "original_filename": uploaded["original_filename"],
                 "file_size": uploaded["bytes"],
             }
+            if is_video:
+                row_kwargs["width"] = uploaded.get("width") or 0
+                row_kwargs["height"] = uploaded.get("height") or 0
 
         image_url = uploaded["secure_url"]
         try:
@@ -616,7 +647,11 @@ class ArchiveUploadView(View):
 
         return JsonResponse(
             {
-                "detail": "Image added to the archive." if is_image else "File added to the archive.",
+                "detail": (
+                    "Image added to the archive."
+                    if is_image
+                    else ("Video added to the archive." if is_video else "File added to the archive.")
+                ),
                 "valid": True,
                 "id": archive_item.pk,
                 "kind": archive_item.kind,

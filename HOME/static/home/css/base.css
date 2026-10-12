@@ -1098,12 +1098,14 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .story-inline-fig-center > .story-inline-img { max-height: 320px; }
 .story-inline-fig-center figcaption { text-align: center; }
-/*  vidl / vidr / vidc: an inline autoplaying video with a single play/pause
-    control and no native control bar. The <figure> reuses the
-    .story-inline-fig float/frame/caption rules above; only the <video>
-    sizing, the black letterbox fill and the toggle button are new. The
-    button is wired in HOME/static/home/js/interactions.js (data-video-toggle)
-    and the `is-paused` class it toggles swaps the pause/play glyphs. */
+/*  vidl / vidr / vidc: an inline autoplaying video with a play/pause button
+    and a sound (mute/unmute) button, and no native control bar. Sound is off
+    by default and only plays while the video is on screen. The <figure>
+    reuses the .story-inline-fig float/frame/caption rules above; only the
+    <video> sizing, the black letterbox fill and the two overlay buttons are
+    new. Both buttons are wired in HOME/static/home/js/interactions.js
+    (data-video-toggle / data-video-sound); the `is-paused` and `is-muted`
+    classes it toggles swap the glyphs. */
 .story-inline-video-frame {
   position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto;
 }
@@ -1124,10 +1126,14 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .story-inline-video-toggle:hover,
 .story-inline-video-toggle:focus-visible { background: rgba(14, 27, 44, 0.85); }
 .story-inline-video-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.story-inline-video-sound { left: auto; right: 8px; }
 .story-inline-video-icon { display: block; }
 .story-inline-video-icon-play { display: none; }
 .story-inline-video.is-paused .story-inline-video-icon-play { display: block; }
 .story-inline-video.is-paused .story-inline-video-icon-pause { display: none; }
+.story-inline-video-icon-sound-on { display: none; }
+.story-inline-video:not(.is-muted) .story-inline-video-icon-sound-on { display: block; }
+.story-inline-video:not(.is-muted) .story-inline-video-icon-sound-off { display: none; }
 @media (max-width: 599.98px) {
   .story-inline-fig { max-width: min(55%, 200px); }
   .story-inline-fig > .story-inline-img { max-height: 190px; }

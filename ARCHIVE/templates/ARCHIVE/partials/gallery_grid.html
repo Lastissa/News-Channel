@@ -19,7 +19,7 @@
     {% with proxied_url=image.url|cloudinary_proxy %}
     {% with absolute_url=proxied_url|archive_absolute_url:request %}
     <article class="archive-card" id="archive-card-{{ image.id }}" style="--i: {{ forloop.counter0 }}">
-      <div class="archive-card-media{% if image.kind == 'file' %} archive-card-media-file{% endif %}">
+      <div class="archive-card-media{% if image.kind == 'file' %} archive-card-media-file{% endif %}{% if image.is_video %} archive-card-media-video{% endif %}">
         {% if image.kind == 'image' %}
         <button type="button" class="archive-card-open" data-archive-open
                 data-view-src="{{ proxied_url }}"
@@ -37,6 +37,18 @@
                onerror="this.onerror=null;this.src='/static/404.jpg';this.classList.add('is-loaded')">
         </button>
         <span class="archive-tag">Image</span>
+        {% elif image.is_video %}
+        <div class="archive-videotile">
+          <video class="archive-video-el" src="{{ proxied_url }}" muted loop playsinline autoplay preload="metadata"
+                 {% if image.width and image.height %}width="{{ image.width }}" height="{{ image.height }}"{% endif %}
+                 onerror="this.onerror=null;this.src='/static/404_video.mp4';"
+                 aria-label="{{ image.alt }}"></video>
+          <button type="button" class="archive-video-toggle" data-archive-video-toggle aria-label="Pause video">
+            <svg class="archive-video-icon archive-video-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            <svg class="archive-video-icon archive-video-icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+        <span class="archive-tag">Video</span>
         {% else %}
         <div class="archive-filetile" aria-hidden="true">
           <svg viewBox="0 0 64 80" class="archive-filesheet"><path d="M6 2h36l16 16v58a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M42 2v16h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>

@@ -397,6 +397,10 @@
       '<button type="button" class="story-inline-video-toggle" data-video-toggle aria-label="Pause video">' +
       '<svg class="story-inline-video-icon story-inline-video-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>' +
       '<svg class="story-inline-video-icon story-inline-video-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>' +
+      '</button>' +
+      '<button type="button" class="story-inline-video-toggle story-inline-video-sound" data-video-sound aria-label="Unmute video">' +
+      '<svg class="story-inline-video-icon story-inline-video-icon-sound-on" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>' +
+      '<svg class="story-inline-video-icon story-inline-video-icon-sound-off" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line></svg>' +
       '</button></div>' +
       (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
       "</figure>";

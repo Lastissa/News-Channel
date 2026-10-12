@@ -13,20 +13,24 @@
 
     <p class="archive-modal-error" data-archive-upload-error hidden role="alert"></p>
 
-    <form data-archive-upload-form data-endpoint="{% url 'archive:upload' %}">
+    <form data-archive-upload-form data-endpoint="{% url 'archive:upload' %}"
+          data-image-max-mb="{{ image_max_mb }}"
+          data-video-max-mb="{{ video_max_mb }}"
+          data-file-max-mb="{{ file_max_mb }}">
       {% csrf_token %}
       <div class="archive-modal-field">
         <span class="archive-modal-label">Picture or file</span>
         <label class="archive-file-zone" for="archive-upload-file" data-archive-dropzone>
           <svg viewBox="0 0 24 24" class="archive-file-zone-icon" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span class="archive-file-zone-title">Choose a file or drop it here</span>
-          <span class="archive-file-zone-hint">JPEG or PNG pictures up to {{ image_max_mb }} MB. Other files (PDF, Office, text, audio, video, archives) up to {{ file_max_mb }} MB.</span>
+          <span class="archive-file-zone-hint">JPEG or PNG pictures up to {{ image_max_mb }} MB. Videos (MP4, MOV) up to {{ video_max_mb }} MB. Other files (PDF, Office, text, audio, archives) up to {{ file_max_mb }} MB.</span>
           <input id="archive-upload-file" class="archive-file-zone-input" type="file" name="upload_file"
                  accept="image/jpeg,image/png,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.zip,.rar,.7z,.mp3,.wav,.mp4,.mov,.json"
                  required data-archive-upload-file>
         </label>
         <div class="archive-modal-preview" data-archive-upload-preview hidden>
           <img data-archive-upload-preview-img alt="Selected picture preview">
+          <video class="archive-modal-preview-video" data-archive-upload-preview-video muted loop playsinline hidden></video>
           <div class="archive-modal-preview-file" data-archive-upload-preview-file hidden>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span data-archive-upload-preview-filename></span>
@@ -34,16 +38,17 @@
         </div>
       </div>
 
-      <div class="archive-modal-row" data-archive-image-only>
+      <div class="archive-modal-row" data-archive-resizable>
         <div class="archive-modal-field">
           <label for="archive-upload-width">Width (px)</label>
-          <input id="archive-upload-width" type="number" name="width" min="50" max="4000">
+          <input id="archive-upload-width" type="number" name="width" min="50" max="4000" inputmode="numeric">
         </div>
         <div class="archive-modal-field">
           <label for="archive-upload-height">Height (px)</label>
-          <input id="archive-upload-height" type="number" name="height" min="50" max="4000">
+          <input id="archive-upload-height" type="number" name="height" min="50" max="4000" inputmode="numeric">
         </div>
       </div>
+      <p class="archive-modal-note" data-archive-video-only hidden>Videos resize only when you fill in a width or height. Leave both blank to upload the clip at its original size.</p>
 
       <div class="archive-modal-field" data-archive-image-only>
         <label for="archive-upload-quality">Quality</label>
