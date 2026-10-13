@@ -39,7 +39,7 @@
         <span class="archive-tag">Image</span>
         {% elif image.is_video %}
         <div class="archive-videotile">
-          <video class="archive-video-el" src="{{ proxied_url }}" muted loop playsinline autoplay preload="metadata"
+          <video class="archive-video-el" src="{{ proxied_url }}" muted loop playsinline preload="metadata"
                  {% if image.width and image.height %}width="{{ image.width }}" height="{{ image.height }}"{% endif %}
                  onerror="this.onerror=null;this.src='/static/404_video.mp4';"
                  aria-label="{{ image.alt }}"></video>

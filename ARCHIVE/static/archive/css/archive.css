@@ -67,7 +67,7 @@
 .archive-subtitle {
   margin: 8px 0 0;
   font-size: 0.95rem;
-  color: var(--slate);
+  color: var(--ink);
   max-width: 58ch;
 }
 
@@ -147,7 +147,7 @@
   padding: 9px 14px;
   font-size: 0.88rem;
   font-weight: 700;
-  color: var(--slate);
+  color: var(--ink);
   transition: color 0.2s ease;
 }
 
@@ -283,7 +283,7 @@
   padding: 3px 8px;
   font-size: 0.74rem;
   font-weight: 600;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 /* ---------- summary line above the grid ---------- */
@@ -294,7 +294,7 @@
   gap: 4px 14px;
   margin: 10px 0 18px;
   font-size: 0.82rem;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 /* ---------- grid ---------- */
@@ -495,7 +495,7 @@
   padding: 3px 8px;
   font-size: 0.74rem;
   font-weight: 600;
-  color: var(--slate);
+  color: var(--ink);
   max-width: 100%;
 }
 
@@ -512,7 +512,7 @@
   justify-content: space-between;
   gap: 10px;
   font-size: 0.76rem;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .archive-card-uploader {
@@ -582,7 +582,7 @@
 
 .archive-empty-icon { width: 42px; height: 42px; color: var(--slate); margin-bottom: 6px; }
 .archive-empty-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
-.archive-empty-text { margin: 0 0 12px; color: var(--slate); font-size: 0.9rem; max-width: 44ch; }
+.archive-empty-text { margin: 0 0 12px; color: var(--ink); font-size: 0.9rem; max-width: 44ch; }
 
 /* shared paginator comes from base.css: remove its hover lift here */
 .archive-pagination { margin-top: 32px; margin-bottom: 8px; }
@@ -870,7 +870,7 @@ html.archive-locked { overflow: hidden; }
 
 .archive-file-zone-icon { width: 28px; height: 28px; color: var(--amber-alt-deep); margin-bottom: 2px; }
 .archive-file-zone-title { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
-.archive-file-zone-hint { font-size: 0.76rem; color: var(--slate); max-width: 38ch; }
+.archive-file-zone-hint { font-size: 0.76rem; color: var(--ink); max-width: 38ch; }
 
 .archive-modal-field .archive-file-zone-input {
   position: absolute;
@@ -910,7 +910,7 @@ html.archive-locked { overflow: hidden; }
 
 .archive-modal-note {
   margin: 6px 0 0;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -989,7 +989,7 @@ html.archive-locked { overflow: hidden; }
 .archive-manage-hint {
   margin: 0 0 12px;
   font-size: 0.8rem;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .archive-manage-notice {
@@ -1039,7 +1039,7 @@ html.archive-locked { overflow: hidden; }
   flex: none;
   border: 0;
   background: transparent;
-  color: var(--slate);
+  color: var(--ink);
   padding: 8px 4px;
   font: inherit;
   font-size: 0.8rem;
@@ -1129,7 +1129,7 @@ html.archive-locked { overflow: hidden; }
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.75rem;
   white-space: nowrap;
 }
@@ -1160,7 +1160,7 @@ html.archive-locked { overflow: hidden; }
   justify-content: space-between;
   gap: 8px;
   font-size: 0.74rem;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .archive-manage-row-delete {

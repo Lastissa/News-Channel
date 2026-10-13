@@ -471,6 +471,7 @@ html.auth-gate-locked { overflow: hidden; }
 .hero-slide {
   position: absolute; inset: 0; background-image: var(--slide-image); background-size: cover; background-position: center;
   background-color: var(--nav-bg);
+  background: radial-gradient(140% 140% at 50% 10%, #1a2f4a 0%, var(--nav-bg) 65%);
   opacity: 0; visibility: hidden; transition: opacity 0.9s ease, visibility 0s linear 0.9s;
   display: flex; align-items: flex-end;
 }
@@ -709,7 +710,7 @@ a.teaser-slide { color: inherit; text-decoration: none; }
   background: transparent; border: none; border-radius: 0; overflow: visible; display: flex; flex-direction: column; box-shadow: none; transition: none;
 }
 .story-card:hover { transform: none; box-shadow: none; }
-.story-card-media { aspect-ratio: 16/10; overflow: hidden; background: var(--paper-dim); }
+.story-card-media { aspect-ratio: 16/10; overflow: hidden; background: radial-gradient(120% 120% at 50% 0%, var(--surface) 0%, var(--paper-dim) 100%); }
 .story-card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
 .story-card:hover .story-card-media img { transform: scale(1.04); }
 .story-card-body { padding: 16px 16px 18px; display: flex; flex-direction: column; gap: 8px; flex: 1; }

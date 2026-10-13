@@ -150,7 +150,7 @@ class EditorialTeamPageTests(TestCase):
         self.assertContains(response, 'alt="Editorial Author"')
         self.assertContains(response, 'class="editorial-standards"')
         self.assertContains(response, "How we report")
-        self.assertContains(response, "editorial_team.css?v=20261011-5")
+        self.assertContains(response, "editorial_team.css?v=20261013-1")
         self.assertContains(response, '"@type": "Organization"')
         self.assertContains(response, "application/ld+json")
         self.assertContains(response, 'name="description"')

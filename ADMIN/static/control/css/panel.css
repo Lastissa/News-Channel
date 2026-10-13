@@ -141,7 +141,7 @@ html { scroll-behavior: smooth; }
 .panel-primary-btn:disabled { opacity: .5; cursor: not-allowed; }
 .panel-primary-btn[aria-busy="true"] .ic { animation: panelPulse .9s ease-in-out infinite; }
 
-.panel-empty { margin: 0; padding: 18px 12px; text-align: center; color: var(--slate); font-size: 0.86rem; border: 1px dashed var(--line); border-radius: var(--radius-s); }
+.panel-empty { margin: 0; padding: 18px 12px; text-align: center; color: var(--ink); font-size: 0.86rem; border: 1px dashed var(--line); border-radius: var(--radius-s); }
 
 /* ---------- Staff gallery strip ---------- */
 .panel-gallery-viewport { overflow-x: auto; overflow-y: hidden; cursor: grab; scrollbar-width: thin; padding-bottom: 6px; }
@@ -208,7 +208,7 @@ html { scroll-behavior: smooth; }
 
 .panel-warning { color: var(--danger); font-size: 0.82rem; margin: 0 0 12px; }
 .panel-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.panel-sender-note { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--slate); min-width: 0; }
+.panel-sender-note { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--ink); min-width: 0; }
 
 /* Recipient chips */
 .panel-toggle-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -257,7 +257,7 @@ html { scroll-behavior: smooth; }
 .panel-row:last-child { border-bottom: none; }
 .panel-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .panel-row-name { font-weight: 600; }
-.panel-row-sub { color: var(--slate); font-size: 0.78rem; }
+.panel-row-sub { color: var(--ink); font-size: 0.78rem; }
 .panel-row-link { color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; transition: background-color .2s var(--panel-ease); }
 .panel-row-link:hover { background: var(--paper-dim); }
 .panel-row-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--paginator-bg); flex: 0 0 auto; overflow: hidden; }
@@ -288,7 +288,7 @@ html { scroll-behavior: smooth; }
 [data-user-directory] .panel-skeleton-bar--sub { width: 28%; height: 7px; }
 .panel-skeleton-chip { width: 62px; height: 20px; border-radius: 999px; flex: 0 0 auto; }
 
-.panel-pager { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.8rem; color: var(--slate); }
+.panel-pager { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.8rem; color: var(--ink); }
 .panel-pager:empty { display: none; }
 .panel-pager button {
   width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
@@ -326,8 +326,8 @@ html { scroll-behavior: smooth; }
 .ta-item-expired { border-left-color: var(--danger); }
 .ta-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 auto; }
 .ta-text { font-weight: 600; font-size: 0.92rem; line-height: 1.4; overflow-wrap: anywhere; }
-.ta-text-sub { font-weight: 400; font-size: 0.8rem; color: var(--slate); }
-.ta-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; color: var(--slate); font-size: 0.78rem; }
+.ta-text-sub { font-weight: 400; font-size: 0.8rem; color: var(--ink); }
+.ta-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; color: var(--ink); font-size: 0.78rem; }
 .ta-meta .ic { width: 14px; height: 14px; }
 .ta-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .ta-status {
@@ -338,7 +338,7 @@ html { scroll-behavior: smooth; }
 .ta-status-live { background: var(--success); }
 .ta-status-paused { background: var(--slate); }
 .ta-status-expired { background: var(--danger); }
-.ta-empty { margin: 0; padding: 22px 14px; text-align: center; color: var(--slate); font-size: 0.86rem; border: 1px dashed var(--line); border-radius: var(--radius-s); }
+.ta-empty { margin: 0; padding: 22px 14px; text-align: center; color: var(--ink); font-size: 0.86rem; border: 1px dashed var(--line); border-radius: var(--radius-s); }
 
 .ta-editor { flex-direction: column; align-items: stretch; gap: 12px; border-left-color: var(--brand-deep); }
 .ta-pair { display: grid; grid-template-columns: 1fr; gap: 12px; }

@@ -186,7 +186,7 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "data-archive-refresh")
         self.assertContains(response, "data-editor-modal-confirm")
         self.assertContains(response, "add-news-editor.js")
-        self.assertContains(response, "20261012-1")
+        self.assertContains(response, "20261013-1")
         self.assertContains(response, "Image and file archive")
         self.assertContains(response, "Do not begin the content with a")
         self.assertContains(response, "position: sticky")

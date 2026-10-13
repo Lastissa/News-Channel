@@ -868,6 +868,21 @@
     if (btn) btn.setAttribute("aria-label", video.paused ? "Play video" : "Pause video");
   }
 
+  function primeArchiveVideos() {
+    var videos = document.querySelectorAll(".archive-videotile video");
+    for (var i = 0; i < videos.length; i++) {
+      var video = videos[i];
+      if (video.hasAttribute("data-autoplay-primed")) continue;
+      video.setAttribute("data-autoplay-primed", "1");
+      try {
+        var p = video.play();
+        if (p && p.then) {
+          p.then(function () {}).catch(function () { /* blocked */ });
+        }
+      } catch (e) {}
+    }
+  }
+
   document.addEventListener("click", function (event) {
     var btn = event.target.closest && event.target.closest("[data-archive-video-toggle]");
     if (!btn) return;
@@ -882,6 +897,13 @@
       video.pause();
     }
   });
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", primeArchiveVideos);
+  } else {
+    primeArchiveVideos();
+  }
+  document.body.addEventListener("htmx:afterSwap", primeArchiveVideos);
 
   document.addEventListener("play", function (event) {
     if (event.target && event.target.tagName === "VIDEO" && event.target.closest(".archive-videotile")) {

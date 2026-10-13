@@ -100,7 +100,7 @@
 /* ---------- Staff access: self-service profile editor ---------- */
 .staff-panel-intro {
   margin: 0;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.9rem;
 }
 
@@ -163,7 +163,7 @@
 }
 
 .staff-field small {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.74rem;
 }
 
@@ -243,7 +243,7 @@
 }
 
 .profile-prefs-extra .profile-joined-row span {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.85rem;
 }
 
@@ -301,7 +301,7 @@
 
 .profile-role {
   margin: 6px 0 0;
-  color: var(--slate);
+  color: var(--ink);
   font-weight: 700;
   font-size: 0.8rem;
   letter-spacing: 0.05em;
@@ -325,7 +325,7 @@
 }
 
 .profile-info-list span {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.85rem;
   white-space: nowrap;
 }
@@ -412,7 +412,7 @@
 }
 
 .setting-copy small {
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .toggle-switch {
@@ -517,7 +517,7 @@
 
 .profile-panel p {
   margin-bottom: 16px;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .profile-list {
@@ -550,7 +550,7 @@
 }
 
 .profile-list small {
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .profile-list a {
@@ -659,7 +659,7 @@
   border: 1px dashed var(--line);
   border-radius: 8px;
   background: var(--paper-dim);
-  color: var(--slate);
+  color: var(--ink);
   text-align: center;
 }
 
@@ -787,13 +787,13 @@
 }
 
 .staff-record-email {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.9rem;
   word-break: break-all;
 }
 
 .staff-record-note {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.85rem;
   line-height: 1.5;
   margin-bottom: 14px;
@@ -812,7 +812,7 @@
 }
 
 .staff-record-block-head small {
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .staff-record-textarea,
@@ -838,7 +838,7 @@
 .staff-record-feedback {
   min-height: 18px;
   font-size: 0.85rem;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .staff-record-feedback.is-error {
@@ -980,7 +980,7 @@
 
 .staff-create-check small {
   grid-column: 1 / -1;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.74rem;
 }
 
@@ -1055,7 +1055,7 @@
   flex-shrink: 0;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--slate);
+  color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 4px 8px;
@@ -1069,7 +1069,7 @@
 
 .delete-account-sub {
   margin: 0 0 16px;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.88rem;
 }
 
@@ -1161,12 +1161,12 @@
 
 .delete-account-placard-wait p {
   margin: 0;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.88rem;
 }
 
 .delete-account-placard-wait small {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.78rem;
 }
 
@@ -1358,7 +1358,7 @@ html.avatar-crop-open {
 .avatar-crop-hint {
   margin: 0;
   font-size: 0.78rem;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .avatar-crop-feedback {

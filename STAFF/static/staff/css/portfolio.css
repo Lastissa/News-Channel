@@ -132,7 +132,7 @@ html[data-theme="dark"] .portfolio-shell {
   align-items: center;
   gap: 6px 10px;
   margin: 0;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -245,7 +245,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 12px;
   margin: 0;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.78rem;
   line-height: 1.25;
 }
@@ -267,7 +267,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
   margin: -2px 0 0;
   padding-left: 10px;
   border-left: 3px solid darkgreen;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -340,7 +340,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 .portfolio-stats-strip small {
   display: block;
   margin-top: 4px;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -467,7 +467,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 
 .portfolio-card-head p {
   margin: 4px 0 0;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.82rem;
   line-height: 1.4;
 }
@@ -493,7 +493,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 .portfolio-empty,
 .portfolio-caption {
   margin: 0;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.84rem;
   line-height: 1.5;
 }
@@ -557,7 +557,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  color: var(--slate);
+  color: var(--ink);
 }
 
 .reach-metrics {
@@ -567,7 +567,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 .reach-nums {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.78rem;
 }
 
@@ -674,7 +674,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 .coverage-count small,
 .legend-value small,
 .response-nums small {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.7rem;
 }
 
@@ -734,7 +734,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 
 .rhythm-col.is-empty .rhythm-value {
   bottom: 7px;
-  color: var(--slate);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -750,7 +750,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 .rhythm-label small {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.62rem;
   font-weight: 600;
 }
@@ -897,7 +897,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 .response-copy small {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.74rem;
 }
 
@@ -1113,7 +1113,7 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
 }
 
 .portfolio-feed-count {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.78rem;
   white-space: nowrap;
 }
@@ -1188,7 +1188,7 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
 }
 
 .portfolio-feed-author time {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.72rem;
 }
 
@@ -1250,7 +1250,7 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
   gap: 14px;
   padding: 11px 16px;
   border-top: 1px solid var(--line);
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.75rem;
 }
 
@@ -1301,7 +1301,7 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
-  color: var(--slate);
+  color: var(--ink);
   text-align: center;
 }
 
@@ -1427,7 +1427,7 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
 }
 
 .portfolio-popular-views {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.73rem;
 }
 

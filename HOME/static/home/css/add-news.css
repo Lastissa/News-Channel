@@ -97,7 +97,7 @@ html.editor-modal-open { overflow: hidden; }
   color: var(--ink);
 }
 
-.editor-field label small { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--slate); }
+.editor-field label small { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); }
 
 .editor-field input,
 .editor-field select,
@@ -125,7 +125,7 @@ html.editor-modal-open { overflow: hidden; }
 }
 
 .editor-field input.is-error { border-color: var(--danger); }
-.editor-field input:disabled { background: var(--paper-dim, var(--input-fill)); color: var(--slate); cursor: not-allowed; }
+.editor-field input:disabled { background: var(--paper-dim, var(--input-fill)); color: var(--ink); cursor: not-allowed; }
 
 .editor-image-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
@@ -172,7 +172,7 @@ html.editor-modal-open { overflow: hidden; }
   padding: 18px 16px;
 }
 
-.editor-preview-empty { color: var(--slate); font-size: 0.9rem; text-align: center; padding: 40px 10px; }
+.editor-preview-empty { color: var(--ink); font-size: 0.9rem; text-align: center; padding: 40px 10px; }
 
 /* ---------- insert bar above the content box ---------- */
 .editor-insert-bar {
@@ -282,7 +282,7 @@ html.editor-modal-open { overflow: hidden; }
 .fg-intro { margin: 0 0 16px; font-size: 0.88rem; line-height: 1.55; color: var(--ink-soft); }
 
 .fg-block h3 { margin: 0 0 10px; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-.fg-block h3 span { font-weight: 400; font-size: 0.78rem; letter-spacing: 0; text-transform: none; color: var(--slate); margin-left: 6px; }
+.fg-block h3 span { font-weight: 400; font-size: 0.78rem; letter-spacing: 0; text-transform: none; color: var(--ink); margin-left: 6px; }
 
 .fg-block + .fg-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 
@@ -348,7 +348,7 @@ html.editor-modal-open { overflow: hidden; }
 }
 
 .fg-row dt { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.fg-row dd { margin: 0; color: var(--slate); }
+.fg-row dd { margin: 0; color: var(--ink); }
 
 .format-guide code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -358,7 +358,7 @@ html.editor-modal-open { overflow: hidden; }
   background: var(--input-fill);
 }
 
-.fg-note { margin: 10px 0 0; font-size: 0.84rem; color: var(--slate); }
+.fg-note { margin: 10px 0 0; font-size: 0.84rem; color: var(--ink); }
 
 /* ---------- dialogs (validation + archive picker) ---------- */
 .editor-modal[hidden] { display: none; }
@@ -400,7 +400,7 @@ html.editor-modal-open { overflow: hidden; }
 .editor-modal.is-open .editor-modal-card { opacity: 1; transform: none; }
 
 .editor-modal-title { margin: 0 0 4px; font-size: 1.1rem; }
-.editor-modal-intro { margin: 0 0 14px; font-size: 0.9rem; line-height: 1.5; color: var(--slate); }
+.editor-modal-intro { margin: 0 0 14px; font-size: 0.9rem; line-height: 1.5; color: var(--ink); }
 
 .editor-modal-list {
   margin: 0 0 16px;
@@ -462,7 +462,7 @@ html.editor-modal-open { overflow: hidden; }
 
 .archive-picker-heading { min-width: 0; }
 .archive-picker-heading .editor-modal-title { margin: 0; }
-.archive-picker-hint { margin: 3px 0 0; font-size: 0.8rem; line-height: 1.4; color: var(--slate); }
+.archive-picker-hint { margin: 3px 0 0; font-size: 0.8rem; line-height: 1.4; color: var(--ink); }
 
 .archive-picker-header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .archive-picker-header-actions .editor-modal-btn { white-space: nowrap; }
@@ -488,7 +488,7 @@ html.editor-modal-open { overflow: hidden; }
   inset: 0;
   display: grid;
   place-items: center;
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.86rem;
   background: linear-gradient(100deg, var(--paper-dim) 30%, var(--line) 50%, var(--paper-dim) 70%);
   background-size: 250% 100%;
