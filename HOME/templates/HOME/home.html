@@ -47,7 +47,7 @@
   {% if featured_posts %}
   <div class="hero-track">
     {% for post in featured_posts %}
-        <article class="hero-slide {% if forloop.first %}is-active{% endif %}"style="--slide-image: url('{{ post.image_1|default:placeholder}}');" data-index="{{ forloop.counter0 }}">
+        <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|default:placeholder|safe }}');" data-index="{{ forloop.counter0 }}">
       <div class="hero-scrim"></div>
       {# whole slide (image included) opens the story; headline link below stays the accessible one #}
       <a class="hero-slide-link" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true"></a>
