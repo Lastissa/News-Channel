@@ -270,11 +270,11 @@
           if (result.status === 401) {
             openAuthGate("bookmark", extractDetail(result.text, "Sign in to save stories."));
           } else if (result.status === 403) {
-            toast(extractDetail(result.text, "Security check failed. Please reload and try again."), "error");
+            bottomtoast(extractDetail(result.text, "Security check failed. Please reload & try again."), "error");
           } else if (result.status >= 500) {
-            toast(extractDetail(result.text, "Server error. Please try again."), "error");
+            bottomtoast(extractDetail(result.text, "Server error. Please try again."), "error");
           } else {
-            toast(extractDetail(result.text, "Could not update bookmark."), "error");
+            bottomtoast(extractDetail(result.text, "Could not update bookmark."), "error");
           }
           return;
         }
@@ -291,14 +291,14 @@
         if (typeof payload.bookmarked === "boolean") {
           setBookmarkVisual(btn, payload.bookmarked);
         }
-        toast(extractDetail(result.text, "Bookmark updated."));
+        bottomtoast(extractDetail(result.text, "Bookmark updated."));
       })
       .catch(function () {
         btn.dataset.pending = "false";
         btn.classList.remove("is-pending");
         setBookmarkVisual(btn, wasSaved);
         if (countNode) countNode.textContent = String(oldCount);
-        toast("Network Error. Story was not saved.", "error");
+        bottomtoast("Network Error. Story was not bookmarked.", "error");
       });
   });
 
@@ -327,7 +327,7 @@
       navigator.clipboard.writeText(text).then(function () {
         bottomToast("copied.");
       }).catch(function () {
-        toast("Could not copy link.", "error");
+        bottomtoast("Could not copy link.", "error");
       });
     } else {
       window.prompt("Copy this link:", url);
@@ -964,7 +964,7 @@
         if (!result.ok) {
           button.dataset.pending = "false";
           button.disabled = false;
-          toast(extractDetail(result.text, "Could not unfollow this author."), "error");
+          bottomtoast(extractDetail(result.text, "Could not unfollow this author."), "error");
           return;
         }
         var row = form.closest("[data-following-item]");
@@ -974,7 +974,7 @@
         var pageNode = list && list.querySelector("[data-following-page]");
         var page = pageNode ? pageNode.getAttribute("data-following-page") : "1";
         var query = search ? search.value.trim() : "";
-        toast("Unfollowed.");
+        bottomtoast("Unfollowed.");
         setTimeout(function () {
           if (list && window.htmx && list.dataset.followingEndpoint) {
             window.htmx.ajax("GET", list.dataset.followingEndpoint + "?page=" + encodeURIComponent(page) + "&q=" + encodeURIComponent(query), { target: "#profile-following-list", swap: "innerHTML" });
@@ -1033,7 +1033,7 @@
           var count = Number((total.textContent || "").trim().split(" ")[0]);
           if (!isNaN(count)) total.textContent = Math.max(0, count - 1) + " total";
         }
-        toast(extractDetail(result.text, "Story deleted."));
+        bottomtoast(extractDetail(result.text, "Story deleted."));
       })
       .catch(function () {
         button.dataset.pending = "false";
@@ -1196,7 +1196,7 @@
           list.classList.remove("is-animating");
           list.style.height = "";
           list.style.overflow = "";
-          toast(extractDetail(JSON.stringify(result.payload || {}), config.loadError), "error");
+          bottomtoast(extractDetail(JSON.stringify(result.payload || {}), config.loadError), "error");
           return;
         }
 

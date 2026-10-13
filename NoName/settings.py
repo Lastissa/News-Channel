@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
@@ -11,12 +10,16 @@ AUTH_USER_MODEL = "AUTHENTICATION.Auth"
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 CSRF_FAILURE_VIEW = "AUTHENTICATION.views.csrf_failure"
-CSRF_TRUSTED_ORIGINS = ['https://esta-sensate-unquickly.ngrok-free.dev',]
+CSRF_TRUSTED_ORIGINS = [f"https://{i}" for i in (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')]
 
 SECRET_KEY = os.getenv('DJANGO_SECRET')
 
 DEBUG = os.getenv("DEBUG", 'False').upper() in ['TRUE']
 # DEBUG = False
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')
 
@@ -129,8 +132,11 @@ MAILERS = {
 }
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 SY_SECRET = os.getenv('sy_secret')
 

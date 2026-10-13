@@ -83,7 +83,7 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
 
       <section class="continue-popup-block" aria-label="Recommended for you">
         <h3 class="continue-popup-subhead">{% if continue_has_history %}More like what you read{% else %}Latest stories{% endif %}</h3>
-        {% if continue_has_history %}<p class="continue-popup-why">Because you read &ldquo;{{ continue_recent.0.heading }}&rdquo;</p>{% endif %}
+        {% if continue_has_history %}<p class="continue-popup-why">hey {{request.user.email}}, Because you read &ldquo;{{ continue_recent.0.heading }}&rdquo;</p>{% endif %}
         <div class="continue-popup-grid continue-popup-grid--feed" data-continue-items>
           {% include "HOME/partials/continue_feed_items.html" with continue_items=continue_items %}
         </div>
