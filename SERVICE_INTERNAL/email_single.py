@@ -425,3 +425,63 @@ def _try_send_new_follower_email(author: object, follower_label: str, follower_c
     _dispatch_email(author.email, subject, html_message)
     info_logger(msg=f"EMAIL: new follower alert sent to {author.email} (followers={follower_count})")
 
+
+def _try_send_archive_upload_alert_email(uploader, item, recipient=None):
+    """Tells the site owner that a new item just landed in the archive gallery.
+
+    The caller (ARCHIVE.views.ArchiveUploadView) only calls this when the
+    superuser has switched `SiteSettings.archive_upload_alerts` on. `uploader`
+    is the signed in Auth who added the item and `item` is the saved
+    ArchiveImage row, so the mail names both the person and the kind of file
+    that was uploaded. Sent to ARCHIVE_UPLOAD_ALERT_EMAIL.
+    """
+    recipient = recipient or getattr(settings, "ARCHIVE_UPLOAD_ALERT_EMAIL", "")
+    if not recipient:
+        return
+
+    #   A reverse OneToOne that does not exist raises an AttributeError
+    #   subclass, so getattr with a default is safe for a plain member.
+    staff_profile = getattr(uploader, "staffprofile", None)
+    full_name = (getattr(staff_profile, "full_name", "") or "").strip() if staff_profile else ""
+    uploader_email = getattr(uploader, "email", "") or "unknown"
+    uploader_label = f"{full_name} ({uploader_email})" if full_name else uploader_email
+
+    kind = (getattr(item, "kind", "") or "item").lower()
+    filename = getattr(item, "original_filename", "") or ""
+    alt = getattr(item, "alt", "") or ""
+    size_bytes = getattr(item, "file_size", 0) or 0
+    size_text = f"{size_bytes / (1024 * 1024):.2f} MB" if size_bytes else ""
+    width = getattr(item, "width", 0) or 0
+    height = getattr(item, "height", 0) or 0
+    dimensions = f"{width}x{height}" if width and height else ""
+
+    details = [
+        f"<li><strong>Uploaded by:</strong> {escape(uploader_label)}</li>",
+        f"<li><strong>Type:</strong> {escape(kind)}</li>",
+    ]
+    if filename:
+        details.append(f"<li><strong>File:</strong> {escape(filename)}</li>")
+    if dimensions:
+        details.append(f"<li><strong>Dimensions:</strong> {escape(dimensions)}</li>")
+    if size_text:
+        details.append(f"<li><strong>File size:</strong> {escape(size_text)}</li>")
+    if alt:
+        details.append(f"<li><strong>Description:</strong> {escape(alt)}</li>")
+
+    main_content = (
+        f"<p>Someone just added a new item to the {About.project_name} archive gallery.</p>"
+        f"<ul>{''.join(details)}</ul>"
+        f'<p><a href="{About.domain}/archive/">Open the archive</a></p>'
+    )
+    html_message = _build_email_html(
+        title="New archive upload",
+        main_content=main_content,
+        end_note=f"{About.project_name} Team",
+        unsubscribe_query=None,
+        preference_note="You can turn these alerts off from your profile settings at any time.",
+    )
+    _dispatch_email(recipient, subject=f"New {kind} in the {About.project_name} archive", html_message=html_message)
+    info_logger(
+        msg=f"EMAIL: archive upload alert sent to {recipient} for item={getattr(item, 'pk', '?')} by {uploader_email}"
+    )
+

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static archive_extras %}
 {% load custom_tag %}
 
 {% block title %} {{blog.heading}} {% endblock %}
@@ -12,7 +12,7 @@
 {% if not author_profile %}
 <meta property="og:title" content="Unverified author · {{ blog.author.email|before_at }}">
 <meta property="og:description" content="This story was published by an Unverified author · {{ blog.author.email |before_at }} without a verified {{ project_name }} profile. READ WITH CAUTION.">
-<meta property="og:image" content="{{blog.image_1}}">
+<meta property="og:image" content="{{ blog.image_1|cloudinary_proxy|archive_absolute_url:request }}">
 {% endif %}
 {% endblock %}
 

@@ -29,6 +29,7 @@ from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_s
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.images import ImageUploadError, destroy_archive_asset, upload_advert_image
 from SERVICE_INTERNAL.permissions import admin_only
+from SERVICE_INTERNAL.passwords import first_password_error
 from SERVICE_INTERNAL.sessions import drop_sessions_for
 from Partner.models import AdvertImage, AdvertText
 from ADMIN.models import SiteSettings
@@ -584,6 +585,8 @@ class StaffCreateView(View):
             error = "That email already has an account."
         elif not password or len(password) < 6:
             error = "The password must be at least 6 characters long."
+        elif (password_error := first_password_error(password, user=Auth(email=email))):
+            error = password_error
         elif not full_name:
             error = "The full name cannot be empty."
         elif len(full_name) > 100:
@@ -603,7 +606,7 @@ class StaffCreateView(View):
         _try_send_staff_welcome_email(account, password, full_name)
         role_label = dict(StaffConfig.role_choices()).get(role, role)
         _try_send_staff_created_batch_email(account, full_name, role_label, request.user.email)
-        info_logger(msg=f"STAFF CREATED: {account.email} (grant_admin={grant_admin}) by {request.user.email} with password set as : {password}")
+        info_logger(msg=f"STAFF CREATED: {account.email} (grant_admin={grant_admin}) by {request.user.email}")
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(

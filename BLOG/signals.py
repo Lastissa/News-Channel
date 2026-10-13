@@ -15,6 +15,7 @@ from django.dispatch import receiver
 from django.core.cache import cache
 
 from SERVICE_INTERNAL.abstract import invalidate_cache
+from SERVICE_INTERNAL.cache_keys import HOME_BLOGS_CACHE_KEY
 
 from .models import Blog, Category, refresh_category_cache
 
@@ -30,4 +31,4 @@ def category_changed(sender, **kwargs):
 @receiver(post_save, sender=Blog, dispatch_uid="blog.story.saved.invalidate_home_cache")
 @receiver(post_delete, sender=Blog, dispatch_uid="blog.story.deleted.invalidate_home_cache")
 def story_changed(sender, **kwargs):
-    transaction.on_commit(lambda: invalidate_cache("home_page_blogs_v2"), robust=True)
+    transaction.on_commit(lambda: invalidate_cache(HOME_BLOGS_CACHE_KEY), robust=True)

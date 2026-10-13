@@ -1,4 +1,4 @@
-{% load static %}
+{% load static archive_extras %}
 {% comment %}
   Story card used inside the "Continue reading" popup, both for the pinned
   last-reads block and for the recommendation feed that loads more pages
@@ -11,7 +11,7 @@
 {% for story in continue_items %}
 <article class="continue-popup-card" data-continue-story>
   <a class="continue-popup-media" href="{% url 'blog:story_detail' story.slug %}">
-    <img src="{{ story.image_1|default:continue_placeholder }}" alt="{% if story.image_info and story.image_info != 'The image is self explanatory.' %}{{ story.image_info }}{% else %}{{ story.heading }}{% endif %}" loading="lazy">
+    <img src="{{ story.image_1|cloudinary_proxy|default:continue_placeholder }}" alt="{% if story.image_info and story.image_info != 'The image is self explanatory.' %}{{ story.image_info }}{% else %}{{ story.heading }}{% endif %}" loading="lazy">
   </a>
   <div class="continue-popup-card-body">
     <a class="tag continue-popup-tag" href="{% url 'home:category' story.category|slugify %}">{{ story.get_category_display|title }}</a>

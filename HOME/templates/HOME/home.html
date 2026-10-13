@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% load format_copy_btn %}
+{% load format_copy_btn archive_extras %}
 
 {% block title %}
 {% spaceless %}
@@ -47,7 +47,7 @@
   {% if featured_posts %}
   <div class="hero-track">
     {% for post in featured_posts %}
-        <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|default:placeholder|safe }}');" data-index="{{ forloop.counter0 }}">
+        <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|cloudinary_proxy|default:placeholder|safe }}');" data-index="{{ forloop.counter0 }}">
       <div class="hero-scrim"></div>
       {# whole slide (image included) opens the story; headline link below stays the accessible one #}
       <a class="hero-slide-link" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true"></a>
@@ -222,12 +222,14 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
 
 {% block extra_head %}
 {{ block.super }}
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5391303565722259"
+     crossorigin="anonymous"></script>
 <meta name="yandex-verification" content="1093315bd8192b90" />
 <link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261013-1">
 {% comment %} Slow-connection: fetch the first on-screen images before paint so
 the hero/teaser never pop in after the page reveals. {% endcomment %}
 {% if featured_posts and featured_posts.0.image_1 %}
-<link rel="preload" as="image" href="{{ featured_posts.0.image_1 }}" fetchpriority="high">
+<link rel="preload" as="image" href="{{ featured_posts.0.image_1|cloudinary_proxy }}" fetchpriority="high">
 {% endif %}
 {% if teaser_items and teaser_items.0.image %}
 <link rel="preload" as="image" href="{{ teaser_items.0.image }}">

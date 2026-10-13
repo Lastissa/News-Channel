@@ -48,14 +48,19 @@ class AuthEndpointThrottleMiddleware:
 
 
 from django.db import connection
+from django.conf import settings
 
 class QueryCountMiddleware:
-    """ONLY FOR PRINTING THE Q COUNTS"""
+    """ONLY FOR PRINTING THE Q COUNTS, and only while DEBUG is on: in
+    production this middleware does nothing at all, so a page view never pays
+    for the forced template render or the print."""
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         response = self.get_response(request)
+        if not settings.DEBUG:
+            return response
         # Template rendering has finished by now
         if hasattr(response, "render") and callable(response.render):
             response.render()

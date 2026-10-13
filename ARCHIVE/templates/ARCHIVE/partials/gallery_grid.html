@@ -38,12 +38,19 @@
         </button>
         <span class="archive-tag">Image</span>
         {% elif image.is_video %}
-        <div class="archive-videotile">
-          <video class="archive-video-el" src="{{ proxied_url }}" muted loop playsinline preload="metadata"
+        {% comment %}
+          Click to play: the clip is NOT given a src and uses preload="none",
+          so opening the gallery downloads no video bytes at all. The URL sits
+          in data-src and is only moved onto src when the reader presses play
+          (ARCHIVE/static/archive/js/archive.js). The initial is-paused class
+          shows the play glyph before any JS runs.
+        {% endcomment %}
+        <div class="archive-videotile is-paused">
+          <video class="archive-video-el" data-src="{{ proxied_url }}" muted loop playsinline preload="none"
                  {% if image.width and image.height %}width="{{ image.width }}" height="{{ image.height }}"{% endif %}
                  onerror="this.onerror=null;this.src='/static/404_video.mp4';"
                  aria-label="{{ image.alt }}"></video>
-          <button type="button" class="archive-video-toggle" data-archive-video-toggle aria-label="Pause video">
+          <button type="button" class="archive-video-toggle" data-archive-video-toggle aria-label="Play video">
             <svg class="archive-video-icon archive-video-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
             <svg class="archive-video-icon archive-video-icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
           </button>

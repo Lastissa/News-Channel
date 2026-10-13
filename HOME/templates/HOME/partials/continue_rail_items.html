@@ -1,4 +1,4 @@
-{% load static %}
+{% load static archive_extras %}
 {% comment %}
   Compact card for the horizontally scrolling rails inside the "Continue
   reading" popup ("Your last reads", guest "Just in"). Small square thumbnail,
@@ -10,7 +10,7 @@
 {% for story in continue_items %}
 <a class="continue-popup-rail-card" href="{% url 'blog:story_detail' story.slug %}" data-continue-story>
   <span class="continue-popup-rail-thumb">
-    <img src="{{ story.image_1|default:continue_placeholder }}" alt="" loading="lazy">
+    <img src="{{ story.image_1|cloudinary_proxy|default:continue_placeholder }}" alt="" loading="lazy">
   </span>
   <span class="continue-popup-rail-text">
     <span class="continue-popup-rail-title">{{ story.heading }}</span>

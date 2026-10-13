@@ -1186,3 +1186,40 @@ class LlmsTxtTests(QuietTestCase):
         self.assertContains(response, reverse("home:author_handbook"))
         self.assertContains(response, reverse("home:privacy_policy"))
         self.assertContains(response, "Story URLs look like")
+
+
+class ArchiveUploadAlertToggleTests(QuietTestCase):
+    """The archive upload alert switch is a superuser-only setting on the single
+    SiteSettings row, flipped from the profile page."""
+
+    def test_superuser_toggle_flips_the_site_setting(self):
+        boss = Auth.objects.create_superuser(email="boss@example.com")
+        self.client.force_login(boss)
+
+        response = self.client.post(reverse("home:profile_archive_alert_toggle"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["enabled"])
+        self.assertTrue(SiteSettings.get_solo().archive_upload_alerts)
+
+        response = self.client.post(reverse("home:profile_archive_alert_toggle"))
+        self.assertFalse(response.json()["enabled"])
+        self.assertFalse(SiteSettings.get_solo().archive_upload_alerts)
+
+    def test_a_plain_member_cannot_toggle_archive_upload_alerts(self):
+        member = Auth.objects.create_user(email="member@example.com")
+        self.client.force_login(member)
+
+        response = self.client.post(reverse("home:profile_archive_alert_toggle"))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(SiteSettings.get_solo().archive_upload_alerts)
+
+    def test_profile_shows_the_toggle_only_to_superusers(self):
+        boss = Auth.objects.create_superuser(email="boss2@example.com")
+        self.client.force_login(boss)
+        self.assertContains(self.client.get(reverse("home:profile")), "Archive upload alerts")
+
+        member = Auth.objects.create_user(email="member2@example.com")
+        self.client.force_login(member)
+        self.assertNotContains(self.client.get(reverse("home:profile")), "Archive upload alerts")

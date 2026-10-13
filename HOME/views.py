@@ -30,6 +30,7 @@ from SERVICE_INTERNAL.abstract import (
     is_rate_limited,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig, custom_context_processors
+from SERVICE_INTERNAL.cache_keys import HOME_BLOGS_CACHE_KEY, HOME_BLOGS_CACHE_TTL
 from SERVICE_INTERNAL.email_batch import (
     _try_send_account_deleted_batch_email,
     _try_send_new_story_batch_email,
@@ -375,6 +376,25 @@ def _page_context(page, user):
     }
 
 
+def _featured_home_posts():
+    """The FEATURED_COUNT newest stories -- the only slice of the home page
+    that is cached.
+
+    Bounded (one small row set) and held under a single shared key with a sane
+    TTL. The BLOG/STAFF/ADMIN signals clear that key the moment a story, staff
+    profile or site setting changes, so publishing or editing is reflected on
+    the very next request instead of lingering in a never-expiring list. The
+    rest of the grid is fetched one page at a time straight from the database
+    (see HomeView and LoadMoreView), so the full story table is never loaded
+    into memory.
+    """
+    return cache_or_run(
+        HOME_BLOGS_CACHE_KEY,
+        fn=lambda: {"posts": list(_home_blog_queryset()[:FEATURED_COUNT])},
+        timeout=HOME_BLOGS_CACHE_TTL,
+    )["posts"]
+
+
 def _continue_recent_stories(user, exclude_ids=None):
     """The reader's last few opened stories, most recently read first.
 
@@ -643,11 +663,13 @@ class HomeView(View):
 
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
 
-        home_posts = cache_or_run("home_page_blogs",fn=lambda: {"posts": list(_home_blog_queryset())},timeout=None)["posts"]
-        featured = home_posts[:FEATURED_COUNT]
+        #   FEATURED: the small, cached head of the page. GRID: everything
+        #   else, sliced by the database (Paginator on a queryset runs COUNT +
+        #   LIMIT) instead of materialising every story in the project.
+        featured = _featured_home_posts()
         featured_ids = {post.id for post in featured}
-        grid_posts = [post for post in home_posts if post.id not in featured_ids]
-        paginator = Paginator(grid_posts, PAGE_SIZE)
+        grid_qs = _home_blog_queryset().exclude(id__in=featured_ids)
+        paginator = Paginator(grid_qs, PAGE_SIZE)
 
         if page_number > paginator.num_pages and paginator.num_pages:
             raise Http404("Page not found.")
@@ -701,13 +723,12 @@ class LoadMoreView(View):
                 base_qs = base_qs.filter(category=category)
             grid_qs = base_qs
         else:
-            home_posts = cache_or_run(
-                "home_page_blogs_v2",
-                fn=lambda: {"posts": list(_home_blog_queryset())},
-                timeout=None,
-            )["posts"]
-            featured_ids = {post.id for post in home_posts[:FEATURED_COUNT]}
-            grid_qs = [post for post in home_posts if post.id not in featured_ids]
+            #   The same bounded, cached featured head the home page uses, so
+            #   "Load more" never repeats the hero stories; the grid itself is
+            #   a database slice.
+            featured = _featured_home_posts()
+            featured_ids = {post.id for post in featured}
+            grid_qs = _home_blog_queryset().exclude(id__in=featured_ids)
 
         paginator = Paginator(grid_qs, PAGE_SIZE)
         if page_number > paginator.num_pages and paginator.num_pages:
@@ -1018,8 +1039,10 @@ class AddNewsView(View):
         #   SERVICE_INTERNAL.indexnow.ping_indexnow. Fire-and-forget: this
         #   can never fail the publish itself.
         ping_indexnow(story_url)
-        # invalidate the home_page_blogs so new article can be get
-        invalidate_cache("home_page_blogs")
+        #   Drop the cached featured head so the new story shows immediately.
+        #   (BLOG.signals already clears the same key on every Blog save; this
+        #   is the explicit belt-and-braces for the publish path.)
+        invalidate_cache(HOME_BLOGS_CACHE_KEY)
         #   NEW NEWS ALERT: email every user who has news alerts on and follows
         #   this author, plus users who follow nobody at all. Dispatched on the
         #   background email pool so the publish never waits on Resend, and a
@@ -1459,6 +1482,46 @@ class ProfileCommentNotificationToggleView(View):
         return JsonResponse(
             {
                 "detail": "Comment alerts enabled." if new_state else "Comment alerts disabled.",
+                "enabled": new_state,
+                "status": "on" if new_state else "off",
+            },
+            status=200,
+        )
+
+
+class ProfileArchiveAlertToggleView(View):
+    """Superuser-only switch for the site-wide archive upload alert.
+
+    While on (ADMIN.models.SiteSettings.archive_upload_alerts), every new item
+    added to the /archive/ gallery emails ARCHIVE_UPLOAD_ALERT_EMAIL who
+    uploaded it and what kind of file it was. Only a superuser is shown the
+    button that calls this endpoint (HOME/templates/HOME/profile.html); the
+    check is repeated here so a crafted request still cannot flip it.
+    """
+
+    def post(self, request):
+        if not request.user.is_authenticated or not request.user.is_superuser:
+            return JsonResponse({"detail": "Superuser access is required.", "enabled": False}, status=403)
+
+        try:
+            from ADMIN.models import SiteSettings
+
+            settings_row = SiteSettings.get_solo()
+        except Exception:
+            #   The column is added by ADMIN migration 0003; until that has run
+            #   the setting cannot be read or written, so say so instead of 500.
+            return JsonResponse(
+                {"detail": "Archive alerts are unavailable until the settings table is migrated.", "enabled": False},
+                status=503,
+            )
+
+        new_state = not settings_row.archive_upload_alerts
+        settings_row.archive_upload_alerts = new_state
+        settings_row.save(update_fields=["archive_upload_alerts"])
+
+        return JsonResponse(
+            {
+                "detail": "Archive upload alerts enabled." if new_state else "Archive upload alerts disabled.",
                 "enabled": new_state,
                 "status": "on" if new_state else "off",
             },
@@ -1965,6 +2028,18 @@ class ProfileView(View):
         #   context, so non-admin pages pay nothing for it.
         is_admin = admin_only(request.user)
 
+        #   Archive upload alerts are a superuser switch on the single
+        #   SiteSettings row. Read defensively so the page still renders if the
+        #   ADMIN migration that adds the column has not been applied yet.
+        archive_upload_alerts = False
+        if request.user.is_superuser:
+            try:
+                from ADMIN.models import SiteSettings
+
+                archive_upload_alerts = bool(SiteSettings.get_solo().archive_upload_alerts)
+            except Exception:
+                archive_upload_alerts = False
+
         context = {
             "profile": profile,
             "user": request.user,
@@ -1990,6 +2065,7 @@ class ProfileView(View):
 
             "is_staff_user": staff_only(request.user),
             "is_admin_user": is_admin,
+            "archive_upload_alerts": archive_upload_alerts,
             "show_staff_dashboard": staff_only(request.user),
             "user_sessions": _user_sessions_for_profile(request.user, request),
             "gender_choices": GENDER_CHOICES,

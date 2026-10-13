@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static archive_extras %}
 
 {% block title %}About {{ project_name }} · {{ project_cachphrase }}{% endblock %}
 {% block meta_description %}About {{ project_name }}: news across all genres with a strong focus on Nigeria and Africa, and how to reach us.{% endblock %}
@@ -61,7 +61,7 @@
         {% for post in latest_posts %}
         <li class="about-news-item">
           <a class="about-news-thumb" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true">
-            <img src="{{ post.image_1|default:story_placeholder }}" alt="" loading="lazy" decoding="async">
+            <img src="{{ post.image_1|cloudinary_proxy|default:story_placeholder }}" alt="" loading="lazy" decoding="async">
           </a>
           <div class="about-news-body">
             <a class="about-news-link" href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a>

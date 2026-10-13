@@ -34,6 +34,7 @@ from SERVICE_INTERNAL.images import (
     upload_archive_image,
     upload_archive_video,
 )
+from SERVICE_INTERNAL.email_single import _try_send_archive_upload_alert_email
 from SERVICE_INTERNAL.permissions import is_authenticated
 
 from ARCHIVE.models import ArchiveImage, ArchiveKind
@@ -349,6 +350,22 @@ def _uploader_label(uploader):
     return _masked_email(email) if email else ""
 
 
+def _archive_upload_alerts_enabled():
+    """True when a superuser has switched archive upload alerts on.
+
+    Read straight from SiteSettings rather than a cached copy so a toggle flip
+    takes effect on the very next upload. Fails closed (and silent) if the
+    settings row cannot be read, e.g. before the ADMIN migration that adds the
+    column has run.
+    """
+    try:
+        from ADMIN.models import SiteSettings
+
+        return bool(SiteSettings.get_solo().archive_upload_alerts)
+    except Exception:
+        return False
+
+
 def _proxy_cloudinary_url(secure_url):
     """Convert a URL returned by this project's Cloudinary upload into the
     project's own proxy route before storing it."""
@@ -644,6 +661,13 @@ class ArchiveUploadView(View):
             )
         except IntegrityError:
             return JsonResponse({"detail": "This exact item already exists in the archive.", "valid": False}, status=400)
+
+        #   ALERT THE OWNER (off by default). Sent after the row is committed
+        #   so the mail can never describe an upload that then failed to save.
+        #   Any signed in member can upload, so this is the audit trail that
+        #   names who uploaded and what kind of file it was.
+        if _archive_upload_alerts_enabled():
+            _try_send_archive_upload_alert_email(request.user, archive_item)
 
         return JsonResponse(
             {

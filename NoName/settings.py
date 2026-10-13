@@ -102,7 +102,12 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
+        #   THE PROJECT'S PASSWORD FLOOR IS 6 CHARACTERS (the forms say so and
+        #   SERVICE_INTERNAL.passwords runs these validators on every incoming
+        #   password), so the length validator is pinned to 6 rather than
+        #   Django's default 8. Common/numeric/similarity checks still apply.
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 6},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -183,6 +188,13 @@ ARCHIVE_VIDEO_UPLOAD_MAX_MB = int(os.getenv('archive_video_upload_max_mb', 10))
 ARCHIVE_FILE_UPLOAD_MAX_MB = int(os.getenv('archive_file_upload_max_mb', 3))
 
 RESEND_API_KEY = os.getenv('resend_api_key')
+
+#   ARCHIVE UPLOAD ALERTS: when the superuser turns the toggle on
+#   (ADMIN.models.SiteSettings.archive_upload_alerts), every new item added to
+#   the /archive/ gallery emails this address who uploaded it and what kind of
+#   file it was (see ARCHIVE.views.ArchiveUploadView and
+#   SERVICE_INTERNAL.email_single._try_send_archive_upload_alert_email).
+ARCHIVE_UPLOAD_ALERT_EMAIL = os.getenv('archive_upload_alert_email', 'lastissa11@gmail.com')
 
 #   STORY VIEW ALERTS: staff with StaffProfile.get_blog_notification on get
 #   an email every N views their own story crosses (see BLOG.views.StoryDetailView

@@ -28,8 +28,8 @@ class AuthReturnPathTests(TestCase):
             "/auth/register/",
             {
                 "email": "new-reader@example.com",
-                "password": "secret123",
-                "password_confirm": "secret123",
+                "password": "testpass123",
+                "password_confirm": "testpass123",
                 "to": "/promote/",
             },
         )
@@ -64,11 +64,23 @@ class GateConfirmPasswordTests(TestCase):
     def test_registration_without_confirm_password_succeeds(self):
         response = self.client.post(
             "/auth/register/",
-            {"email": "no-confirm@example.com", "password": "secret123"},
+            {"email": "no-confirm@example.com", "password": "testpass123"},
         )
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Auth.objects.filter(email="NO-CONFIRM@EXAMPLE.COM").exists())
+
+    def test_registration_rejects_a_common_password(self):
+        #   The 6 character minimum is not enough on its own: the project also
+        #   runs Django's password validators (see SERVICE_INTERNAL.passwords),
+        #   so a well known password is refused even though it is long enough.
+        response = self.client.post(
+            "/auth/register/",
+            {"email": "weak@example.com", "password": "password"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Auth.objects.filter(email="WEAK@EXAMPLE.COM").exists())
 
     def test_registration_with_mismatched_confirm_is_still_rejected(self):
         response = self.client.post(

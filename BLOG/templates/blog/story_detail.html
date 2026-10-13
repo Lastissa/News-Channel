@@ -12,8 +12,8 @@
 
 {% block og_image %}
   {% if blog.image_1 %}
-  <meta property="og:image" content="{{ blog.image_1 }}">
-  <meta name="twitter:image" content="{{ blog.image_1 }}">
+  <meta property="og:image" content="{{ blog.image_1|cloudinary_proxy|archive_absolute_url:request }}">
+  <meta name="twitter:image" content="{{ blog.image_1|cloudinary_proxy|archive_absolute_url:request }}">
   {% else %}
   <meta property="og:image" content="{{ site_domain }}{% static '404.jpg' %}">
   <meta name="twitter:image" content="{{ site_domain }}{% static '404.jpg' %}">
@@ -32,7 +32,7 @@
     "@type": "NewsArticle",
     "headline": "{{ blog.heading|escapejs }}",
     "description": "{{ excerp|escapejs }}",
-    {% if blog.image_1 %}"image": ["{{ blog.image_1|escapejs }}"],{% endif %}
+    {% if blog.image_1 %}"image": ["{{ blog.image_1|cloudinary_proxy|archive_absolute_url:request|escapejs }}"],{% endif %}
     "datePublished": "{{ blog.date_created|date:'c' }}",
     "dateModified": "{{ blog.last_updated|date:'c' }}",
     "author": {
@@ -191,7 +191,7 @@ visit https://www.abureport.com.ng for more up to date news."
     </header>
 
       <figure class="story-hero-figure">
-        <img src="{{ blog.image_1|default:image_fallback }}" alt="{{ blog.heading }}" loading="eager">
+        <img src="{{ blog.image_1|cloudinary_proxy|default:image_fallback }}" alt="{{ blog.heading }}" loading="eager">
         {% if blog.image_info %}
           <figcaption>{{ blog.image_info }}</figcaption>
         {% else %}

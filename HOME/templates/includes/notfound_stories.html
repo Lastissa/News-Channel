@@ -1,3 +1,4 @@
+{% load archive_extras %}
 {% comment %}Latest stories shown under the 404 pages. Needs `suggested_stories`; renders nothing when it is empty. Styles: base.css (.notfound-stories, .nf-card).{% endcomment %}
 {% if suggested_stories %}
 <section class="notfound-stories" aria-labelledby="notfound-stories-title">
@@ -6,7 +7,7 @@
     {% for post in suggested_stories %}
     <article class="nf-card" style="--i: {{ forloop.counter0 }};">
       <a class="nf-card-media" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true">
-        <img src="{{ post.image_1|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="{{ post.heading }}" loading="lazy">
+        <img src="{{ post.image_1|cloudinary_proxy|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="{{ post.heading }}" loading="lazy">
       </a>
       <div class="nf-card-body">
         <div class="nf-card-meta">

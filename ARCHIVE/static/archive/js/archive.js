@@ -855,11 +855,13 @@
   }
 
   /* ---------- archive video tiles ----------
-     A video item in the gallery autoplays muted on a loop behind one
-     overlaid pause/play button (see gallery_grid.html). Delegated on the
-     document so it keeps working after every htmx grid swap, and the
-     capture-phase play/pause listeners keep the button glyph in step even
-     when autoplay was blocked or the reader uses a screen reader. ---------- */
+     A video item downloads NOTHING until the reader presses play: the
+     element is rendered with no src and preload="none" (see
+     gallery_grid.html), so an idle gallery costs no video bandwidth. The
+     first play click moves data-src onto src and starts it; after that the
+     button just pauses and resumes. Delegated on the document so it keeps
+     working after every htmx grid swap, and the capture-phase play/pause
+     listeners keep the button glyph in step. ---------- */
   function syncArchiveVideo(video) {
     var tile = video.closest(".archive-videotile");
     if (!tile) return;
@@ -868,19 +870,12 @@
     if (btn) btn.setAttribute("aria-label", video.paused ? "Play video" : "Pause video");
   }
 
-  function primeArchiveVideos() {
-    var videos = document.querySelectorAll(".archive-videotile video");
-    for (var i = 0; i < videos.length; i++) {
-      var video = videos[i];
-      if (video.hasAttribute("data-autoplay-primed")) continue;
-      video.setAttribute("data-autoplay-primed", "1");
-      try {
-        var p = video.play();
-        if (p && p.then) {
-          p.then(function () {}).catch(function () { /* blocked */ });
-        }
-      } catch (e) {}
-    }
+  function loadArchiveVideo(video) {
+    if (!video || video.getAttribute("src")) return;
+    var src = video.getAttribute("data-src");
+    if (!src) return;
+    video.setAttribute("src", src);
+    video.load();
   }
 
   document.addEventListener("click", function (event) {
@@ -891,19 +886,13 @@
     if (!video) return;
     event.preventDefault();
     if (video.paused) {
+      loadArchiveVideo(video);
       var played = video.play();
-      if (played && played.catch) played.catch(function () { /* autoplay blocked */ });
+      if (played && played.catch) played.catch(function () { /* playback blocked */ });
     } else {
       video.pause();
     }
   });
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", primeArchiveVideos);
-  } else {
-    primeArchiveVideos();
-  }
-  document.body.addEventListener("htmx:afterSwap", primeArchiveVideos);
 
   document.addEventListener("play", function (event) {
     if (event.target && event.target.tagName === "VIDEO" && event.target.closest(".archive-videotile")) {

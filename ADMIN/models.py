@@ -19,6 +19,15 @@ class SiteSettings(models.Model):
     customer_support_mobile = models.CharField(
         max_length=32, blank=True, default="", help_text="Customer support phone / WhatsApp number shown to readers."
     )
+    #   ARCHIVE UPLOAD ALERTS: a superuser turns this on from their profile.
+    #   While it is on, every new item added to the /archive/ gallery emails
+    #   ARCHIVE_UPLOAD_ALERT_EMAIL with who uploaded it and what kind of file
+    #   it was (see ARCHIVE.views.ArchiveUploadView). Off by default so a fresh
+    #   install never emails anyone without being asked to.
+    archive_upload_alerts = models.BooleanField(
+        default=False,
+        help_text="Email the owner every time a new item is uploaded to the archive gallery.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

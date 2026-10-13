@@ -19,6 +19,7 @@ from django.contrib.auth import get_user_model
 from SERVICE_INTERNAL.abstract import _response, is_rate_limited
 from SERVICE_INTERNAL.config import About
 from SERVICE_INTERNAL.email_single import _try_send_login_email, _try_send_password_reset_email, _try_send_password_reset_success_email
+from SERVICE_INTERNAL.passwords import first_password_error
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +158,8 @@ class RegisterView(View):
             error = "Passwords do not match."
         elif len(password) < 6:
             error = "Password must be at least 6 characters long."
+        elif (password_error := first_password_error(password, user=get_user_model()(email=email))):
+            error = password_error
         elif get_user_model().objects.filter(email__iexact=email).exists():
             error = "Email Taken OR Email Not Allowed"
         else:
@@ -345,6 +348,15 @@ class PasswordResetView(View):
                 request,
                 "auth/password_reset.html",
                 {"stage": "confirm", "email": email, "key": key, "sign": sign, "error": "Password must be at least 6 characters long."},
+                status=400,
+            )
+
+        password_error = first_password_error(new_password, user=reset_row.user)
+        if password_error:
+            return render(
+                request,
+                "auth/password_reset.html",
+                {"stage": "confirm", "email": email, "key": key, "sign": sign, "error": password_error},
                 status=400,
             )
 

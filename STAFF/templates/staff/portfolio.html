@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static l10n %}
+{% load static l10n archive_extras %}
 
 {% block title %}{{ display_name }} · {{ role_label }} · Portfolio · {{ project_name }}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
@@ -213,7 +213,7 @@
                 <span class="portfolio-popular-rank" aria-label="Rank {{ forloop.counter }}">{{ forloop.counter }}</span>
                 <a class="portfolio-popular-media" href="{% url 'blog:story_detail' story.slug %}" tabindex="-1" aria-hidden="true">
                   {% if story.image_1 %}
-                    <img src="{{ story.image_1|default:'https://placehold.co/160x160/1F2A37/F6F3ED?text=%20' }}" alt="{% if story.image_info and story.image_info != 'The image is self explanatory.' %}{{ story.image_info }}{% else %}{{ story.heading }}{% endif %}" loading="lazy">
+                    <img src="{{ story.image_1|cloudinary_proxy|default:'https://placehold.co/160x160/1F2A37/F6F3ED?text=%20' }}" alt="{% if story.image_info and story.image_info != 'The image is self explanatory.' %}{{ story.image_info }}{% else %}{{ story.heading }}{% endif %}" loading="lazy">
                   {% else %}
                     <img src="{% static '404.jpg' %}" alt="No picture for {{ story.heading }}" loading="lazy">
                   {% endif %}

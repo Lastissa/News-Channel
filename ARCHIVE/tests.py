@@ -1,6 +1,7 @@
 from datetime import datetime
 from unittest import mock
 
+from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -60,6 +61,63 @@ class ArchiveAssetManagementTests(TestCase):
             "/archive/cdn/image/upload/v123/abureport/archive/photo.jpg",
         )
         self.assertNotIn("res.cloudinary.com", item.url)
+
+    def test_new_upload_alerts_the_owner_when_the_toggle_is_on(self):
+        settings_row = SiteSettings.get_solo()
+        settings_row.archive_upload_alerts = True
+        settings_row.save(update_fields=["archive_upload_alerts"])
+
+        upload_result = {
+            "secure_url": "https://res.cloudinary.com/test-cloud/raw/upload/v123/abureport/archive/report.pdf",
+            "public_id": "abureport/archive/report",
+            "resource_type": "raw",
+            "bytes": 4096,
+            "original_filename": "report.pdf",
+        }
+        with (
+            mock.patch("ARCHIVE.views.is_rate_limited", return_value=(0, False)),
+            mock.patch("ARCHIVE.views.upload_archive_file", return_value=upload_result),
+            mock.patch("ARCHIVE.views._try_send_archive_upload_alert_email") as alert,
+        ):
+            response = self.client.post(
+                reverse("archive:upload"),
+                {
+                    "alt": "Annual report",
+                    "upload_file": SimpleUploadedFile("report.pdf", b"file", content_type="application/pdf"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        alert.assert_called_once()
+        uploader, item = alert.call_args.args
+        self.assertEqual(uploader, self.user)
+        self.assertEqual(item.kind, ArchiveKind.FILE)
+
+    def test_new_upload_stays_quiet_when_the_toggle_is_off(self):
+        SiteSettings.get_solo()  # default row: archive upload alerts off
+
+        upload_result = {
+            "secure_url": "https://res.cloudinary.com/test-cloud/raw/upload/v123/abureport/archive/report.pdf",
+            "public_id": "abureport/archive/report",
+            "resource_type": "raw",
+            "bytes": 4096,
+            "original_filename": "report.pdf",
+        }
+        with (
+            mock.patch("ARCHIVE.views.is_rate_limited", return_value=(0, False)),
+            mock.patch("ARCHIVE.views.upload_archive_file", return_value=upload_result),
+            mock.patch("ARCHIVE.views._try_send_archive_upload_alert_email") as alert,
+        ):
+            response = self.client.post(
+                reverse("archive:upload"),
+                {
+                    "alt": "Annual report",
+                    "upload_file": SimpleUploadedFile("report.pdf", b"file", content_type="application/pdf"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        alert.assert_not_called()
 
     def test_video_without_a_size_stays_on_the_raw_pipeline(self):
         upload_result = {
@@ -126,7 +184,7 @@ class ArchiveAssetManagementTests(TestCase):
         self.assertEqual(item.height, 360)
         self.assertEqual(item.url, "/archive/cdn/video/upload/v123/abureport/archive/clip.mp4")
 
-    def test_video_grid_renders_an_autoplaying_tile_with_a_fallback(self):
+    def test_video_grid_renders_a_click_to_play_tile_with_a_fallback(self):
         ArchiveImage.objects.create(
             kind=ArchiveKind.FILE,
             url="/archive/cdn/raw/upload/v123/abureport/archive/clip.mp4",
@@ -141,6 +199,11 @@ class ArchiveAssetManagementTests(TestCase):
         self.assertContains(response, "data-archive-video-toggle")
         self.assertContains(response, "/static/404_video.mp4")
         self.assertContains(response, "archive-card-media-video")
+        #   NOTHING may download until the reader presses play: the clip is
+        #   rendered with preload="none" and no src at all, only data-src.
+        self.assertContains(response, 'preload="none"')
+        self.assertContains(response, 'data-src="/archive/cdn/raw/upload/v123/abureport/archive/clip.mp4"')
+        self.assertNotContains(response, '<video class="archive-video-el" src=')
 
     def test_description_and_quality_can_be_updated_without_reupload(self):
         item = ArchiveImage.objects.create(

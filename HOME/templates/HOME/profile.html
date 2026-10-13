@@ -216,6 +216,30 @@
         </div>
       </div>
 
+      {% if user.is_superuser %}
+      <div class="profile-setting-block">
+        <div class="setting-row">
+          <div class="setting-copy">
+            <span class="setting-label">Archive upload alerts</span>
+            <small>Get an email each time someone uploads an item to the archive, naming who uploaded it and what kind of file it was.</small>
+          </div>
+          <div class="newsletter-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-switch {% if archive_upload_alerts %}is-on{% endif %}"
+              aria-pressed="{{ archive_upload_alerts|yesno:'true,false' }}"
+              data-newsletter-toggle
+              data-enable-url="{% url 'home:profile_archive_alert_toggle' %}"
+              data-enabled="{{ archive_upload_alerts|yesno:'true,false' }}"
+              data-on-text="Receiving archive upload alerts"
+              data-off-text="Not receiving archive upload alerts">
+              <span class="toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       {#  MOBILE ONLY: Joined and Delete Account ride at the very bottom of the page, under the toggles. The desktop copies above stay hidden on mobile and these stay hidden on desktop (profile.css). #}
       <div class="profile-prefs-extra">
         <div class="profile-joined-row"><span>Joined</span><strong>{{ user.date_joined|date:"M d, Y" }}</strong></div>
