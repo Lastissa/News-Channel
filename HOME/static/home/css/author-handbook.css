@@ -1,14 +1,15 @@
 /* Author handbook: the parts that only this page needs.
-   Layout, hero, contents rail, sections, callouts and tables live in
-   doc-reader.css; colours come from the Signal tokens in base.css. */
+   Layout, masthead, contents and sections live in doc-reader.css; colours
+   come from the tokens in base.css. Steps are a plain numbered list, the
+   do/don't blocks are plain columns, and the status labels are plain text. */
 
 /* ---------- Typed codes ---------- */
 .hb-code {
   display: inline-block;
-  padding: 1px 8px;
-  border: 1px solid var(--doc-rule);
+  padding: 1px 7px;
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--doc-code-bg);
+  background: var(--paper-dim);
   color: var(--ink);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 0.86em;
@@ -16,156 +17,75 @@
   overflow-wrap: anywhere;
 }
 
-/* ---------- Steps: a vertical timeline ---------- */
+/* ---------- Steps: a plain numbered list ---------- */
 .hb-steps {
   max-width: 70ch;
-  margin: 22px 0 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: step;
+  margin: 18px 0 0;
+  padding-left: 1.4em;
+  list-style: decimal;
 }
 
 .hb-steps > li {
-  position: relative;
-  counter-increment: step;
-  margin: 0;
-  padding: 0 0 24px 58px;
-  color: var(--ink-soft);
+  margin: 0 0 12px;
+  color: var(--ink);
   line-height: 1.75;
 }
 
-.hb-steps > li::before {
-  content: counter(step);
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--doc-rule);
-  border-radius: var(--radius-s);
-  background: var(--doc-tint-strong);
-  color: var(--brand-deep);
-  font-size: 0.92rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.hb-steps > li::after {
-  content: "";
-  position: absolute;
-  left: 18px;
-  top: 46px;
-  bottom: 8px;
-  width: 1px;
-  background: var(--doc-rule);
-}
-
-.hb-steps > li:last-child { padding-bottom: 0; }
-.hb-steps > li:last-child::after { display: none; }
-.hb-steps > li:hover::before { border-color: var(--brand-deep); background: var(--brand-deep); color: var(--paper); }
+.hb-steps > li:last-child { margin-bottom: 0; }
 .hb-steps strong { color: var(--ink); }
 
-/* ---------- Do and do not panels ---------- */
+/* ---------- Do and don't blocks ---------- */
 .hb-pair {
   display: grid;
-  gap: 16px;
-  margin-top: 24px;
-}
-
-.hb-panel {
-  --panel: var(--doc-do);
-  --panel-wash: var(--doc-do-wash);
-  --panel-ic: var(--ic-check);
-  max-width: 70ch;
+  gap: 30px 44px;
   margin-top: 22px;
-  padding: 22px 22px 14px;
-  border: 1px solid var(--doc-rule);
-  /* border-radius: var(--radius-m); */
-  background: var(--panel-wash);
 }
 
-.hb-panel--dont {
-  --panel: var(--doc-dont);
-  --panel-wash: var(--doc-dont-wash);
-  --panel-ic: var(--ic-cross);
-}
+.hb-panel { max-width: 70ch; margin-top: 22px; }
 
 .hb-pair .hb-panel { max-width: none; margin-top: 0; }
 
 .doc-section .hb-panel h3 {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 8px;
-  color: var(--panel);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-family: var(--font-display);
   font-size: 1.08rem;
+  font-weight: 700;
 }
 
-.hb-panel h3::before {
-  content: "";
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  background: var(--panel);
-  -webkit-mask: var(--panel-ic) center / contain no-repeat;
-  mask: var(--panel-ic) center / contain no-repeat;
+.hb-check {
+  margin: 0;
+  padding-left: 1.25em;
+  list-style: disc;
 }
-
-.hb-check { margin: 0; padding: 0; list-style: none; }
 
 .hb-check li {
-  position: relative;
-  margin: 0;
-  padding: 11px 0 11px 32px;
-  border-top: 1px solid var(--doc-rule);
+  margin: 0 0 10px;
   color: var(--ink);
   line-height: 1.65;
-  word-spacing: 0.5px;
+  overflow-wrap: anywhere;
 }
 
-.hb-check li:first-child { border-top: 0; }
+.hb-check li:last-child { margin-bottom: 0; }
 
-.hb-check li::before {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: 14px;
-  width: 18px;
-  height: 18px;
-  background: var(--panel);
-  -webkit-mask: var(--panel-ic) center / contain no-repeat;
-  mask: var(--panel-ic) center / contain no-repeat;
-}
-
-/* ---------- Status chips in the review table ---------- */
+/* ---------- Status labels in the review table ---------- */
 .hb-result { display: block; }
-.hb-result + .hb-result { margin-top: 8px; }
+.hb-result + .hb-result { margin-top: 6px; }
 
 .hb-chip {
   display: inline-block;
   margin-right: 8px;
-  padding: 2px 16px;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
-  line-height: 1.6;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
 }
 
-.hb-chip--block { background: var(--doc-dont-wash); color: var(--doc-dont); }
-.hb-chip--warn { background: var(--doc-note-wash); color: var(--doc-note); }
+.hb-chip--block { color: var(--doc-dont); }
+.hb-chip--warn { color: var(--doc-note); }
 
 @media (min-width: 760px) {
-  .hb-pair { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-width: 560px) {
-  .hb-steps > li { padding-left: 50px; }
-  .hb-steps > li::before { width: 34px; height: 34px; }
-  .hb-steps > li::after { left: 16px; top: 42px; }
-  .hb-panel { padding: 18px 16px 10px; }
+  .hb-pair { grid-template-columns: 1fr 1fr; gap: 24px 44px; }
 }

@@ -1,560 +1,210 @@
-/* Document reader: shared by the author handbook and the privacy policy.
-
-   Layout: a dark "signal" hero, then a sticky contents rail beside the text on
-   desktop, or a sticky one-line contents bar on phones. Every colour comes from
-   the Signal tokens in base.css (--signal, --doc-*), so both themes work with no
-   extra rules here. Motion is limited to a reading progress line, a soft entrance
-   for sections and a slow glow in the hero. base.css already switches animation
-   off for people who ask for reduced motion. */
+/* Document reader: the plain prose layout used by the author handbook.
+   One column, hairline rules between sections, one accent colour for links.
+   No reading-progress bar, sticky rail, animations, clip-path shapes or
+   icon-masked panels. Colours come from the tokens in base.css. */
 
 .doc {
-  --doc-bar-h: 0px;
-  --doc-pad: clamp(18px, 4vw, 28px);
-  --ic-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8v.01'/%3E%3C/svg%3E");
-  --ic-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
-  --ic-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
-  --ic-warn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4M12 17v.01'/%3E%3C/svg%3E");
-  position: relative;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 20px 72px;
   color: var(--ink);
 }
 
-/* ---------- Reading progress (only when the script is running) ---------- */
-.doc-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 120;
-  height: 3px;
-  pointer-events: none;
-}
-
-.doc-progress::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, var(--signal), var(--brand-deep));
-  transform-origin: 0 50%;
-  transform: scaleX(var(--doc-p, 0));
-}
-
-.doc:not(.doc-js) .doc-progress { display: none; }
-
-/* ---------- Hero ---------- */
+/* ---------- masthead ---------- */
 .doc-hero {
-  position: relative;
-  overflow: hidden;
-  background: var(--doc-night);
-  color: var(--nav-fg);
+  padding: 40px 0 32px;
+  border-bottom: 1px solid var(--line);
 }
 
-/* Fine grid, brightest at the top right and fading out from there. */
-.doc-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image: none;
-  background-size: 44px 44px;
-  -webkit-mask-image: radial-gradient(ellipse 90% 100% at 88% 0%, #000 0%, transparent 72%);
-  mask-image: radial-gradient(ellipse 90% 100% at 88% 0%, #000 0%, transparent 72%);
-}
-
-/* A slow glow behind the title. Only transform moves, so it stays cheap. */
-.doc-hero::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: -60%;
-  right: -20%;
-  width: 90%;
-  height: 160%;
-  background: none;
-}
-
-@keyframes doc-drift {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(-8%, 6%, 0) scale(1.12); }
-}
-
-.doc-hero-inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: clamp(40px, 7vw, 92px) var(--doc-pad) clamp(40px, 6.5vw, 84px);
-}
-
-/* Leaves room for tiles that overlap the bottom edge of the hero. */
-.doc-hero--overlap .doc-hero-inner { padding-bottom: clamp(88px, 11vw, 128px); }
-
-.doc-hero-inner > * { animation: doc-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.doc-hero-inner > :nth-child(2) { animation-delay: 0.07s; }
-.doc-hero-inner > :nth-child(3) { animation-delay: 0.14s; }
-.doc-hero-inner > :nth-child(4) { animation-delay: 0.21s; }
-.doc-hero-inner > :nth-child(5) { animation-delay: 0.28s; }
-
-@keyframes doc-rise {
-  from { opacity: 0; transform: translate3d(0, 14px, 0); }
-  to   { opacity: 1; transform: none; }
-}
-
-/* Parallelogram label */
 .doc-tag {
-  display: inline-block;
-  margin: 0 0 20px;
-  padding: 7px 22px;
-  background: var(--signal);
-  color: var(--signal-ink);
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  line-height: 1.2;
-  text-transform: uppercase;
-  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
-}
-
-.doc-hero h1 {
-  max-width: 16ch;
-  margin: 0 0 20px;
-  color: var(--nav-fg);
-  font-size: clamp(2.3rem, 1.3rem + 4.6vw, 4.4rem);
-  line-height: 1.02;
-  letter-spacing: -0.035em;
-}
-
-.doc-hero-lead {
-  max-width: 62ch;
-  margin: 0;
-  color: var(--doc-hero-text);
-  font-size: clamp(1.02rem, 0.96rem + 0.35vw, 1.2rem);
-  line-height: 1.7;
-}
-
-.doc-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 28px;
-}
-
-.doc-hero-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
-  margin-top: 26px;
-  color: var(--doc-hero-text);
-  font-size: 0.85rem;
-}
-
-.doc-hero-links > span {
-  margin-right: 4px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.doc-hero-links a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid rgba(246, 243, 237, 0.2);
-  border-radius: var(--radius-s);
-  color: var(--nav-fg);
-  font-weight: 600;
-  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
-}
-
-.doc-hero-links a:hover,
-.doc-hero-links a:focus-visible {
-  border-color: var(--signal);
-  background: rgba(34, 211, 238, 0.1);
-  color: var(--signal);
-  outline: none;
-}
-
-/* ---------- Buttons ---------- */
-.doc-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 12px 20px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-s);
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1.2;
-  text-decoration: none;
-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
-}
-
-.doc-btn svg {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  transition: transform 0.2s ease;
-}
-
-.doc-btn--signal { background: var(--signal); color: var(--signal-ink); }
-.doc-btn--signal:hover,
-.doc-btn--signal:focus-visible { filter: brightness(1.06); outline: none; }
-.doc-btn--signal:hover svg { transform: translateX(-3px); }
-
-.doc-btn--glass {
-  border-color: rgba(246, 243, 237, 0.28);
-  background: rgba(246, 243, 237, 0.08);
-  color: var(--nav-fg);
-}
-.doc-btn--glass:hover,
-.doc-btn--glass:focus-visible {
-  border-color: var(--signal);
-  background: rgba(34, 211, 238, 0.12);
-  outline: none;
-}
-.doc-btn--glass:hover svg { transform: translateX(3px); }
-
-/* ---------- Page frame: contents rail + text ---------- */
-.doc-wrap {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 var(--doc-pad) clamp(56px, 8vw, 104px);
-}
-
-.doc-main { min-width: 0; padding-top: clamp(24px, 4vw, 48px); }
-
-/* The aside only exists to give the rail a tall box to stick inside on desktop. */
-.doc-rail { display: contents; }
-
-.doc-toc { margin-bottom: 8px; }
-
-.doc-toc-title {
   margin: 0 0 14px;
   color: var(--slate);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
+.doc-hero h1 {
+  margin: 0 0 18px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 1.5rem + 2.2vw, 2.9rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.doc-hero-lead {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.doc-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 22px 0 0;
+}
+
+.doc-btn {
+  color: var(--amber-deep);
+  font-weight: 700;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.doc-btn:hover { text-decoration: underline; }
+
+.doc-btn:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---------- table of contents ---------- */
+.doc-toc {
+  padding: 26px 0 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-toc-title {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .doc-toc-list {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: toc;
-  border-left: 1px solid var(--doc-rule);
+  padding-left: 1.2em;
+  columns: 2;
+  column-gap: 40px;
 }
 
-.doc-toc-list li { counter-increment: toc; }
+.doc-toc-list li {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  break-inside: avoid;
+}
 
 .doc-toc-list a {
-  position: relative;
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-height: 44px;
-  margin-left: -1px;
-  padding: 10px 12px 10px 18px;
-  border-left: 2px solid transparent;
-  color: var(--slate);
-  font-size: 0.9rem;
-  font-weight: 500;
-  line-height: 1.35;
-  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.doc-toc-list a::before {
-  content: counter(toc, decimal-leading-zero);
-  flex: 0 0 auto;
-  color: var(--slate);
-  font-size: 0.72rem;
+  color: var(--amber-deep);
   font-weight: 700;
-  letter-spacing: 0.06em;
-  font-variant-numeric: tabular-nums;
-  transition: color 0.2s ease;
+  text-decoration: none;
+  text-underline-offset: 3px;
 }
 
-.doc-toc-list a:hover,
+.doc-toc-list a:hover { text-decoration: underline; }
+
 .doc-toc-list a:focus-visible {
-  background: var(--doc-tint);
-  color: var(--ink);
-  outline: none;
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
-.doc-toc-list a.is-active {
-  background: var(--doc-tint);
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.doc-toc-list a.is-active::before { color: var(--brand-deep); }
-
-.doc-toc-toggle { display: none; }
-
-@media (min-width: 960px) {
-  .doc-wrap {
-    display: grid;
-    grid-template-columns: 252px minmax(0, 1fr);
-    gap: clamp(40px, 6vw, 88px);
-    align-items: start;
-  }
-
-  .doc-rail { display: block; align-self: stretch; padding-top: clamp(24px, 4vw, 48px); }
-
-  .doc-toc {
-    position: sticky;
-    top: calc(var(--header-h) + 28px);
-    max-height: calc(100vh - var(--header-h) - 56px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-  }
-
-  .doc-main { padding-top: clamp(24px, 4vw, 48px); }
-}
-
-/* Phones and tablets: the contents collapse into one sticky bar that names the
-   section you are reading. Tap it to jump. Without the script it stays a plain list. */
-@media (max-width: 959.98px) {
-  .doc { --doc-bar-h: 52px; }
-
-  .doc-toc-title { display: none; }
-
-  .doc-js .doc-toc {
-    position: sticky;
-    top: var(--header-h);
-    z-index: 90;
-    margin: 0 calc(var(--doc-pad) * -1);
-    border-bottom: 1px solid var(--doc-rule);
-    background: var(--surface);
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-  }
-
-  .doc-js .doc-toc-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: 52px;
-    padding: 0 var(--doc-pad);
-    border: 0;
-    background: none;
-    color: var(--ink);
-    font: inherit;
-    font-size: 0.92rem;
-    text-align: left;
-  }
-
-  .doc-toc-toggle-label {
-    flex: 0 0 auto;
-    color: var(--slate);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .doc-toc-current {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .doc-toc-toggle svg {
-    flex: 0 0 auto;
-    width: 18px;
-    height: 18px;
-    color: var(--brand-deep);
-    transition: transform 0.25s ease;
-  }
-
-  .doc-toc.is-open .doc-toc-toggle svg { transform: rotate(180deg); }
-
-  /* Solid while open, so page text never shows through the list. */
-  .doc-js .doc-toc.is-open {
-    background: var(--surface);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: var(--shadow-raised);
-  }
-
-  .doc-js .doc-toc-list {
-    display: none;
-    max-height: min(60vh, 420px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 4px var(--doc-pad) 12px;
-    border-top: 1px solid var(--doc-rule);
-    border-left: 0;
-  }
-
-  .doc-js .doc-toc.is-open .doc-toc-list { display: block; }
-
-  .doc-toc-list a { margin-left: 0; padding-left: 12px; }
-}
-
-/* ---------- Sections ---------- */
-.doc-main { counter-reset: sec; }
+/* ---------- sections ---------- */
+.doc-main { padding-top: 6px; }
 
 .doc-section {
-  position: relative;
-  counter-increment: sec;
-  padding: clamp(30px, 4.5vw, 52px) 0;
-  border-top: 1px solid var(--doc-rule);
-  scroll-margin-top: calc(var(--header-h) + var(--doc-bar-h) + 16px);
+  padding: 32px 0;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: calc(var(--header-h, 64px) + 16px);
 }
 
-.doc-section:first-child { padding-top: 0; border-top: 0; }
-.doc-section:last-child { padding-bottom: 0; }
-
-/* A short bright tab sits on the rule above each section after the first. */
-.doc-section:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 0;
-  width: 56px;
-  height: 3px;
-  background: var(--brand-deep);
-}
+.doc-section:first-child { border-top: 0; }
 
 .doc-section h2 {
-  margin: 0 0 18px;
-  font-size: clamp(1.55rem, 1.1rem + 1.8vw, 2.25rem);
-  line-height: 1.12;
-  letter-spacing: -0.025em;
-  text-wrap: balance;
-}
-
-.doc-section h2::before {
-  content: counter(sec, decimal-leading-zero);
-  display: block;
-  margin-bottom: 10px;
-  color: var(--brand-deep);
-  font-size: 0.78rem;
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
-  font-variant-numeric: tabular-nums;
+  line-height: 1.22;
 }
 
 .doc-section h3 {
-  margin: 34px 0 12px;
-  font-size: 1.12rem;
+  margin: 28px 0 10px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 700;
   line-height: 1.3;
-  letter-spacing: -0.01em;
 }
 
 .doc-section p {
-  max-width: 70ch;
+  max-width: 72ch;
   margin: 0 0 14px;
-  color: var(--ink-soft);
-  font-size: 1.02rem;
-  line-height: 1.8;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.75;
 }
 
 .doc-section p.doc-lead {
   margin-bottom: 20px;
-  color: var(--ink);
-  font-size: clamp(1.08rem, 1rem + 0.4vw, 1.22rem);
-  line-height: 1.7;
+  font-size: 1.05rem;
 }
 
 .doc-main a:not([class]) {
-  color: var(--brand-deep);
+  color: var(--amber-deep);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   overflow-wrap: anywhere;
-  transition: text-decoration-thickness 0.15s ease;
 }
 
 .doc-main a:not([class]):hover { text-decoration-thickness: 2px; }
 
-/* Entrance: sections ease in as they reach the screen. Without the script they
-   are simply there. */
-.doc-js .doc-section {
-  opacity: 0;
-  transform: translate3d(0, 18px, 0);
-  transition: opacity 0.6s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+/* ---------- lists ---------- */
+.doc-list {
+  margin: 0 0 14px;
+  padding-left: 1.25em;
+  list-style: disc;
 }
-
-.doc-js .doc-section.is-in { opacity: 1; transform: none; }
-
-/* ---------- Lists ---------- */
-.doc-list { margin: 0 0 6px; padding: 0; list-style: none; max-width: 70ch; }
 
 .doc-list li {
-  position: relative;
-  margin: 0;
-  padding: 9px 0 9px 24px;
-  color: var(--ink-soft);
+  margin: 0 0 8px;
+  color: var(--ink);
   line-height: 1.7;
-}
-
-.doc-list li::before {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: 1.05em;
-  width: 8px;
-  height: 8px;
-  background: var(--brand-deep);
-  clip-path: polygon(30% 0, 100% 0, 70% 100%, 0 100%);
 }
 
 .doc-list strong { color: var(--ink); }
 
-/* ---------- Callouts ---------- */
+/* ---------- callouts ---------- */
 .doc-callout {
-  position: relative;
   max-width: 70ch;
-  margin: 26px 0 0;
-  padding: 16px 18px 16px 60px;
-  border: 1px solid var(--doc-rule);
+  margin: 24px 0 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
   border-radius: var(--radius-s);
-  background: var(--doc-tint);
+  background: var(--paper-dim);
 }
 
-.doc-callout::before {
-  content: "";
-  position: absolute;
-  left: 18px;
-  top: 17px;
-  width: 26px;
-  height: 26px;
-  background: var(--brand-deep);
-  -webkit-mask: var(--ic-info) center / contain no-repeat;
-  mask: var(--ic-info) center / contain no-repeat;
+.doc-section .doc-callout p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.7;
 }
 
-.doc-section .doc-callout p { margin: 0; color: var(--ink); line-height: 1.7; }
+/* ---------- tables ---------- */
+.doc-table-wrap { margin-top: 20px; }
 
-.doc-callout--warn { background: var(--doc-note-wash); }
-.doc-callout--warn::before { background: var(--doc-note); -webkit-mask-image: var(--ic-warn); mask-image: var(--ic-warn); }
-.doc-callout--warn strong { color: var(--doc-note); }
-
-/* ---------- Tables ---------- */
-.doc-table-wrap {
-  margin-top: 22px;
-  border: 1px solid var(--doc-rule);
-  border-radius: var(--radius-m);
-  background: var(--surface);
-  overflow: hidden;
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
 }
-
-.doc-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 
 .doc-table th {
-  padding: 13px 20px;
-  border-bottom: 1px solid var(--doc-rule);
-  background: var(--doc-tint);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
   color: var(--slate);
   font-size: 0.7rem;
   font-weight: 700;
@@ -564,20 +214,18 @@
 }
 
 .doc-table td {
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--doc-rule);
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
   color: var(--ink);
   line-height: 1.55;
   vertical-align: top;
 }
 
 .doc-table td:first-child { width: 46%; }
-.doc-table tbody tr { transition: background-color 0.15s ease; }
-.doc-table tbody tr:hover { background: var(--doc-tint); }
 .doc-table tbody tr:last-child td { border-bottom: 0; }
 
-/* On a phone each row becomes its own small card with the column name above
-   the value, so nothing scrolls sideways. */
+/* On a phone each row becomes its own block with the column name above the
+   value, so nothing scrolls sideways. */
 @media (max-width: 639.98px) {
   .doc-table thead {
     position: absolute;
@@ -592,9 +240,9 @@
   .doc-table tr,
   .doc-table td { display: block; width: 100%; }
 
-  .doc-table tr { padding: 14px 16px; border-bottom: 1px solid var(--doc-rule); }
+  .doc-table tr { padding: 14px 0; border-bottom: 1px solid var(--line); }
   .doc-table tbody tr:last-child { border-bottom: 0; }
-  .doc-table td { padding: 4px 0; border: 0; overflow-wrap: anywhere; }
+  .doc-table td { padding: 3px 0; border: 0; overflow-wrap: anywhere; }
   .doc-table td:first-child { width: 100%; }
 
   .doc-table td::before {
@@ -609,27 +257,142 @@
   }
 }
 
-/* ---------- Closing note ---------- */
+/* ---------- closing note ---------- */
 .doc-foot {
-  position: relative;
-  margin: clamp(36px, 5vw, 64px) 0 0;
-  padding: 22px 24px 22px 28px;
-  border: 1px solid var(--doc-rule);
-  border-radius: var(--radius-m);
-  background: var(--doc-tint);
+  margin: 40px 0 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
   color: var(--ink);
   font-weight: 600;
   line-height: 1.6;
 }
 
-/* The closing note used to carry a gradient rule down its left edge. The
-   tinted panel already separates it, so the rule was removed. */
+/* ---------- small screens ---------- */
+@media (max-width: 620px) {
+  .doc { padding: 0 16px 56px; }
+  .doc-hero { padding: 28px 0 24px; }
+  .doc-toc { padding: 22px 0 24px; }
+  .doc-toc-list { columns: 1; }
+}
 
-/* ---------- Small screens ---------- */
-@media (max-width: 560px) {
-  .doc-btn { width: 100%; }
-  .doc-hero-actions { gap: 10px; }
-  .doc-hero-links a { flex: 1 1 auto; justify-content: center; }
-  .doc-callout { padding: 16px 16px 16px 52px; }
-  .doc-callout::before { left: 14px; }
+/* ---------- slide mode ----------
+   The long document is the default. The "Read as slides" switch turns the
+   sections into a horizontal, snap-scrolling deck, with a close control and
+   a status line pinned at the top. Without the script, none of this shows. */
+.doc-mode-toggle {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.doc-mode-toggle:hover,
+.doc-mode-toggle[aria-pressed="true"] { background: var(--paper-dim); }
+
+.doc-mode-toggle:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+}
+
+.doc-slidebar {
+  position: sticky;
+  top: calc(var(--header-h, 64px) + 8px);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--paper);
+}
+
+.doc-slidebar[hidden] { display: none; }
+
+.doc-slidebar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.doc-slidebar-btn svg { width: 20px; height: 20px; }
+
+.doc-slidebar-btn:hover { background: var(--paper-dim); }
+
+.doc-slidebar-btn:focus-visible,
+.doc-slidebar-close:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+}
+
+.doc-slidebar-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-slidebar-close {
+  flex: none;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.doc-slidebar-close:hover { background: var(--paper-dim); }
+
+.doc--slides .doc-hero,
+.doc--slides .doc-toc,
+.doc--slides .doc-foot { display: none; }
+
+.doc--slides .doc-main {
+  display: flex;
+  gap: 0;
+  margin: 16px 0 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.doc--slides .doc-section {
+  flex: 0 0 100%;
+  min-width: 0;
+  max-height: calc(100vh - var(--header-h, 64px) - 170px);
+  overflow-y: auto;
+  padding: 24px 20px;
+  border: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  scroll-snap-align: start;
+  scroll-margin-top: 0;
+  background: var(--paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc--slides .doc-main { scroll-behavior: auto; }
 }

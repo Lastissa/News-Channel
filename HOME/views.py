@@ -1238,7 +1238,7 @@ class AuthorHandbookView(View):
 
     def dispatch(self, request, *args, **kwargs):
         if not staff_only(request.user):
-            messages.error(request, "Sorry, The author handbook is for staff accounts.")
+            messages.error(request, "Sorry, The author handbook is for AUTHOR ONLY.")
             return redirect("home:home")
         return super().dispatch(request, *args, **kwargs)
 

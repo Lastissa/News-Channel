@@ -104,7 +104,7 @@ html[data-theme="dark"] .share-btn-twitter .share-icon { filter: invert(1); }
 }
 
 /* ---------- comment timestamp ---------- */
-.comment-date { color: var(--slate); font-size: 0.76rem; font-weight: 400; }
+.comment-date { color: var(--ink); font-size: 0.76rem; font-weight: 400; }
 
 /* ---------- follow button duplicated next to the byline ---------- */
 .meta-author-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -121,7 +121,7 @@ html[data-theme="dark"] .share-btn-twitter .share-icon { filter: invert(1); }
 }
 .story-report-note summary { color: var(--ink); font-weight: 700; cursor: pointer; }
 .story-report-note summary:hover { color: var(--brand-deep); }
-.story-report-note > p { margin: 12px 0; color: var(--slate); }
+.story-report-note > p { margin: 12px 0; color: var(--ink); }
 .story-report-note form { display: grid; gap: 9px; }
 .story-report-note label { font-weight: 600; }
 .story-report-note textarea {
@@ -398,7 +398,7 @@ html[data-theme="dark"] .share-btn-twitter .share-icon { filter: invert(1); }
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.read-also-error { margin: 12px 0; color: var(--slate); font-size: .82rem; }
+.read-also-error { margin: 12px 0; color: var(--ink); font-size: .82rem; }
 .read-also-retry {
   margin: 0 0 12px;
   padding: 8px 12px;

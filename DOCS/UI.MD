@@ -54,6 +54,19 @@ the remaiing body should be news and also a button at the end for "load more", n
 ### BRAND COLOUR
 The accent is Signal Cyan. Tokens live in `HOME/static/home/css/base.css`: `--brand` (#22D3EE, fills and anything sitting on the navy nav or footer), `--brand-deep` (#0B6E8A on light paper, cyan on the dark theme, for text and lines), `--brand-hover`, `--brand-wash` and `--on-brand` (navy text that sits on a brand fill). Never hard code the hex in a template or stylesheet. `--amber-alt` is the green used by the profile page despite its name.
 
+### TEXT COLOUR (readability rule)
+Text must stay dark and readable. `--slate` is not a body-text colour.
+
+- Running text uses `--ink`: paragraphs, page intros and ledes, story excerpts, list items, bylines, dates and timestamps, captions, notes, hints, help text, empty-state lines, and table cells.
+- `--slate` is reserved for very short subheadings only (eyebrows and micro labels: a few words, usually uppercase with letter-spacing), and for borders, rules, dividers, separators and icons.
+- Never paint a paragraph or any running text with `--slate` or a low-opacity ink. It reads as washed out or disabled, and it lowers contrast.
+- This is why early pages looked grey: `--slate` had been adopted as a general secondary text token across components. When in doubt, use `--ink`. A short label may still use `--slate`, but nothing longer than a few words.
+
+### AUTHOR HANDBOOK (`/author-handbook/`)
+Template `HOME/templates/HOME/author_handbook.html`, styles `HOME/static/home/css/doc-reader.css` plus `HOME/static/home/css/author-handbook.css`, script `HOME/static/home/js/author-handbook.js`.
+- The default view is one plain vertical document: masthead, a short Contents list, then hairline-ruled sections.
+- A `Read as slides` button in the masthead switches to a horizontal, snap-scrolling deck, one section per slide, for authors who prefer to page through it. A sticky bar with Previous, Next, the slide name and a Close button sits at the top while the deck is open. Arrow keys move, Escape closes. The script only adds this mode; without it the page is still a complete document.
+
 ### AUTHOR PORTFOLIO (`/portfolio/<id>/`)
 Template `STAFF/templates/staff/portfolio.html`, styles `STAFF/static/staff/css/portfolio.css`, numbers computed in `STAFF/views.py`.
 - Placard: a fixed 30% left strip on the nav background (picture, follow button, centred) split from the identity column by a thick brand line, on mobile and desktop alike. Identity column: role, name, email, contact icons (an empty social is skipped), quick facts (sex, team since, last promoted, most covered, last published), counts, follow note, editorial focus.
