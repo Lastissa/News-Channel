@@ -41,7 +41,7 @@
             <button type="button" class="profile-delete-account-btn is-desktop-only"
                     hx-get="{% url 'home:profile_delete_placard' %}?step=1"
                     hx-target="[data-delete-overlay]"
-                    hx-swap="innerHTML">Delete Account</button>
+                    hx-swap="innerHTML">Delete account</button>
           {% endif %}
         </div>
         <div><span>Active sessions</span><strong>{{ user_sessions|length }}</strong></div>
@@ -79,7 +79,8 @@
       <div class="profile-setting-block">
         <div class="setting-row">
           <div class="setting-copy">
-            <span class="setting-label">Login Alert</span>
+            <span class="setting-label">Login alerts</span>
+            <small>Get an email when someone signs in to your account.</small>
             {% comment %} <small>{% if user.receive_email_login_alert %}Receiving login alert{% else %}Not receiving login alert{% endif %}</small> {% endcomment %}
           </div>
           <div class="newsletter-toggle-wrap">
@@ -101,7 +102,7 @@
       <div class="profile-setting-block">
         <div class="setting-row">
           <div class="setting-copy">
-            <span class="setting-label">Receive likes on post</span>
+            <span class="setting-label">Like alerts</span>
             <small>Email alerts when a reader likes your story or your comment.</small>
           </div>
           <div class="newsletter-toggle-wrap">
@@ -124,7 +125,8 @@
       <div class="profile-setting-block">
         <div class="setting-row">
           <div class="setting-copy">
-            <span class="setting-label">Story views alert</span>
+            <span class="setting-label">Story view alerts</span>
+            <small>Get an email when a story you published is viewed.</small>
             {% comment %} <small>{% if profile.get_blog_notification %}Receiving view alert for stories{% else %}Not receiving view alert{% endif %}</small> {% endcomment %}
           </div>
           <div class="newsletter-toggle-wrap">
@@ -146,7 +148,8 @@
       <div class="profile-setting-block">
         <div class="setting-row">
           <div class="setting-copy">
-            <span class="setting-label">New follower alert</span>
+            <span class="setting-label">New follower alerts</span>
+            <small>Get an email when someone starts following you.</small>
           </div>
           <div class="newsletter-toggle-wrap">
             <button
@@ -167,7 +170,7 @@
       <div class="profile-setting-block">
         <div class="setting-row">
           <div class="setting-copy">
-            <span class="setting-label">Comment on post alert</span>
+            <span class="setting-label">Comment alerts</span>
             <small>Email alerts when a reader comments on one of your stories.</small>
           </div>
           <div class="newsletter-toggle-wrap">
@@ -193,7 +196,8 @@
             {% comment %} TODO: A follow btn attached to author profile to know the news to send to users that on this setting
             Currently i plan to send all news with info that they once they have at least one suscribed author, they get only news alert from that one
             {% endcomment %}
-            <span class="setting-label">News Alert</span>
+            <span class="setting-label">News alerts</span>
+            <small>Get the news roundup in your inbox.</small>
             {% comment %} <small>{% if user.send_newsletter %}Receiving news updates{% else %}Not receiving news updates{% endif %}</small> {% endcomment %}
           </div>
           <div class="newsletter-toggle-wrap">
@@ -219,7 +223,7 @@
           <button type="button" class="profile-delete-account-btn profile-delete-account-btn-block"
                   hx-get="{% url 'home:profile_delete_placard' %}?step=1"
                   hx-target="[data-delete-overlay]"
-                  hx-swap="innerHTML">Delete Account</button>
+                  hx-swap="innerHTML">Delete account</button>
         {% endif %}
       </div>
       </div>
@@ -232,7 +236,7 @@
             <h3>Staff Profile</h3>
             <span class="panel-tag">{{ profile.get_role_display|default:"Staff" }}</span>
           </div>
-          <p class="staff-panel-intro">Customize apperance .</p>
+          <p class="staff-panel-intro">Edit the details readers see on your stories and author page.</p>
 
           <form class="staff-profile-form" method="post" action="{% url 'home:profile_staff_update' %}" data-staff-profile-form data-endpoint="{% url 'home:profile_staff_update' %}" novalidate>
             {% csrf_token %}
@@ -378,7 +382,7 @@
           <h3>Following</h3>
           <span class="panel-tag" id="following-count-tag">{{ following_page_obj.paginator.count }} total</span>
         </div>
-        <p>These are the authors you currently follow and receive their newsletter.</p>
+        <p>Authors you follow. You will receive updates when they publish.</p>
         <div class="profile-search">
           <label for="following-search">Search followed authors</label>
           <input type="search" id="following-search" name="q" placeholder="Search followed authors" maxlength="100" autocomplete="off"
@@ -421,7 +425,7 @@
             {% endfor %}
           </ul>
           {% else %}
-          <p class="empty-copy">No comments yet. All comment made on every news appear here</p>
+          <p class="empty-copy">No comments yet. The comments you leave on stories will appear here.</p>
           {% endif %}
         </div>
 

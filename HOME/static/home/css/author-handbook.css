@@ -1,324 +1,171 @@
-/* Author handbook: a single, staff-only reference page.
-   It follows the /profile/ language on purpose: a navy header band, one clear
-   panel per topic, a sticky contents card on the side, and large, high-contrast
-   touch targets. Every colour comes from the base.css tokens, so both themes
-   work with no extra rules here. */
+/* Author handbook: the parts that only this page needs.
+   Layout, hero, contents rail, sections, callouts and tables live in
+   doc-reader.css; colours come from the Signal tokens in base.css. */
 
-.handbook-shell {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 22px 20px 72px;
-}
-
-/* ---------- Hero: the same dark navy as the profile/header band ---------- */
-.handbook-hero {
-  background: var(--nav-bg);
-  color: var(--nav-fg);
-  border-radius: var(--radius-m);
-  padding: 26px 24px 24px;
-  margin-bottom: 26px;
-}
-
-.handbook-kicker {
+/* ---------- Typed codes ---------- */
+.hb-code {
   display: inline-block;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--amber);
-  margin-bottom: 10px;
-}
-
-.handbook-hero h1 {
-  margin: 0 0 10px;
-  color: #fff;
-  font-size: clamp(1.7rem, 1.2rem + 2.4vw, 2.5rem);
-  line-height: 1.12;
-  letter-spacing: -0.01em;
-}
-
-.handbook-hero p {
-  margin: 0;
-  max-width: 74ch;
-  color: var(--nav-fg-light);
-  font-size: 1rem;
-  line-height: 1.65;
-}
-
-.handbook-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 22px;
-}
-
-/* Big, obvious buttons: the first one is the primary action. */
-.handbook-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 12px 20px;
-  border: 1px solid rgba(246, 243, 237, 0.3);
-  border-radius: var(--radius-s);
-  background: rgba(246, 243, 237, 0.1);
-  color: var(--nav-fg);
-  font-size: 0.95rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.handbook-back:first-child {
-  border-color: var(--amber-alt);
-  background: var(--amber-alt);
-  color: #fff;
-}
-
-.handbook-back:hover,
-.handbook-back:focus-visible {
-  border-color: var(--amber);
-  background: rgba(246, 243, 237, 0.18);
-  outline: none;
-}
-
-.handbook-back:first-child:hover,
-.handbook-back:first-child:focus-visible {
-  border-color: var(--amber-alt-deep);
-  background: var(--amber-alt-deep);
-}
-
-/* ---------- Layout: contents card + the manual ---------- */
-.handbook-grid {
-  display: grid;
-  grid-template-columns: 282px minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-}
-
-.handbook-toc {
-  position: sticky;
-  top: calc(var(--header-h) + 16px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  background: var(--surface);
-  padding: 16px;
-  box-shadow: var(--shadow-card);
-}
-
-.handbook-toc h2 {
-  margin: 0 0 12px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid var(--amber-alt);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding: 1px 8px;
+  border: 1px solid var(--doc-rule);
+  border-radius: 4px;
+  background: var(--doc-code-bg);
   color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.86em;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-.handbook-toc ol {
-  margin: 0;
+/* ---------- Steps: a vertical timeline ---------- */
+.hb-steps {
+  max-width: 70ch;
+  margin: 22px 0 0;
   padding: 0;
   list-style: none;
-  counter-reset: toc;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  counter-reset: step;
 }
 
-.handbook-toc li { counter-increment: toc; }
-
-.handbook-toc a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 8px 10px;
-  border-left: 3px solid transparent;
-  border-radius: var(--radius-s);
-  color: var(--ink);
-  font-size: 0.92rem;
-  font-weight: 600;
-  line-height: 1.3;
-  text-decoration: none;
-  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
-}
-
-.handbook-toc a::before {
-  content: counter(toc);
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  border-radius: 4px;
-  background: var(--paper-dim);
-  color: var(--amber-alt-deep);
-  font-size: 0.74rem;
-  font-weight: 800;
-}
-
-.handbook-toc a:hover,
-.handbook-toc a:focus-visible {
-  background: var(--paper-dim);
-  border-left-color: var(--amber-alt);
-  color: var(--amber-alt-deep);
-  outline: none;
-}
-
-.handbook-main { display: flex; flex-direction: column; min-width: 0; }
-
-/* ---------- Topic panels: same shape as a profile card ---------- */
-.hb-section {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  padding: 20px 22px 22px;
-  scroll-margin-top: calc(var(--header-h) + 16px);
-}
-
-.hb-section + .hb-section { margin-top: 20px; }
-
-.hb-section h2 {
+.hb-steps > li {
   position: relative;
-  margin: 0 0 16px;
-  padding: 0 0 12px 14px;
-  border-bottom: 2px solid var(--ink);
-  font-size: clamp(1.25rem, 1rem + 1vw, 1.6rem);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  color: var(--ink);
+  counter-increment: step;
+  margin: 0;
+  padding: 0 0 24px 58px;
+  color: var(--ink-soft);
+  line-height: 1.75;
 }
 
-.hb-section h2::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 4px;
-  bottom: 18px;
-  width: 5px;
-  border-radius: 3px;
-  background: var(--amber-alt);
-}
-
-.hb-section h3 {
-  margin: 22px 0 10px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--amber-alt-deep);
-}
-
-.hb-lead { margin: 0 0 14px; color: var(--ink); line-height: 1.65; }
-
-.hb-section p { line-height: 1.7; color: var(--ink); }
-.hb-section p + p { margin-top: 10px; }
-
-.hb-list { margin: 0; padding-left: 20px; }
-.hb-list li { margin: 8px 0; line-height: 1.65; color: var(--ink); }
-
-.hb-check { list-style: none; margin: 0; padding: 0; }
-.hb-check li { position: relative; margin: 9px 0; padding-left: 34px; line-height: 1.65; color: var(--ink); }
-.hb-check li::before {
+.hb-steps > li::before {
+  content: counter(step);
   position: absolute;
   left: 0;
   top: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #fff;
-}
-.hb-do li::before { content: "\2713"; background: var(--success); }
-.hb-dont li::before { content: "\00D7"; background: var(--danger); }
-
-.hb-callout {
-  border-left: 4px solid var(--amber-alt);
-  background: var(--paper-dim);
-  border-radius: 0 var(--radius-s) var(--radius-s) 0;
-  padding: 14px 16px;
-  margin: 16px 0 0;
-}
-.hb-callout p { margin: 0; color: var(--ink); }
-.hb-callout-warn { border-left-color: var(--danger); }
-.hb-callout-warn strong { color: var(--danger); }
-.hb-callout strong { color: var(--ink); }
-
-.hb-code {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 0.84em;
-  background: var(--paginator-bg);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 1px 6px;
-  color: var(--ink);
-}
-
-.hb-table { width: 100%; border-collapse: collapse; margin: 12px 0 0; font-size: 0.92rem; }
-.hb-table th,
-.hb-table td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.hb-table th {
-  color: var(--ink);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: var(--paper-dim);
-}
-.hb-table td { color: var(--ink); }
-.hb-table tr:last-child td { border-bottom: none; }
-
-.hb-steps { margin: 0; padding-left: 22px; }
-.hb-steps li { margin: 11px 0; line-height: 1.65; color: var(--ink); }
-.hb-steps li strong { color: var(--ink); }
-
-.handbook-foot {
-  margin-top: 26px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--amber-alt);
-  border-radius: 0 var(--radius-s) var(--radius-s) 0;
-  background: var(--surface);
-  text-align: center;
-  color: var(--ink);
-  font-weight: 600;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--doc-rule);
+  border-radius: var(--radius-s);
+  background: var(--doc-tint-strong);
+  color: var(--brand-deep);
   font-size: 0.92rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-/* ---------- Responsive ---------- */
-@media (max-width: 880px) {
-  .handbook-grid { grid-template-columns: 1fr; gap: 18px; }
-  .handbook-toc { position: static; }
-  /* On phones the contents becomes a wrap of tappable rows instead of a tall
-     vertical card, so it never pushes the manual far down the page. */
-  .handbook-toc ol {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .handbook-toc li { flex: 1 1 auto; }
-  .handbook-toc a {
-    min-height: 40px;
-    border-left: none;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-s);
-    padding: 6px 12px 6px 8px;
-  }
-  .handbook-toc a:hover,
-  .handbook-toc a:focus-visible { border-color: var(--amber-alt); }
+.hb-steps > li::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 46px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--doc-rule);
+}
+
+.hb-steps > li:last-child { padding-bottom: 0; }
+.hb-steps > li:last-child::after { display: none; }
+.hb-steps > li:hover::before { border-color: var(--brand-deep); background: var(--brand-deep); color: var(--paper); }
+.hb-steps strong { color: var(--ink); }
+
+/* ---------- Do and do not panels ---------- */
+.hb-pair {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.hb-panel {
+  --panel: var(--doc-do);
+  --panel-wash: var(--doc-do-wash);
+  --panel-ic: var(--ic-check);
+  max-width: 70ch;
+  margin-top: 22px;
+  padding: 22px 22px 14px;
+  border: 1px solid var(--doc-rule);
+  /* border-radius: var(--radius-m); */
+  background: var(--panel-wash);
+}
+
+.hb-panel--dont {
+  --panel: var(--doc-dont);
+  --panel-wash: var(--doc-dont-wash);
+  --panel-ic: var(--ic-cross);
+}
+
+.hb-pair .hb-panel { max-width: none; margin-top: 0; }
+
+.doc-section .hb-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 8px;
+  color: var(--panel);
+  font-size: 1.08rem;
+}
+
+.hb-panel h3::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  background: var(--panel);
+  -webkit-mask: var(--panel-ic) center / contain no-repeat;
+  mask: var(--panel-ic) center / contain no-repeat;
+}
+
+.hb-check { margin: 0; padding: 0; list-style: none; }
+
+.hb-check li {
+  position: relative;
+  margin: 0;
+  padding: 11px 0 11px 32px;
+  border-top: 1px solid var(--doc-rule);
+  color: var(--ink);
+  line-height: 1.65;
+  word-spacing: 0.5px;
+}
+
+.hb-check li:first-child { border-top: 0; }
+
+.hb-check li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 14px;
+  width: 18px;
+  height: 18px;
+  background: var(--panel);
+  -webkit-mask: var(--panel-ic) center / contain no-repeat;
+  mask: var(--panel-ic) center / contain no-repeat;
+}
+
+/* ---------- Status chips in the review table ---------- */
+.hb-result { display: block; }
+.hb-result + .hb-result { margin-top: 8px; }
+
+.hb-chip {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 16px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+}
+
+.hb-chip--block { background: var(--doc-dont-wash); color: var(--doc-dont); }
+.hb-chip--warn { background: var(--doc-note-wash); color: var(--doc-note); }
+
+@media (min-width: 760px) {
+  .hb-pair { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 560px) {
-  .handbook-shell { padding: 16px 14px 56px; }
-  .handbook-hero { padding: 20px 18px; }
-  .hb-section { padding: 18px 16px; }
-  .hb-section h2 { padding-left: 12px; }
-  .hb-table th, .hb-table td { padding: 10px; }
-  .handbook-back { width: 100%; }
+  .hb-steps > li { padding-left: 50px; }
+  .hb-steps > li::before { width: 34px; height: 34px; }
+  .hb-steps > li::after { left: 16px; top: 42px; }
+  .hb-panel { padding: 18px 16px 10px; }
 }

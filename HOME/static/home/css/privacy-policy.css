@@ -1,0 +1,144 @@
+/* Privacy policy: a plain, single-column document.
+   A hairline rule under the masthead, hairline rules between sections, and one
+   accent colour for links. No cards, tiles, progress bar or sticky contents. */
+
+.pol-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 20px 72px;
+}
+
+/* ---------- masthead ---------- */
+.pol-masthead {
+  padding: 40px 0 32px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pol-eyebrow {
+  margin: 0 0 14px;
+  color: var(--slate);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.pol-title {
+  margin: 0 0 18px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 1.5rem + 2.2vw, 2.9rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.pol-lede {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.pol-lede:last-child { margin-bottom: 0; }
+
+/* ---------- table of contents ---------- */
+.pol-toc {
+  padding: 26px 0 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pol-toc-title {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pol-toc-list {
+  margin: 0;
+  padding-left: 1.2em;
+  columns: 2;
+  column-gap: 40px;
+  color: var(--slate);
+}
+
+.pol-toc-list li {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  break-inside: avoid;
+}
+
+.pol-toc-list a {
+  color: var(--amber-deep);
+  font-weight: 700;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.pol-toc-list a:hover { text-decoration: underline; }
+
+.pol-toc-list a:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---------- sections ---------- */
+.pol-body { padding: 6px 0 0; }
+
+.pol-section {
+  padding: 32px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.pol-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.pol-section h2 {
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.pol-section p {
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.pol-section p:last-child { margin-bottom: 0; }
+
+.pol-section a {
+  color: var(--amber-deep);
+  font-weight: 700;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.pol-section a:hover { text-decoration: underline; }
+
+.pol-section a:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 620px) {
+  .pol-page { padding: 0 16px 56px; }
+  .pol-masthead { padding: 28px 0 24px; }
+  .pol-section { padding: 26px 0; }
+  .pol-toc { padding: 22px 0 24px; }
+  .pol-toc-list { columns: 1; }
+}

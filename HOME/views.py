@@ -156,6 +156,7 @@ class SitemapXmlView(View):
         )
         urls = [
             {"loc": f"{domain}/", "lastmod": "", "changefreq": "hourly", "priority": "1.0"},
+            {"loc": f"{domain}{reverse('home:about')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
             {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": "", "changefreq": "yearly", "priority": "0.3"},
             {"loc": f"{domain}{reverse('home:promote')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
             #   /archive/ now also carries every image/file's own real,
@@ -229,9 +230,9 @@ class LlmsTxtView(View):
         "WAEC": "WAEC examinations, results, registration and timetables.",
         "NECO": "NECO examinations, results and candidate news.",
         "SCHOLARSHIP": "Scholarships, grants and funding for Nigerian students.",
-        "GENERAL": "General education and student-interest news.",
+        "GENERAL": "General news and current affairs.",
         "TODAY IN HISTORY": "Notable events in Nigerian and world history.",
-        "TECHNOLOGY": "Technology, digital skills and innovation relevant to students.",
+        "TECHNOLOGY": "Technology, digital skills and innovation.",
         "EDUCATION": "Education policy, funding, institutions and sector-wide news.",
     }
 
@@ -256,15 +257,12 @@ class LlmsTxtView(View):
         lines = [
             f"# {name}",
             "",
-            f"> {catchphrase} {name} is a Nigerian education news platform reporting verified, "
-            "up-to-date news for students, admission seekers, parents, educators and institutions.",
+            f"> {catchphrase} {name} is a Nigerian news platform reporting verified, "
+            "up-to-date news across many genres, with a strong focus on Nigeria and Africa.",
             "",
-            f"{name} publishes original reporting and verified updates on Nigerian tertiary "
-            "education and the things that affect students' academic lives. Coverage includes "
-            "universities, polytechnics and colleges of education; admission and examination "
-            "bodies such as JAMB, WAEC and NECO; scholarships and student grants; education "
-            "policy and funding; campus news; and technology and careers relevant to young "
-            "Nigerians.",
+            f"{name} publishes original reporting and verified updates for a general audience. "
+            "Coverage spans education, politics, business, science, sports, arts and culture, "
+            "entertainment and general news, with Nigeria and Africa as its main focus.",
             "",
             "Facts come before speed. Information is checked against official sources, "
             "institutional announcements and credible documents before it is published, and the "
@@ -274,7 +272,7 @@ class LlmsTxtView(View):
             f"- Canonical domain: {domain}",
             f"- Tagline: {catchphrase}",
             "- Primary language: English",
-            "- Coverage: Nigeria, focused on tertiary education, student life and daily recent news",
+            "- Coverage: news across many genres, with a strong focus on Nigeria and Africa",
             "- Cadence: multiple updates most days",
             "",
             "## What we cover",
@@ -304,6 +302,7 @@ class LlmsTxtView(View):
             f"- [Home]({domain}/): latest stories and the day's headlines.",
             f"- [Archive]({domain}/archive/): every published story plus the image and file gallery.",
             f"- [Editorial team]({domain}/editorial/): who reports for {name} and how we work.",
+            f"- [About us]({domain}{reverse('home:about')}): what we cover and how we report it.",
             f"- [Privacy policy]({domain}{reverse('home:privacy_policy')})",
             f"- [Advertise and partner with us]({domain}{reverse('home:promote')})",
             f"- [Author handbook]({domain}{reverse('home:author_handbook')}): the writing and formatting guide for our reporters.",
@@ -822,7 +821,7 @@ class SearchView(View):
 
         project = About.project_name
         if query:
-            meta_description = f'Search results for "{query}" across {project} news, reports and updates for Nigerian students and readers.'
+            meta_description = f'Search results for "{query}" across {project} news, reports and updates, with a strong focus on Nigeria and Africa.'
         else:
             meta_description = f"Search {project} news, reports and updates. Type a keyword to find the education, university and policy stories that matter to you."
 
@@ -867,7 +866,7 @@ class CategoryView(View):
             "category_slug": slug,
             "is_filtered": True,
             "canonical_url": canonical_url,
-            "meta_description": f"Latest {label} news and updates from {About.project_name}: verified reports for Nigerian students, universities and readers.",
+            "meta_description": f"Latest {label} news and updates from {About.project_name}: verified reporting with a strong focus on Nigeria and Africa.",
             "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
             **_page_context(page, request.user),
         }
@@ -1281,6 +1280,18 @@ class NewsletterSubscribeView(View):
         info_logger( msg = f"NEWSLETTER SIGNUP: {email} subscribed, account created")
         _try_send_newsletter_subscribe_email(email)
         return _response({"detail": "Welcome Odogwu."}, status=201)
+
+
+class AboutView(View):
+    """Public about page: what we cover, how we report, and who writes it.
+
+    Everything on the page is reused from the editable config and existing
+    pages (editorial team, privacy policy, archive), so no newsroom detail is
+    invented for it.
+    """
+
+    def get(self, request):
+        return render(request, "HOME/about.html", {"latest_posts": latest_stories_for_404(3)})
 
 
 class PrivacyPolicyView(View):

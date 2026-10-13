@@ -1,0 +1,208 @@
+/* About: a plain "About Us" page with a short list of the latest stories.
+   Prose on the page background, hairline rules for the sections, one accent
+   colour for links. No cards, no decoration. On desktop the latest-stories
+   list sits in a column to one side; on smaller screens it drops in just
+   above the contact block. */
+
+.about-page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 20px 72px;
+}
+
+/* ---------- masthead ---------- */
+.about-masthead {
+  padding: 40px 0 32px;
+  border-bottom: 1px solid var(--line);
+}
+
+.about-eyebrow {
+  margin: 0 0 14px;
+  color: var(--slate);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.about-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 1.5rem + 2.2vw, 2.9rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- layout: prose + latest news ---------- */
+.about-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 48px;
+  align-items: start;
+}
+
+/* ---------- prose ---------- */
+.about-prose { padding: 32px 0 0; }
+
+.about-prose p {
+  margin: 0 0 20px;
+  color: var(--ink);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.about-prose p:last-child { margin-bottom: 0; }
+
+/* ---------- latest news: list tiles ---------- */
+.about-news { padding-top: 32px; }
+
+.about-news-title {
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.about-news-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.about-news-item {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.about-news-thumb {
+  display: block;
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  background: var(--paper-dim);
+}
+
+.about-news-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.about-news-body { min-width: 0; }
+
+.about-news-link {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.about-news-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.about-news-link:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.about-news-time {
+  display: block;
+  margin-top: 5px;
+  color: var(--slate);
+  font-size: 0.8rem;
+}
+
+/* ---------- contact ---------- */
+.about-block {
+  margin-top: 40px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+
+.about-block-title {
+  margin: 0 0 18px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.about-contact { margin: 0; }
+
+.about-contact > div {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 4px 24px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.about-contact > div:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.about-contact dt {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.about-contact dd { margin: 0; font-size: 0.95rem; }
+
+.about-contact a,
+.about-inline-link {
+  color: var(--amber-deep);
+  font-weight: 700;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.about-contact a { word-break: break-word; }
+
+.about-contact a:hover,
+.about-inline-link:hover { text-decoration: underline; }
+
+.about-contact a:focus-visible,
+.about-inline-link:focus-visible {
+  outline: 2px solid var(--amber-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.about-legal {
+  margin: 20px 0 0;
+  color: var(--slate);
+  font-size: 0.92rem;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 860px) {
+  /* Prose, then the latest-stories list, then contact. */
+  .about-layout { grid-template-columns: 1fr; gap: 0; }
+  .about-news { padding-top: 32px; }
+}
+
+@media (max-width: 620px) {
+  .about-page { padding: 0 16px 56px; }
+  .about-masthead { padding: 28px 0 24px; }
+  .about-block { margin-top: 32px; padding-top: 32px; }
+  .about-contact > div { grid-template-columns: 1fr; gap: 4px; }
+}

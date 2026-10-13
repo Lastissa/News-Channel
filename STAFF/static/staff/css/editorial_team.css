@@ -12,7 +12,7 @@
   width: min(100% - 32px, 1240px);
   margin: 0 auto;
   padding: 28px 0 96px;
-  color: var(--ef-ink);
+  color: var(--ink);
   font-family: var(--font-body), "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -36,7 +36,7 @@
 .ef-intro::before {
   width: 56px;
   height: 4px;
-  background: var(--ef-accent);
+  background: var(--brand-deep);
   content: "";
 }
 
@@ -49,7 +49,7 @@
 
 .ef-count {
   margin: 0;
-  color: var(--ef-slate);
+  color: var(--slate);
   font-size: .9rem;
 }
 
@@ -60,6 +60,7 @@
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
   margin-top: 28px;
   background: var(--ef-soft);
+  color: var(--ef-ink);
 }
 
 .ef-ph {
@@ -236,14 +237,14 @@
 }
 
 .ef-card .ef-t li {
-  color: var(--ef-accent);
+  color: var(--brand-deep);
   font-size: .78rem;
   font-weight: 700;
 }
 
 .ef-card .ef-t li + li::before {
   margin-right: 8px;
-  color: var(--ef-line);
+  color: var(--line);
   content: "/";
 }
 
@@ -263,8 +264,8 @@
   justify-content: space-between;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid var(--ef-line);
-  color: var(--ef-slate);
+  border-top: 1px solid var(--line);
+  color: var(--slate);
   font-size: .85rem;
 }
 
@@ -278,8 +279,8 @@
 .ef-empty {
   margin-top: 36px;
   padding: 56px 24px;
-  border: 1px solid var(--ef-line);
-  background: var(--ef-soft);
+  border: 1px solid var(--line);
+  background: var(--paper-dim);
   text-align: center;
 }
 
@@ -290,7 +291,7 @@
 
 .ef-empty p {
   margin: 0;
-  color: var(--ef-slate);
+  color: var(--slate);
 }
 
 /* Shared eyebrow ------------------------------------------------------- */
@@ -300,7 +301,7 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  color: var(--ef-accent);
+  color: var(--brand-deep);
   font-size: .72rem;
   font-weight: 700;
   letter-spacing: .13em;
@@ -313,7 +314,7 @@
 .editorial-standards {
   margin-top: clamp(74px, 10vw, 128px);
   padding-top: 26px;
-  border-top: 2px solid var(--ef-ink);
+  border-top: 2px solid var(--ink);
 }
 
 .editorial-standards > .ef-eyebrow {
@@ -322,7 +323,7 @@
 
 .editorial-standards h2 {
   margin: 0;
-  color: var(--ef-ink);
+  color: var(--ink);
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(2.25rem, 4vw, 3.6rem);
   font-weight: 500;
@@ -348,11 +349,11 @@
 
 .editorial-standards-grid article {
   padding-top: 15px;
-  border-top: 1px solid var(--ef-line);
+  border-top: 1px solid var(--line);
 }
 
 .editorial-standards-grid article > span {
-  color: var(--ef-accent);
+  color: var(--brand-deep);
   font-size: .73rem;
   font-weight: 700;
   letter-spacing: .08em;
@@ -369,7 +370,7 @@
 .editorial-standards-grid p {
   max-width: 36ch;
   margin: 0;
-  color: var(--ef-slate);
+  color: var(--slate);
   font-size: .9rem;
   line-height: 1.6;
 }
@@ -560,7 +561,7 @@
     top: calc(64px + 10px + var(--i) * 9px);
     padding-bottom: 16px;
     background: var(--paper);
-    box-shadow: 1px 2px 5px var(--ef-slate);
+    border: 1px solid var(--line);
   }
 
   .ef-card > *:not(.ef-ph) {

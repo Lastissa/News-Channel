@@ -36,6 +36,7 @@ urlpatterns = [
     path("continue-reading/", views.ContinueReadingFeedView.as_view(), name="continue_feed"),
     path("bookmark/<int:blog_id>/", views.BookmarkView.as_view(), name="bookmark"),
     path("newsletter/", views.NewsletterSubscribeView.as_view(), name="newsletter"),
+    path("about/", views.AboutView.as_view(), name="about"),
     path("privacy-policy/", views.PrivacyPolicyView.as_view(), name="privacy_policy"),
     path("promote-your-bussiness/", views.PromoteView.as_view(), name="promote"),
     path("most-viewed/", views.MostViewedView.as_view(), name="most_viewed"),

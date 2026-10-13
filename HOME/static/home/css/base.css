@@ -4,7 +4,7 @@
   --nav-bg-dynamic:var(--nav-bg);
   --nav-bg-light:#0e1b2cc5;
   --nav-fg:#F6F3ED;
-  --nav-fg-light:#edf1f680;
+  --nav-fg-light:#edf1f6cc;
   --ink-soft: #1F2A37;
   --paper-very-transparent:#fbf6ea;
   --paper: white;/*#fffcf7;*/
@@ -14,7 +14,7 @@
   --amber: #e8a324d3;
   --amber-alt:rgb(15, 113, 15);
   --amber-alt-deep:rgb(24, 100, 24);
-  --amber-deep: #af700a;
+  --amber-deep: #8a5600;
   --slate: #5B6B7C;
   --line: rgba(14, 27, 44, 0.12);
   --success: #2F7A4D;
@@ -44,6 +44,30 @@
   --toast-fg: #0E1B2C;
   --toast-accent: #0B6E8A;
   --toast-accent-error: #B3402A;
+  /* ---- Signal: colour set for long reading pages (author handbook, privacy policy) ----
+     --signal is one fixed cyan for glow and fills on always-dark surfaces, so it does not
+     flip with the theme the way --brand does. The rest are cool tints and rules for paper,
+     plus do / do not / note colours so guidance reads at a glance. */
+  --signal: #22D3EE;
+  --signal-ink: #04202A;
+  /* Text colour for anything sitting on a --signal fill. Fixed because
+     --signal stays cyan in both themes, so --ink would be unreadable in dark. */
+  --on-signal: #04202A;
+  --doc-night: #07101C;
+  --doc-hero-text: #c9d4de;
+  --doc-grid: rgba(34, 211, 238, 0.10);
+  --doc-glow: rgba(34, 211, 238, 0.32);
+  --doc-glow-soft: rgba(11, 110, 138, 0.14);
+  --doc-tint: #F3F8FB;
+  --doc-tint-strong: #E3EEF4;
+  --doc-rule: rgba(11, 110, 138, 0.20);
+  --doc-code-bg: #E8F1F6;
+  --doc-do: #1F7A4D;
+  --doc-do-wash: rgba(31, 122, 77, 0.12);
+  --doc-dont: #B3402A;
+  --doc-dont-wash: rgba(179, 64, 42, 0.11);
+  --doc-note: #8A5300;
+  --doc-note-wash: rgba(232, 163, 36, 0.18);
   color-scheme: light;
 }
 
@@ -80,6 +104,18 @@ html[data-theme="dark"] {
   --toast-fg: #F3EFE6;
   --toast-accent: #22D3EE;
   --toast-accent-error: #FF8876;
+  /* Signal set, dark theme: brighter marks on a deep navy, same roles as in :root. */
+  --doc-glow-soft: rgba(34, 211, 238, 0.16);
+  --doc-tint: #0F1C2D;
+  --doc-tint-strong: #172A41;
+  --doc-rule: rgba(34, 211, 238, 0.22);
+  --doc-code-bg: #182c44;
+  --doc-do: #4CC38A;
+  --doc-do-wash: rgba(76, 195, 138, 0.14);
+  --doc-dont: #FF8876;
+  --doc-dont-wash: rgba(255, 136, 118, 0.14);
+  --doc-note: #EDB35A;
+  --doc-note-wash: rgba(237, 179, 90, 0.16);
   color-scheme: dark;
 }
 
@@ -211,7 +247,7 @@ button { font-family: inherit; cursor: pointer; }
 .primary-nav a.soon { opacity: 0.6; cursor: default; }
 .soon-tag {
   font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
-  background: rgba(246, 243, 237, 0.14); color: lightgreen; border-radius: 4px; padding: 1px 5px; margin-left: 4px;
+  background: rgba(246, 243, 237, 0.14); color: #9be59b; border-radius: 4px; padding: 1px 5px; margin-left: 4px;
 }
 
 .has-dropdown { position: relative; }
@@ -347,7 +383,7 @@ html[data-theme="dark"] .icon-moon { display: block; }
 }
 .notfound-home-link {
   display: inline-flex; padding: 10px 18px; border-radius: var(--radius-m);
-  background: var(--amber); color: var(--ink); font-weight: 700; font-size: 0.9rem;
+  background: var(--amber); color: #0E1B2C; font-weight: 700; font-size: 0.9rem;
 }
 .notfound-home-link:hover { background: var(--amber-deep); }
 
@@ -494,7 +530,7 @@ html.auth-gate-locked { overflow: hidden; }
 
 .hero-controls { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 3; display: flex; align-items: center; justify-content: center; gap: 18px; }
 .hero-arrow { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; }
-.hero-arrow:hover { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+.hero-arrow:hover { background: var(--amber); color: #0E1B2C; border-color: var(--amber); }
 .hero-dots { display: flex; align-items: center; gap: 8px; }
 .hero-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.4); border: none; padding: 0; transition: background 0.2s ease, width 0.25s ease; }
 .hero-dot.is-active { background: var(--amber); width: 26px; }
@@ -579,8 +615,9 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 }
 /* TOP MOST TICKER */
 .ad-ticker {
-  background: linear-gradient(var(--brand), 95%, var(--brand-deep));
-  color: var(--ink);
+  background-color: var(--brand);
+  background: linear-gradient(90deg, var(--brand), var(--brand-deep));
+  color: #0E1B2C;
   padding: 8px 0;
 }
 
@@ -588,7 +625,7 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 .headline-ticker {
   flex: 1 1 auto;
   min-width: 0;
-  background: linear-gradient(var(--paper), 95%, var(--slate));
+  background: var(--paper);
   color: var(--ink);
   padding: 7px 0;
   clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
@@ -759,7 +796,7 @@ a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 }
 .newsletter-form input::placeholder { color: rgba(246,243,237,0.45); }
 .newsletter-form button {
-  padding: 11px 20px; border-radius: var(--radius-m); border: none; background: var(--amber); color: var(--ink);
+  padding: 11px 20px; border-radius: var(--radius-m); border: none; background: var(--amber); color: #0E1B2C;
   font-weight: 700; font-size: 0.9rem; transition: background 0.15s ease;
 }
 .newsletter-form button:hover { background: #f4b743; }
@@ -919,7 +956,7 @@ a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 .social-row a {
   width: 34px; height: 34px; border-radius: 50%; background: rgba(246,243,237,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--nav-fg);
 }
-.social-row a:hover { background: var(--amber); color: var(--ink); }
+.social-row a:hover { background: var(--amber); color: #0E1B2C; }
 .social-row svg { width: 16px; height: 16px; }
 .social-row p {
   margin: 0; color: var(--nav-fg-light); font-size: 0.82rem; font-weight: 600; line-height: 1.4; flex: 1; word-break: break-word;
@@ -1221,7 +1258,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   border-color: var(--nav-bg); background: transparent; color: var(--ink);
 }
 .follow-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-.follow-btn[data-following="true"] { background: var(--surface); border-color: var(--nav-bg); color: green; }
+.follow-btn[data-following="true"] { background: var(--surface); border-color: var(--nav-bg); color: var(--amber-alt-deep); }
 .follow-btn[data-following="true"] .follow-icon-plus { display: none; }
 .follow-btn[data-following="true"] .follow-icon-check { display: block; }
 .follow-btn[data-following="true"]:hover, .follow-btn[data-following="true"]:focus-visible {
@@ -1281,7 +1318,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   display: flex; gap: 1px; flex-wrap: wrap; margin-top: 14px;
 }
 .author-socials a {
-  display: inline-flex; align-items: center; justify-content: center; margin: 6px 10px; border-radius: 999px; background: white; border: 1px solid var(--line); font-size: 0.8rem; font-weight: 600; color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center; margin: 6px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 0.8rem; font-weight: 600; color: var(--ink-soft);
 }
 .author-more-stories {
   margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--line);
@@ -1788,7 +1825,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   border-radius: var(--radius-m);
   border: none;
   background: var(--amber);
-  color: var(--ink);
+  color: #0E1B2C;
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
@@ -2144,7 +2181,7 @@ html.nav-locked { overflow: hidden; }
   background: rgba(246, 243, 237, 0.08); border: 1px solid rgba(246, 243, 237, 0.16); color: var(--nav-fg);
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.footer-col .footer-contact-socials a:hover { background: var(--amber); color: var(--ink); transform: translateY(-1px); }
+.footer-col .footer-contact-socials a:hover { background: var(--amber); color: #0E1B2C; transform: translateY(-1px); }
 .footer-contact-socials svg { width: 18px; height: 18px; }
 
 /* =====================================================================

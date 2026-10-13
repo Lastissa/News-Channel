@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}About {{ project_name }} · {{ project_cachphrase }}{% endblock %}
+{% block meta_description %}About {{ project_name }}: news across all genres with a strong focus on Nigeria and Africa, and how to reach us.{% endblock %}
+{% block og_type %}website{% endblock %}
+{% block og_title %}About {{ project_name }} · {{ project_cachphrase }}{% endblock %}
+{% block og_description %}News across all genres with a strong focus on Nigeria and Africa.{% endblock %}
+{% block twitter_title %}About {{ project_name }}{% endblock %}
+{% block twitter_description %}News across all genres with a strong focus on Nigeria and Africa.{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    "name": "About {{ project_name|escapejs }}",
+    "url": "{{ site_domain }}{% url 'home:about' %}",
+    "mainEntity": {
+      "@type": "NewsMediaOrganization",
+      "name": "{{ project_name|escapejs }}",
+      "url": "{{ site_domain }}/",
+      "logo": "{{ site_domain }}{% static 'logo.jpg' %}"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="{% static 'home/css/about.css' %}?v=20261013-4">
+{% endblock %}
+
+{% block content %}
+{% static 'home_no_bg.svg' as story_placeholder %}
+<main class="about-page">
+  <header class="about-masthead">
+    <p class="about-eyebrow">{{ project_name }}</p>
+    <h1 class="about-title">About Us</h1>
+  </header>
+
+  <div class="about-layout">
+    <div class="about-prose">
+      <p>
+        Easily access the major news of the day with a strong focus on Nigeria and Africa. We cover
+        all genres, including education, politics, business, science, sports, arts and culture,
+        entertainment and fashion.
+      </p>
+      <p>
+        {{ project_name }} is a general news platform, not limited to one subject. As well as the
+        main stories, we like to highlight positive stories about Nigeria and Africa. We publish
+        throughout the day, and we check information before we publish it and link to the source
+        where we can, so you can verify it yourself.
+      </p>
+      <p>
+        {% if support_email and "@" in support_email %}If you find a mistake, or have a story to share, email <a href="mailto:{{ support_email }}">{{ support_email }}</a> and we will look into it.{% else %}If you find a mistake, or have a story to share, tell us and we will look into it.{% endif %}
+      </p>
+    </div>
+
+    {% if latest_posts %}
+    <aside class="about-news" aria-labelledby="about-news-title">
+      <h2 class="about-news-title" id="about-news-title">Latest news</h2>
+      <ul class="about-news-list">
+        {% for post in latest_posts %}
+        <li class="about-news-item">
+          <a class="about-news-thumb" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true">
+            <img src="{{ post.image_1|default:story_placeholder }}" alt="" loading="lazy" decoding="async">
+          </a>
+          <div class="about-news-body">
+            <a class="about-news-link" href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a>
+            <time class="about-news-time" datetime="{{ post.date_created|date:'c' }}">{{ post.date_created|date:"M d, Y" }}</time>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </aside>
+    {% endif %}
+  </div>
+
+  <section class="about-block" aria-labelledby="about-contact">
+    <h2 id="about-contact" class="about-block-title">Contact</h2>
+    <dl class="about-contact">
+      {% if support_email and "@" in support_email %}
+      <div>
+        <dt>Support and general enquiries</dt>
+        <dd><a href="mailto:{{ support_email }}">{{ support_email }}</a></dd>
+      </div>
+      {% endif %}
+      {% if tech_expert_email and "@" in tech_expert_email %}
+      <div>
+        <dt>Corrections and story tips</dt>
+        <dd><a href="mailto:{{ tech_expert_email }}">{{ tech_expert_email }}</a></dd>
+      </div>
+      {% endif %}
+      {% if partnership_email and "@" in partnership_email %}
+      <div>
+        <dt>Advertising and partnerships</dt>
+        <dd><a href="mailto:{{ partnership_email }}">{{ partnership_email }}</a></dd>
+      </div>
+      {% endif %}
+    </dl>
+    <p class="about-legal">
+      Reading about your data? See the <a class="about-inline-link" href="{% url 'home:privacy_policy' %}">privacy policy</a>.
+    </p>
+  </section>
+
+</main>
+{% endblock %}

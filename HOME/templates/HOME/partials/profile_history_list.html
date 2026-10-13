@@ -14,7 +14,7 @@
 {% elif search_query %}
 <p class="empty-copy">No stories in your history match &quot;{{ search_query }}&quot;.</p>
 {% else %}
-<p class="empty-copy">No reading history yet. All news you view shows here</p>
+<p class="empty-copy">No reading history yet. Stories you open will appear here.</p>
 {% endif %}
 
 {% url 'home:profile_history' as history_endpoint %}

@@ -7,13 +7,13 @@
     {% include "includes/splash_head.html" %}
     {% comment %} {% csrf_token %} {% endcomment %}
     <title>{% block title %}{{ project_name }} · {{ project_cachphrase }}{% endblock %}</title>
-    <meta name="description" content="{% block meta_description %}{{ project_name }} brings verified education, university, exam, scholarship and policy news for Nigerian students, with clear reporting and sources you can check.{% endblock %}">
+    <meta name="description" content="{% block meta_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
     {% block meta_robots %}<meta name="robots" content="index, follow">{% endblock %}
     <meta property="og:site_name" content="{{ project_name }}">
     <meta property="og:locale" content="en_NG">
     <meta property="og:type" content="{% block og_type %}website{% endblock %}">
     <meta property="og:title" content="{% block og_title %}{{ project_name }} · {{ project_cachphrase }}{% endblock %}">
-    <meta property="og:description" content="{% block og_description %}{{ project_name }} brings verified education, university, exam, scholarship and policy news for Nigerian students, with clear reporting and sources you can check.{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
     {% comment %}
       Every page is self canonical by default. A page that owns a meaningful
       query string (search results keep ?q=, for example) passes `canonical_url`
@@ -24,7 +24,7 @@
     {% comment %} Default Twitter card. Pages may override the three blocks below and the og:image block further down adds a matching twitter:image. {% endcomment %}
     <meta name="twitter:card" content="{% block twitter_card %}summary{% endblock %}">
     <meta name="twitter:title" content="{% block twitter_title %}{{ project_name }} · {{ project_cachphrase }}{% endblock %}">
-    <meta name="twitter:description" content="{% block twitter_description %}{{ project_name }} brings verified education, university, exam, scholarship and policy news for Nigerian students, with clear reporting and sources you can check.{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
     {% comment %} ONCE WE HAVE AN OFFICAL X HANDLE, I WILL ATTACH twitter:site HERE {% endcomment %}
     <link rel="icon" type="image/jpeg" href="{% static "logo.jpg" %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
