@@ -771,9 +771,11 @@
      Only commands that act the moment they are typed live here (line-start
      markers and img/file tokens). **bold** and __italic__ are left out
      because they only work once the closing marker is typed.
-     The command always lands at the start of a line, because the parser only
-     recognises these at the start of a line. If text is selected, the marker
-     is put in front of it. */
+     A line-start command (data-insert-kind="line", the default) always lands
+     at the start of a line, because the parser only recognises those at the
+     start of a line. An inline command (data-insert-kind="inline", e.g. the
+     Link button) is dropped in place at the cursor instead. If text is
+     selected, the marker is put in front of it. */
   function insertAtCursor(text) {
     contentInput.focus();
     var done = false;
@@ -794,9 +796,10 @@
       var end = contentInput.selectionEnd;
       var atLineStart = start === 0 || value.charAt(start - 1) === "\n";
       var selected = value.slice(start, end);
+      var inline = btn.getAttribute("data-insert-kind") === "inline";
 
       /* a selection that is already a whole line keeps its text, the marker goes in front */
-      var prefix = atLineStart ? "" : "\n";
+      var prefix = (!inline && !atLineStart) ? "\n" : "";
       contentInput.focus();
       if (selected) {
         contentInput.setSelectionRange(start, end);
