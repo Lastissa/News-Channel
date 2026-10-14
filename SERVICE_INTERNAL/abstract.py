@@ -45,6 +45,28 @@ BOT_USER_AGENT_MARKERS = (
     "linkedinbot", "pinterest", "embedly", "quora link preview", "outbrain",
     "vkshare", "w3c_validator", "google-inspectiontool", "postmanruntime",
     "go-http-client", "java/", "libwww-perl", "okhttp",
+    #   ---- ADDED: crawlers/clients seen in production logs (Oct 2026) whose
+    #   UA does not necessarily contain one of the generic tokens above ----
+    #   AI / LLM and answer-engine fetchers
+    "chatgpt-user", "cohere-ai", "anthropic-ai", "claude-web", "perplexity",
+    "meta-externalagent", "apis-google",
+    #   search engines and SEO crawlers the generic tokens miss
+    "seznam", "megaindex", "qwantify", "screaming frog", "baidu", "sogou",
+    "yisou", "yeti/", "google-read-aloud",
+    #   RSS / feed fetchers (a feed poll is not a human page read)
+    "feedfetcher", "feedly", "feedspot", "inoreader", "newsblur", "feedbin",
+    "superfeedr",
+    #   social / chat link-preview fetchers not caught above
+    "slack-imgproxy",
+    #   HTTP clients and scripted libraries a real browser never sends
+    "httpx", "aiohttp", "node-fetch", "undici", "got (", "guzzle", "http.rb",
+    "ruby/", "php/", "dart/", "deno/", "bun/", "powershell", "winhttp",
+    "mechanize", "zend_http_client", "libcurl",
+    #   headless browsers, automation and site-audit tools
+    "headless", "puppeteer", "webdriver", "chrome-lighthouse", "lighthouse",
+    #   uptime and health monitors
+    "pingdom", "statuscake", "site24x7", "datadog", "newrelic", "kube-probe",
+    "elb-healthchecker", "googlehc", "healthcheck",
 )
 
 

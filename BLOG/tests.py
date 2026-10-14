@@ -18,6 +18,7 @@ from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Comment
 from BLOG.views import parse_story_content, StoryDetailView
+from SERVICE_INTERNAL.abstract import is_bot_request
 from STAFF.models import StaffProfile
 
 
@@ -853,3 +854,43 @@ class Bug1PreservationContextPBTTest(HypothesisTestCase):
                 f"This tracking must survive the Bug 1 fix."
             ),
         )
+
+
+class BotDetectionTests(TestCase):
+    """`is_bot_request` is the only gate keeping crawler/scripted traffic out
+    of the story view counter (see BLOG.views.StoryDetailView). These tests
+    pin the marker list so a future edit cannot silently let a crawler back
+    in, and -- just as important -- cannot start treating a real browser as
+    a bot (which would freeze the counter)."""
+
+    @staticmethod
+    def _request(user_agent):
+        request = RequestFactory().get("/")
+        request.META["HTTP_USER_AGENT"] = user_agent
+        return request
+
+    def test_crawlers_and_scripted_clients_are_detected(self):
+        crawlers = [
+            # SemrushBot was already covered; kept to guard the regression.
+            "Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)",
+            "meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)",
+            "Mozilla/5.0 (compatible; Yeti/1.1; +http://naver.me/spd)",
+            "Feedly/1.0 (+http://www.feedly.com/fetcher.html)",
+            "python-httpx/0.27.0",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/120.0.0.0 Safari/537.36",
+            "Pingdom.com_bot_version_1.4",
+            "Mozilla/5.0 (compatible; Google-Read-Aloud; +https://support.google.com/webmasters/answer/1061943)",
+        ]
+        for ua in crawlers:
+            with self.subTest(user_agent=ua):
+                self.assertTrue(is_bot_request(self._request(ua)), ua)
+
+    def test_missing_user_agent_is_a_bot(self):
+        self.assertTrue(is_bot_request(self._request("")))
+
+    def test_real_browser_is_not_a_bot(self):
+        ua = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        self.assertFalse(is_bot_request(self._request(ua)))

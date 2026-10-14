@@ -6,3 +6,5 @@ __pycache__/
 env/
 
 staticfiles/
+
+FULL_REPORT_V2.MD
