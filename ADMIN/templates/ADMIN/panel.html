@@ -46,7 +46,7 @@
   <nav class="panel-nav" aria-label="Panel sections" data-panel-nav>
     <a class="panel-nav-link" href="#panel-staff-gallery" aria-label="Staff" title="Staff"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></a>
     <a class="panel-nav-link" href="#panel-users" aria-label="Users" title="Users"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></a>
-    <a class="panel-nav-link" href="#panel-text-awareness" aria-label="Text awareness" title="Text awareness"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></a>
+    <a class="panel-nav-link" href="#panel-announcements" aria-label="Announcements" title="Announcements"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></a>
     <a class="panel-nav-link" href="#panel-image-adverts" aria-label="Image adverts" title="Image adverts"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg></a>
     <a class="panel-nav-link" href="#panel-mass-email" aria-label="Mass email" title="Mass email"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg></a>
     <a class="panel-nav-link" href="#panel-sessions" aria-label="Active sessions" title="Active sessions"><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg></a>
@@ -127,49 +127,49 @@
       </div></div>
     </section>
 
-    <section class="panel-card panel-card-wide" id="panel-text-awareness" aria-label="Text awareness">
+    <section class="panel-card panel-card-wide" id="panel-announcements" aria-label="Announcements">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></span>
-        <h2>Text awareness</h2>
-        <span class="panel-eyebrow" data-ta-total></span>
+        <h2>Announcements</h2>
+        <span class="panel-eyebrow" data-ann-total></span>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Text awareness" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Announcements" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
         <div class="ta-layout">
           <div class="ta-compose">
-            <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg><span class="panel-sr">Add new text</span></h3>
-            <form class="panel-form" data-ta-form data-endpoint="{% url 'control:panel_text_awareness_create' %}">
+            <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg><span class="panel-sr">Add new announcement</span></h3>
+            <form class="panel-form" data-ann-form data-endpoint="{% url 'control:panel_announcement_create' %}">
               <div class="panel-field">
-                <label for="ta-content">Text <small data-ta-count>0 / 400</small></label>
-                <textarea id="ta-content" name="content" rows="3" maxlength="400" required placeholder="" data-ta-content></textarea>
+                <label for="ann-content">Text <small data-ann-count>0 / 400</small></label>
+                <textarea id="ann-content" name="content" rows="3" maxlength="400" required placeholder="" data-ann-content></textarea>
               </div>
               <div class="panel-field">
-                <label for="ta-url"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg><span class="panel-sr">Link, optional</span></label>
-                <input id="ta-url" type="url" name="url" placeholder="https://...">
+                <label for="ann-url"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg><span class="panel-sr">Link, optional</span></label>
+                <input id="ann-url" type="url" name="url" placeholder="https://...">
               </div>
               <div class="panel-field">
-                <label for="ta-expiry"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg><span class="panel-sr">Stops showing on</span></label>
-                <input id="ta-expiry" type="datetime-local" name="expiry_date" required>
+                <label for="ann-expiry"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg><span class="panel-sr">Stops showing on</span></label>
+                <input id="ann-expiry" type="datetime-local" name="expiry_date" required>
               </div>
               <input type="hidden" name="is_active" value="1">
               <div class="ta-preview" aria-hidden="true">
                 <span class="ta-preview-label">Preview</span>
-                <span class="ta-preview-text" data-ta-preview>Your text appears here</span>
+                <span class="ta-preview-text" data-ann-preview>Your text appears here</span>
               </div>
-              <button type="submit" class="panel-primary-btn ta-add-btn" aria-label="Add text" title="Add text"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+              <button type="submit" class="panel-primary-btn ta-add-btn" aria-label="Add announcement" title="Add announcement"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
             </form>
           </div>
 
           <div class="ta-feed">
             <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg><span class="panel-sr">Currently added</span></h3>
-            <div class="ta-list" data-ta-list
-                 data-update-endpoint="{% url 'control:panel_text_awareness_update' 0 %}"
-                 data-delete-endpoint="{% url 'control:panel_text_awareness_delete' 0 %}"></div>
+            <div class="ta-list" data-ann-list
+                 data-update-endpoint="{% url 'control:panel_announcement_update' 0 %}"
+                 data-delete-endpoint="{% url 'control:panel_announcement_delete' 0 %}"></div>
           </div>
         </div>
-        {{ text_awareness_items|json_script:"ta-initial" }}
+        {{ announcement_items|json_script:"ann-initial" }}
       </div></div>
     </section>
 

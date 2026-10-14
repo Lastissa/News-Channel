@@ -39,9 +39,10 @@ The goal is not to guess whether Google will approve. The goal is to remove the 
 | 2 | Article content audit | P2 | Yes | ◐ |
 | 3 | Publication transparency pages | P3 | Yes | ☑ |
 | 4 | Mobile experience & readability | P4 | Can | ☑ |
-| 5 | Technical crawl & indexing | P5 | Yes | ☐ |
-| 6 | Ad / traffic policy hygiene | P6 | Yes | ☐ |
+| 5 | Technical crawl & indexing | P5 | Yes | ☑ |
+| 6 | Ad / traffic policy hygiene | P6 | Yes | ☑ |
 | 7 | Accessibility semantics | P7 | No | ☐ |
+| 8 | Story-page layout shift (logged from Segment 5) | P4 | Can | ☐ |
 
 ---
 
@@ -219,6 +220,34 @@ No horizontal overflow was found on any tested page at 390px (document `scrollWi
 
 **Definition of done.** Key pages return 200 and are indexable; the sitemap is accepted; no accidental block remains.
 
+**Result (audited 14 Oct 2026 against PRODUCTION — https://abureport.com.ng).**
+
+**Crawlable and indexable — all green.** Every key page type was fetched live and returned `200` with `<meta name="robots" content="index, follow">` and a correct self-canonical: `/`, `/story/<slug>/`, `/category/<slug>/`, `/archive/`, `/about/`, `/privacy-policy/`, `/editorial/`, `/portfolio/<slug>/`. ✅
+
+- **No broken links or server errors.** All 52 internal links on the homepage return `200`. Unknown slugs return a real `404`. Out-of-range paging (`/category/university/?page=2`) returns `404` by design — the category fits one 25-story page and paging uses crawlable `<a href="?page=N">` links.
+- **Canonical dedup works.** A story fetched with `?utm_source=facebook` canonicalises to the clean story URL, so tracking links do not split ranking. ✅
+- **`robots.txt` — correct.** `200`, `text/plain`, served in 249 ms; disallows only `/_admin/`, `/control/`, `/sy/`, `/profile/`, `/load-more/` and (added 14 Oct) `/promote-ads/`, the promote page's fragment feed, and declares the sitemap. No needed path is blocked. ✅
+- **`sitemap.xml` — valid, 84 URLs.** `200`, `application/xml`, well-formed: home, about, privacy, promote, archive, 11 categories, 66 stories and 2 portfolios. ✅
+
+**Two sitemap defects found and fixed (code).**
+
+1. **`/editorial/` was missing.** The live "who reports this and how" trust page — the E-E-A-T sibling of `/about/` and `/privacy-policy/`, both of which *are* listed — was absent from the sitemap. `HOME/views.py` (`SitemapXmlView`) now lists it; test added to `HOME/tests.py`.
+2. **`/promote-your-bussiness/` was listed but returned a 17-byte `"still in progress"` stub.** A complete `HOME/promote.html` (the ₦2,000/month sponsored-banner offer) existed and `PromoteView` still had its `return render(..., "HOME/promote.html")`, but a single stray line added 7 Oct (`return HttpResponse("still in progress")`) sat in front of it as unreachable code — so the footer banner and the advert "coming soon" page both led to a blank page. The stray line is removed, the real offer page renders, and a test locks it in. *Subsequently redesigned (14 Oct):* the ₦2,000 offer copy was itself out of date, so `HOME/promote.html` is now a "still in progress" hero (`promote.jpg`, a pulsing in-progress indicator) with a direct `mailto:` to the partnership mailbox (free for the first two weeks), plus a live advert gallery loaded by GET (`PromoteAdsView` → `HOME/promote_ads.html`) that starts on a shimmer skeleton and falls back to tagged example creatives when no advert is live.
+
+**PageSpeed Insights (mobile, Moto G Power, Slow 4G, Lighthouse 13.5).**
+
+| Page | Perf | A11y | Best-practices | SEO | FCP | LCP | TBT | CLS | SI |
+|------|------|------|----------------|-----|-----|-----|-----|-----|-----|
+| Homepage | 61 | 90 | 100 | 92 | 3.3 s | 6.6 s | 60 ms | 0.057 | 15.9 s |
+| Story | 65 | 92 | 100 | 100 | 1.7 s | 3.0 s | 0 ms | **1.06** | 5.4 s |
+
+- The homepage's SEO `92` is a transient PSI-side timeout fetching `robots.txt`; the file was re-fetched directly and serves correctly in 249 ms.
+- **Story-page CLS is 1.06 (target < 0.1).** The failed Lighthouse audit is *"Image elements do not have explicit width and height"* — a real Core Web Vitals defect the Segment 4 pass missed. Logged as **Segment 8**, not fixed here.
+
+**Not changed (deliberate).** `/search/?q=…` is `index, follow` with the query kept in its canonical, and is explicitly unit-tested that way. Left as designed, but noted as a thin-content / crawl-budget risk for an owner call.
+
+**Owner action outside this session.** Search Console: submit `sitemap.xml` and confirm the property — cannot be done from the repo.
+
 ---
 
 ## Segment 6 — Ad & traffic policy hygiene
@@ -237,6 +266,20 @@ No horizontal overflow was found on any tested page at 390px (document `scrollWi
 **Deliverable.** A short compliance note.
 
 **Definition of done.** The three points above are confirmed and documented.
+
+**Result (audited 14 Oct 2026 — code sweep + live production).** All three checks pass.
+
+1. **No self-clicks or click incentives.** No code path clicks an advert: the only `.click()` calls in the project target the editors' hidden image-file input and copy buttons, never an ad. No copy anywhere invites readers to click ads to support us, and no feature trades a reward (points, unlocks, extra content) for a click — search for reward/unlock/points/earn language returns only unrelated matches (SVG `points`, form `unlock`, editor terms). The ad surfaces are ordinary links to the advertiser's URL.
+2. **No artificial traffic.** Nothing reloads or auto-fetches an ad-bearing page: no `<meta http-equiv="refresh">`, and no page `prefetch`/`prerender` (only the first hero/teaser **image** is preloaded and the fonts are preconnected). The only `location.reload()` calls run after a real login/logout/gate action. The hero and teaser carousels rotate slides with `setInterval` — a UI rotation that neither loads a page nor reloads an ad. The story view counter increments server-side on a real GET and explicitly ignores bot User-Agents (`SERVICE_INTERNAL/abstract.py:is_bot_request`). The only outbound automation is the IndexNow ping and the archive image proxy; neither touches our own pages. The AdSense loader is included on the **homepage template only** (`HOME/templates/HOME/home.html`), so ad impressions accrue only on genuine homepage views.
+3. **Paid/promotional content is labelled and does not swamp editorial.** The hero-teaser carousel is the homepage's paid surface: it carries `aria-label="Adverts"` and every advert link carries `rel="sponsored noopener"`. The thin strip at the very top is an **announcements** bar (it was mislabelled "AD CENTER"), so it is no longer marked "Sponsored" and its links carry no sponsored rel. Google's own units are rendered and labelled by Google (AdChoices). On the live homepage the paid surface is small beside the news — a ~3-slide teaser + **2** Google Auto-ad units against **~36 story cards**, and story / category / search pages carry no Google ads at all.
+
+**Fixed (code).** The announcement bar's house fallback — shown only when no announcement is live — pointed at a malformed `https:localhost:8000/missing/` URL with a "Bussiness"/"Clicking HERE" typo. It now reads *"Put your business in front of our readers — partner with us"* and links to the `/promote-your-bussiness/` page. Locked by a test (`HOME/tests.py`).
+
+**Advisory (owner call, no code change).** The direct-sold hero-teaser carousel is labelled for search (`rel="sponsored"`) and for assistive tech (`aria-label="Adverts"`), but carries no **visible** "Ad"/"Sponsored" text tag on desktop. This is not an AdSense blocker — Google's own units are labelled by Google, and `rel="sponsored"` satisfies the paid-link disclosure — so it was left as-is; the advert slides already carry a small visible "AD" chip on mobile, and a matching desktop chip was added later (see the dev log).
+
+**Stays under Segment 2 (not fixed here).** The self-promotional *editorial* stories (7 & 40) still sit in the news feed; removing/labelling them is part of the Segment 2 content clean-up, not an advertising surface.
+
+**Tests.** `HOME` = **115 tests**, only the 5 known pre-existing failures. New: the ticker fallback + ad-surface labelling assertions.
 
 ---
 
@@ -260,6 +303,27 @@ No horizontal overflow was found on any tested page at 390px (document `scrollWi
 
 ---
 
+## Segment 8 — Story-page layout shift (logged from Segment 5)
+
+**Goal.** Bring the story page's Cumulative Layout Shift under 0.1.
+
+**Why Google cares.** CLS is a Core Web Vitals metric. At 1.06 the story page is roughly ten times over Google's "good" threshold, which depresses page-experience signals and is exactly the kind of unstable, moving layout AdSense reviewers dislike.
+
+**Where.** `BLOG/templates/blog/story_detail.html` and its partials. The failing Lighthouse audit is *"Image elements do not have explicit width and height"*; PSI also flags "Improve image delivery (43 KiB)" and render-blocking / unused CSS.
+
+**Single-execution task.**
+
+1. Give every story-page image explicit `width`/`height` (or an `aspect-ratio` box) so space is reserved before it loads.
+2. Re-run PSI on the same story (mobile) and confirm CLS < 0.1.
+
+**Deliverable.** The resized images and a re-run PSI score.
+
+**Definition of done.** Story-page mobile CLS ≤ 0.1 and the "explicit width and height" audit passes.
+
+**Status.** ☐ pending.
+
+---
+
 ## Status log
 
 | Date | Segment | Change | Status |
@@ -268,11 +332,16 @@ No horizontal overflow was found on any tested page at 390px (document `scrollWi
 | 14 Oct 2026 | 2 — Article content audit | First pass accidentally read the local DB (void). Re-audited **production**: 8 stories fetched across 8 categories + sitemap. Majority are 130–200-word single-source rewrites; padding in story 66; self-promo stories 7 & 40 in the news feed; typo links. ~55 stories live. Editorial fixes listed, none actioned | ◐ |
 | 14 Oct 2026 | 2 — Enforcement (A + B) | Updated `DOCS/NEWS_CONTENT_CONVENTION.MD` with editorial rules; `SERVICE_INTERNAL/story_validation.py` blocks <100-word bodies and warns <300 words / no source; Add News guide + author handbook updated; `SitemapXmlView` skips empty categories; tests refreshed for the new rule | ◐ |
 | 14 Oct 2026 | 4 — Mobile experience & readability | Audited **production** at a 390px viewport + Lighthouse on home, a story, category and search. No code change: contrast passes (the Lighthouse hits were the read-also entrance animation mid-flight), story body is 16px, images are lazy + sized, no CLS source, no horizontal overflow. The 6s "Continue reading" sheet covers 94% of a phone screen but the owner reviewed it and **kept it as-is**. The desktop-only hero-dot target-size hit does not apply on phones (30px hit area). Accessibility-semantics gaps logged as Segment 7 | ☑ |
+| 14 Oct 2026 | 5 — Technical crawl & indexing | Crawled **production**: every key page is `200` + `index, follow` + canonical; 52/52 homepage links live; `robots.txt` correct; `sitemap.xml` valid (84 URLs). Fixed: `/editorial/` added to the sitemap; `PromoteView`'s stray `"still in progress"` stub removed so `HOME/promote.html` renders. PSI mobile — home 61/90/100/92, story 65/92/100/100. Story CLS 1.06 logged as Segment 8 | ☑ |
+| 14 Oct 2026 | Promote page (side change) | Redesigned `/promote-your-bussiness/`: out-of-date ₦2,000 offer replaced by a "still in progress" hero (`promote.jpg` + pulse), a direct `mailto:` to the partnership mailbox (free first 2 weeks), and a GET advert gallery (`PromoteAdsView` → `HOME/promote_ads.html`, shimmer skeleton → cards → tagged examples). `/promote-ads/` disallowed in `robots.txt`. Footer "Company" column now carries a **Partner with us** link just before Author handbook | ☑ |
+| 14 Oct 2026 | 6 — Ad / traffic policy hygiene | Audited code + **live production**: no self-clicks or click incentives, no artificial traffic (no meta-refresh / page prefetch; carousels only rotate slides; bot-aware view counter; AdSense loader on the homepage only), and paid content is `rel="sponsored"` + `aria-label`-labelled and small beside the news (~36 stories vs 1 ticker item + ~3 teaser slides + 2 Google units). Fixed the ticker's dead house-fallback URL → `/promote-your-bussiness/`. Visible-label gap logged as an owner call. `HOME` = 115 tests, only the 5 known pre-existing failures | ☑ |
+| 14 Oct 2026 | Rename + ad label (side change) | The thin top strip is an **announcements** bar, not an advert slot: renamed the `AdvertText` model → `Announcement` and `ad_content` → `content` (migration `Partner/0004`, data-preserving), the PANEL "Text awareness" section → "Announcements" (`/panel/announcements/…`), and the home `ad_center_items` / `ad-ticker` → `announcement_items` / `announcement-ticker`; dropped its `aria-label="Sponsored"` and `rel="sponsored"`. Also gave the desktop hero-teaser caption the "AD" chip the phone layout already shows, centred on the image/caption divider | ☑ |
 
 ---
 
 ## Notes / open questions
 
 - Confirm whether `/privacy-policy/`, `/about/`, editorial team and author pages are indexed and reachable before applying.
+- `/promote-your-bussiness/` is misspelled ("bussiness"); renaming it should carry a permanent redirect from the old path, so it is left for a dedicated change.
 - Google publishes **no** minimum number of articles or monthly visitors; consistency and usefulness matter, not volume.
 - Apply only through the official Google AdSense site.

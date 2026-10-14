@@ -1,0 +1,325 @@
+/* ==========================================================================
+   Promote page (HOME/templates/HOME/promote.html)
+   A "still in progress" hero with an email call to action, plus the async
+   advert gallery that starts on a shimmer skeleton (HOME/views.PromoteAdsView
+   -> HOME/static/home/js/promote.js). Uses the site theme tokens so it reads
+   correctly in both light and dark themes.
+   ========================================================================== */
+
+.promote-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 34px 20px 72px;
+}
+
+/* ---------- hero ---------- */
+.promote-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 44px;
+  align-items: center;
+  margin: 0 0 58px;
+}
+
+.promote-eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber-alt-deep);
+}
+
+.promote-title {
+  margin: 0 0 18px;
+  font-size: clamp(1.7rem, 1.05rem + 2.7vw, 2.6rem);
+  line-height: 1.12;
+  color: var(--ink);
+}
+
+.promote-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 7px 15px;
+  /* border: 1px solid var(--line); */
+  /* border-radius: 999px; */
+  background: var(--paper-dim);
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.promote-status-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--amber-alt-deep);
+  box-shadow: 0 0 0 0 rgba(24, 100, 24, 0.5);
+  animation: promote-pulse 1.6s ease-out infinite;
+}
+
+@keyframes promote-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(24, 100, 24, 0.5); }
+  70%  { box-shadow: 0 0 0 9px rgba(24, 100, 24, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(24, 100, 24, 0); }
+}
+
+/* indeterminate "work in progress" bar under the status pill */
+.promote-progress {
+  position: relative;
+  height: 5px;
+  max-width: 240px;
+  margin: 0 0 22px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.promote-progress span {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  height: 100%;
+  width: 40%;
+  border-radius: 999px;
+  background: var(--amber-alt-deep);
+  animation: promote-progress 1.8s ease-in-out infinite;
+}
+
+@keyframes promote-progress {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}
+
+.promote-lede {
+  max-width: 48ch;
+  margin: 0 0 22px;
+  font-size: 1.06rem;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+
+.promote-cta {
+  margin: 0 0 8px;
+}
+
+.promote-mail {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 20px;
+  border-radius: var(--radius-m);
+  background: var(--amber-alt-deep);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.promote-mail:hover,
+.promote-mail:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-raised);
+}
+
+.promote-mail-kicker {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.promote-mail-address {
+  font-size: 1.02rem;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.promote-cta-note {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--slate);
+}
+
+.promote-cta-note a {
+  color: var(--amber-alt-deep);
+  font-weight: 600;
+}
+
+.promote-hero-media {
+  margin: 0;
+  aspect-ratio: 1672 / 941;
+  border-radius: var(--radius-l);
+  overflow: hidden;
+  background: var(--input-fill);
+  box-shadow: var(--shadow-raised);
+}
+
+.promote-hero-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- advert gallery ---------- */
+.promote-ads {
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+
+.promote-ads-head {
+  margin: 0 0 22px;
+}
+
+.promote-ads-head h2 {
+  margin: 0 0 6px;
+  font-size: 1.45rem;
+  color: var(--ink);
+}
+
+.promote-ads-sub {
+  margin: 0;
+  color: var(--slate);
+}
+
+.promote-ads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 20px;
+}
+
+.promote-ad-card {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.promote-ad-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.promote-ad-link:hover .promote-ad-heading,
+a.promote-ad-link:focus-visible .promote-ad-heading {
+  color: var(--amber-alt-deep);
+}
+
+.promote-ad-media {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--input-fill);
+}
+
+.promote-ad-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.promote-ad-body {
+  padding: 12px 14px 14px;
+}
+
+.promote-ad-tag {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--doc-note-wash);
+  color: var(--doc-note);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.promote-ad-heading {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.promote-ad-text {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--slate);
+}
+
+.promote-ads-empty,
+.promote-ads-noscript {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--slate);
+}
+
+/* ---------- loading skeleton (shimmer) ---------- */
+.promote-ad-skeleton {
+  padding-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.promote-ad-skeleton-media {
+  aspect-ratio: 16 / 10;
+}
+
+.promote-ad-skeleton-line {
+  height: 11px;
+  margin: 12px 14px 0;
+  border-radius: 4px;
+}
+
+.promote-ad-skeleton-line--short {
+  width: 55%;
+}
+
+.promote-ad-skeleton-media,
+.promote-ad-skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--input-fill) 25%,
+    color-mix(in srgb, var(--input-fill) 55%, var(--line)) 37%,
+    var(--input-fill) 63%
+  );
+  background-size: 400% 100%;
+  animation: promote-shimmer 1.7s ease-in-out infinite;
+}
+
+@keyframes promote-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* ---------- responsive & motion ---------- */
+@media (max-width: 820px) {
+  .promote-hero {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .promote-hero-media {
+    order: -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promote-status-pulse,
+  .promote-progress span,
+  .promote-ad-skeleton-media,
+  .promote-ad-skeleton-line {
+    animation: none;
+  }
+}

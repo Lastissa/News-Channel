@@ -135,6 +135,9 @@ class RobotsTxtView(View):
                 # "Disallow: /auth/", i will use noindex follow in the meta so it wont get index but itcan be crawled cos of othr pages linkage
                 "Disallow: /profile/",
                 "Disallow: /load-more/",
+                #   Fragment/AJAX endpoints, not standalone pages -- keep them
+                #   out of the index the same way /load-more/ already is.
+                "Disallow: /promote-ads/",
                 "",
                 f"Sitemap: {domain}/sitemap.xml",
             ]
@@ -162,6 +165,10 @@ class SitemapXmlView(View):
         urls = [
             {"loc": f"{domain}/", "lastmod": "", "changefreq": "hourly", "priority": "1.0"},
             {"loc": f"{domain}{reverse('home:about')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
+            #   /editorial/ is the public "who reports this and how" trust page;
+            #   it carries the same E-E-A-T weight as /about/ and is indexable,
+            #   so it belongs in the sitemap beside it.
+            {"loc": f"{domain}{reverse('editorial_team')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
             {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": "", "changefreq": "yearly", "priority": "0.3"},
             {"loc": f"{domain}{reverse('home:promote')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
             #   /archive/ now also carries every image/file's own real,
@@ -636,18 +643,19 @@ def _user_sessions_for_profile(user, request):
     
     
 
-def _ad_center_items():
-    """Content of the AD CENTER bar at the top of the home page. Each item is
-    {"text": ..., "url": ...} and is rendered as an underlined link. Placeholder
-    "coming soon" data for now -- replace the list below (or load it from the
-    database) and the template needs no changes. External urls (http...) open
-    in a new tab automatically."""
-    from Partner.models import AdvertText
-    active_advert = AdvertText.objects.filter(expiry_date__gte = timezone.now(), is_active = True)
-    if active_advert:
-        return [{"text": i.ad_content, "url": i.url  or "#"} for i in active_advert]
+def _announcement_items():
+    """Content of the announcement bar at the very top of the home page. Each
+    item is {"text": ..., "url": ...} and is rendered as an underlined link.
+    Items come from the live announcements an admin manages in PANEL
+    (Partner.Announcement, active and unexpired); when none exist the bar falls
+    back to this house announcement, which points at the "Partner with us" page
+    rather than a dead link."""
+    from Partner.models import Announcement
+    active_announcements = Announcement.objects.filter(expiry_date__gte=timezone.now(), is_active=True)
+    if active_announcements:
+        return [{"text": row.content, "url": row.url or "#"} for row in active_announcements]
     else:
-        return [{'text': 'Do You Know You Can Boost Your Bussiness Online Presence By Clicking HERE', 'url': 'https:localhost:8000/missing/'}]
+        return [{"text": "Put your business in front of our readers — partner with us", "url": reverse("home:promote")}]
 
 
 def _home_blog_queryset():
@@ -722,7 +730,7 @@ class HomeView(View):
         context = {
             "featured_posts": featured,
             "headline_ticker_text": headline_ticker_text,
-            "ad_center_items": _ad_center_items(),
+            "announcement_items": _announcement_items(),
             "teaser_items": _teaser_items(),
             "categories": get_category_choices(),
             "query": "",
@@ -1353,14 +1361,66 @@ class PrivacyPolicyView(View):
         return render(request, "HOME/privacy_policy.html")
 
 
+def _promote_contact_email():
+    """The address the promote page's call to action mails. It reads the
+    partnership mailbox from SiteSettings directly (not the cached context
+    processor value) and falls back to the support address so the button is
+    never a dead `mailto:`."""
+    from ADMIN.models import SiteSettings
+
+    row = SiteSettings.get_solo()
+    return (row.promotion_email or "").strip() or (row.support_email or "").strip()
+
+
 class PromoteView(View):
-    """Dummy placeholder for the footer's 'promote your business' banner.
-    No form/backend logic yet -- just a page to land on until that flow
-    is designed."""
+    """Public landing page for the footer's "promote your business" banner.
+    The self-serve advert dashboard is not built yet, so the page says so, takes
+    interest by email (free for the first two weeks while the service is new)
+    and shows the adverts running on the site right now."""
 
     def get(self, request):
-        return HttpResponse("still in progress")
-        return render(request, "HOME/promote.html")
+        return render(request, "HOME/promote.html", {"advert_email": _promote_contact_email()})
+
+
+class PromoteAdsView(View):
+    """HTML fragment for the promote page's advert gallery (HOME/promote.html).
+
+    Lists the image adverts currently running on the home carousel
+    (Partner.AdvertImage, active and not expired), newest first. When none are
+    live yet it returns the demo creatives tagged "Example" so the section still
+    shows what an advert looks like instead of collapsing to plain text.
+
+    A server-rendered fragment (not JSON) so the browser never builds DOM from
+    strings; promote.js starts the grid on a shimmer skeleton and swaps this in.
+    """
+
+    def get(self, request):
+        from django.templatetags.static import static
+
+        from Partner.models import AdvertImage
+
+        live = (
+            AdvertImage.objects.filter(expiry_date__gte=timezone.now(), is_active=True)
+            .order_by("-date_created")[:12]
+        )
+        items = [
+            {
+                "heading": row.heading,
+                "body": row.body,
+                "image": row.image_url,
+                "url": row.url or "",
+                "is_example": False,
+            }
+            for row in live
+        ]
+        if not items:
+            items = [
+                {"heading": "", "body": "", "image": static(f"partner/ad_demo_{number}.jpg"), "url": "", "is_example": True}
+                for number in (1, 2, 3)
+            ]
+        response = render(request, "HOME/promote_ads.html", {"items": items})
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class AdvertInquiryView(View):

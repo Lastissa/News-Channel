@@ -26,16 +26,16 @@
 {% block content %}
 {% static 'home_no_bg.svg' as placeholder %}
 {% comment %}
-  AD CENTER: rectangular scrolling bar. Every item comes from HomeView
-  (ad_center_items, see HOME/views.py) as {text, url}, and each one is an
+  ANNOUNCEMENTS: rectangular scrolling bar. Every item comes from HomeView
+  (announcement_items, see HOME/views.py) as {text, url}, and each one is an
   underlined link. The JS clones the segment to make the loop endless, the
   clones are aria-hidden / not focusable.
 {% endcomment %}
-{% if ad_center_items %}
-<div class="ad-ticker" aria-label="Sponsored">
+{% if announcement_items %}
+<div class="announcement-ticker" aria-label="Announcements">
   <div class="headline-ticker-track" data-ticker-track>
     <span class="headline-ticker-segment" data-ticker-segment>
-      {% for item in ad_center_items %}<a class="ad-ticker-link" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_self"{% endif %}>{{ item.text }}</a><span class="ticker-sep" aria-hidden="true">*</span>{% endfor %}
+      {% for item in announcement_items %}<a class="announcement-ticker-link" href="{{ item.url }}"{% if item.url|slice:":4" == "http" %} target="_self"{% endif %}>{{ item.text }}</a><span class="ticker-sep" aria-hidden="true">*</span>{% endfor %}
     </span>
   </div>
 </div>

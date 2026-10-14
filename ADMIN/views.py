@@ -31,7 +31,7 @@ from SERVICE_INTERNAL.images import ImageUploadError, destroy_archive_asset, upl
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.passwords import first_password_error
 from SERVICE_INTERNAL.sessions import drop_sessions_for
-from Partner.models import AdvertImage, AdvertText
+from Partner.models import AdvertImage, Announcement
 from ADMIN.models import SiteSettings
 from STAFF.models import GENDER_CHOICES, StaffProfile
 
@@ -709,7 +709,7 @@ class PanelView(View):
                 "sender_full_name": own_profile.full_name.strip() if own_profile and own_profile.full_name else "",
                 "site_settings": SiteSettings.get_solo(),
                 "category_rows": _category_rows(),
-                "text_awareness_items": _text_awareness_items(),
+                "announcement_items": _announcement_items(),
                 "image_advert_items": _image_advert_items(),
                 "gallery_items": staff_directory_rows(list(gallery_page.object_list)),
                 "gallery_has_next": gallery_page.has_next(),
@@ -1167,17 +1167,17 @@ class PanelSpecialityView(View):
 
 """
 ------------------------------------------------------------
-#   TEXT AWARENESS
+#   ANNOUNCEMENTS
 ------------------------------------------------------------
-The scrolling bar at the top of the home page (HOME.views._ad_center_items)
-shows every Partner.AdvertText row that is active and not expired. These
+The scrolling bar at the top of the home page (HOME.views._announcement_items)
+shows every Partner.Announcement row that is active and not expired. These
 three endpoints let an admin add, edit and delete those rows from PANEL.
 """
 
-TEXT_AWARENESS_LIST_LIMIT = 100   #   newest rows shown in PANEL
+ANNOUNCEMENT_LIST_LIMIT = 100   #   newest rows shown in PANEL
 
 
-def _text_awareness_item(row):
+def _announcement_item(row):
     expiry = timezone.localtime(row.expiry_date)
     if not row.is_active:
         status = "paused"
@@ -1187,7 +1187,7 @@ def _text_awareness_item(row):
         status = "live"
     return {
         "id": row.id,
-        "content": row.ad_content,
+        "content": row.content,
         "url": row.url or "",
         "expiry_input": expiry.strftime("%Y-%m-%dT%H:%M"),
         "expiry_label": expiry.strftime("%d %b %Y, %H:%M"),
@@ -1197,12 +1197,12 @@ def _text_awareness_item(row):
     }
 
 
-def _text_awareness_items():
-    rows = AdvertText.objects.select_related("author").order_by("-date_created")[:TEXT_AWARENESS_LIST_LIMIT]
-    return [_text_awareness_item(row) for row in rows]
+def _announcement_items():
+    rows = Announcement.objects.select_related("author").order_by("-date_created")[:ANNOUNCEMENT_LIST_LIMIT]
+    return [_announcement_item(row) for row in rows]
 
 
-def _clean_text_awareness(post):
+def _clean_announcement(post):
     """Validate the posted fields. Returns (values, error)."""
     content = " ".join((post.get("content") or "").split())
     if not content:
@@ -1226,11 +1226,11 @@ def _clean_text_awareness(post):
         expiry = timezone.make_aware(expiry, timezone.get_current_timezone())
 
     is_active = (post.get("is_active") or "").lower() in ("1", "true", "on", "yes")
-    return {"ad_content": content, "url": url or None, "expiry_date": expiry, "is_active": is_active}, None
+    return {"content": content, "url": url or None, "expiry_date": expiry, "is_active": is_active}, None
 
 
-def _text_awareness_guard(request):
-    """Rate limit + admin check shared by the three endpoints. Returns an error response or None."""
+def _panel_write_guard(request):
+    """Rate limit + admin check shared by the panel write endpoints. Returns an error response or None."""
     remaining_seconds, limited = is_rate_limited(request, 10, 6)
     if limited:
         return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
@@ -1239,51 +1239,51 @@ def _text_awareness_guard(request):
     return None
 
 
-class PanelTextAwarenessCreateView(View):
+class PanelAnnouncementCreateView(View):
     def post(self, request):
-        denied = _text_awareness_guard(request)
+        denied = _panel_write_guard(request)
         if denied:
             return denied
-        values, error = _clean_text_awareness(request.POST)
+        values, error = _clean_announcement(request.POST)
         if error:
             return JsonResponse({"detail": error}, status=400)
         if values["expiry_date"] <= timezone.now():
             return JsonResponse({"detail": "The end time has to be in the future."}, status=400)
 
-        row = AdvertText.objects.create(author=request.user, **values)
-        info_logger(msg=f"PANEL: text awareness {row.id} added by {request.user.email}")
-        return JsonResponse({"detail": "Text added to the scrolling bar.", "item": _text_awareness_item(row)}, status=201)
+        row = Announcement.objects.create(author=request.user, **values)
+        info_logger(msg=f"PANEL: announcement {row.id} added by {request.user.email}")
+        return JsonResponse({"detail": "Text added to the scrolling bar.", "item": _announcement_item(row)}, status=201)
 
 
-class PanelTextAwarenessUpdateView(View):
+class PanelAnnouncementUpdateView(View):
     def post(self, request, item_id):
-        denied = _text_awareness_guard(request)
+        denied = _panel_write_guard(request)
         if denied:
             return denied
-        row = AdvertText.objects.select_related("author").filter(pk=item_id).first()
+        row = Announcement.objects.select_related("author").filter(pk=item_id).first()
         if row is None:
             return JsonResponse({"detail": "That text no longer exists."}, status=404)
-        values, error = _clean_text_awareness(request.POST)
+        values, error = _clean_announcement(request.POST)
         if error:
             return JsonResponse({"detail": error}, status=400)
 
         for field, value in values.items():
             setattr(row, field, value)
         row.save()
-        info_logger(msg=f"PANEL: text awareness {row.id} edited by {request.user.email}")
-        return JsonResponse({"detail": "Text updated.", "item": _text_awareness_item(row)}, status=200)
+        info_logger(msg=f"PANEL: announcement {row.id} edited by {request.user.email}")
+        return JsonResponse({"detail": "Text updated.", "item": _announcement_item(row)}, status=200)
 
 
-class PanelTextAwarenessDeleteView(View):
+class PanelAnnouncementDeleteView(View):
     def post(self, request, item_id):
-        denied = _text_awareness_guard(request)
+        denied = _panel_write_guard(request)
         if denied:
             return denied
-        row = AdvertText.objects.filter(pk=item_id).first()
+        row = Announcement.objects.filter(pk=item_id).first()
         if row is None:
             return JsonResponse({"detail": "That text no longer exists."}, status=404)
         row.delete()
-        info_logger(msg=f"PANEL: text awareness {item_id} deleted by {request.user.email}")
+        info_logger(msg=f"PANEL: announcement {item_id} deleted by {request.user.email}")
         return JsonResponse({"detail": "Text deleted."}, status=200)
 
 
@@ -1360,7 +1360,7 @@ def _clean_image_advert(post):
 
 class PanelImageAdvertCreateView(View):
     def post(self, request):
-        denied = _text_awareness_guard(request)
+        denied = _panel_write_guard(request)
         if denied:
             return denied
         values, error = _clean_image_advert(request.POST)
@@ -1394,7 +1394,7 @@ class PanelImageAdvertCreateView(View):
 
 class PanelImageAdvertUpdateView(View):
     def post(self, request, item_id):
-        denied = _text_awareness_guard(request)
+        denied = _panel_write_guard(request)
         if denied:
             return denied
         row = AdvertImage.objects.select_related("author").filter(pk=item_id).first()
@@ -1424,7 +1424,7 @@ class PanelImageAdvertUpdateView(View):
 
 class PanelImageAdvertDeleteView(View):
     def post(self, request, item_id):
-        denied = _text_awareness_guard(request)
+        denied = _panel_write_guard(request)
         if denied:
             return denied
         row = AdvertImage.objects.filter(pk=item_id).first()

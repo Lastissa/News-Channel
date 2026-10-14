@@ -1,11 +1,13 @@
 from django.db import models
 
-class AdvertText(models.Model):
-    """THIS OLD ALL ADVERT THAT IS ONLY TEXT BASED"""
+class Announcement(models.Model):
+    """A short text announcement that scrolls across the top bar of the home
+    page (HOME.views._announcement_items). Managed from PANEL
+    ("Announcements")."""
     author = models.ForeignKey('AUTHENTICATION.Auth', on_delete=models.CASCADE)
     date_created = models.DateTimeField(auto_now_add=True)
     expiry_date = models.DateTimeField(null=False, blank=False)
-    ad_content = models.CharField(max_length=400, default = "This is an advert with no content")
+    content = models.CharField(max_length=400, default="")
     url = models.URLField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     

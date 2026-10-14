@@ -790,14 +790,14 @@
     });
   })();
 
-  /* ---------- text awareness: scrolling home bar, add + edit + delete ---------- */
+  /* ---------- announcements: scrolling home bar, add + edit + delete ---------- */
   (function () {
-    var form = document.querySelector("[data-ta-form]");
-    var list = document.querySelector("[data-ta-list]");
-    var initial = document.getElementById("ta-initial");
+    var form = document.querySelector("[data-ann-form]");
+    var list = document.querySelector("[data-ann-list]");
+    var initial = document.getElementById("ann-initial");
     if (!form || !list) return;
 
-    var total = document.querySelector("[data-ta-total]");
+    var total = document.querySelector("[data-ann-total]");
     var updateTemplate = list.dataset.updateEndpoint || "";
     var deleteTemplate = list.dataset.deleteEndpoint || "";
     var STATUS_LABEL = { live: "Live", paused: "Paused", expired: "Expired" };
@@ -825,7 +825,7 @@
 
     function buildRow(item) {
       var row = el("div", "ta-item ta-item-" + item.status);
-      row.dataset.taRow = "";
+      row.dataset.annRow = "";
       row.dataset.id = item.id;
 
       var main = el("span", "ta-main");
@@ -840,9 +840,9 @@
 
       var actions = el("span", "ta-actions");
       var edit = iconButton("panel-icon-btn", "edit", "Edit");
-      edit.dataset.taEdit = "";
+      edit.dataset.annEdit = "";
       var del = iconButton("panel-icon-btn panel-icon-danger", "trash", "Delete");
-      del.dataset.taDelete = "";
+      del.dataset.annDelete = "";
       actions.appendChild(edit);
       actions.appendChild(del);
 
@@ -853,7 +853,7 @@
 
     function buildEditor(item) {
       var row = el("form", "ta-item ta-editor");
-      row.dataset.taEditor = "";
+      row.dataset.annEditor = "";
       row.dataset.id = item.id;
       row.noValidate = false;
 
@@ -864,7 +864,7 @@
       var expiry = el("input");
       expiry.type = "datetime-local"; expiry.name = "expiry_date"; expiry.required = true; expiry.value = item.expiry_input;
 
-      var key = "ta-" + item.id + "-";
+      var key = "ann-" + item.id + "-";
       row.appendChild(field("Text", content, key + "c"));
       var pair = el("div", "ta-pair");
       pair.appendChild(field("Link", url, key + "u"));
@@ -880,7 +880,7 @@
 
       var footer = el("div", "ta-editor-actions");
       var cancel = iconButton("panel-icon-btn", "x", "Cancel");
-      cancel.dataset.taCancel = "";
+      cancel.dataset.annCancel = "";
       var save = el("button", "panel-primary-btn");
       save.type = "submit"; save.setAttribute("aria-label", "Save"); save.title = "Save"; save.appendChild(icon("check"));
       footer.appendChild(cancel);
@@ -904,9 +904,9 @@
       return -1;
     }
 
-    var contentBox = form.querySelector("[data-ta-content]");
-    var counter = form.querySelector("[data-ta-count]");
-    var preview = form.querySelector("[data-ta-preview]");
+    var contentBox = form.querySelector("[data-ann-content]");
+    var counter = form.querySelector("[data-ann-count]");
+    var preview = form.querySelector("[data-ann-preview]");
     function syncCompose() {
       var value = contentBox ? contentBox.value : "";
       if (counter) counter.textContent = value.length + " / 400";
@@ -932,20 +932,20 @@
     });
 
     list.addEventListener("click", function (event) {
-      var row = event.target.closest("[data-ta-row]");
-      var editor = event.target.closest("[data-ta-editor]");
+      var row = event.target.closest("[data-ann-row]");
+      var editor = event.target.closest("[data-ann-editor]");
 
-      if (event.target.closest("[data-ta-edit]") && row) {
+      if (event.target.closest("[data-ann-edit]") && row) {
         var item = items[indexOfId(row.dataset.id)];
         if (item) row.replaceWith(buildEditor(item));
         return;
       }
-      if (event.target.closest("[data-ta-cancel]") && editor) {
+      if (event.target.closest("[data-ann-cancel]") && editor) {
         var original = items[indexOfId(editor.dataset.id)];
         if (original) editor.replaceWith(buildRow(original));
         return;
       }
-      var delBtn = event.target.closest("[data-ta-delete]");
+      var delBtn = event.target.closest("[data-ann-delete]");
       if (delBtn && row) {
         if (delBtn.disabled) return;
         if (!window.confirm("Delete this text? It stops scrolling on the home page straight away.")) return;
@@ -961,7 +961,7 @@
     });
 
     list.addEventListener("submit", function (event) {
-      var editor = event.target.closest("[data-ta-editor]");
+      var editor = event.target.closest("[data-ann-editor]");
       if (!editor) return;
       event.preventDefault();
       var save = editor.querySelector("button[type='submit']");

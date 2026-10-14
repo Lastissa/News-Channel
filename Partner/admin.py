@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from Partner.models import AdvertImage, AdvertText
+from Partner.models import AdvertImage, Announcement
 from SERVICE_INTERNAL.images import destroy_archive_asset
 
 
@@ -24,5 +24,5 @@ class AdvertImageAdmin(admin.ModelAdmin):
             destroy_archive_asset(public_id)
 
 
-admin.site.register([AdvertText])
+admin.site.register([Announcement])
 admin.site.register(AdvertImage, AdvertImageAdmin)

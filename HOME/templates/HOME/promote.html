@@ -1,28 +1,90 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Promote your business · {{ project_name }}{% endblock %}
-{% block meta_description %}Reach {{ project_name }} readers with a sponsored banner on every story page. ₦2,000/month after a 7-day free trial.{% endblock %}
+{% block meta_description %}Promote your business on {{ project_name }}. Our self-serve advert dashboard is still being built, so we set everything up for you by hand — free for the first 2 weeks.{% endblock %}
+{% block og_title %}Promote your business · {{ project_name }}{% endblock %}
+{% block og_description %}Reach {{ project_name }} readers. The service is new, so your advert runs free for the first 2 weeks.{% endblock %}
+{% block twitter_title %}Promote your business · {{ project_name }}{% endblock %}
+{% block twitter_description %}Reach {{ project_name }} readers. Free for the first 2 weeks.{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}">
+{% endblock %}
 
 {% block content %}
-<section class="legal-page">
-  <div class="legal-wrap">
-    <p class="legal-eyebrow">Partnerships</p>
-    <h1>Want us to help promote your business?</h1>
-    <p class="legal-intro">We now have a simple plan for local businesses that want to reach {{ project_name }} readers. The self-serve sign-up and dashboard are still being built, but the offer is ready today — reach out and we'll get you set up manually in the meantime.</p>
+<section class="promote-page">
+  <header class="promote-hero">
+    <div class="promote-hero-copy">
+      <p class="promote-eyebrow">Partnerships</p>
+      <h1 class="promote-title">Promote your business on {{ project_name }}</h1>
 
-    <h2>The plan</h2>
-    <ul>
-      <li><strong>7-day free trial</strong> — no card, no payment.</li>
-      <li><strong>₦2,000 / month</strong> after the trial ends at 50% discount for 2 years for first 3 partners.</li>
-      <li><strong>One banner slot</strong> at the top of every story page, clearly labelled <em>Sponsored</em>.</li>
-      <li><strong>Real numbers</strong> — views and clicks on your ad, visible in your dashboard once it's live.</li>
-      <li><strong>Cancel any time</strong> — your ad simply stops showing when your period ends.</li>
-    </ul>
+      <p class="promote-status" role="status">
+        <span class="promote-status-pulse" aria-hidden="true"></span>
+        <span>Still In Progress</span>
+      </p>
+      <div class="promote-progress" aria-hidden="true"><span></span></div>
 
-    <p>Payments will be handled securely once the self-serve flow is live. Until then, we'll take payment directly and activate your placement for you.</p>
+      <p class="promote-lede">
+        Our self-serve advert dashboard is still being built. Until it is ready we'll set up
+        everything for you manually and because this side of {{ project_name }} is
+        brand still very new, your advert runs <strong>free for the first 2 weeks if you reach out to us now</strong>.
+      </p>
 
-    <h2>Get in touch</h2>
-    <p>Click <a style="color:var(--amber-alt-deep);" href="mailto:{{ partnership_email }}">here</a> or message us on WhatsApp at <a style="color:var(--amber-alt-deep);" href="{{ whatsapp_dm }}" target="_blank" rel="noopener noreferrer">"click me"</a>.</p>
-  </div>
+      {% if advert_email %}
+      <p class="promote-cta">
+        <a class="promote-mail" href="mailto:{{ advert_email }}?subject=Advert%20enquiry">
+          <span class="promote-mail-kicker">Email us</span>
+          <span class="promote-mail-address">{{ advert_email }}</span>
+        </a>
+      </p>
+      <p class="promote-cta-note">Tell us what you want to promote and we&rsquo;ll help with the rest.</p>
+      {% else %}
+      <p class="promote-cta-note">
+        Our partnership mailbox is being set up. Meanwhile you can
+        <a href="{% url 'home:advert_inquiry' %}">register your interest here</a> and we&rsquo;ll reach out.
+      </p>
+      {% endif %}
+    </div>
+
+    <figure class="promote-hero-media">
+      <img src="{% static 'promote.jpg' %}" width="1672" height="941" fetchpriority="high" decoding="async"
+           alt="A business promoting its advert to {{ project_name }} readers">
+    </figure>
+  </header>
+
+  <section class="promote-ads" aria-labelledby="promote-ads-title">
+    <div class="promote-ads-head">
+      <h2 id="promote-ads-title">Running on {{ project_name }} right now</h2>
+      <p class="promote-ads-sub">A live look at the adverts our readers are seeing.</p>
+    </div>
+
+    <div class="promote-ads-grid" id="promote-ads-grid"
+         data-promote-ads data-ads-url="{% url 'home:promote_ads' %}"
+         aria-busy="true" aria-live="polite">
+      {% comment %} Shimmer skeleton; promote.js swaps in the live adverts. {% endcomment %}
+      {% for _ in "123" %}
+      <div class="promote-ad-skeleton" aria-hidden="true">
+        <div class="promote-ad-skeleton-media"></div>
+        <div class="promote-ad-skeleton-line"></div>
+        <div class="promote-ad-skeleton-line promote-ad-skeleton-line--short"></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <noscript>
+      <style>.promote-ads-grid { display: none; }</style>
+      <p class="promote-ads-noscript">
+        Turn on JavaScript to see the adverts we&rsquo;re running — or
+        {% if advert_email %}<a href="mailto:{{ advert_email }}">email us</a>{% else %}<a href="{% url 'home:advert_inquiry' %}">register your interest</a>{% endif %}
+        and we&rsquo;ll show you examples.
+      </p>
+    </noscript>
+  </section>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'home/js/promote.js' %}" defer></script>
 {% endblock %}

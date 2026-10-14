@@ -296,7 +296,7 @@ html { scroll-behavior: smooth; }
 }
 .panel-pager button:disabled { opacity: .4; cursor: not-allowed; }
 
-/* ---------- Text awareness + image adverts (shared layout) ---------- */
+/* ---------- Announcements + image adverts (shared layout) ---------- */
 .ta-layout { display: grid; grid-template-columns: 1fr; gap: 22px; }
 .ta-subhead { display: flex; align-items: center; margin: 0 0 12px; color: var(--slate); font-family: var(--font-body); }
 .ta-compose .panel-field textarea { min-height: 0; }

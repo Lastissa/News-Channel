@@ -409,6 +409,126 @@ class HomeAdvertTeaserTests(QuietTestCase):
         self.assertEqual(self._placeholder_url(), reverse("home:advert_inquiry"))
 
 
+class AdSurfaceLabellingTests(QuietTestCase):
+    """Segment 6 (ad & traffic policy hygiene): the paid/promotional surfaces on
+    the home page must be labelled and must not point anywhere dead. The
+    hero-teaser advert carousel carries an "Adverts" label and every advert link
+    carries rel="sponsored"; the top bar is now an announcement strip, so its
+    house fallback must still land on the promote page rather than a broken URL."""
+
+    def test_ad_surfaces_are_labelled_and_the_ticker_fallback_is_live(self):
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'aria-label="Adverts"')
+        self.assertContains(response, 'rel="sponsored noopener"')
+
+        from HOME.views import _announcement_items
+
+        #   The test database has no live announcement, so the bar shows the
+        #   house fallback -- which must be a real page, not a dead link.
+        self.assertEqual(_announcement_items()[0]["url"], reverse("home:promote"))
+
+        #   The top bar is an announcement strip, not a paid surface: it is an
+        #   announcement-ticker and no longer advertises itself as "Sponsored".
+        self.assertContains(response, 'class="announcement-ticker"')
+        self.assertNotContains(response, 'aria-label="Sponsored"')
+
+
+class PromotePageViewTests(QuietTestCase):
+    """The footer's "promote your business" banner lands on PromoteView, a
+    "still in progress" offer page (HOME/promote.html): a working mailto, the
+    free-first-two-weeks note, and the async advert gallery fed by PromoteAdsView
+    (HOME/promote_ads.html) which starts on a skeleton and must never be blank."""
+
+    def test_promote_page_renders_the_offer_page(self):
+        row = SiteSettings.get_solo()
+        row.promotion_email = "partners@example.com"
+        row.save()
+
+        response = self.client.get(reverse("home:promote"))
+
+        self.assertEqual(response.status_code, 200)
+        #   The old stub returned exactly this body; the real page must not.
+        self.assertNotEqual(response.content, b"still in progress")
+        self.assertContains(response, "Promote your business")
+        self.assertContains(response, "free for the first 2 weeks")
+        #   The page's own call to action (not the footer's generic links).
+        self.assertContains(response, 'href="mailto:partners@example.com?subject=Advert%20enquiry"')
+        self.assertContains(response, "data-promote-ads")
+        self.assertContains(response, 'data-ads-url="' + reverse("home:promote_ads") + '"')
+        self.assertContains(response, '<meta name="robots" content="index, follow">')
+
+    def test_promote_page_falls_back_to_interest_link_without_a_mailbox(self):
+        row = SiteSettings.get_solo()
+        row.promotion_email = ""
+        row.support_email = ""
+        row.save()
+
+        response = self.client.get(reverse("home:promote"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "promote-mail")
+        self.assertContains(response, reverse("home:advert_inquiry"))
+
+    def test_footer_links_to_the_promote_page(self):
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'href="' + reverse("home:promote") + '">Partner with us</a>')
+
+    def test_ads_feed_lists_a_live_advert(self):
+        AdvertImage.objects.create(
+            author=make_staff("advertiser@example.com"),
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading="Campus hostel rooms",
+            body="Book a room before the semester starts.",
+            image_url="https://cdn.example.com/ads/hostel.jpg",
+            url="https://hostel.example.com",
+            is_active=True,
+        )
+
+        response = self.client.get(reverse("home:promote_ads"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Campus hostel rooms")
+        self.assertContains(response, "https://cdn.example.com/ads/hostel.jpg")
+        self.assertContains(response, "https://hostel.example.com")
+
+    def test_ads_feed_skips_expired_and_inactive_adverts(self):
+        AdvertImage.objects.create(
+            author=make_staff("expired@example.com"),
+            expiry_date=timezone.now() - timedelta(days=1),
+            image_url="https://cdn.example.com/ads/expired.jpg",
+            url="https://example.com",
+        )
+        AdvertImage.objects.create(
+            author=make_staff("paused@example.com"),
+            expiry_date=timezone.now() + timedelta(days=7),
+            image_url="https://cdn.example.com/ads/paused.jpg",
+            url="https://example.com",
+            is_active=False,
+        )
+
+        response = self.client.get(reverse("home:promote_ads"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "expired")
+        self.assertNotContains(response, "paused")
+        #   With nothing live it drops to the tagged example creatives.
+        self.assertContains(response, "Example")
+
+    def test_ads_feed_falls_back_to_example_creatives(self):
+        AdvertImage.objects.all().delete()
+
+        response = self.client.get(reverse("home:promote_ads"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Example")
+        self.assertContains(response, static("partner/ad_demo_1.jpg"))
+        self.assertEqual(response["Cache-Control"], "no-store")
+
+
 class AdvertInquiryViewTests(QuietTestCase):
     """Clicking that placeholder when no mailbox exists must alert the admins
     (HOME.views.AdvertInquiryView) and show the visitor "coming soon". Only a
@@ -1096,6 +1216,14 @@ class SearchAndCategoryPageTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("home:category", args=["news"]))
+
+    def test_sitemap_lists_the_editorial_trust_page(self):
+        """The public editorial/trust page is indexable like /about/, so it
+        must be discoverable from the sitemap too."""
+        response = self.client.get("/sitemap.xml")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("editorial_team"))
 
 
 class ContinueReadingPopupTests(QuietTestCase):

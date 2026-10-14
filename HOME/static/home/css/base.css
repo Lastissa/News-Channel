@@ -606,19 +606,20 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 /* Two endless marquees share the same track/segment classes and the same
    script (headline-ticker.js, which clones the segment until it is wider than
    the bar, so the loop never shows a gap):
-   - .ad-ticker: rectangular AD CENTER bar at the very top of the page, every
-     item an underlined link passed from HomeView (ad_center_items).
+   - .announcement-ticker: rectangular announcement bar at the very top of the
+     page, every item an underlined link passed from HomeView
+     (announcement_items).
    - .headline-ticker: story headings scrolling in the "Headlines" row, right
      beside the parallelogram "Headlines" label, taking the remaining space.
    All ticker text is bold. */
-.ad-ticker,
+.announcement-ticker,
 .headline-ticker {
   overflow: hidden;
   white-space: nowrap;
   font-weight: 700;
 }
 /* TOP MOST TICKER */
-.ad-ticker {
+.announcement-ticker {
   background-color: var(--brand);
   background: linear-gradient(90deg, var(--brand), var(--brand-deep));
   color: #0E1B2C;
@@ -655,15 +656,15 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 }
 
 .ticker-sep { margin: 0 14px; font-weight: 700; }
-.ad-ticker .ticker-sep { color: var(--amber); }
+.announcement-ticker .ticker-sep { color: var(--amber); }
 
-.ad-ticker-link {
+.announcement-ticker-link {
   color: inherit;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.ad-ticker-link:hover { color: var(--amber); }
+.announcement-ticker-link:hover { color: var(--amber); }
 
 /* shifts by exactly one group width (set from JS as --ticker-shift), so the
    restart is invisible; -50% is only the fallback before the script runs */
@@ -674,7 +675,7 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .headline-ticker-track { animation: none; }
-  .ad-ticker, .headline-ticker { overflow-x: auto; }
+  .announcement-ticker, .headline-ticker { overflow-x: auto; }
 }
 
 /* ---------- Story grid ---------- */
@@ -2303,6 +2304,22 @@ html.nav-locked { overflow: hidden; }
 
   /* story grid: a touch more air below the cards */
   .story-grid-section { padding: 28px 20px 24px; }
+}
+
+/* ---- Desktop advert pictures carry the same "AD" chip the phone bar shows,
+   but here it sits on the divider between the picture and the caption: half
+   the chip rests on the image and half on the text, so the caption bar reads
+   as a deliberate ad unit rather than a stray line of copy. */
+@media (min-width: 900px) {
+  .teaser-slide.has-image .teaser-slide-inner { position: relative; }
+  .teaser-slide.has-image .teaser-slide-inner::before {
+    content: "AD";
+    position: absolute; top: 0; left: 16px; transform: translateY(-50%);
+    padding: 1px 8px 1px 6px;
+    background: var(--brand-deep); color: var(--paper);
+    font-size: 0.56rem; font-weight: 800; letter-spacing: 0.14em; line-height: 1.7;
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  }
 }
 
 /* ---- Footer newsletter form: input and button sit side by side and only

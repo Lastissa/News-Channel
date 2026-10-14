@@ -1,0 +1,25 @@
+{% comment %}
+  Advert cards for the promote page gallery. Swapped into HOME/promote.html's
+  [data-promote-ads] grid by promote.js (HOME/views.PromoteAdsView), so there is
+  no surrounding block here -- just the cards.
+{% endcomment %}
+{% for item in items %}
+<article class="promote-ad-card">
+  {% if item.url %}
+  <a class="promote-ad-link" href="{{ item.url }}" target="_blank" rel="noopener noreferrer nofollow">
+  {% else %}
+  <div class="promote-ad-link is-static">
+  {% endif %}
+    <div class="promote-ad-media">
+      <img src="{{ item.image }}" alt="{{ item.heading|default:'Advert running on the site' }}" loading="lazy" decoding="async">
+    </div>
+    <div class="promote-ad-body">
+      {% if item.is_example %}<span class="promote-ad-tag">Example</span>{% endif %}
+      {% if item.heading %}<h3 class="promote-ad-heading">{{ item.heading }}</h3>{% endif %}
+      {% if item.body %}<p class="promote-ad-text">{{ item.body }}</p>{% endif %}
+    </div>
+  {% if item.url %}</a>{% else %}</div>{% endif %}
+</article>
+{% empty %}
+<p class="promote-ads-empty">No adverts are running right now — yours could be the first.</p>
+{% endfor %}

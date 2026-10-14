@@ -40,6 +40,7 @@ urlpatterns = [
     path("about/", views.AboutView.as_view(), name="about"),
     path("privacy-policy/", views.PrivacyPolicyView.as_view(), name="privacy_policy"),
     path("promote-your-bussiness/", views.PromoteView.as_view(), name="promote"),
+    path("promote-ads/", views.PromoteAdsView.as_view(), name="promote_ads"),
     path("advertise/", views.AdvertInquiryView.as_view(), name="advert_inquiry"),
     path("most-viewed/", views.MostViewedView.as_view(), name="most_viewed"),
 ]
