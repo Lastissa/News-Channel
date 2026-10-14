@@ -23,11 +23,15 @@ CSRF_COOKIE_SECURE = True
 
 ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')
 
-#   TEMPORARY DIAGNOSTIC (SERVICE_INTERNAL.abstract.log_forwarded_headers):
-#   when True, the login views log the masked proxy/IP header chain so the real
-#   client hop can be identified behind Render. Off unless explicitly enabled
-#   via the LOG_FORWARDED_HEADERS env var; remove once the IP issue is settled.
-LOG_FORWARDED_HEADERS = os.getenv("LOG_FORWARDED_HEADERS", "False").upper() in {"TRUE", "1", "YES"}
+#   TEMPORARY IP DIAGNOSTIC -- COMMENTED OUT (14 Oct 2026).
+#   When True this flag switched on SERVICE_INTERNAL.abstract.log_forwarded_headers,
+#   which made the login views log the masked proxy/IP header chain
+#   (CF-Connecting-IP, the X-Forwarded-For hops, X-Real-IP, True-Client-IP,
+#   REMOTE_ADDR, X-Forwarded-Proto/Host) so the real client hop could be told
+#   apart from Render/Cloudflare infrastructure. The investigation is finished,
+#   so the flag, the helper, mask_ip and the two LoginView call sites are all
+#   disabled. Re-enable them together only if the client IP has to be re-checked.
+# LOG_FORWARDED_HEADERS = os.getenv("LOG_FORWARDED_HEADERS", "False").upper() in {"TRUE", "1", "YES"}
 
 INSTALLED_APPS = [
     'django.contrib.admin',

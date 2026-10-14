@@ -1174,9 +1174,11 @@ class ContinueReadingPopupTests(QuietTestCase):
         self.assertContains(response, 'data-share-platform="facebook"')
         self.assertContains(response, 'data-share-platform="twitter"')
         # The brand art is the bought SVG files, not hand written inline paths.
-        self.assertContains(response, "blog/file/WhatsApp-icon.svg")
-        self.assertContains(response, "blog/file/2023_Facebook_icon.svg")
-        self.assertContains(response, "blog/file/X_logo_2023.svg")
+        # Resolve through static() so the assertion follows the hashed manifest
+        # name that {% static %} actually prints (whitenoise manifest storage).
+        self.assertContains(response, static("blog/file/WhatsApp-icon.svg"))
+        self.assertContains(response, static("blog/file/2023_Facebook_icon.svg"))
+        self.assertContains(response, static("blog/file/X_logo_2023.svg"))
         self.assertNotContains(response, "Tap To Share Story")
 
     def test_home_popup_cooldown_is_twelve_hours(self):

@@ -515,7 +515,11 @@ class StoryDetailRecommendationsMarkupTests(TestCase):
         self.assertContains(response, "Another story from the same author")
         self.assertContains(response, "Most viewed author story")
         self.assertContains(response, 'class="trending-list author-latest-list"')
-        self.assertContains(response, "blog/js/category-recommendations.js")
+        # Resolve through static() so the assertion follows the hashed manifest
+        # name that {% static %} prints (the template also appends a ?v= tag).
+        from django.templatetags.static import static
+
+        self.assertContains(response, static("blog/js/category-recommendations.js"))
         self.assertContains(response, 'class="story-like-icon"')
         self.assertContains(response, 'aria-label="Like this story"')
         self.assertContains(response, "Like this story")

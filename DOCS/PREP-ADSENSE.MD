@@ -121,7 +121,14 @@ Sample = 8 live stories fetched in full, across 8 categories (ids 66, 42, 40, 7,
 - **Enforcement at Add News.** `SERVICE_INTERNAL/story_validation.py` now **blocks** a body under 100 words and **warns** (author must confirm) below the 300-word target or when no source is named. The same rule is shown in the Add News formatting guide and in the author handbook.
 - **B — sitemap.** `HOME/views.py` (`SitemapXmlView`) now omits configured categories that hold no stories, so Google is not asked to index empty category pages.
 
-Still open: the editorial clean-up itself — expanding the 130–200 word stories and moving stories 7 & 40 out of the news feed.
+**Still open — the editorial clean-up itself (owner: editor, on PRODUCTION).** The code now prevents *new* short/sourceless posts, but the existing corpus is untouched. To close Segment 2:
+1. **Expand or merge the short stories.** Most of the ~55 live stories sit at 130–200 words; bring each up to a real ~300-word body (add the who/what/when/where, context and a second angle).
+2. **Remove the self-promo pieces from news.** Story 7 (`ABUREPORT: PLATFORM FOR RELIABLE UP-TO-DATE NEWS`) and story 40 ("Item 7" promo) — delete, unpublish, or re-file outside a news category.
+3. **Fix the sloppy links.** Story 42 `?utm_aource=` typo and the `?abureport.com.ng` / `?utm_source=` suffixes; story 63 bare `https://punchng.com/?abureport.com.ng`; author social `https://x.om/lastissa/` → `x.com`.
+4. **Add a second independent source** where a story leans on one only (e.g. 63, 38, 40, 60).
+5. **Minor page cleanup** (may belong to Segment 5, not here): drop the public "Word count" and view counter from the story page and remove the dead `ServicesSoon` nav item.
+
+Segment 2 can be marked ☑ once the live stories pass 1–4.
 
 ---
 

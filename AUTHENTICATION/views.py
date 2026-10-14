@@ -16,7 +16,10 @@ from django.views import View
 from django.contrib import messages
 
 from django.contrib.auth import get_user_model
-from SERVICE_INTERNAL.abstract import _response, is_rate_limited, log_forwarded_headers
+#   TEMPORARY IP DIAGNOSTIC -- import disabled with the helper; see
+#   SERVICE_INTERNAL.abstract.log_forwarded_headers.
+# from SERVICE_INTERNAL.abstract import _response, is_rate_limited, log_forwarded_headers
+from SERVICE_INTERNAL.abstract import _response, is_rate_limited
 from SERVICE_INTERNAL.config import About
 from SERVICE_INTERNAL.email_single import _try_send_login_email, _try_send_password_reset_email, _try_send_password_reset_success_email
 from SERVICE_INTERNAL.passwords import first_password_error
@@ -73,14 +76,16 @@ def _auth_context(request, **context):
 
 class LoginView(View):
     def get(self, request): 
-        log_forwarded_headers(request, "login:get")
+        # TEMPORARY IP DIAGNOSTIC -- disabled; logged masked proxy/IP headers.
+        # log_forwarded_headers(request, "login:get")
 
         if request.user.is_authenticated:
             return redirect(_return_to(request))
         return render(request, "auth/login.html", _auth_context(request))
     
     def post(self, request):
-        log_forwarded_headers(request, "login:post")
+        # TEMPORARY IP DIAGNOSTIC -- disabled; logged masked proxy/IP headers.
+        # log_forwarded_headers(request, "login:post")
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         # rate limting here
         remaining_time, _rate_limit = is_rate_limited(request, timeout_window=15, max_requests=3)
