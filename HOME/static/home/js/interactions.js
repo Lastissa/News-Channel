@@ -2299,4 +2299,144 @@
       observeAll();
     }
   })();
+
+  /* ---------- video theatre (tap a video to widen it) ----------
+     Tapping a story inline video (vidl/vidr/vidc) or an archive video tile
+     opens the same much-wider overlay player. The clip is read from the
+     tapped element -- its src, or the archive tile's data-src so a video
+     still downloads only when it is actually wanted. The tap is the user
+     gesture that lets the sound start straight away. The native bar
+     handles play/pause, the scrub bar and volume; the speed row adds
+     0.5x / 1x / 2x / 10x. Escape, the close button or a tap on the dark
+     backdrop closes it and, if the tapped clip was playing, resumes it.
+
+     This lives here rather than per-page because both the story pages and
+     the archive (which extends base.html) already defer this same file. */
+  (function initVideoTheatre() {
+    var SPEEDS = [0.5, 1, 2, 10];
+    var SOURCE_SELECTOR = ".story-inline-video video, .archive-videotile video";
+
+    var overlay = null;
+    var stageVideo = null;
+    var speedButtons = [];
+    var sourceVideo = null;
+    var sourceWasPlaying = false;
+    var lastFocus = null;
+
+    function setSpeed(rate) {
+      if (stageVideo) stageVideo.playbackRate = rate;
+      speedButtons.forEach(function (btn) {
+        var active = Number(btn.getAttribute("data-speed")) === rate;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+    }
+
+    function build() {
+      if (overlay) return;
+      overlay = document.createElement("div");
+      overlay.className = "video-theatre";
+      overlay.setAttribute("hidden", "");
+      overlay.innerHTML =
+        '<div class="video-theatre-stage">' +
+          '<button type="button" class="video-theatre-close" data-theatre-close aria-label="Close video">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+          '</button>' +
+          '<video class="video-theatre-el" controls playsinline preload="metadata"></video>' +
+          '<div class="video-theatre-tools" data-theatre-tools role="group" aria-label="Playback speed"></div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+
+      stageVideo = overlay.querySelector(".video-theatre-el");
+      var tools = overlay.querySelector("[data-theatre-tools]");
+      SPEEDS.forEach(function (rate) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "video-theatre-speed";
+        btn.setAttribute("data-speed", String(rate));
+        btn.textContent = rate + "x";
+        tools.appendChild(btn);
+        speedButtons.push(btn);
+      });
+      setSpeed(1);
+
+      overlay.addEventListener("click", function (event) {
+        var target = event.target;
+        if (target === overlay) { close(); return; }
+        if (!target.closest) return;
+        if (target.closest("[data-theatre-close]")) { event.preventDefault(); close(); return; }
+        var speedBtn = target.closest(".video-theatre-speed");
+        if (speedBtn) { event.preventDefault(); setSpeed(Number(speedBtn.getAttribute("data-speed"))); }
+      });
+    }
+
+    function open(source) {
+      if (!source) return;
+      build();
+      sourceVideo = source;
+      sourceWasPlaying = !source.paused;
+      try { source.pause(); } catch (err) { /* already stopped */ }
+
+      var src = source.getAttribute("src") || source.getAttribute("data-src") || "";
+      if (!src) {
+        var sourceTag = source.querySelector("source");
+        if (sourceTag) src = sourceTag.getAttribute("src") || "";
+      }
+      if (!src) return;
+
+      lastFocus = document.activeElement;
+      overlay.hidden = false;
+      document.body.classList.add("video-theatre-open");
+      stageVideo.muted = false;
+      stageVideo.volume = 1;
+      stageVideo.setAttribute("src", src);
+      if (stageVideo.currentSrc === src) {
+        try { stageVideo.currentTime = source.currentTime || 0; } catch (err) {}
+      } else {
+        stageVideo.load();
+      }
+      setSpeed(1);
+      var played = stageVideo.play();
+      if (played && played.catch) played.catch(function () { /* gesture blocked */ });
+      var closeBtn = overlay.querySelector("[data-theatre-close]");
+      if (closeBtn) closeBtn.focus({ preventScroll: true });
+    }
+
+    function close() {
+      if (!overlay || overlay.hidden) return;
+      try { stageVideo.pause(); } catch (err) {}
+      stageVideo.removeAttribute("src");
+      try { stageVideo.load(); } catch (err) {}
+      setSpeed(1);
+      overlay.hidden = true;
+      document.body.classList.remove("video-theatre-open");
+      if (sourceVideo && sourceWasPlaying) {
+        var resumed = sourceVideo.play();
+        if (resumed && resumed.catch) resumed.catch(function () { /* autoplay blocked */ });
+      }
+      sourceVideo = null;
+      var focusBack = lastFocus;
+      lastFocus = null;
+      if (focusBack && document.contains(focusBack) && focusBack.focus) {
+        try { focusBack.focus({ preventScroll: true }); } catch (err) {}
+      }
+    }
+
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+      if (!target || !target.closest) return;
+      /* the story/archive play, pause and sound buttons keep their own job */
+      if (target.closest("[data-video-toggle], [data-video-sound], [data-archive-video-toggle]")) return;
+      var video = target.closest(SOURCE_SELECTOR);
+      if (!video) return;
+      event.preventDefault();
+      open(video);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape" || !overlay || overlay.hidden) return;
+      event.preventDefault();
+      close();
+    });
+  })();
 })();

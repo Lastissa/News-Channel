@@ -2425,8 +2425,92 @@ a:focus:not(:focus-visible) {
 .story-grid .trending-wide .section-heading { margin-bottom: 4px; }
 .story-grid .trending-wide .section-heading h2 { display: block; font-size: 1.05rem; }
 
-/* --- 6. Slow-connection / FOUC hardening --------------------------------
-   Skip layout+paint for what is below the first screenful; contain-intrinsic
-   sizes stop the scrollbar from jumping while those blocks are skipped. */
 .site-footer { content-visibility: auto; contain-intrinsic-size: auto 420px; }
 #trending-section { content-visibility: auto; contain-intrinsic-size: auto 280px; }
+
+/* ============================================================
+   VIDEO THEATRE
+   Tapping a story inline video or an archive video tile opens the
+   clip in this wider overlay. The DOM is built and shown by the
+   video-theatre block in HOME/static/home/js/interactions.js, which
+   every page defers through base.html.
+   ============================================================ */
+.video-theatre {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(6, 10, 18, 0.94);
+}
+.video-theatre[hidden] { display: none; }
+
+.video-theatre-stage {
+  position: relative;
+  width: min(1200px, 96vw);
+}
+
+.video-theatre-el {
+  display: block;
+  width: 100%;
+  max-height: 84vh;
+  background: #000;
+  border-radius: 8px;
+}
+
+.video-theatre-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.66);
+  color: #fff;
+  cursor: pointer;
+}
+.video-theatre-close:hover { background: rgba(0, 0, 0, 0.9); }
+
+.video-theatre-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.video-theatre-speed {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.video-theatre-speed:hover { background: rgba(255, 255, 255, 0.14); }
+
+.video-theatre-speed.is-active {
+  background: #fff;
+  border-color: #fff;
+  color: #111;
+}
+
+body.video-theatre-open { overflow: hidden; }
+
+@media (max-width: 560px) {
+  .video-theatre { padding: 10px; }
+  .video-theatre-stage { width: 96vw; }
+  .video-theatre-el { max-height: 78vh; }
+  .video-theatre-speed { padding: 6px 14px; }
+}
