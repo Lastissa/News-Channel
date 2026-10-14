@@ -7,6 +7,7 @@ from django.core.cache import cache
 from django.db import connection
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,6 +21,50 @@ from STAFF.models import AuthorFollow, StaffProfile
 
 
 _counter = itertools.count(1)
+
+
+#   A complete, source-attributed body. The editor now blocks a body under 100
+#   words and warns below the 300-word target, and it warns when a story names no
+#   source (SERVICE_INTERNAL/story_validation.py). Tests that expect a clean
+#   publish use this: it is over 300 words and carries a "Source:" line, so it
+#   produces no warnings at all.
+PUBLISHABLE_BODY = (
+    "The university transport office confirmed on Monday that the revised campus shuttle routes will begin "
+    "operating next week, ending weeks of uncertainty for students who depend on the service to reach lectures "
+    "on time.\n\n"
+    "### What changes\n\n"
+    "Under the new arrangement, buses will serve the north and south campuses throughout the day, with the first "
+    "departure moved earlier to match the morning lecture schedule. Officials said the number of vehicles on the "
+    "busiest routes will increase from six to nine, and a supervisor will be stationed at each terminal to keep "
+    "departures on time. Current fares remain unchanged, and the office said any future adjustment will be "
+    "announced at least two weeks in advance so that students can plan their budgets. The revised timetable also "
+    "adds a late evening service on weekdays for students who stay behind for practical classes and library work.\n\n"
+    "### Why it matters\n\n"
+    "The shuttle service carries thousands of students every day, and delays in the past have forced many to miss "
+    "the first lecture of the morning or to arrive late for examinations. Student leaders welcomed the change but "
+    "asked the university to publish the full timetable online so that commuters can check it before leaving their "
+    "hostels. The office said the timetable will be posted on the university website and on notice boards at the "
+    "main gates, and that drivers will receive a copy at the start of every shift.\n\n"
+    "### What students should do\n\n"
+    "Students who use the service are advised to check the new timetable before classes resume and to arrive at "
+    "their terminal a few minutes early, especially during the first week when demand is usually highest. "
+    "Complaints about missed or overcrowded buses can be filed at the transport office, and officials promised to "
+    "review the feedback after the first month of operation. The office also said a short survey will be shared "
+    "with student leaders so that routes can be adjusted where demand is strongest.\n\n"
+    "Source: University transport office briefing, 13 October 2026."
+)
+
+
+#   A real but short report between the 100-word floor and the 300-word target, and
+#   with no source. It must be CONFIRMED (409), never blocked (400).
+CONFIRMABLE_BODY = (
+    "The university's transport office said the revised campus shuttle routes will begin operating next week, "
+    "ending weeks of uncertainty for students who depend on the service to reach lectures on time. Buses will "
+    "serve the north and south campuses throughout the day, and the first departure will move earlier to match "
+    "the morning lecture schedule. Current fares remain unchanged, and officials said the timetable will be "
+    "posted on the university website and on notice boards at the main gates. Student leaders welcomed the "
+    "change and asked the office to review the routes again after the first month of operation."
+)
 
 
 class QuietTestCase(TestCase):
@@ -185,7 +230,7 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "data-archive-open")
         self.assertContains(response, "data-archive-refresh")
         self.assertContains(response, "data-editor-modal-confirm")
-        self.assertContains(response, "add-news-editor.js")
+        self.assertContains(response, static("home/js/add-news-editor.js"))
         self.assertContains(response, "20261013-1")
         self.assertContains(response, "Image and file archive")
         self.assertContains(response, "Do not begin the content with a")
@@ -228,9 +273,9 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertTrue(any(error["code"] == "body_starts_with_heading_copy" for error in response.json()["errors"]))
 
-    def test_short_meaningful_report_requires_confirmation_not_length_rejection(self, _ping):
+    def test_report_below_target_requires_confirmation_not_rejection(self, _ping):
         heading = "UNILORIN postpones examinations"
-        content = "The university postponed examinations until Monday."
+        content = CONFIRMABLE_BODY
 
         response = self.post_story(heading, content)
         self.assertEqual(response.status_code, 409)
@@ -241,6 +286,15 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertEqual(confirmed.status_code, 201)
         story = Blog.objects.get(author=self.author)
         self.assertEqual(story.content, content)
+
+    def test_report_under_the_floor_is_blocked_outright(self, _ping):
+        heading = "UNILORIN postpones examinations"
+        content = "The university postponed examinations until Monday."
+
+        response = self.post_story(heading, content)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(any(error["code"] == "body_too_short" for error in response.json()["errors"]))
+        self.assertFalse(Blog.objects.filter(author=self.author).exists())
 
     def test_filler_and_empty_headings_are_blocked(self, _ping):
         for content, expected_code in [
@@ -255,13 +309,7 @@ class AddNewsValidationTests(QuietTestCase):
 
     def test_real_markdown_sections_are_preserved(self, _ping):
         heading = "University announces a new student transport schedule"
-        content = (
-            "The transport office confirmed that the revised routes begin next Monday. "
-            "Students can review the timetable online before classes resume.\n\n"
-            "### Route information\n\n"
-            "Buses will serve the north and south campuses throughout the day. "
-            "Current fares remain unchanged, and staff will be available to answer questions."
-        )
+        content = PUBLISHABLE_BODY
         response = self.post_story(heading, content)
 
         self.assertEqual(response.status_code, 201)
@@ -285,13 +333,7 @@ class NewStoryAlertTests(QuietTestCase):
             {
                 "heading": heading,
                 "category": "GENERAL",
-                "content": (
-                    "The transport office confirmed that the revised routes begin next Monday. "
-                    "Students can review the timetable online before classes resume.\n\n"
-                    "### Route information\n\n"
-                    "Buses will serve the north and south campuses throughout the day. "
-                    "Current fares remain unchanged, and staff will be available to answer questions."
-                ),
+                "content": PUBLISHABLE_BODY,
             },
         )
 
@@ -391,8 +433,8 @@ class EditNewsViewTests(QuietTestCase):
         self.assertContains(response, 'value="Original caption."')
         self.assertContains(response, ">Original content.</textarea>")
         self.assertContains(response, '<option value="GENERAL" selected>')
-        self.assertContains(response, "edit-news-editor.js")
-        self.assertContains(response, "add-news.css")
+        self.assertContains(response, static("home/js/edit-news-editor.js"))
+        self.assertContains(response, static("home/css/add-news.css"))
         #   the heading input is disabled and has no name, so it can never be submitted
         html = response.content.decode()
         heading_input = html[html.index('id="editor-heading"'):]

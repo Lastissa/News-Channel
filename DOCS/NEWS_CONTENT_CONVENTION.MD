@@ -10,6 +10,30 @@ To keep the system clear and safe, each job has one official format only.
 
 ---
 
+## EDITORIAL QUALITY RULES
+
+These rules decide whether a story may be published. They are enforced by the
+editor on the server (`SERVICE_INTERNAL/story_validation.py`, used by the Add
+News form) and are repeated in the author handbook for writers.
+
+1. **Length.** A story body must carry at least 300 words of real content. Under
+   100 words the editor blocks the post; between 100 and 300 it warns and the
+   author must confirm. Short posts reach fewer readers and weaken the site's
+   eligibility for advertising partners.
+2. **Source.** Every story must name where its facts came from: a `Source:` line
+   or a link in the body. A story built on another outlet's report, a social post
+   or a press release must say so.
+3. **Originality.** Do not publish a single tweet, a single social post or a
+   lightly reworded copy of another report as a full article. Add the facts,
+   names, dates and detail readers cannot get from the source alone.
+4. **No filler.** Do not pad the body with sentences that carry no information.
+   Say each fact once, then move on.
+5. **Keep promotion out of the news feed.** About-us pieces and business
+   promotions are not news. They belong on the promotion surface, never in a
+   news category.
+
+---
+
 ## OFFICIAL FORMATS
 
 ### 1) LINKS
@@ -169,6 +193,8 @@ Writers should use plain article writing. They should not be forced to think in 
 Recommended guidance for writers:
 
 - Write in normal paragraphs.
+- Write at least 300 words of real content. A body under 100 words is blocked by the editor.
+- Always name your source with a `Source:` line or a link in the body.
 - Leave a blank line between paragraphs.
 - Start a new line with * for bullet points.
 - Start a new line with 1. for numbered points.

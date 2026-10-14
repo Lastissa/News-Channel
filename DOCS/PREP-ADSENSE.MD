@@ -36,7 +36,7 @@ The goal is not to guess whether Google will approve. The goal is to remove the 
 | # | Segment | Priority | Blocks AdSense? | Status |
 |---|---------|----------|-----------------|--------|
 | 1 | Privacy-policy ad disclosures | P1 | Yes — clearest gap | ☑ |
-| 2 | Article content audit | P2 | Yes | ☐ |
+| 2 | Article content audit | P2 | Yes | ◐ |
 | 3 | Publication transparency pages | P3 | Yes | ☐ |
 | 4 | Mobile experience & readability | P4 | Can | ☐ |
 | 5 | Technical crawl & indexing | P5 | Yes | ☐ |
@@ -96,6 +96,32 @@ The goal is not to guess whether Google will approve. The goal is to remove the 
 **Deliverable.** A short findings list, with the sample used and corrections made.
 
 **Definition of done.** Every sampled story is original, verifiable and adequately sourced; problem items are fixed or removed.
+
+**Result (audited 14 Oct 2026 against PRODUCTION — https://abureport.com.ng).**
+> Correction: an earlier pass of this segment read the **local dev database** by mistake. That data is not production and is fully superseded by the production audit below.
+
+Sample = 8 live stories fetched in full, across 8 categories (ids 66, 42, 40, 7, 63, 55, 60, 38), plus the complete `sitemap.xml` and homepage listing. About 55 stories are live (sitemap entries), 23 Sep – 13 Oct 2026, by two named authors (Opeyemi, ABU SUĀD).
+
+**Corpus shape (production).** Word counts printed on each story page: 40 = 129, 60 ≈ 130, 63 = 150, 66 = 199, 7 = 199, then 42 = 642, 55 = 571, 38 = 595. Most of the sample sits at **130–200 words**; only some reach 550-650.
+
+**Findings.**
+
+1. **Short, single-source rewrites dominate.** 63 (150 words) cites only Punch; 38 cites only one history site; 40 is a rewrite of one tweet (`Source: Ash-Aar (@YesItsBash) on X`); 60 rewrites a JAMB social post. This is the "duplicated/aggregated, little added value" pattern AdSense rejections cite most.
+2. **Padding / hollow sentences.** Story 66 carries: *"Although the specific challenges she encountered during her studies have not been independently documented, her accomplishment provides an opportunity to recognise the dedication involved..."* — filler a reviewer reads as low value.
+3. **Self-promotional pieces are filed as news.** Story 7 (`ABUREPORT: PLATFORM FOR RELIABLE UP-TO-DATE NEWS`) is an about-us puff piece in General; story 40 is effectively a brand promotion for "Item 7". Both read as ads dressed as editorial.
+4. **Sloppy links in body copy.** Story 42 has `?utm_aource=` (typo) and source links with appended `?abureport.com.ng` / `?utm_source=`; story 63's source is a bare `https://punchng.com/?abureport.com.ng`; the author social link is `https://x.om/lastissa/` (x.om typo).
+5. Minor: the story page prints a public **"Word count"** and view counter; the nav has a dead `ServicesSoon` placeholder.
+
+**Strengths.** Real Nigerian education/news topics, clear headlines, good structure where developed (55 and 42 have summary blocks and subheads), sources named on several pieces, and editorial-team + author pages exist.
+
+**Required action (editorial — owner).** Hold every story to a consistent **~300+ word original body** (expand or merge the 130–200 word ones); require at least one explicit source line and, where possible, a second independent source; move the self-promo pieces (7, 40) out of the news feed; add the padding and typo-link checks to the editorial checklist. Nothing was changed by this audit.
+
+**Enforcement added (14 Oct 2026 — code).** Two of the audit follow-ups are now implemented:
+- **A — convention updated.** `DOCS/NEWS_CONTENT_CONVENTION.MD` gains an **Editorial quality rules** section (≈300-word target, name the source, originality, no filler, no self-promo in news) plus two writer bullets.
+- **Enforcement at Add News.** `SERVICE_INTERNAL/story_validation.py` now **blocks** a body under 100 words and **warns** (author must confirm) below the 300-word target or when no source is named. The same rule is shown in the Add News formatting guide and in the author handbook.
+- **B — sitemap.** `HOME/views.py` (`SitemapXmlView`) now omits configured categories that hold no stories, so Google is not asked to index empty category pages.
+
+Still open: the editorial clean-up itself — expanding the 130–200 word stories and moving stories 7 & 40 out of the news feed.
 
 ---
 
@@ -181,6 +207,8 @@ The goal is not to guess whether Google will approve. The goal is to remove the 
 | Date | Segment | Change | Status |
 |------|---------|--------|--------|
 | 14 Oct 2026 | 1 — Privacy-policy ad disclosures | Added Google/third-party advertising disclosure behind a `show_google_ads` switch in `HOME/templates/HOME/privacy_policy.html`; bumped "Last updated" to 14 Oct 2026 | ☑ |
+| 14 Oct 2026 | 2 — Article content audit | First pass accidentally read the local DB (void). Re-audited **production**: 8 stories fetched across 8 categories + sitemap. Majority are 130–200-word single-source rewrites; padding in story 66; self-promo stories 7 & 40 in the news feed; typo links. ~55 stories live. Editorial fixes listed, none actioned | ◐ |
+| 14 Oct 2026 | 2 — Enforcement (A + B) | Updated `DOCS/NEWS_CONTENT_CONVENTION.MD` with editorial rules; `SERVICE_INTERNAL/story_validation.py` blocks <100-word bodies and warns <300 words / no source; Add News guide + author handbook updated; `SitemapXmlView` skips empty categories; tests refreshed for the new rule | ◐ |
 
 ---
 

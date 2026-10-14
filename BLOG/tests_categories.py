@@ -39,6 +39,36 @@ ORIGINAL_CHOICES = [(name, name) for name in ORIGINAL_CATEGORIES]
 _MISS = object()
 _counter = itertools.count(1)
 
+#   A complete, source-attributed body. AddNewsView now blocks a body under 100
+#   words and warns below the 300-word target or when no source is named
+#   (SERVICE_INTERNAL/story_validation.py). This body clears all of it, so a
+#   publish here reaches the category validation this test class is about.
+COMPLIANT_BODY = (
+    "The university transport office confirmed on Monday that the revised campus shuttle routes will begin "
+    "operating next week, ending weeks of uncertainty for students who depend on the service to reach lectures "
+    "on time.\n\n"
+    "### What changes\n\n"
+    "Under the new arrangement, buses will serve the north and south campuses throughout the day, with the first "
+    "departure moved earlier to match the morning lecture schedule. Officials said the number of vehicles on the "
+    "busiest routes will increase from six to nine, and a supervisor will be stationed at each terminal to keep "
+    "departures on time. Current fares remain unchanged, and the office said any future adjustment will be "
+    "announced at least two weeks in advance so that students can plan their budgets. The revised timetable also "
+    "adds a late evening service on weekdays for students who stay behind for practical classes and library work.\n\n"
+    "### Why it matters\n\n"
+    "The shuttle service carries thousands of students every day, and delays in the past have forced many to miss "
+    "the first lecture of the morning or to arrive late for examinations. Student leaders welcomed the change but "
+    "asked the university to publish the full timetable online so that commuters can check it before leaving their "
+    "hostels. The office said the timetable will be posted on the university website and on notice boards at the "
+    "main gates, and that drivers will receive a copy at the start of every shift.\n\n"
+    "### What students should do\n\n"
+    "Students who use the service are advised to check the new timetable before classes resume and to arrive at "
+    "their terminal a few minutes early, especially during the first week when demand is usually highest. "
+    "Complaints about missed or overcrowded buses can be filed at the transport office, and officials promised to "
+    "review the feedback after the first month of operation. The office also said a short survey will be shared "
+    "with student leaders so that routes can be adjusted where demand is strongest.\n\n"
+    "Source: University transport office briefing, 13 October 2026."
+)
+
 
 @override_settings(CACHES=ISOLATED_CACHE)
 class CategoryCacheTestCase(TestCase):
@@ -200,7 +230,7 @@ class StoryFormFollowsCategoriesTests(CategoryCacheTestCase):
     def publish(self, category):
         return self.client.post(
             reverse("home:add_news"),
-            {"heading": f"Heading {next(_counter)}", "category": category, "content": "Body text of the story."},
+            {"heading": f"Heading {next(_counter)}", "category": category, "content": COMPLIANT_BODY},
         )
 
     def test_a_category_added_in_panel_can_be_published_into(self, _ping):

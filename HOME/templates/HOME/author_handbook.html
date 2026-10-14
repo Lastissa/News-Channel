@@ -61,7 +61,7 @@
         <li><strong>Open the editor:</strong> Use the '+ news' button in the header. Every author. </li>
         <li><strong>Write a headline that matches the article:</strong> Currently limited to 100 characters and you <b>CANNOT</b> change it later.</li>
         <li><strong>Add a banner:</strong> Paste an image link, upload a file, or pick one from the archive. Add an image description so the picture is accessible and explained - avoid vague unrelated banner explanation.</li>
-        <li><strong>Write the body:</strong> The first paragraph should be a quick overview for readers in a hurry. Then add the detail in sections with headings. You can also just use paragraphs, but the first one must be a quick overview.</li>
+        <li><strong>Write the body:</strong> The first paragraph should be a quick overview for readers in a hurry. Then add the detail in sections with headings. You can also just use paragraphs, but the first one must be a quick overview. A story must have at least 300 words of real content (anything under 100 words is blocked), and it must name its source with a <span class="hb-code">Source:</span> line or a link.</li>
         <li><strong>Pick a category:</strong> It decides where the story is listed and which similar stories readers are offered. The list of categories is set by the admins, so choose the one that best matches your article{% if support_email and "@" in support_email %} or email <a href="mailto:{{ support_email }}">{{ support_email }}</a> if you have a category in mind that we should add{% endif %}.</li>
         <li><strong>Review before you publish:</strong> The editor runs the checks below and blocks a story that cannot does nt align it its guidelines. If a story can still be published but may reach fewer readers, you get a warning to read and confirm before proceding but that is at your own risk.</li>
         <li><strong>Publish.</strong> The story goes live immediately and is announced to our readers who suscribed to newsletter or are following you.</li>
@@ -78,6 +78,7 @@
           <ul class="hb-check">
             <li>Check today's news on <a href="https://abureport.com.ng" target="_blank" rel="noopener noreferrer">abureport.com.ng</a> before you write. If we have not published that news yet, go ahead. If we already have, do not publish it again. If it is an update to the older one, say so clearly.</li>
             <li>Check every fact, name, date and figure before you publish.</li>
+            <li>Write at least 300 words of real content, and always name your source with a <span class="hb-code">Source:</span> line or a link. Anything under 100 words is blocked.</li>
             <li>Open with new information. The first paragraph should not repeat the headline AND the first paragraph should be a quick overview of the entire report.</li>
             <li>Say each fact once, then move on. Repetition affects trust and reach.</li>
             <li>Use sections with real headings so readers can scan (optional).</li>
@@ -92,6 +93,8 @@
           <ul class="hb-check">
             <li>Do not publish a said fact you have not confirmed.</li>
             <li>Do not copy another writer's work word for word. Plagiarism is a removal offence.</li>
+            <li>Do not publish a story that is only a rewrite of a single tweet or Facebook post. Develop it with facts and context.</li>
+            <li>Do not file self-promotion or "about us" pieces under a news category.</li>
             <li>Do not start the body with a heading that repeats the headline.</li>
             <li>Do not bloat the first paragraph , it should be a quick summary not soyinka's novel</li>
             <li>Do not separate sections with lines of symbols such as <span class="hb-code">------</span> or <span class="hb-code">=====</span>. Use a blank line or a real heading.</li>
@@ -161,7 +164,9 @@
                 <span class="hb-result"><span class="hb-chip hb-chip--warn">Warning</span>from a strong match</span>
               </td>
             </tr>
-            <tr><td data-label="Check">A body under 40 words</td><td data-label="Result"><span class="hb-chip hb-chip--warn">Warning</span>You can confirm it</td></tr>
+            <tr><td data-label="Check">A body under 100 words</td><td data-label="Result"><span class="hb-chip hb-chip--block">Blocked</span>Add real content first</td></tr>
+            <tr><td data-label="Check">A body under 300 words</td><td data-label="Result"><span class="hb-chip hb-chip--warn">Warning</span>You can confirm it</td></tr>
+            <tr><td data-label="Check">No named source (no <span class="hb-code">Source:</span> line and no link)</td><td data-label="Result"><span class="hb-chip hb-chip--warn">Warning</span>Add your source</td></tr>
             <tr><td data-label="Check">The body starts with any heading at all</td><td data-label="Result"><span class="hb-chip hb-chip--warn">Warning</span>A normal opening paragraph reads better</td></tr>
           </tbody>
         </table>

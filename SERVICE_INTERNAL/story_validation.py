@@ -23,9 +23,17 @@ from difflib import SequenceMatcher
 SIMILARITY_BLOCK = 0.90
 SIMILARITY_WARN = 0.75
 
-#   Very short content is allowed when meaningful, but the author is asked to
-#   confirm that it contains enough information. Length alone is not a block.
-SHORT_BODY_WARN_WORDS = 40
+#   Editorial quality floor (mirrors DOCS/NEWS_CONTENT_CONVENTION.MD). A story
+#   under HARD_MIN_BODY_WORDS is refused outright; between the floor and
+#   MIN_BODY_WORDS it can still publish, but only after the author reads the
+#   reason and confirms. This keeps the corpus from filling up with near-empty
+#   posts that hurt search visibility and ad eligibility.
+HARD_MIN_BODY_WORDS = 100
+MIN_BODY_WORDS = 300
+#   A story built on another report, post or page must say so: a line that starts
+#   with "Source" (e.g. "Source: https://..."), or a link anywhere in the body.
+SOURCE_RE = re.compile(r"(?im)^\s*source\b")
+URL_RE = re.compile(r"https?://\S+")
 
 IMG_RE = re.compile(r"^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$")
 VID_RE = re.compile(r"^(vidl|vidr|vidc)\s+(\S+)(?:\s+(.*))?$")
@@ -324,11 +332,28 @@ def validate_story(heading, content):
             "meaningless_text",
             "Your article body looks like filler text (repeated words or characters). Replace it with a real report of the story.",
         ))
-    elif words < SHORT_BODY_WARN_WORDS:
+    elif words < HARD_MIN_BODY_WORDS:
+        add(_block(
+            "body_too_short",
+            f"Your article body is only {words} words. A story needs at least {HARD_MIN_BODY_WORDS} words of real "
+            "reporting before it can be published. Add the facts, names, dates and details readers need.",
+        ))
+    elif words < MIN_BODY_WORDS:
         add(_warn(
-            "body_is_very_short",
-            f"Your article body is very short ({words} words). Check that it gives readers enough meaningful information "
-            "about this story.You can go back and edit, or confirm that you want to post it anyway. (This will hurt your story outreach and you might be shadow banned.)",
+            "body_below_target",
+            f"Your article body is {words} words. Our standard is at least {MIN_BODY_WORDS} words so the story is complete "
+            "and useful; short stories reach fewer readers and weaken our eligibility for ad partners. "
+            "Expand it with real detail, or confirm that you want to publish it as it is.",
+        ))
+
+    #   RULE 11: NAME THE SOURCE. A story built on another report, post or page
+    #   must say where the facts came from, so readers (and reviewers) can verify
+    #   it. A link anywhere in the body, or a "Source:" line, satisfies this.
+    if body_blocks and not (URL_RE.search(content) or SOURCE_RE.search(content)):
+        add(_warn(
+            "missing_source",
+            "Your article does not name a source. Add a 'Source:' line or a link to where the facts come from, "
+            "so readers can trust the story and verify it.",
         ))
 
     #   RULE 1: FIRST PARAGRAPH vs HEADING (>= 90% blocks)

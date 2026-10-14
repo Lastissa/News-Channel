@@ -167,8 +167,19 @@ class SitemapXmlView(View):
         ]
 
         #   PERMANENT CATEGORY PAGES: /category/<slog>/ is a stable landing page
-        #   for each news category, so every one belongs in the sitemap.
+        #   for each news category. Only categories that ACTUALLY HOLD STORIES
+        #   are listed: an empty category page is thin content, so putting every
+        #   configured category (including ones with zero stories) in the sitemap
+        #   asks Google to index empty pages.
+        published_categories = set(
+            Blog.objects.exclude(slug__isnull=True)
+            .exclude(slug="")
+            .values_list("category", flat=True)
+            .distinct()
+        )
         for name, _ in get_category_choices():
+            if name not in published_categories:
+                continue
             urls.append(
                 {
                     "loc": f"{domain}{reverse('home:category', args=[slugify(name)])}",
