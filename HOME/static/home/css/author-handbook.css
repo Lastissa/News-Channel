@@ -89,3 +89,35 @@
 @media (min-width: 760px) {
   .hb-pair { grid-template-columns: 1fr 1fr; gap: 24px 44px; }
 }
+
+/* ---------- Copyable example lines ---------- */
+.hb-example {
+  max-width: 70ch;
+  margin: 24px 0 0;
+}
+
+.hb-example-title {
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+
+.hb-example-hint {
+  margin: 0 0 12px;
+  color: var(--ink);
+  line-height: 1.7;
+}
+
+.hb-example-line {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--doc-code-bg);
+  color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.86em;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.hb-example-line:last-child { margin-bottom: 0; }

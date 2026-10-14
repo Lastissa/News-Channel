@@ -468,7 +468,7 @@ class StoryDetailView(View):
                 )
             )
         elif request.headers.get("HX-Request", "").lower() != "true":
-            remote_addr = request.META.get("REMOTE_ADDR", "").strip() or "unknown"
+            remote_addr = get_client_ip(request).strip() or "unknown"
             address_hash = hmac.new(
                 settings.SECRET_KEY.encode("utf-8"),
                 remote_addr.encode("utf-8"),

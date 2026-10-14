@@ -17,15 +17,33 @@ logger = logging.getLogger(__name__)
 
 from django.conf import settings
 debug_base = getattr(settings, "DEBUG", False)
-def get_client_ip(request)-> str:
-    """Return the client IP using X-Forwarded-For when available."""
+def get_client_ip(request) -> str:
+    """Return the real client IP address.
+
+    The lookup order matters and each step exists for a reason:
+
+    1. ``CF-Connecting-IP`` -- Cloudflare rewrites this header on every
+       request to hold the single real client, so it cannot be faked the
+       way an ``X-Forwarded-For`` entry can. This is the value to trust on
+       the current setup (Cloudflare in front of Render).
+    2. The first entry in ``X-Forwarded-For`` -- the oldest hop, which is
+       where the client's own address sits. Used when ``CF-Connecting-IP``
+       is missing (a plain load balancer that does not inject it).
+    3. ``REMOTE_ADDR`` -- the actual TCP peer; last resort, and the only
+       value that exists with no proxy in front at all.
+    """
     if request is None:
         return "unknown"
 
+    cf_connecting = request.META.get("HTTP_CF_CONNECTING_IP")
+    if cf_connecting:
+        return cf_connecting.strip()
 
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded_for:
-        return forwarded_for.split(",")[0].strip() or request.META.get("REMOTE_ADDR", "unknown")
+        first_hop = forwarded_for.split(",")[0].strip()
+        if first_hop:
+            return first_hop
 
     return request.META.get("REMOTE_ADDR", "unknown")
 

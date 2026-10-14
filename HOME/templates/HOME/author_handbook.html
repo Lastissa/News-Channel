@@ -8,7 +8,7 @@
 {% block extra_head %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'home/css/doc-reader.css' %}?v=20261013-4">
-  <link rel="stylesheet" href="{% static 'home/css/author-handbook.css' %}?v=20261013-4">
+  <link rel="stylesheet" href="{% static 'home/css/author-handbook.css' %}?v=20261014-1">
 {% endblock %}
 
 {% block content %}
@@ -180,6 +180,12 @@
         <li>Replacing an uploaded banner overwrites the same stored file, so a swapped picture does not leave a duplicate behind.</li>
         <li>Pasted links stay exactly as you typed them. The site does not take ownership of, or delete, an image that only lives on someone else's server.</li>
       </ul>
+      <div class="hb-example">
+        <p class="hb-example-title">Copy an example</p>
+        <p class="hb-example-hint">Paste a line like one of these into the body, then replace the description with your own words. Everything you type after the URL becomes the caption shown under that picture or clip.</p>
+        <p class="hb-example-line">imgc {{ site_domain }}{% static '404.jpg' %} AbuReport sample picture</p>
+        <p class="hb-example-line">vidc {{ site_domain }}{% static '404_video.mp4' %} AbuReport sample clip</p>
+      </div>
     </section>
 
     <section class="doc-section" id="editing">
