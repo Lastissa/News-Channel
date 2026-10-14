@@ -3,8 +3,9 @@ from unittest import mock
 
 from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
+from django.contrib import admin
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import TestCase, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -266,6 +267,42 @@ class ArchiveAssetManagementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(ArchiveImage.objects.filter(pk=item.pk).exists())
         destroy_asset.assert_called_once_with("abureport/archive/legacy-photo", "image")
+
+
+class ArchiveAdminDeleteReleasesAssetTests(TestCase):
+    """Deleting an archive item from the hidden Django admin (_admin/) releases
+    its Cloudinary asset best effort after the row is gone, so the backdoor
+    cannot orphan it."""
+
+    def setUp(self):
+        self.user = Auth.objects.create_user(email="admin-archive@example.com")
+        self.model_admin = admin.site._registry[ArchiveImage]
+        self.request = RequestFactory().get("/_admin/")
+
+    def test_delete_model_releases_the_asset(self):
+        item = ArchiveImage.objects.create(
+            url="/archive/cdn/image/upload/v123/abureport/archive/admin-photo.jpg",
+            alt="Admin photo",
+            public_id="abureport/archive/admin-photo",
+            author=self.user,
+        )
+        item_pk = item.pk
+        with mock.patch("ARCHIVE.admin.destroy_archive_asset", return_value=True) as destroy_asset:
+            self.model_admin.delete_model(self.request, item)
+        self.assertFalse(ArchiveImage.objects.filter(pk=item_pk).exists())
+        destroy_asset.assert_called_once_with("abureport/archive/admin-photo", "image")
+
+    def test_delete_queryset_uses_the_legacy_url_fallback(self):
+        item = ArchiveImage.objects.create(
+            url="/archive/cdn/image/upload/v123/abureport/archive/legacy-admin-photo.jpg",
+            alt="Legacy admin photo",
+            author=self.user,
+        )
+        item_pk = item.pk
+        with mock.patch("ARCHIVE.admin.destroy_archive_asset", return_value=True) as destroy_asset:
+            self.model_admin.delete_queryset(self.request, ArchiveImage.objects.filter(pk=item_pk))
+        self.assertFalse(ArchiveImage.objects.filter(pk=item_pk).exists())
+        destroy_asset.assert_called_once_with("abureport/archive/legacy-admin-photo", "image")
 
 
 @override_settings(CLOUDINARY_CLOUD_NAME="test-cloud")

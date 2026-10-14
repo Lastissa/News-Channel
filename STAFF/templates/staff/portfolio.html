@@ -157,6 +157,24 @@
     </div>
   </header>
 
+  {% comment %}
+    Author bio, shown for transparency. It was retired by accident with the
+    old analytics dashboard (the if-False block lower down), but the view still
+    feeds bio and uses it for the meta description and the Person schema. The
+    card styles already exist.
+  {% endcomment %}
+  {% if bio %}
+  <div class="portfolio-grid portfolio-about">
+    <article class="portfolio-card" id="portfolio-bio">
+      <header class="portfolio-card-head">
+        <div><h2>Profile</h2></div>
+        <span class="tag portfolio-section-tag">About</span>
+      </header>
+      <p class="portfolio-prose">{{ bio|linebreaksbr }}</p>
+    </article>
+  </div>
+  {% endif %}
+
   <div class="portfolio-content-layout">
     <section class="portfolio-feed" id="portfolio-feed"
              data-feed-url="{% url 'staff:portfolio_stories' staff_profile.slug %}"
@@ -308,26 +326,6 @@
   </nav>
 
   <div class="portfolio-grid">
-
-    {% if bio %}
-      <section class="portfolio-card {% if tribute %}span-6{% else %}span-12{% endif %}" id="portfolio-bio">
-        <header class="portfolio-card-head">
-          <div><h2>Profile</h2></div>
-          <span class="tag portfolio-section-tag">About</span>
-        </header>
-        <p class="portfolio-prose">{{ bio|linebreaksbr }}</p>
-      </section>
-    {% endif %}
-
-    {% if tribute %}
-      <section class="portfolio-card portfolio-card--endorsement {% if bio %}span-6{% else %}span-12{% endif %}" id="portfolio-tribute">
-        <header class="portfolio-card-head">
-          <div><h2>Endorsement from the editorial team</h2></div>
-          <span class="tag portfolio-section-tag">Editors</span>
-        </header>
-        <p class="portfolio-prose">{{ tribute|linebreaksbr }}</p>
-      </section>
-    {% endif %}
 
     {% if stories %}
       {# ---- recent story reach ---- #}

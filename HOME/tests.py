@@ -12,9 +12,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from ADMIN.models import SiteSettings
+from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, Category, refresh_category_cache
 from HOME.models import ReadingHistory
+from Partner.models import AdvertImage
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.config import custom_context_processors
 from STAFF.models import AuthorFollow, StaffProfile
@@ -379,6 +381,69 @@ class NewStoryAlertTests(QuietTestCase):
         executor.submit.assert_not_called()
 
 
+class HomeAdvertTeaserTests(QuietTestCase):
+    """The hero carousel's placeholder slides are the "advertise with us" call
+    to action (HOME.views._teaser_items). They must never fall back to "/":
+    with a partnership mailbox configured they open it, otherwise they point
+    at the AdvertInquiryView that tells the admins it still needs setting up."""
+
+    def _placeholder_url(self):
+        from HOME.views import _teaser_items
+
+        #   The test database has no live advert, so _teaser_items returns the
+        #   placeholder slides.
+        return _teaser_items()[0]["url"]
+
+    def test_placeholder_opens_the_partnership_mailbox_when_configured(self):
+        row = SiteSettings.get_solo()
+        row.promotion_email = "partners@example.com"
+        row.save()
+
+        self.assertEqual(self._placeholder_url(), "mailto:partners@example.com")
+
+    def test_placeholder_falls_back_to_the_advertise_page_without_a_mailbox(self):
+        row = SiteSettings.get_solo()
+        row.promotion_email = ""
+        row.save()
+
+        self.assertEqual(self._placeholder_url(), reverse("home:advert_inquiry"))
+
+
+class AdvertInquiryViewTests(QuietTestCase):
+    """Clicking that placeholder when no mailbox exists must alert the admins
+    (HOME.views.AdvertInquiryView) and show the visitor "coming soon". Only a
+    signed in visitor's email is handed to the alert."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("home:advert_inquiry")
+
+    def test_signed_in_visitor_email_is_forwarded_and_page_says_coming_soon(self):
+        visitor = Auth.objects.create_user(email="visitor@example.com")
+        self.client.force_login(visitor)
+
+        with mock.patch("HOME.views._try_send_partnership_inquiry_batch_email") as alert:
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Coming soon")
+        alert.assert_called_once_with(visitor.email)
+
+    def test_anonymous_visitor_email_is_not_forwarded(self):
+        with mock.patch("HOME.views._try_send_partnership_inquiry_batch_email") as alert:
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        alert.assert_called_once_with("")
+
+    def test_alert_is_rate_limited_to_one_per_ip(self):
+        with mock.patch("HOME.views._try_send_partnership_inquiry_batch_email") as alert:
+            self.client.get(self.url)
+            self.client.get(self.url)
+
+        self.assertEqual(alert.call_count, 1)
+
+
 @mock.patch("HOME.views.ping_indexnow")
 class EditNewsViewTests(QuietTestCase):
     def setUp(self):
@@ -715,6 +780,65 @@ class StoryDeleteReleasesImageTests(QuietTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Auth.objects.filter(pk=self.author.pk).exists())
         destroy_asset.assert_called_once_with("abureport/news/abc123", "image")
+
+    def _delete_account(self):
+        return self.client.post(reverse("home:profile_delete_account"), {"email": self.author.email})
+
+    def test_account_deletion_releases_the_avatar(self, _ping):
+        Auth.objects.filter(pk=self.author.pk).update(
+            profile_img="https://res.cloudinary.com/test/image/upload/v1/abureport/avatars/user_%d.jpg" % self.author.pk
+        )
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
+            "HOME.views.drop_sessions_for", return_value=0
+        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
+            response = self._delete_account()
+        self.assertEqual(response.status_code, 302)
+        destroy_asset.assert_called_once_with(f"abureport/avatars/user_{self.author.pk}")
+
+    def test_account_deletion_releases_image_adverts(self, _ping):
+        AdvertImage.objects.create(
+            author=self.author,
+            expiry_date=timezone.now() + timedelta(days=7),
+            image_url="https://res.cloudinary.com/test/image/upload/v1/abureport/adverts/banner.jpg",
+            image_public_id="abureport/adverts/banner",
+            url="https://example.com",
+        )
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
+            "HOME.views.drop_sessions_for", return_value=0
+        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
+            response = self._delete_account()
+        self.assertEqual(response.status_code, 302)
+        destroy_asset.assert_called_once_with("abureport/adverts/banner")
+
+    def test_account_deletion_releases_archive_uploads(self, _ping):
+        ArchiveImage.objects.create(
+            author=self.author,
+            url="/archive/cdn/image/upload/v123/abureport/archive/photo.jpg",
+            alt="Campus view",
+            public_id="abureport/archive/photo",
+            resource_type="image",
+        )
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
+            "HOME.views.drop_sessions_for", return_value=0
+        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
+            response = self._delete_account()
+        self.assertEqual(response.status_code, 302)
+        destroy_asset.assert_called_once_with("abureport/archive/photo", "image")
+
+    def test_account_deletion_recovers_a_legacy_archive_public_id(self, _ping):
+        ArchiveImage.objects.create(
+            author=self.author,
+            url="/archive/cdn/image/upload/v123/abureport/archive/legacy-photo.jpg",
+            alt="Legacy photo",
+            public_id="",
+            resource_type="image",
+        )
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
+            "HOME.views.drop_sessions_for", return_value=0
+        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
+            response = self._delete_account()
+        self.assertEqual(response.status_code, 302)
+        destroy_asset.assert_called_once_with("abureport/archive/legacy-photo", "image")
 
 
 class AuthorHandbookViewTests(QuietTestCase):

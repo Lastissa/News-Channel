@@ -1339,13 +1339,14 @@ def _clean_image_advert(post):
         return None, "The text can be at most 200 characters."
 
     url = (post.get("url") or "").strip()
-    if url:
-        if not url.lower().startswith(("http://", "https://")):
-            return None, "The link must start with http:// or https://"
-        try:
-            URLValidator(schemes=["http", "https"])(url)
-        except ValidationError:
-            return None, "Enter a valid link, or leave it empty."
+    if not url:
+        return None, "Add the link this advert should open."
+    if not url.lower().startswith(("http://", "https://")):
+        return None, "The link must start with http:// or https://"
+    try:
+        URLValidator(schemes=["http", "https"])(url)
+    except ValidationError:
+        return None, "Enter a valid link."
 
     expiry = parse_datetime((post.get("expiry_date") or "").strip())
     if expiry is None:

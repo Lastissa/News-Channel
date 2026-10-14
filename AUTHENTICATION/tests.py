@@ -1,7 +1,11 @@
-from django.test import TestCase
+from unittest import mock
+
+from django.contrib import admin
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from AUTHENTICATION.models import Auth
+from BLOG.models import Blog
 
 
 class AuthReturnPathTests(TestCase):
@@ -90,3 +94,37 @@ class GateConfirmPasswordTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Auth.objects.filter(email="MISMATCH@EXAMPLE.COM").exists())
+
+
+class AuthAdminDeleteReleasesCloudinaryAssetsTests(TestCase):
+    """Deleting an account from the hidden Django admin (_admin/) releases every
+    Cloudinary asset the cascade removes (its story banners, image adverts,
+    archive uploads and avatar), exactly like
+    HOME.views.ProfileDeleteAccountView does."""
+
+    def setUp(self):
+        self.user = Auth.objects.create_user(email="admin-delete-me@example.com")
+        self.user_pk = self.user.pk
+        Auth.objects.filter(pk=self.user.pk).update(
+            profile_img="https://res.cloudinary.com/test/image/upload/v1/abureport/avatars/user_x.jpg"
+        )
+        self.user.refresh_from_db()
+        Blog.objects.create(
+            author=self.user,
+            heading="Admin account story",
+            category="GENERAL",
+            content="Body.",
+            image_1="https://example.com/banner.jpg",
+            image_public_id="abureport/news/admin-account",
+        )
+        self.model_admin = admin.site._registry[Auth]
+        self.request = RequestFactory().get("/_admin/")
+
+    def test_delete_model_releases_the_story_banner_and_avatar(self):
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset:
+            self.model_admin.delete_model(self.request, self.user)
+        self.assertFalse(Auth.objects.filter(pk=self.user_pk).exists())
+        self.assertEqual(
+            {call.args for call in destroy_asset.call_args_list},
+            {("abureport/news/admin-account", "image"), (f"abureport/avatars/user_{self.user_pk}",)},
+        )

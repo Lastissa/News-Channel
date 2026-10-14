@@ -279,3 +279,60 @@ def _try_send_staff_created_batch_email(new_account, full_name, role_label, crea
 
     _EMAIL_EXECUTOR.submit(_dispatch_batch_email, recipients, subject, build_html_for)
     info_logger(msg=f"BATCH EMAIL: new staff alert queued for {len(recipients)} admins (new={new_account.email})")
+
+
+def _try_send_partnership_inquiry_batch_email(visitor_email=""):
+    """
+    Fired when a visitor taps the hero carousel's "advertise with us" slide
+    while no partnership mailbox is configured yet
+    (HOME.views.AdvertInquiryView). One batch mail to every active
+    admin / superuser telling them the partnership address still needs setting
+    up, because someone just tried to advertise on the platform.
+
+    Anonymous visitors are never tracked: `visitor_email` is passed through
+    only when the visitor was signed in, and the mail then shows it in full so
+    an admin can reply. The dispatch runs on the shared email pool, so the
+    request never waits on Resend.
+    """
+    recipients = _active_admin_emails()
+    if getattr(settings, "DEBUG"):
+        info_logger(
+            msg="BATCH EMAIL: DEV MODE -- would alert admins that the partnership email is unset "
+                f"(signed_in={bool(visitor_email)})"
+        )
+        return
+    if not recipients:
+        info_logger(msg="BATCH EMAIL: no active admins to notify about a partnership inquiry")
+        return
+
+    subject = f"Partnership email not set on {About.project_name}"
+    detail_rows = "<li>Where: <strong>Home page advert slide</strong></li>"
+    if visitor_email:
+        detail_rows += f"<li>Signed in visitor: <strong>{escape(visitor_email)}</strong></li>"
+    else:
+        detail_rows += "<li>Visitor: <strong>not signed in</strong></li>"
+    detail_rows += f"<li>When: <strong>{escape(_format_mail_datetime(timezone.now()))}</strong></li>"
+
+    main_content = (
+        "<p>Hi,</p>"
+        "<p>Someone just tried to advertise with us from the home page, but no partnership "
+        "email is configured yet, so their click could not reach anyone.</p>"
+        "<p>Set the partnership address in the panel (Site settings &rarr; promotion email) "
+        "so the advert slide starts opening a mail to you.</p>"
+        f"<ul>{detail_rows}</ul>"
+    )
+
+    def build_html_for(email):
+        return _build_email_html(
+            title="Partnership Email Needed",
+            main_content=main_content,
+            end_note=f"{About.project_name} Team",
+            unsubscribe_query="",
+            preference_note="You receive this because you are an admin on this site.",
+        )
+
+    _EMAIL_EXECUTOR.submit(_dispatch_batch_email, recipients, subject, build_html_for)
+    info_logger(
+        msg=f"BATCH EMAIL: partnership inquiry alert queued for {len(recipients)} admins "
+            f"(signed_in={bool(visitor_email)})"
+    )

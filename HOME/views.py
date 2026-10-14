@@ -17,9 +17,11 @@ from django.utils import timezone
 from django.utils.text import Truncator, slugify
 from django.views import View
 
+from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark
+from Partner.models import AdvertImage
 from SERVICE_INTERNAL.abstract import (
     _optimization,
     _response,
@@ -34,11 +36,13 @@ from SERVICE_INTERNAL.cache_keys import HOME_BLOGS_CACHE_KEY, HOME_BLOGS_CACHE_T
 from SERVICE_INTERNAL.email_batch import (
     _try_send_account_deleted_batch_email,
     _try_send_new_story_batch_email,
+    _try_send_partnership_inquiry_batch_email,
 )
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import (
     ImageQuality,
     ImageUploadError,
+    _avatar_public_id,
     destroy_archive_asset,
     upload_news_image,
     upload_profile_image,
@@ -562,13 +566,28 @@ def _teaser_items():
     {heading, body, image, url}. Real data is the live Partner.AdvertImage rows
     the admin manages in PANEL (active + not expired, newest first). Until at
     least one exists the old placeholder slides are shown so the carousel is
-    never empty. The template and hero-teaser.js only read those four keys."""
+    never empty. The template and hero-teaser.js only read those four keys.
+
+    A live advert always carries a link now (the panel refuses to save one
+    without it), so an empty `url` only ever means "this row predates that
+    rule" and the slide is simply not clickable. The placeholder slides are
+    the "advertise with us" call to action, so their click has to go
+    somewhere useful: the partnership mailbox when one is configured in the
+    panel, otherwise a tiny endpoint that tells the admins it still needs
+    setting up and shows the visitor "coming soon" (AdvertInquiryView). It
+    must never fall back to "/" -- clicking an advert and landing on the home
+    page looks broken."""
     from Partner.models import AdvertImage
     live = AdvertImage.objects.filter(expiry_date__gte=timezone.now(), is_active=True).order_by("-date_created")
     if live:
         return [{"heading": row.heading, "body": row.body, "image": row.image_url, "url": row.url or ""} for row in live]
 
     from django.templatetags.static import static
+    from ADMIN.models import SiteSettings
+
+    partnership_email = (SiteSettings.get_solo().promotion_email or "").strip()
+    placeholder_url = f"mailto:{partnership_email}" if partnership_email else reverse("home:advert_inquiry")
+
     curent_dummy_image = [
         static('partner/ad_demo_1.jpg'),
         static('partner/ad_demo_2.jpg'),
@@ -580,7 +599,7 @@ def _teaser_items():
             "heading": "Have something to promote? Let’s help you get the word out! Whether it’s your business, product, service, or event, we’d love to help you reach more people.",
             "body": "Tap the image above to reach us and let’s work together!",
             "image": curent_dummy_image[random.randint(0, len_current_dummy - 1)],
-            "url": "/"
+            "url": placeholder_url
         }
         for _ in range(TEASER_PLACEHOLDER_COUNT)
             ]
@@ -1344,6 +1363,27 @@ class PromoteView(View):
         return render(request, "HOME/promote.html")
 
 
+class AdvertInquiryView(View):
+    """Where the hero carousel's "advertise with us" slide sends a click when
+    no partnership mailbox is configured in the panel (HOME.views.
+    _teaser_items points the placeholder there instead of the old "/" default).
+
+    The click means someone just tried to advertise, so every active admin is
+    told to set the partnership address up, and the visitor gets a short
+    "coming soon" page. Only a signed in visitor's email is included in that
+    alert -- anonymous visitors are neither tracked nor asked for one. The
+    alert is rate limited to one per IP per hour and never raises: a failed
+    mail must not break the page the visitor lands on.
+    """
+
+    def get(self, request):
+        _, limited = is_rate_limited(request, 3600, 1, scope="advert_inquiry")
+        if not limited:
+            visitor_email = request.user.email if request.user.is_authenticated else ""
+            _try_send_partnership_inquiry_batch_email(visitor_email)
+        return render(request, "HOME/advert_coming_soon.html")
+
+
 class ProfileLoginAlert(View):
     """Toggle Login Alert Wether to receive mail or not for login."""
 
@@ -1953,6 +1993,56 @@ def _release_story_image(public_id):
         info_logger(msg=f"STORY IMAGE LEFT ON CLOUDINARY: could not delete {public_id}")
 
 
+def _collect_account_assets(account):
+    """Every Cloudinary asset a to-be-deleted account owns: its story banners,
+    its image advert pictures, its archive uploads and its avatar. Gathered
+    BEFORE the account cascade removes the rows so nothing is left orphaned.
+
+    Pasted links carry a blank public id and are left alone (never ours).
+    Shared by HOME.views.ProfileDeleteAccountView and the Django admin's Auth
+    delete, so both paths clean up exactly the same way.
+    """
+    #   deferred: ARCHIVE.views imports HOME.views, so this cannot sit on top.
+    from ARCHIVE.views import _public_id_from_url
+
+    story_image_ids = set(
+        Blog.objects.filter(author=account)
+        .exclude(image_public_id="")
+        .values_list("image_public_id", flat=True)
+    )
+    advert_image_ids = set(
+        AdvertImage.objects.filter(author=account)
+        .exclude(image_public_id="")
+        .values_list("image_public_id", flat=True)
+    )
+    archive_assets = []
+    for archive_item in ArchiveImage.objects.filter(author=account):
+        archive_public_id = archive_item.public_id or _public_id_from_url(
+            archive_item.url, archive_item.resource_type
+        )
+        if archive_public_id:
+            archive_assets.append((archive_public_id, archive_item.resource_type))
+    #   THE AVATAR ALWAYS LIVES AT ONE FIXED PUBLIC ID built from the account
+    #   id (see SERVICE_INTERNAL.images), so it needs no bookkeeping column.
+    avatar_public_id = _avatar_public_id(account.pk) if account.profile_img else ""
+    return story_image_ids, advert_image_ids, archive_assets, avatar_public_id
+
+
+def _release_account_assets(account_assets):
+    """Best effort release of everything _collect_account_assets gathered.
+    Called after the account row is gone, so a shared story banner is already
+    handled by _release_story_image's surviving-story check."""
+    story_image_ids, advert_image_ids, archive_assets, avatar_public_id = account_assets
+    for image_public_id in story_image_ids:
+        _release_story_image(image_public_id)
+    for image_public_id in advert_image_ids:
+        destroy_archive_asset(image_public_id)
+    for archive_public_id, resource_type in archive_assets:
+        destroy_archive_asset(archive_public_id, resource_type)
+    if avatar_public_id:
+        destroy_archive_asset(avatar_public_id)
+
+
 class ProfilePublishedDeleteView(View):
     """Delete a story from its author's profile dashboard.
 
@@ -2198,20 +2288,15 @@ class ProfileDeleteAccountView(View):
             deleted_full_name = deleted_profile.full_name.strip() if deleted_profile else ""
         deleted_at = timezone.now()
 
-        #   COLLECT THE STORY BANNERS BEFORE THE CASCADE REMOVES THE ROWS, so the
-        #   uploaded assets can be released afterwards (see _release_story_image).
-        #   Pasted links carry a blank public id and are skipped there.
-        story_image_ids = set(
-            Blog.objects.filter(author=account)
-            .exclude(image_public_id="")
-            .values_list("image_public_id", flat=True)
-        )
+        #   CLOUDINARY CLEANUP: gather every uploaded asset the cascade is about to
+        #   orphan BEFORE it runs, then release them after it commits (see the
+        #   _collect_account_assets / _release_account_assets helpers above).
+        account_assets = _collect_account_assets(account)
 
         dropped = drop_sessions_for(account)
         with transaction.atomic():
             account.delete()
-        for image_public_id in story_image_ids:
-            _release_story_image(image_public_id)
+        _release_account_assets(account_assets)
 
         #   EVERY ACTIVE ADMIN GETS THE BATCH MAIL (ACCOUNT TYPE, EMAIL, STAFF FULL NAME, DATETIME)
         _try_send_account_deleted_batch_email(deleted_email, deleted_account_type, deleted_full_name, deleted_at)

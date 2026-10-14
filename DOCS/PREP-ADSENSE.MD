@@ -37,7 +37,7 @@ The goal is not to guess whether Google will approve. The goal is to remove the 
 |---|---------|----------|-----------------|--------|
 | 1 | Privacy-policy ad disclosures | P1 | Yes — clearest gap | ☑ |
 | 2 | Article content audit | P2 | Yes | ◐ |
-| 3 | Publication transparency pages | P3 | Yes | ☐ |
+| 3 | Publication transparency pages | P3 | Yes | ☑ |
 | 4 | Mobile experience & readability | P4 | Can | ☐ |
 | 5 | Technical crawl & indexing | P5 | Yes | ☐ |
 | 6 | Ad / traffic policy hygiene | P6 | Yes | ☐ |
@@ -148,6 +148,22 @@ Segment 2 can be marked ☑ once the live stories pass 1–4.
 **Deliverable.** A list of any missing page or empty bio, plus the fixes.
 
 **Definition of done.** About, editorial team, at least one author bio and a contact path are all live and non-empty.
+
+**Result (audited 14 Oct 2026 against PRODUCTION — https://abureport.com.ng).**
+
+All three routes were fetched live and read in full: `/about/`, `/editorial/`, and `/portfolio/opeyemi/`.
+
+- **About page — present and informative.** Real prose ("Easily access the major news of the day…", how we verify and link sources), plus a Contact block with three mailto routes (`support@abureport.com.ng` general, `tech@abureport.com.ng` corrections, `partner@abureport.com.ng` partnerships) and a privacy-policy link. ✅
+- **Editorial team — present and informative.** Two named journalists, real counts (62 published stories), an "Author Of The Week" card and a portrait grid. ✅
+- **Author bios — live and non-empty.** The editorial page renders each member's bio (ABU SUĀD and Opeyemi), and the "How we report" section states the corrections approach ("Corrections are made when errors are identified"). ✅
+- **Editorial/corrections guideline — present.** "Our approach → How we report" already covers verification, sourcing and corrections; there was nothing to add. ✅
+- **Contact routes — live.** The footer and the About page both expose working mailto addresses; no dead contact route found. ✅
+
+**One gap found and fixed (code).** The author's **own portfolio page** did not show the bio at all: the `Profile` card sat inside a retired `{% if False %}` analytics block in `STAFF/templates/staff/portfolio.html`, even though `StaffProfile.bio` is still fed by the view and used for the page's meta description and Person schema. That `Profile` card was moved out of the dead block into the live layout, reusing the existing `.portfolio-card` / `.portfolio-prose` styles, so an author page now states who the author is. An empty bio renders no card. (The separate editors' "endorsement" card that sat beside it was intentionally dropped — it is not wanted on the author page.)
+
+**Tests.** `STAFF/tests.py`: two new tests cover the bio card (shown when set, omitted when empty). The two stale asset-version assertions on these same pages (`portfolio-feed.js?v=…`, `editorial_team.css?v=…`) were switched to `static(...)` so they follow the hashed manifest names — the last two pre-existing failures in the STAFF suite. `manage.py test STAFF` → 21 tests, OK.
+
+**Logged for another segment (not fixed here).** The author portfolio still exposes a personal email (`LASTISSA11@GMAIL.COM`) rather than an `@abureport.com.ng` address, and still links `https://x.om/lastissa/` (x.om typo); both already sit under Segment 2's link/self-promo clean-up.
 
 ---
 

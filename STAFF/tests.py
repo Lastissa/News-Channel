@@ -2,6 +2,7 @@ from unittest import mock
 
 from datetime import timedelta
 
+from django.templatetags.static import static
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -42,7 +43,9 @@ class PortfolioFeedTests(TestCase):
         self.assertContains(response, "Posts by Portfolio Author")
         self.assertContains(response, "portfolio-feed-skeleton")
         self.assertContains(response, "data-next-page=\"2\"")
-        self.assertContains(response, "portfolio-feed.js?v=20261006-3")
+        # Resolve through static() so the assertion follows the hashed manifest
+        # name (e.g. portfolio-feed.<hash>.js) instead of a fixed ?v= string.
+        self.assertContains(response, static("staff/js/portfolio-feed.js"))
         self.assertNotContains(response, "Recent story reach")
         self.assertEqual(len(response.context["stories"]), 6)
         self.assertEqual(
@@ -61,6 +64,23 @@ class PortfolioFeedTests(TestCase):
             content.index("Portfolio story 5", rail_start),
             content.index("Portfolio story 4", rail_start),
         )
+
+    def test_portfolio_shows_the_author_bio_when_it_is_set(self):
+        self.profile.bio = "Reports on the stories that matter to our readers."
+        self.profile.save(update_fields=["bio"])
+
+        response = self.client.get(reverse("staff:portfolio", args=[self.profile.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="portfolio-bio"')
+        self.assertContains(response, "Profile")
+        self.assertContains(response, "Reports on the stories that matter to our readers.")
+
+    def test_portfolio_omits_the_bio_card_when_there_is_no_bio(self):
+        response = self.client.get(reverse("staff:portfolio", args=[self.profile.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="portfolio-bio"')
 
     def test_feed_endpoint_returns_next_slice_and_pagination_headers(self):
         final_story = self.stories[0]
@@ -150,7 +170,7 @@ class EditorialTeamPageTests(TestCase):
         self.assertContains(response, 'alt="Editorial Author"')
         self.assertContains(response, 'class="editorial-standards"')
         self.assertContains(response, "How we report")
-        self.assertContains(response, "editorial_team.css?v=20261013-1")
+        self.assertContains(response, static("staff/css/editorial_team.css"))
         self.assertContains(response, '"@type": "Organization"')
         self.assertContains(response, "application/ld+json")
         self.assertContains(response, 'name="description"')

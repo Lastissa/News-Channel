@@ -1080,7 +1080,7 @@
       var body = el("textarea");
       body.name = "body"; body.rows = 2; body.maxLength = 200; body.value = item.body;
       var url = el("input");
-      url.type = "url"; url.name = "url"; url.value = item.url; url.placeholder = "https://...";
+      url.type = "url"; url.name = "url"; url.value = item.url; url.placeholder = "https://..."; url.required = true;
       var expiry = el("input");
       expiry.type = "datetime-local"; expiry.name = "expiry_date"; expiry.required = true; expiry.value = item.expiry_input;
 

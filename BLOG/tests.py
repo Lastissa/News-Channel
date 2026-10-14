@@ -314,6 +314,45 @@ class ProjectAdminRegistrationTests(TestCase):
         self.assertEqual(unregistered, [])
 
 
+class BlogAdminDeleteReleasesImageTests(TestCase):
+    """Deleting a story from the hidden Django admin (_admin/) must release its
+    uploaded banner from Cloudinary exactly like the profile dashboard does
+    (HOME.views.ProfilePublishedDeleteView), so the backdoor cannot orphan it."""
+
+    def setUp(self):
+        self.author = Auth.objects.create_user(email="admin-blog-author@example.com")
+        self.blog = Blog.objects.create(
+            author=self.author,
+            heading="Admin deletes me",
+            category="GENERAL",
+            content="Body.",
+            image_1="https://example.com/banner.jpg",
+            image_public_id="abureport/news/admin-delete",
+        )
+        self.model_admin = admin.site._registry[Blog]
+        self.request = RequestFactory().get("/_admin/")
+
+    def test_delete_model_releases_the_banner(self):
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset:
+            self.model_admin.delete_model(self.request, self.blog)
+        self.assertFalse(Blog.objects.filter(pk=self.blog.pk).exists())
+        destroy_asset.assert_called_once_with("abureport/news/admin-delete", "image")
+
+    def test_delete_queryset_releases_each_banner_once(self):
+        Blog.objects.create(
+            author=self.author,
+            heading="Second admin story",
+            category="GENERAL",
+            content="Body.",
+            image_1="https://example.com/two.jpg",
+            image_public_id="abureport/news/admin-delete-two",
+        )
+        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset:
+            self.model_admin.delete_queryset(self.request, Blog.objects.filter(author=self.author))
+        self.assertFalse(Blog.objects.filter(author=self.author).exists())
+        self.assertEqual(destroy_asset.call_count, 2)
+
+
 # ---------------------------------------------------------------------------
 # Bug 1 — Exploration test (Task 1)
 # ---------------------------------------------------------------------------
