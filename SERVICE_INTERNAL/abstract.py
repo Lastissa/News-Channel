@@ -290,7 +290,7 @@ def cache_or_run(key, fn, timeout=300):
     else:
         msg = f"CRITICAL: Cache got a fn of None, almost raising a good 500 error message. LOOK INTO THIS FN {fn}"
         error_logger(msg=msg)
-        raise Exception("BEFORE CACHE CAN SET, THE FN NEED TO RETURN SOMETHING")
+        # raise Exception("BEFORE CACHE CAN SET, THE FN NEED TO RETURN SOMETHING")
     return value
 
 def invalidate_cache(key):
