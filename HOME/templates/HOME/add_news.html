@@ -163,7 +163,8 @@
                   <dl class="fg-table">
                     <div class="fg-row" data-guide-item="**text** = bold"><dt><code>**text**</code></dt><dd>Bold</dd></div>
                     <div class="fg-row" data-guide-item="__text__ = italic"><dt><code>__text__</code></dt><dd>Italic</dd></div>
-                    <div class="fg-row" data-guide-item="https://... = becomes a clickable link by itself"><dt><code>https://...</code></dt><dd>Becomes a clickable link by itself</dd></div>
+                    <div class="fg-row" data-guide-item="[words](https://...) = makes the words a link instead of showing a long web address"><dt><code>[words](https://...)</code></dt><dd>Makes the words a link</dd></div>
+                    <div class="fg-row" data-guide-item="https://... = becomes a clickable link by itself (shows the whole address)"><dt><code>https://...</code></dt><dd>Becomes a clickable link by itself</dd></div>
                   </dl>
                 </section>
 
@@ -179,6 +180,14 @@
                     <div class="fg-row" data-guide-item="filel URL link text = download link for a file"><dt><code>filel</code> URL link text</dt><dd>Download link for a file</dd></div>
                   </dl>
                   <p class="fg-note" data-guide-item="The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.">The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.</p>
+                </section>
+
+                <section class="fg-block" data-guide-section="Button (each on its own line)">
+                  <h3>Button <span>on its own line</span></h3>
+                  <dl class="fg-table">
+                    <div class="fg-row" data-guide-item="btn URL text = a button the reader can tap, carrying your text"><dt><code>btn</code> URL text</dt><dd>A button the reader can tap, carrying your text</dd></div>
+                  </dl>
+                  <p class="fg-note" data-guide-item="Use [words](url) for a link inside a sentence. Use a btn line when the link should stand out as a button.">Use <code>[words](url)</code> for a link inside a sentence. Use a <code>btn</code> line when the link should stand out as a button.</p>
                 </section>
               </div>
             </div>
@@ -239,6 +248,10 @@
               <button type="button" class="editor-insert-btn" data-insert="1. " data-insert-kind="line" title="Numbered point">Numbered</button>
             </div>
             <div class="editor-insert-group">
+              <button type="button" class="editor-insert-btn" data-insert="[words](https://)" title="Word as a link">Link</button>
+              <button type="button" class="editor-insert-btn" data-insert="btn " data-insert-kind="line" title="Button on its own line">btn</button>
+            </div>
+            <div class="editor-insert-group">
               <button type="button" class="editor-insert-btn" data-insert="imgl " data-insert-kind="line" title="Image on the left">imgl</button>
               <button type="button" class="editor-insert-btn" data-insert="imgr " data-insert-kind="line" title="Image on the right">imgr</button>
               <button type="button" class="editor-insert-btn" data-insert="imgc " data-insert-kind="line" title="Centered image">imgc</button>
@@ -283,7 +296,7 @@
       <div class="archive-picker-header">
         <div class="archive-picker-heading">
           <h2 class="editor-modal-title" id="archive-picker-title">Choose an image or file</h2>
-          <p class="archive-picker-hint">Copy an item's link, then paste it into the Image URL field or after imgl, imgr, imgc, vidl, vidr, vidc or filel.</p>
+          <p class="archive-picker-hint">Copy an item's link, then paste it into the Image URL field or after imgl, imgr, imgc, vidl, vidr, vidc or filel. A btn line takes the link too.</p>
         </div>
         <div class="archive-picker-header-actions">
           <button type="button" class="editor-modal-btn" data-archive-refresh aria-label="Refresh archive">Refresh</button>

@@ -38,15 +38,27 @@ News form) and are repeated in the author handbook for writers.
 
 ### 1) LINKS
 
-Any word or token that begins with http:// or https:// should be treated as a hyperlink.
+A link has two allowed shapes:
 
-Example:
+- A short phrase that hides a long address: `[words](https://...)`
+- A bare address pasted as it is: `https://...`
 
-https://myschoolgist.com/news/unilag-post-utme-form/
+Examples:
+
+Read the [admission guide](https://myschoolgist.com/news/unilag-post-utme-form/) before you apply.
+
+The official portal is https://myschoolgist.com/news/unilag-post-utme-form/
 
 Rule:
-- The parser should convert the whole URL token into an anchor tag.
-- No second format such as [text](url) should be used for the same job.
+- Prefer `[words](https://...)` whenever the address is long, so the reader
+  sees a word instead of a wall of characters.
+- The parser turns `[words](url)` into a link whose visible text is `words`
+  and whose destination is the address inside the brackets.
+- A bare URL is still auto-linked, but it shows the whole address. Use it
+  only for short addresses or a link simply pasted into the text.
+- Both shapes are parsed in one pass, so the address inside `[words](...)`
+  is never linked a second time.
+- A link may appear inside a paragraph, a heading, or a list item.
 
 ### 2) ORDERED LISTS
 
@@ -184,6 +196,26 @@ Rule:
 - Do not introduce an alternate syntax for inline videos.
 - The easiest way to get a video line: upload the clip to /archive/ (Add Image / File), then use its "Copy url" button for the URL. Videos must be MP4 or MOV and 10MB or smaller; other files are capped at 3MB and pictures at 5MB. An oversized upload is refused right away with the size in the message, so shrink or trim the clip and try again.
 
+### 10) BUTTONS
+
+Any line that starts with the word `btn` should be treated as a button.
+
+Example:
+
+btn https://a.com/apply Start your application
+btn https://a.com/donate Donate to the fund
+
+Rule:
+- The first word on the line is the keyword: `btn`.
+- The second word is the destination URL.
+- Everything after the URL, on the same line, is the text printed on the button.
+- The button sits on its own line and nothing wraps around it. It is a link
+  (a call to action such as Apply, Register, Donate or Subscribe), not a download.
+- If no text is given after the URL, the URL itself is printed on the button.
+- Use `[words](url)` for a link inside a sentence; use `btn` on its own line
+  when the link should stand out as a button a reader can tap.
+- Do not introduce an alternate syntax for buttons.
+
 ---
 
 ## WRITING STYLE FOR AUTHORS
@@ -199,7 +231,8 @@ Recommended guidance for writers:
 - Start a new line with * for bullet points.
 - Start a new line with 1. for numbered points.
 - Start a new line with # for section titles.
-- Paste links normally as full URLs.
+- Paste a link as a full URL, or write [words](url) so a long address shows as a short phrase instead.
+- Start a new line with btn, followed by the URL and the text the button carries, to place a call-to-action button (Apply, Register, Donate, Subscribe).
 - Use bold or italic only when needed, using the allowed markers.
 - Start a new line with imgl or imgr, followed by the image URL and optional alt text, to place a small inline image that floats left or right.
 - Start a new line with imgc, followed by the image URL and optional alt text, to place a small inline image that is centered and blocking instead of floated.
@@ -215,11 +248,12 @@ To avoid conflict, the parser should process content in this order:
 1. Detect inline image tokens (imgl/imgr/imgc) first, so their URL and alt text are never consumed by another marker
 2. Detect inline video tokens (vidl/vidr/vidc) next, for the same reason
 3. Detect inline file tokens (filel) next
-4. Detect heading blocks next
-5. Detect unordered and ordered list blocks next
-6. Detect URL links in text
-7. Detect bold and italic inline markup
-8. Treat remaining text as normal paragraphs
+4. Detect button lines (btn) next
+5. Detect heading blocks next
+6. Detect unordered and ordered list blocks next
+7. Detect links in text, both [words](url) and bare URLs
+8. Detect bold and italic inline markup
+9. Treat remaining text as normal paragraphs
 
 This order prevents a line from being misread as ordinary copy when it is actually a heading, list, or link.
 
@@ -234,10 +268,11 @@ This is the most important rule:
 - Ordered list: 1. only
 - Italic: __ only
 - Bold: ** only
-- Link: http:// or https:// only
+- Link: [words](url) for a short phrase over a long address, or a bare http:// or https:// URL
 - Inline image: imgl (left), imgr (right), or imgc (centered, blocking) only
 - Inline video: vidl (left), vidr (right), or vidc (centered, blocking) only
 - Inline file: filel only
+- Button: btn only
 
 Do not introduce alternate patterns for the same purpose. This keeps the editor simple and the parser reliable.
 

@@ -36,6 +36,19 @@ logger = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 
+#   MARKDOWN-STYLE LINK: "[label](https://url)". Lets the author show a short
+#   word while the anchor still points at a long address, so a raw link never
+#   has to stretch across the page. It is matched in the SAME pass as the
+#   bare-URL form below (see _LINK_OR_URL_RE) so the URL inside the brackets
+#   is never linkified a second time.
+MARKDOWN_LINK_RE = re.compile(r"\[([^\[\]]+)\]\((https?://[^\s)]+)\)")
+#   One alternation, tried left to right: a markdown link wins over the bare
+#   URL it contains because the whole "[words](url)" is consumed in one match.
+#   Group 1 = the label, group 2 = its URL; group 3 is a bare URL on its own.
+_LINK_OR_URL_RE = re.compile(
+    r"\[([^\[\]]+)\]\((https?://[^\s)]+)\)|(https?://[^\s<>'\"]+)"
+)
+
 #   INLINE IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text" (floated,
 #   text wraps around it) / "imgc URL alt text" (centered, blocking -- the
 #   surrounding text does NOT wrap it, still kept smaller than the
@@ -76,6 +89,13 @@ VID_FIG_CLASSES = {
 #   instead of a floated picture -- see _render_inline_file below.
 FILE_TOKEN_RE = re.compile(r"^filel\s+(\S+)(?:\s+(.*))?$")
 
+#   BUTTON BLOCK TOKEN: "btn URL label text". A whole line that starts with
+#   `btn` becomes one button-style link. The URL is the destination and the
+#   trailing text is the label printed on the button -- the block-level
+#   companion to the inline "[words](url)" link above. See
+#   DOCS/NEWS_CONTENT_CONVENTION.MD.
+BTN_TOKEN_RE = re.compile(r"^btn\s+(\S+)(?:\s+(.*))?$")
+
 STORY_404_CONTENT = (
     "This page does not exist. We may not have enough stories published yet, "
     "or the story you are looking for was deleted by the publisher and is no "
@@ -84,12 +104,22 @@ STORY_404_CONTENT = (
 
 
 def _linkify_text(value):
-    """Turn URL-like tokens into anchor tags while preserving normal text."""
+    """Turn markdown links ([words](url)) and bare URLs into anchor tags
+    while preserving normal text. A markdown link lets the writer show a
+    short word instead of a long raw URL; the bare-URL form stays for links
+    simply pasted into the text. Both are matched in one pass so a URL that
+    already sits inside "[words](...)" is never linkified a second time."""
     safe_text = html.escape(value, quote=False)
     safe_text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", safe_text)
     safe_text = re.sub(r"__(.+?)__", r"<em>\1</em>", safe_text)
-    safe_text = URL_RE.sub(lambda match: f'<a href="{match.group(0)}" rel="noopener noreferrer" target="_blank">{match.group(0)}</a>', safe_text)
-    return safe_text
+
+    def _anchor(match):
+        label, url = match.group(1), match.group(2)
+        if url is None:                       #   bare-URL branch (group 3)
+            url = label = match.group(3)
+        return f'<a href="{url}" rel="noopener noreferrer" target="_blank">{label}</a>'
+
+    return _LINK_OR_URL_RE.sub(_anchor, safe_text)
 
 
 def _image_filename_from_url(url):
@@ -187,6 +217,25 @@ def _render_inline_file(url, display_text):
     )
 
 
+def _render_inline_button(url, label_text):
+    """Build the block-level button for a "btn URL label" token.
+
+    Unlike `filel`, this is not a download: it is a normal link the reader
+    taps, styled to stand out as a call to action. The URL is the
+    destination and the trailing text is the label printed on the button.
+    When no label was typed the URL itself is printed so the button is never
+    blank. It sits on its own line (a <p> wrapper), so it never floats and
+    surrounding text never wraps around it."""
+    label = (label_text or "").strip() or url
+    safe_url = html.escape(url, quote=True)
+    safe_label = html.escape(label, quote=False)
+    return (
+        f'<p class="story-inline-btn-row">'
+        f'<a class="story-inline-btn" href="{safe_url}" rel="noopener noreferrer" target="_blank">{safe_label}</a>'
+        f'</p>'
+    )
+
+
 def _render_inline_video(direction, url, caption_text):
     """Build the inline <figure> for a vidl/vidr/vidc token.
 
@@ -277,6 +326,13 @@ def parse_story_content(content):
             i += 1
             continue
 
+        btn_match = BTN_TOKEN_RE.match(line)
+        if btn_match:
+            url, label_text = btn_match.groups()
+            blocks.append(_render_inline_button(url, label_text))
+            i += 1
+            continue
+
         heading_match = re.match(r"^(#+)\s*(.*)$", line)
         if heading_match:
             heading_level = len(heading_match.group(1))
@@ -316,7 +372,7 @@ def parse_story_content(content):
             current = lines[i].strip()
             if not current:
                 break
-            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+)", current):
+            if re.match(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+|btn\s+)", current):
                 break
             paragraph_lines.append(current)
             i += 1
@@ -338,35 +394,43 @@ def _clean_content_block(block):
     chunk, i.e. the text between blank lines): strips this project's
     markdown-style markers (#, *, __, **) and replaces an inline
     imgl/imgr/imgc token with its alt text, a vidl/vidr/vidc token with its
-    caption and a filel token with its link text, so nothing but readable
-    prose survives. Shared by build_ticker_text (the whole story, for the
-    reading marquee) and the og/meta excerpt built in StoryDetailView.get
-    (just the story's first block) -- neither should ever leak a raw
-    imgl/imgr/imgc/vidl/vidr/vidc/filel token, or a leftover #/*/**/__
-    marker, into what a reader (or a search engine's snippet/the page's own
-    <head> tags) sees."""
+    caption, a filel token with its link text and a btn token with its button
+    label, so nothing but readable prose survives. A markdown link
+    ([words](url)) keeps its words and drops the address. Shared by
+    build_ticker_text (the whole story, for the reading marquee) and the
+    og/meta excerpt built in StoryDetailView.get (just the story's first
+    block) -- neither should ever leak a raw
+    imgl/imgr/imgc/vidl/vidr/vidc/filel/btn token, a [words](url) address, or
+    a leftover #/*/**/__ marker, into what a reader (or a search engine's
+    snippet/the page's own <head> tags) sees."""
     lines = []
     for line in block.splitlines():
         line = line.strip()
         if not line:
             continue
-        img_match = IMG_TOKEN_RE.match(line)
-        if img_match:
-            _, img_url, img_alt = img_match.groups()
-            line = (img_alt or "").strip() or _image_filename_from_url(img_url)
+        btn_match = BTN_TOKEN_RE.match(line)
+        if btn_match:
+            btn_url, btn_label = btn_match.groups()
+            line = (btn_label or "").strip() or btn_url
         else:
-            vid_match = VID_TOKEN_RE.match(line)
-            if vid_match:
-                _, vid_url, vid_caption = vid_match.groups()
-                line = (vid_caption or "").strip() or _image_filename_from_url(vid_url)
+            img_match = IMG_TOKEN_RE.match(line)
+            if img_match:
+                _, img_url, img_alt = img_match.groups()
+                line = (img_alt or "").strip() or _image_filename_from_url(img_url)
             else:
-                file_match = FILE_TOKEN_RE.match(line)
-                if file_match:
-                    file_url, file_text = file_match.groups()
-                    line = (file_text or "").strip() or _image_filename_from_url(file_url)
+                vid_match = VID_TOKEN_RE.match(line)
+                if vid_match:
+                    _, vid_url, vid_caption = vid_match.groups()
+                    line = (vid_caption or "").strip() or _image_filename_from_url(vid_url)
                 else:
-                    line = TICKER_MARKER_RE.sub("", line)
-                    line = line.replace("**", "").replace("__", "")
+                    file_match = FILE_TOKEN_RE.match(line)
+                    if file_match:
+                        file_url, file_text = file_match.groups()
+                        line = (file_text or "").strip() or _image_filename_from_url(file_url)
+                    else:
+                        line = TICKER_MARKER_RE.sub("", line)
+                        line = MARKDOWN_LINK_RE.sub(r"\1", line)
+                        line = line.replace("**", "").replace("__", "")
         if line:
             lines.append(line)
     return " ".join(lines).strip()

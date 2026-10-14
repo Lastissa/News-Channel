@@ -122,11 +122,13 @@
             <tr><td data-label="You type"><span class="hb-code">1.</span> Text</td><td data-label="You get">A numbered point, then 2., 3. and so on</td></tr>
             <tr><td data-label="You type"><span class="hb-code">**text**</span></td><td data-label="You get"><strong>Bold</strong></td></tr>
             <tr><td data-label="You type"><span class="hb-code">__text__</span></td><td data-label="You get"><em>Italic</em></td></tr>
-            <tr><td data-label="You type">A URL on its own</td><td data-label="You get">A clickable link</td></tr>
+            <tr><td data-label="You type"><span class="hb-code">[words](https://...)</span></td><td data-label="You get">The words become a link</td></tr>
+            <tr><td data-label="You type">A URL on its own</td><td data-label="You get">A clickable link that shows the whole address</td></tr>
             <tr><td data-label="You type"><span class="hb-code">imgl</span> URL description</td><td data-label="You get">An image on the left, with the text wrapping around it</td></tr>
             <tr><td data-label="You type"><span class="hb-code">imgr</span> URL description</td><td data-label="You get">An image on the right, with the text wrapping around it</td></tr>
             <tr><td data-label="You type"><span class="hb-code">imgc</span> URL description</td><td data-label="You get">An image in the centre, on its own line</td></tr>
             <tr><td data-label="You type"><span class="hb-code">filel</span> URL link text</td><td data-label="You get">A download link for a file</td></tr>
+            <tr><td data-label="You type"><span class="hb-code">btn</span> URL text</td><td data-label="You get">A button the reader can tap, carrying your text</td></tr>
           </tbody>
         </table>
       </div>
@@ -193,8 +195,22 @@
       </div>
     </section>
 
+    <section class="doc-section" id="links">
+      <h2>Links and buttons</h2>
+      <ul class="doc-list">
+        <li>A long web address is ugly in the middle of a sentence. Write <span class="hb-code">[words](https://...)</span> and the words carry the link instead, anywhere in the body.</li>
+        <li>A plain URL still works and turns into a link on its own, but it shows the whole address.</li>
+        <li>When the link should stand out, put a line like <span class="hb-code">btn https://... Read the full list</span> on its own. It becomes a button the reader can tap, with your text on it.</li>
+      </ul>
+      <div class="hb-example">
+        <p class="hb-example-title">Copy an example</p>
+        <p class="hb-example-hint">Paste a line like one of these into the body and replace the words and the URL with your own.</p>
+        <p class="hb-example-line">Read the [admission guide](https://example.com/admission/guide) before you apply.</p>
+        <p class="hb-example-line">btn https://example.com/apply Start your application</p>
+      </div>
+    </section>
+
     <section class="doc-section" id="editing">
-      <h2>Editing a published story</h2>
       <p class="doc-lead">You can edit your own stories from your profile. Some edits carry more weight than others.</p>
       <ul class="doc-list">
         <li><strong>The headline is locked.</strong> Changing it after publishing would break the story's link, so it is not editable. Get it right the first time.</li>
@@ -220,7 +236,7 @@
       <h2>Reusing pictures from the archive</h2>
       <ul class="doc-list">
         <li>The archive holds pictures and files that are already cleared and described, ready to drop into any story. Use <strong>Browse archive</strong> in the editor.</li>
-        <li>An archived picture can be inserted left, right or centred with <span class="hb-code">imgl</span>, <span class="hb-code">imgr</span> or <span class="hb-code">imgc</span>, or as a download with <span class="hb-code">filel</span>.</li>
+        <li>An archived picture can be inserted left, right or centred with <span class="hb-code">imgl</span>, <span class="hb-code">imgr</span> or <span class="hb-code">imgc</span>, or as a download with <span class="hb-code">filel</span>. A <span class="hb-code">btn</span> line takes the same link when you want a button.</li>
         <li>Reuse is encouraged. A good, relevant picture is better than a borrowed screenshot that might disappear.</li>
         <li>Give the picture a description that fits your story, rather than reusing the old caption word for word.</li>
       </ul>

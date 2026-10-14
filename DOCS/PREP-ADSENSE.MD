@@ -38,9 +38,10 @@ The goal is not to guess whether Google will approve. The goal is to remove the 
 | 1 | Privacy-policy ad disclosures | P1 | Yes — clearest gap | ☑ |
 | 2 | Article content audit | P2 | Yes | ◐ |
 | 3 | Publication transparency pages | P3 | Yes | ☑ |
-| 4 | Mobile experience & readability | P4 | Can | ☐ |
+| 4 | Mobile experience & readability | P4 | Can | ☑ |
 | 5 | Technical crawl & indexing | P5 | Yes | ☐ |
 | 6 | Ad / traffic policy hygiene | P6 | Yes | ☐ |
+| 7 | Accessibility semantics | P7 | No | ☐ |
 
 ---
 
@@ -184,6 +185,20 @@ All three routes were fetched live and read in full: `/about/`, `/editorial/`, a
 
 **Definition of done.** No confirmed contrast, legibility or layout-shift blocker remains on the tested pages.
 
+**Result (audited 14 Oct 2026 against PRODUCTION — https://abureport.com.ng).** No code change was required: none of the five checks confirmed a blocker.
+
+Tested at a 390 px phone viewport (the site's own HTML rendered in a 390px frame, so its media queries applied) and with Lighthouse (accessibility / best-practices / SEO) on home `/`, a story (`/story/fg-unveils-2026-agreements-with-ssanu-nasu-other-tertiary-staff-unions-67/`), `/category/university/` and `/search/?q=nigeria`.
+
+- **Text contrast — pass.** Lighthouse first flagged three story-page items (read-also meta text and a headline), but those are the read-also **entrance animation caught mid-flight** (the cards fade in from `opacity: 0`): the reported foregrounds `#828e9b`/`#c4c9d0`/`#a8acb3` are exactly `--slate`/`--ink` blended with white at 76%/36% opacity. In the settled state the rendered colours are `--slate` `#5B6B7C` (5.47:1 on white) and `--ink` `#0E1B2C` — both pass AA. Home, category and search pages were clean.
+- **Font size — pass.** Story body renders at 16px / 24px line-height; meta and labels sit at 10–13px (tags, timestamps, view counts, bylines), which is conventional and legible.
+- **Image loading — pass.** 15 of 18 story images carry `loading="lazy"`, every image has an `alt`, and each sits in a fixed box (Lighthouse `image-aspect-ratio` / `image-size-responsive` pass).
+- **Layout shift — pass.** Images use fixed CSS boxes / `aspect-ratio`; no CLS source was found.
+- **Intrusive overlays — reviewed, accepted as-is.** The home page's "Continue reading" sheet auto-opens 6 seconds after load and, on a phone, covers **94%** of the viewport (369×822, a 16px strip left at the top) — the intrusive-interstitial pattern. The owner reviewed this and chose to keep the feature unchanged (12-hour cooldown), so no change was made. The separate newsletter sheet is scroll-gated (40%) and was not a concern.
+
+No horizontal overflow was found on any tested page at 390px (document `scrollWidth` ≤ viewport). The desktop-only Lighthouse `target-size` hit on the hero carousel dots does not apply on phones: there the dots are 12px with a 30px hit area (the `::after { inset: -9px }` rule), which clears the 24px minimum.
+
+**Logged for a new segment (not fixed here).** The Lighthouse pass also surfaced accessibility-semantics gaps outside this segment's mobile-UX scope: the continue sheet's `aria-labelledby` points at a commented-out heading (so the dialog has no accessible name); several icon-only links/buttons have no accessible name (home trending thumbnails, story author-social icons, the copy-link button); a `label-content-name-mismatch` on the bookmark/like chips; and a heading-order jump on category/search. Recorded as **Segment 7**.
+
 ---
 
 ## Segment 5 — Technical crawl & indexing
@@ -225,6 +240,26 @@ All three routes were fetched live and read in full: `/about/`, `/editorial/`, a
 
 ---
 
+## Segment 7 — Accessibility semantics (logged from Segment 4)
+
+**Goal.** Give interactive controls and dialogs accessible names, and keep heading order sane.
+
+**Why it matters.** Not an AdSense blocker on its own, but controls with no accessible name are unusable to screen-reader users and depress Google's quality/Lighthouse signals.
+
+**Where (all found by the Segment 4 Lighthouse pass).**
+1. `HOME/templates/HOME/partials/continue_popup.html` — the sheet's `aria-labelledby="continue-popup-title"` points at a heading that is commented out, so the dialog has no accessible name.
+2. Icon-only links/buttons with no accessible name: home trending thumbnails (`.trending-media`, `tabindex="-1"`), story author-social icons, the story copy-link button (`.share-btn-copy`).
+3. `label-content-name-mismatch` on the bookmark chips (`aria-label="Save story"` vs visible "Read later") and the like chip.
+4. Heading-order jump on `/category/.../` and `/search/`.
+
+**Deliverable.** The four items fixed and re-checked with Lighthouse.
+
+**Definition of done.** Lighthouse accessibility reports no `aria-dialog-name`, `link-name`, `button-name` or `label-content-name-mismatch` failures on home and a story; heading order is sequential on category/search.
+
+**Status.** ☐ pending — non-blocking; do after the required segments.
+
+---
+
 ## Status log
 
 | Date | Segment | Change | Status |
@@ -232,6 +267,7 @@ All three routes were fetched live and read in full: `/about/`, `/editorial/`, a
 | 14 Oct 2026 | 1 — Privacy-policy ad disclosures | Added Google/third-party advertising disclosure behind a `show_google_ads` switch in `HOME/templates/HOME/privacy_policy.html`; bumped "Last updated" to 14 Oct 2026 | ☑ |
 | 14 Oct 2026 | 2 — Article content audit | First pass accidentally read the local DB (void). Re-audited **production**: 8 stories fetched across 8 categories + sitemap. Majority are 130–200-word single-source rewrites; padding in story 66; self-promo stories 7 & 40 in the news feed; typo links. ~55 stories live. Editorial fixes listed, none actioned | ◐ |
 | 14 Oct 2026 | 2 — Enforcement (A + B) | Updated `DOCS/NEWS_CONTENT_CONVENTION.MD` with editorial rules; `SERVICE_INTERNAL/story_validation.py` blocks <100-word bodies and warns <300 words / no source; Add News guide + author handbook updated; `SitemapXmlView` skips empty categories; tests refreshed for the new rule | ◐ |
+| 14 Oct 2026 | 4 — Mobile experience & readability | Audited **production** at a 390px viewport + Lighthouse on home, a story, category and search. No code change: contrast passes (the Lighthouse hits were the read-also entrance animation mid-flight), story body is 16px, images are lazy + sized, no CLS source, no horizontal overflow. The 6s "Continue reading" sheet covers 94% of a phone screen but the owner reviewed it and **kept it as-is**. The desktop-only hero-dot target-size hit does not apply on phones (30px hit area). Accessibility-semantics gaps logged as Segment 7 | ☑ |
 
 ---
 

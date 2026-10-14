@@ -38,10 +38,11 @@ URL_RE = re.compile(r"https?://\S+")
 IMG_RE = re.compile(r"^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$")
 VID_RE = re.compile(r"^(vidl|vidr|vidc)\s+(\S+)(?:\s+(.*))?$")
 FILE_RE = re.compile(r"^filel\s+(\S+)(?:\s+(.*))?$")
+BTN_RE = re.compile(r"^btn\s+(\S+)(?:\s+(.*))?$")
 HEADING_RE = re.compile(r"^(#+)\s*(.*)$")
 BULLET_RE = re.compile(r"^\*\s+")
 ORDERED_RE = re.compile(r"^\d+\.\s+")
-STARTER_RE = re.compile(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+)")
+STARTER_RE = re.compile(r"^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+|btn\s+)")
 
 #   a line made only of one repeated decorative symbol, 4 or more times
 SEPARATOR_RE = re.compile(r"^([^\w\s])\1{3,}$")
@@ -65,6 +66,10 @@ def _warn(code, message, rule=None):
 def strip_inline_markup(text):
     """Plain readable text from one line of this project's markdown flavour."""
     text = text or ""
+    #   A markdown link ([words](url)) is reduced to its words first, so the
+    #   label is still counted while the long address is dropped with every
+    #   other link below.
+    text = re.sub(r"\[([^\[\]]+)\]\(https?://[^\s)]+\)", r"\1", text)
     text = re.sub(r"https?://\S+", " ", text)
     text = re.sub(r"\*\*\*(.+?)\*\*\*", r"\1", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
@@ -134,8 +139,8 @@ def opening_similarity(heading, paragraph):
 def split_blocks(content):
     """Return a list of dicts: {type, text, raw, level}.
 
-    type is one of: heading, bullet, ordered, image, video, file, paragraph.
-    Empty headings are kept (text == "") so they can be reported."""
+    type is one of: heading, bullet, ordered, image, video, file, button,
+    paragraph. Empty headings are kept (text == "") so they can be reported."""
     lines = [line.rstrip() for line in (content or "").replace("\r\n", "\n").replace("\r", "\n").strip().split("\n")]
     blocks = []
     i = 0
@@ -155,6 +160,10 @@ def split_blocks(content):
             continue
         if FILE_RE.match(line):
             blocks.append({"type": "file", "text": "", "raw": line, "level": 0})
+            i += 1
+            continue
+        if BTN_RE.match(line):
+            blocks.append({"type": "button", "text": "", "raw": line, "level": 0})
             i += 1
             continue
 
@@ -286,7 +295,7 @@ def validate_story(heading, content):
         ))
 
     #   RULE 3: BODY MUST NOT OPEN WITH A HEADING THAT REPEATS THE MAIN HEADING
-    first_real = next((b for b in blocks if b["type"] not in ("image", "video", "file")), None)
+    first_real = next((b for b in blocks if b["type"] not in ("image", "video", "file", "button")), None)
     if first_real is not None and first_real["type"] == "heading" and first_real["text"]:
         score = similarity(heading, first_real["text"])
         if score >= SIMILARITY_BLOCK:
@@ -319,7 +328,7 @@ def validate_story(heading, content):
     if not body_blocks:
         add(_block(
             "no_body_text",
-            "Your article has no body text. Headings, images, videos and files alone are not a story. "
+            "Your article has no body text. Headings, images, videos, files and buttons alone are not a story. "
             "Write the report itself in normal paragraphs below the headline.",
         ))
     elif body_norm and body_norm == heading_norm:
@@ -359,7 +368,7 @@ def validate_story(heading, content):
     #   RULE 1: FIRST PARAGRAPH vs HEADING (>= 90% blocks)
     first_paragraph = None
     for block in blocks:
-        if block["type"] in ("image", "video", "file", "heading"):
+        if block["type"] in ("image", "video", "file", "button", "heading"):
             continue
         first_paragraph = block
         break

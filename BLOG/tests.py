@@ -113,6 +113,70 @@ __Please note:__ deadlines are strict.
         codes = [item["code"] for item in result["errors"]]
         self.assertIn("no_body_text", codes)
 
+    def test_story_content_renders_markdown_links_and_buttons(self):
+        content = (
+            "Read the [admission guide](https://example.edu/admission/guide) before you apply.\n\n"
+            "btn https://example.edu/apply Start your application\n\n"
+            "The portal is https://example.edu/portal\n"
+        )
+
+        html = parse_story_content(content)
+
+        #   [words](url): the words carry the link, the address is not shown
+        self.assertIn(
+            '<a href="https://example.edu/admission/guide" rel="noopener noreferrer" target="_blank">admission guide</a>',
+            html,
+        )
+        #   a btn line becomes one block-level button carrying the trailing text
+        self.assertIn('<p class="story-inline-btn-row">', html)
+        self.assertIn('<a class="story-inline-btn" href="https://example.edu/apply"', html)
+        self.assertIn(">Start your application</a>", html)
+        #   a bare URL still linkifies
+        self.assertIn('<a href="https://example.edu/portal"', html)
+
+    def test_a_markdown_link_url_is_only_linked_once(self):
+        html = parse_story_content("[Guide](https://example.edu/guide)")
+
+        self.assertEqual(html.count("<a "), 1)
+        self.assertNotIn("](https://example.edu/guide)", html)
+
+    def test_a_button_without_a_label_falls_back_to_the_url(self):
+        html = parse_story_content("btn https://example.edu/apply")
+
+        self.assertIn('<a class="story-inline-btn" href="https://example.edu/apply"', html)
+        self.assertIn(">https://example.edu/apply</a>", html)
+
+    def test_ticker_text_strips_markdown_links_and_button_markers(self):
+        from BLOG.views import build_ticker_text
+
+        text = build_ticker_text(
+            "Read [the guide](https://example.edu/guide) now.\n\n"
+            "btn https://example.edu/apply Apply here\n"
+        )
+
+        self.assertIn("the guide", text)
+        self.assertIn("Apply here", text)
+        self.assertNotIn("[", text)
+        self.assertNotIn("btn ", text)
+        self.assertNotIn("https://example.edu/apply", text)
+
+    def test_a_markdown_link_counts_its_words_but_not_the_address(self):
+        from SERVICE_INTERNAL.story_validation import _word_count, split_blocks
+
+        self.assertEqual(_word_count("[Apply here](https://example.edu/very/long/path)"), 2)
+
+        blocks = split_blocks("btn https://example.edu/apply Apply here\n\nA plain paragraph follows.")
+        self.assertEqual(blocks[0]["type"], "button")
+        self.assertEqual(blocks[1]["type"], "paragraph")
+
+    def test_a_button_alone_does_not_count_as_body_text(self):
+        from SERVICE_INTERNAL.story_validation import validate_story
+
+        result = validate_story("Apply now", "btn https://example.edu/apply Apply here")
+
+        codes = [item["code"] for item in result["errors"]]
+        self.assertIn("no_body_text", codes)
+
     def _like(self, blog):
         return self.client.post(f"/story/{blog.id}/like/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
 

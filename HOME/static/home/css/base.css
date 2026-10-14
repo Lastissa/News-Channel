@@ -1207,6 +1207,28 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   background: var(--ink); color: var(--paper); border-color: var(--ink); transform: translateY(-1px);
 }
 .story-inline-file-icon { font-size: 1.05em; line-height: 1; }
+/*  btn: a block-level button link ("btn URL label" on its own line -- see
+    DOCS/NEWS_CONTENT_CONVENTION.MD). Filled with the theme's ink/paper pair
+    (dark on light, light on dark) so it stays high-contrast in both themes;
+    the brand colour is the hover/focus fill. `.story-body a.story-inline-btn`
+    beats the plain `.story-body a` link styling on specificity, the same
+    approach as `.story-inline-file` above. It flows with the reading column
+    and both the story page and the Add/Edit News live preview render it
+    straight from this file. */
+.story-inline-btn-row { margin: 6px 0 19px; }
+.story-inline-btn,
+.story-body a.story-inline-btn {
+  display: inline-block; padding: 11px 24px;
+  border: 1px solid var(--ink); border-radius: var(--radius-s);
+  background: var(--ink); color: var(--paper);
+  font-weight: 800; font-size: 0.95rem; letter-spacing: 0.01em;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.story-body a.story-inline-btn:hover, .story-body a.story-inline-btn:focus-visible,
+.story-inline-btn:hover, .story-inline-btn:focus-visible {
+  background: var(--brand-deep); color: var(--paper); border-color: var(--brand-deep); transform: translateY(-1px);
+}
 .story-body > p,
 .story-body > ul,
 .story-body > ol,

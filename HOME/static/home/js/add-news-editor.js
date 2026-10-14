@@ -321,8 +321,12 @@
     var safe = escapeHtml(value);
     safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     safe = safe.replace(/__(.+?)__/g, "<em>$1</em>");
-    safe = safe.replace(/https?:\/\/[^\s<>'"]+/g, function (match) {
-      return '<a href="' + match + '" rel="noopener noreferrer" target="_blank">' + match + "</a>";
+    /* Markdown link ([words](url)) and bare URL in one pass, so a URL that
+       already sits inside "[words](...)" is never linkified twice -- mirrors
+       _linkify_text / _LINK_OR_URL_RE in BLOG/views.py. */
+    safe = safe.replace(/\[([^\[\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>'"]+)/g, function (match, label, url, bare) {
+      if (url === undefined) { url = bare; label = bare; }
+      return '<a href="' + url + '" rel="noopener noreferrer" target="_blank">' + label + "</a>";
     });
     return safe;
   }
@@ -359,6 +363,12 @@
     vidc: "story-inline-fig-center"
   };
 
+  /* BUTTON TOKEN: "btn URL label text". A whole line that starts with `btn`
+     becomes one button-style link -- the URL is the destination and the
+     trailing text is the label printed on the button. Mirrors BTN_TOKEN_RE /
+     _render_inline_button in BLOG/views.py. */
+  var btnTokenRe = /^btn\s+(\S+)(?:\s+(.*))?$/;
+
   function imageFilenameFromUrl(url) {
     var withoutQuery = url.split(/[?#]/)[0];
     var parts = withoutQuery.split("/");
@@ -383,6 +393,14 @@
     var label = (displayText || "").trim() || imageFilenameFromUrl(url);
     return '<a class="story-inline-file" href="' + escapeAttr(url) + '" download rel="noopener noreferrer">' +
       '<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>' + escapeHtml(label) + "</a>";
+  }
+
+  /* Mirrors _render_inline_button in BLOG/views.py: one block-level button
+     link. With no label the URL itself is printed so the button is never
+     blank. */
+  function renderInlineButton(url, labelText) {
+    var label = (labelText || "").trim() || url;
+    return '<p class="story-inline-btn-row"><a class="story-inline-btn" href="' + escapeAttr(url) + '" rel="noopener noreferrer" target="_blank">' + escapeHtml(label) + "</a></p>";
   }
 
   /* Mirrors _render_inline_video in BLOG/views.py: the same autoplay/muted/
@@ -415,7 +433,7 @@
     var headingRe = /^(#+)\s*(.*)$/;
     var bulletRe = /^\*\s+/;
     var orderedRe = /^\d+\.\s+/;
-    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+)/;
+    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+|btn\s+)/;
 
     while (i < lines.length) {
       var line = lines[i].trim();
@@ -438,6 +456,13 @@
       var vidMatch = line.match(vidTokenRe);
       if (vidMatch) {
         blocks.push(renderInlineVideo(vidMatch[1], vidMatch[2], vidMatch[3]));
+        i += 1;
+        continue;
+      }
+
+      var btnMatch = line.match(btnTokenRe);
+      if (btnMatch) {
+        blocks.push(renderInlineButton(btnMatch[1], btnMatch[2]));
         i += 1;
         continue;
       }
