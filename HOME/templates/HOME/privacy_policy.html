@@ -12,7 +12,7 @@
 {% block content %}
 <main class="pol-page">
   <header class="pol-masthead">
-    <p class="pol-eyebrow">Last updated 19 September 2026</p>
+    <p class="pol-eyebrow">Last updated 14 October 2026</p>
     <h1 class="pol-title">Privacy Policy</h1>
     <p class="pol-lede">
       At {{ project_name }}, we value the privacy of every visitor. This policy explains how we
@@ -45,21 +45,21 @@
   <article class="pol-body">
     <section class="pol-section" id="what-information-do-we-collect">
       <h2>What information do we collect?</h2>
-      <p>We collect personal information such as your email address when you create an account, subscribe to our newsletter, save content or contact us.</p>
-      <p>We also collect non-personal information such as your browser type, device, referring pages and basic usage data. We use it to improve performance and understand how readers use the site.</p>
-      <p>Personal information is collected only when you give it. You can choose not to provide it, though this may limit access to certain features.</p>
+      <p>We collect personal information such as your email address when you create an account, subscribe to our newsletter or contact us.</p>
+      <p>We may also collect non-personal information such as your browser type and referring pages only for the purpose of improving  performance and understand how readers use the site.</p>
+      <p>Personal information such as your email is collected only when you give it. You can choose not to provide it, though this may limit access to certain features such as bookmarking stories, viewing read history and personalizing the type of article that gets to you .</p>
     </section>
 
     <section class="pol-section" id="how-do-we-use-collected-information">
       <h2>How do we use collected information?</h2>
-      <p>We use personal information to run the site, keep your account secure, personalise your experience, send important updates and respond to enquiries. Aggregated data helps us measure content performance and improve our stories and features.</p>
+      <p>We use personal information to personalize content, keep your account secure, send important updates and respond to enquiries faster. Aggregated data helps us measure content performance and improve our stories and features.</p>
       <p>If you opt in to the newsletter, we may send updates on the topics you selected. You can unsubscribe at any time by signing in and turning the newsletter off on your profile page, or you can <a href="#contact-us">contact our support team</a> and we will help. Use the same link if you joined through the newsletter form and want to unsubscribe.</p>
     </section>
 
     <section class="pol-section" id="cookies-and-local-storage">
       <h2>Cookies and local storage</h2>
-      <p>We may use cookies or browser storage to keep you signed in, secure our forms and remember your chosen theme. You can disable cookies in your browser settings, but some features may stop working as intended.</p>
-      <p>On sign-in and sign-up pages we may also use short-lived security cookies and rate limiting to detect repeated refreshes or automated traffic. This protects those pages from abuse and reduces server load. If excessive refreshing is detected, we may briefly limit access and ask you to wait a few seconds before trying again.</p>
+      <p>We may use cookies or browser storage to keep you signed in, secure our forms and remember your chosen theme. You can disable cookies in your browser settings, but some features such as theme mode settings may stop working as intended.</p>
+      <p>On sign-in and sign-up pages we may also use short-lived security cookies and to detect repeated page refresh or automated traffic. This protects those pages from abuse. If excessive refreshing is detected, we may briefly limit access and ask you to wait a few seconds before trying again.</p>
     </section>
 
     <section class="pol-section" id="bookmarks-reading-history-and-saved-content">
@@ -74,9 +74,9 @@
     <section class="pol-section" id="how-do-we-protect-your-information">
       <h2>How do we protect your information?</h2>
       <p>
-        We maintain reasonable administrative, technical and organisational safeguards to protect
+        We maintain administrative, technical and organisational safeguards to protect
         the personal information we store. No method of transmission or storage is completely
-        risk-free, so we cannot guarantee absolute security.
+        risk-free, so we cannot guarantee absolute security but we defintely will do the best we can as your safety is our priority.
       </p>
     </section>
 
@@ -109,14 +109,39 @@
         site. They may use cookies or similar tools to collect non-personal usage data. This policy
         does not cover how those third parties handle data.
       </p>
+      {% comment %}
+        ADS SWITCH -> the "with" line just below sets show_google_ads.
+          True  : the Google / third-party advertising disclosure is shown.
+          False : that disclosure is hidden and this section is exactly the
+                  regular policy again. Nothing else on the page changes.
+      {% endcomment %}
+      {% with show_google_ads=True %}
+      {% if show_google_ads %}
+      <p>
+        Google and other third-party vendors use cookies, including advertising cookies,
+        to serve ads based on your prior visits to this website and other websites. Google
+        and its partners may also use web identifiers, IP addresses or similar technologies
+        to measure how those ads are used.
+      </p>
+      <p>
+        You can opt out of personalised advertising in
+        <a href="https://adssettings.google.com" target="_blank" rel="noopener">Google Ads Settings</a>,
+        and opt out of some third-party vendors&rsquo; use of cookies at
+        <a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener">www.aboutads.info</a>.
+        You can read more about
+        <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">how Google uses
+        information from sites or apps that use our services</a>.
+      </p>
+      {% endif %}
+      {% endwith %}
     </section>
 
     <section class="pol-section" id="data-retention-and-your-rights">
       <h2>Data retention and your rights</h2>
       <p>
         We keep personal information only as long as we need it for the purposes above, or as the
-        law requires. You can ask us to  delete your account information
-        and to remove your newsletter subscription.
+        law requires. You can ask us to  delete your account information by sending us a mail at <a href="{{support_email}}">
+        {{support_email}}</a> and to remove your newsletter subscription.
       </p>
     </section>
 
