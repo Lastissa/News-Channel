@@ -23,6 +23,12 @@ CSRF_COOKIE_SECURE = True
 
 ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')
 
+#   TEMPORARY DIAGNOSTIC (SERVICE_INTERNAL.abstract.log_forwarded_headers):
+#   when True, the login views log the masked proxy/IP header chain so the real
+#   client hop can be identified behind Render. Off unless explicitly enabled
+#   via the LOG_FORWARDED_HEADERS env var; remove once the IP issue is settled.
+LOG_FORWARDED_HEADERS = os.getenv("LOG_FORWARDED_HEADERS", "False").upper() in {"TRUE", "1", "YES"}
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

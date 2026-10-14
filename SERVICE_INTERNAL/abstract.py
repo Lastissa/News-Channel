@@ -3,6 +3,7 @@
 "===================================================================="
 
 
+import ipaddress
 import time
 
 from django.core.cache import cache, caches
@@ -27,6 +28,59 @@ def get_client_ip(request)-> str:
         return forwarded_for.split(",")[0].strip() or request.META.get("REMOTE_ADDR", "unknown")
 
     return request.META.get("REMOTE_ADDR", "unknown")
+
+
+def mask_ip(value: str) -> str:
+    """Hide the host part of an IP address so it is safe to write to logs.
+
+    IPv4 keeps the network prefix and masks the host bits
+    (``102.89.44.7`` -> ``102.89.x.x``); IPv6 keeps the first two hextets
+    (``2001:db8::1`` -> ``2001:db8::x``). Anything that is not an IP, or an
+    empty value, is returned unchanged (empty becomes ``-``)."""
+    value = (value or "").strip()
+    if not value:
+        return "-"
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        return value
+    if ip.version == 4:
+        first, second, *_ = value.split(".")
+        return f"{first}.{second}.x.x"
+    return ":".join(value.split(":")[:2]) + "::x"
+
+
+def log_forwarded_headers(request, label=""):
+    """TEMPORARY DIAGNOSTIC -- no-op unless ``LOG_FORWARDED_HEADERS`` is on.
+
+    Logs every proxy/IP header the app received, masked, so the real client
+    hop can be told apart from Render/Cloudflare infrastructure. The XFF chain
+    is printed in header order, i.e. leftmost = original client, rightmost =
+    the hop nearest us (``client <- proxy1 <- proxy2``). Remove this helper,
+    the settings flag, and the call sites once ``get_client_ip`` and the story
+    view counter are confirmed to pick the correct hop on Render."""
+    if request is None or not getattr(settings, "LOG_FORWARDED_HEADERS", False):
+        return
+
+    def chain(key):
+        raw = request.META.get(key) or ""
+        return " <- ".join(mask_ip(hop) for hop in raw.split(",") if hop.strip()) or "-"
+
+    logger.warning(
+        "FWD-HEADERS[%s] %s %s | remote=%s | xff=[%s] | x-real=%s | "
+        "cf-connecting=%s | true-client=%s | forwarded=[%s] | x-proto=%s | x-host=%s",
+        label,
+        request.method,
+        request.path,
+        mask_ip(request.META.get("REMOTE_ADDR", "")),
+        chain("HTTP_X_FORWARDED_FOR"),
+        mask_ip(request.META.get("HTTP_X_REAL_IP", "")),
+        mask_ip(request.META.get("HTTP_CF_CONNECTING_IP", "")),
+        mask_ip(request.META.get("HTTP_TRUE_CLIENT_IP", "")),
+        chain("HTTP_FORWARDED"),
+        request.META.get("HTTP_X_FORWARDED_PROTO", "-"),
+        request.META.get("HTTP_X_FORWARDED_HOST", "-"),
+    )
 
 
 #   USER-AGENT SUBSTRINGS (already lowercased) THAT MARK A REQUEST AS A BOT:
