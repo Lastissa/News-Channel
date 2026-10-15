@@ -55,7 +55,7 @@
               <path d="M17 8l-5-5-5 5" />
               <path d="M12 3v12" />
             </svg>
-            <span class="avatar-btn-label">Upload avatar (file)</span>
+            <span class="avatar-btn-label">Change Profile Picture</span>
           </button>
         </div>
         <input id="profile-avatar-file" type="file" name="image_file" data-profile-avatar-file accept="image/jpeg,image/png" hidden>
@@ -72,6 +72,12 @@
         </button>
         <p class="staff-record-feedback" data-logout-all-feedback role="status" aria-live="polite"></p>
       </div>
+
+      {% comment %} Email-category preferences. Deliberately the LAST child of
+          .profile-summary: that block dissolves on desktop, so on mobile this
+          sits right under the "Log out all sessions" button, and on desktop it
+          lands inside the aside, immediately before the "Login alerts" block. {% endcomment %}
+      {% include "HOME/partials/category_preferences.html" %}
       </div>
 
       <div class="profile-prefs">

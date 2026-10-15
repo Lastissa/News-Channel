@@ -1,0 +1,58 @@
+{% comment %}
+  EMAIL CATEGORY PREFERENCES  (profile page)
+  --------------------------------------------------------------------------
+  Rendered twice: once inside HOME/profile.html at first paint, and again on
+  its own by home:profile_category_preferences -- which the category JS
+  re-fetches over a plain GET and swaps in after every add/remove, so the list
+  always mirrors the database and the page never reloads.
+
+  The root carries both endpoints as data attributes so all the behaviour
+  lives in HOME/static/home/js/interactions.js and never has to guess a URL.
+
+  A tag marked `is-on` is a category the reader WILL be emailed about and
+  carries an X to turn it off; the rest carry a check to turn them on. A reader
+  with no stored rows is treated as subscribed to everything (see
+  HOME.views._category_subscription_state).
+{% endcomment %}
+<div class="cat-prefs"
+     data-category-prefs
+     data-prefs-url="{% url 'home:profile_category_preferences' %}"
+     data-toggle-url="{% url 'home:profile_category_preference_toggle' %}">
+  <div class="cat-prefs-head">
+    <h4>This are the category we current you email on, edit as you wish</h4>
+ </div>
+
+  {% if subscribed_categories %}
+  <div class="cat-prefs-group">
+    <span class="cat-prefs-label">Receiving</span>
+    <div class="cat-prefs-tags">
+      {% for name in subscribed_categories %}
+      <button type="button" class="cat-pref-tag is-on"
+              data-cat-action="remove" data-cat-name="{{ name }}"
+              aria-label="Stop emails about {{ name }}" title="Stop emails about {{ name }}">
+        <span class="cat-pref-tag__label">{{ name }}</span>
+        <svg class="cat-pref-tag__icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if available_categories %}
+  <div class="cat-prefs-group">
+    <span class="cat-prefs-label">Not receiving</span>
+    <div class="cat-prefs-tags">
+      {% for name in available_categories %}
+      <button type="button" class="cat-pref-tag"
+              data-cat-action="add" data-cat-name="{{ name }}"
+              aria-label="Start emails about {{ name }}" title="Start emails about {{ name }}">
+        <span class="cat-pref-tag__label">{{ name }}</span>
+        <svg class="cat-pref-tag__icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.4 3.4 3.4 7.6-7.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <p class="cat-prefs-empty">You are on for every category. Turn one off to limit what reaches your inbox.</p>
+  {% endif %}
+</div>

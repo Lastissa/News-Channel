@@ -1974,6 +1974,82 @@
     });
   }
 
+  /*  EMAIL CATEGORY PREFERENCES: the tag control under the profile logout.
+      Each add/remove posts exactly one change (CSRF-protected), then re-fetches
+      the server-rendered tag list over a plain GET and swaps it in -- so the UI
+      always mirrors the database and the page itself never reloads. Removing
+      the last category comes back flagged `reset`, because the server turns
+      everything back on and tells the reader where the real off switch is. */
+  document.addEventListener("click", function (event) {
+    var tag = event.target.closest("[data-cat-action]");
+    if (!tag || tag.dataset.pending === "true") return;
+
+    var box = tag.closest("[data-category-prefs]");
+    if (!box) return;
+
+    var toggleUrl = box.dataset.toggleUrl;
+    var prefsUrl = box.dataset.prefsUrl;
+    if (!toggleUrl || !prefsUrl) return;
+
+    tag.dataset.pending = "true";
+    tag.classList.add("is-pending");
+
+    fetch(toggleUrl, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+        "X-Requested-With": "XMLHttpRequest",
+        "Content-Type": "application/json",
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        category: tag.dataset.catName || "",
+        action: tag.dataset.catAction,
+      }),
+    })
+      .then(function (response) {
+        return response.text().then(function (text) {
+          return { ok: response.ok, text: text };
+        });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          tag.dataset.pending = "false";
+          tag.classList.remove("is-pending");
+          toast(extractDetail(result.text, "Could not update that category."), "error");
+          return;
+        }
+
+        var payload = {};
+        try { payload = JSON.parse(result.text) || {}; } catch (e) { payload = {}; }
+
+        return fetch(prefsUrl, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+        })
+          .then(function (response) {
+            return response.ok ? response.text() : null;
+          })
+          .then(function (html) {
+            if (html && html.indexOf("data-category-prefs") !== -1) {
+              var current = document.querySelector("[data-category-prefs]");
+              if (current) current.outerHTML = html;
+            }
+            if (payload.reset) {
+              toast(payload.detail || "All categories are back on.");
+              if (payload.hint) bottomToast(payload.hint, "info");
+            } else {
+              toast(payload.detail || "Category preference updated.");
+            }
+          });
+      })
+      .catch(function () {
+        tag.dataset.pending = "false";
+        tag.classList.remove("is-pending");
+        toast("Connection issue. That category was not changed.", "error");
+      });
+  });
+
   /*  ADD STAFF: full page form on its own route, submitted the same AJAX way
       as every other form here so the feedback pattern stays one pattern. */
   var createForm = document.querySelector("[data-staff-create-form]");

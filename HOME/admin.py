@@ -1,4 +1,4 @@
 from django.contrib import admin
-from .models import Bookmark, ReadingHistory
+from .models import Bookmark, ReadingHistory, CategorySubscription
 
-admin.site.register([Bookmark, ReadingHistory])
+admin.site.register([Bookmark, ReadingHistory, CategorySubscription])

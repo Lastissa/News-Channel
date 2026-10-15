@@ -1,4 +1,5 @@
 import itertools
+import json
 from datetime import timedelta
 from unittest import mock
 
@@ -14,8 +15,8 @@ from django.utils import timezone
 from ADMIN.models import SiteSettings
 from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth
-from BLOG.models import Blog, Category, refresh_category_cache
-from HOME.models import ReadingHistory
+from BLOG.models import Blog, Category, get_category_choices, refresh_category_cache
+from HOME.models import ReadingHistory, CategorySubscription, CategorySubscription
 from Partner.models import AdvertImage
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.config import custom_context_processors
@@ -379,6 +380,128 @@ class NewStoryAlertTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 201)
         executor.submit.assert_not_called()
+
+    def test_category_opt_in_keeps_the_alert(self):
+        follower = Auth.objects.create_user(email="kept@example.com", send_newsletter=True)
+        AuthorFollow.objects.create(follower=follower, author=self.author)
+        #   Explicitly on for GENERAL, the category this publish uses.
+        CategorySubscription.objects.create(user=follower, category="GENERAL")
+
+        with mock.patch("HOME.views.ping_indexnow"), mock.patch(
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR"
+        ) as executor:
+            response = self._publish()
+
+        self.assertEqual(response.status_code, 201)
+        _, recipients, _, _ = executor.submit.call_args[0]
+        self.assertIn("kept@example.com", [r.lower() for r in recipients])
+
+    def test_category_opt_out_drops_the_alert(self):
+        neutral = Auth.objects.create_user(email="neutral@example.com", send_newsletter=True)
+        follower = Auth.objects.create_user(email="muted@example.com", send_newsletter=True)
+        AuthorFollow.objects.create(follower=neutral, author=self.author)
+        AuthorFollow.objects.create(follower=follower, author=self.author)
+        #   An explicit set that does NOT include GENERAL: this reader has said
+        #   they only want the other category, so a GENERAL story skips them
+        #   while the no-preference reader still gets it.
+        other = next(name for name, _ in get_category_choices() if name != "GENERAL")
+        CategorySubscription.objects.create(user=follower, category=other)
+
+        with mock.patch("HOME.views.ping_indexnow"), mock.patch(
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR"
+        ) as executor:
+            response = self._publish()
+
+        self.assertEqual(response.status_code, 201)
+        _, recipients, _, _ = executor.submit.call_args[0]
+        lowered = [r.lower() for r in recipients]
+        self.assertIn("neutral@example.com", lowered)
+        self.assertNotIn("muted@example.com", lowered)
+
+
+class CategoryEmailPreferenceTests(QuietTestCase):
+    """The profile email-category control: an opt-in set that defaults to
+    "everything on", ignores categories that no longer exist, and resets to all
+    when the reader clears the last one."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = Auth.objects.create_user(email="reader@example.com")
+        self.client.force_login(self.user)
+        self.categories = [name for name, _ in get_category_choices()]
+
+    def _toggle(self, category, action):
+        return self.client.post(
+            reverse("home:profile_category_preference_toggle"),
+            data=json.dumps({"category": category, "action": action}),
+            content_type="application/json",
+        )
+
+    def _rows(self):
+        return set(
+            CategorySubscription.objects.filter(user=self.user).values_list("category", flat=True)
+        )
+
+    def test_no_rows_means_every_category_is_on(self):
+        html = self.client.get(reverse("home:profile_category_preferences")).content.decode()
+
+        self.assertNotIn("Not receiving", html)
+        for name in self.categories:
+            self.assertIn(f'data-cat-action="remove" data-cat-name="{name}"', html)
+        self.assertEqual(self._rows(), set())
+
+    def test_profile_page_includes_the_control(self):
+        html = self.client.get(reverse("home:profile")).content.decode()
+
+        self.assertIn("data-category-prefs", html)
+        self.assertIn("data-toggle-url", html)
+
+    def test_removing_a_category_keeps_the_rest_on(self):
+        dropped = self.categories[0]
+        response = self._toggle(dropped, "remove")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["reset"])
+        self.assertEqual(self._rows(), set(self.categories) - {dropped})
+
+    def test_re_adding_the_missing_category_clears_the_preference(self):
+        dropped = self.categories[0]
+        self._toggle(dropped, "remove")
+        self._toggle(dropped, "add")
+
+        self.assertEqual(self._rows(), set())
+
+    def test_clearing_the_last_category_resets_to_all_on(self):
+        keep, *others = self.categories
+        for name in others:
+            self._toggle(name, "remove")
+        self.assertEqual(self._rows(), {keep})
+
+        response = self._toggle(keep, "remove")
+        payload = response.json()
+
+        self.assertTrue(payload["reset"])
+        self.assertIn("Account settings", payload["hint"])
+        self.assertEqual(self._rows(), set())
+
+    def test_retired_category_rows_are_ignored(self):
+        CategorySubscription.objects.create(user=self.user, category="OLD SUBJECT")
+
+        html = self.client.get(reverse("home:profile_category_preferences")).content.decode()
+
+        self.assertNotIn("OLD SUBJECT", html)
+        self.assertIn(f'data-cat-action="remove" data-cat-name="{self.categories[0]}"', html)
+
+    def test_unknown_category_is_rejected(self):
+        self.assertEqual(self._toggle("NOPE NOPE", "remove").status_code, 400)
+
+    def test_requires_login(self):
+        self.client.logout()
+
+        self.assertEqual(self._toggle(self.categories[0], "remove").status_code, 401)
+        self.assertEqual(
+            self.client.get(reverse("home:profile_category_preferences")).status_code, 401
+        )
 
 
 class HomeAdvertTeaserTests(QuietTestCase):

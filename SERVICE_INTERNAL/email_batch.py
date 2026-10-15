@@ -18,6 +18,8 @@ from django.utils import timezone
 from django.utils.html import escape
 
 from AUTHENTICATION.models import Auth
+from BLOG.models import get_category_choices
+from HOME.models import CategorySubscription
 from SERVICE_INTERNAL.abstract import info_logger, error_logger
 from SERVICE_INTERNAL.config import About
 from SERVICE_INTERNAL.email_single import _EMAIL_EXECUTOR, _build_email_html
@@ -73,6 +75,10 @@ def _try_send_new_story_batch_email(blog: object):
       (a) everyone who follows this story's author (STAFF.AuthorFollow), and
       (b) everyone who follows no author at all, so they still get exposed
           to new stories instead of never hearing from the site again.
+    ...then narrowed by the reader's per-category opt-in (HOME.models.
+    CategorySubscription): anyone who has touched the profile control only
+    hears about the categories they left on. No rows means no preference and
+    keeps the old "everyone gets everything" behaviour.
     Only accounts with `send_newsletter` on are eligible, and the footer's
     unsubscribe link doubles as the opt-out by flipping that same flag off.
     The author themself is always excluded.
@@ -88,12 +94,24 @@ def _try_send_new_story_batch_email(blog: object):
     following_author_ids = AuthorFollow.objects.filter(author=author).values_list("follower_id", flat=True)
     follows_somebody_ids = AuthorFollow.objects.values_list("follower_id", flat=True)
 
+    #   Per-category opt-in from the profile control (HOME.views.
+    #   ProfileCategoryPreferenceToggleView). A reader who has touched it only
+    #   gets stories in the categories they left on; a reader with no rows at
+    #   all keeps getting everything, which is the documented default. Rows for
+    #   categories that have since been removed are filtered out here, so a
+    #   stale preference can never silence a reader by accident.
+    current_category_names = [name for name, _ in get_category_choices()]
+    preferences = CategorySubscription.objects.filter(category__in=current_category_names)
+    opted_in_ids = preferences.filter(category=blog.category).values_list("user_id", flat=True)
+    has_preference_ids = preferences.values_list("user_id", flat=True)
+
     recipients = list(
         Auth.objects.filter(
             Q(pk__in=following_author_ids) | ~Q(pk__in=follows_somebody_ids),
             send_newsletter=True,
             is_active=True,
         )
+        .filter(Q(pk__in=opted_in_ids) | ~Q(pk__in=has_preference_ids))
         .exclude(pk=author.pk)
         .values_list("email", flat=True)
         .distinct()
@@ -126,7 +144,7 @@ def _try_send_new_story_batch_email(blog: object):
             main_content=main_content,
             end_note=f"{About.project_name} Team",
             unsubscribe_query=f"type=author_post&email={quote(email)}",
-            preference_note="You can turn off all news update emails from your profile settings at any time.",
+            preference_note="To personalize the categories of mail you receive, contact us at support@abureport.com.ng or visit your profile.",
         )
 
     _EMAIL_EXECUTOR.submit(_dispatch_batch_email, recipients, subject, build_html_for)

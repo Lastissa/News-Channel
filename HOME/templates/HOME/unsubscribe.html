@@ -75,22 +75,22 @@
 
     {% if state == "confirm" %}
       <h1>Unsubscribe</h1>
-      <p class="unsub-intro">Stop {{ label }} sent to <span class="unsub-email">{{ masked_email }}</span>.</p>
+      <p class="unsub-intro">Stop {{ label }} for <span class="unsub-email">{{ masked_email }}</span>?</p>
     {% elif state == "done" %}
       <h1>Unsubscribed</h1>
-      <p class="unsub-intro">You will no longer receive {{ label }} at <span class="unsub-email">{{ masked_email }}</span>.</p>
+      <p class="unsub-intro"><span class="unsub-email">{{ masked_email }}</span> will no longer get {{ label }}.</p>
     {% elif state == "limited" %}
-      <h1>Please wait a moment</h1>
-      <p class="unsub-intro">There have been too many requests from your connection.</p>
+      <h1>Please wait</h1>
+      <p class="unsub-intro">Too many requests. Try again in a minute.</p>
     {% else %}
-      <h1>Manage How Our Mail Get To You.</h1>
-      <p class="unsub-intro">invalid unsubscribe url.</p>
+      <h1>Invalid link</h1>
+      <p class="unsub-intro">This unsubscribe link is no longer valid.</p>
     {% endif %}
   </div>
 
   {% if state == "confirm" %}
     <div class="unsub-card">
-      <p>Turn off {{ detail }}. Turn this back on from your profile at any time.</p>
+      <p>Turn it back on from your profile at any time.</p>
       <form method="post" class="unsub-actions">
         {% csrf_token %}
         <input type="hidden" name="type" value="{{ kind }}">
@@ -102,25 +102,20 @@
 
   {% elif state == "done" %}
     <div class="unsub-card is-success">
-      <p>Changed your mind? Sign in and turn it back on from your profile settings.</p>
       <div class="unsub-actions">
-        <a class="unsub-btn unsub-btn-primary" href="{% url 'home:home' %}">Back to {{ project_name }}</a>
-        <a class="unsub-btn" href="{% url 'home:profile' %}">Open profile settings</a>
+        <a class="unsub-btn unsub-btn-primary" href="{% url 'home:profile' %}">Turn it back on</a>
+        <a class="unsub-btn" href="{% url 'home:home' %}">Back to {{ project_name }}</a>
       </div>
     </div>
 
   {% elif state == "limited" %}
     <div class="unsub-card is-error">
-      <p>Wait a minute, then open the unsubscribe link in your email again.</p>
+      <p>Wait a minute, then open the link in your email again.</p>
     </div>
 
   {% else %}
     <div class="unsub-card is-error">
-      <p>Did you land here by mistake? <a href="/" style="text-decoration:underline;color:var(--amber-alt);">Back To Home</a>.</p>
-      <div class="unsub-actions">
-        {% comment %} <a class="unsub-btn unsub-btn-primary" href="{% url 'home:profile' %}">Open profile settings</a> {% endcomment %}
-        {% comment %} <a class="unsub-btn" href="{% url 'home:home' %}">Back to {{ project_name }}</a> {% endcomment %}
-      </div>
+      <p>Manage your mail from your <a href="{% url 'home:profile' %}">profile</a>.</p>
     </div>
   {% endif %}
 </section>

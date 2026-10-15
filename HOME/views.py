@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 from urllib.parse import urlencode
@@ -20,7 +21,7 @@ from django.views import View
 from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Comment, get_category_choices
-from HOME.models import Bookmark
+from HOME.models import Bookmark, CategorySubscription
 from Partner.models import AdvertImage
 from SERVICE_INTERNAL.abstract import (
     _optimization,
@@ -1444,8 +1445,146 @@ class AdvertInquiryView(View):
         return render(request, "HOME/advert_coming_soon.html")
 
 
+def _category_subscription_state(user):
+    """Return `(subscribed, available)` current-category-name lists for the
+    profile email control.
+
+    `subscribed` is every live category this account will be emailed about;
+    `available` is the rest, still offered as "turn this one on". A reader who
+    has never touched the control has no rows and is subscribed to EVERYTHING,
+    so the empty state and the all-on state are deliberately the same thing.
+    Any stored name that is no longer a current category (the category was
+    removed or renamed) is dropped here, which is what keeps the reader from
+    holding a subscription to a category that no longer exists.
+    """
+    current = [name for name, _ in get_category_choices()]
+    if not current:
+        return [], []
+
+    stored = set(
+        CategorySubscription.objects.filter(user=user).values_list("category", flat=True)
+    )
+    explicit = stored & set(current)
+    if not explicit:
+        # No preference at all (or every stored name was retired): everything on.
+        return list(current), []
+
+    subscribed = [name for name in current if name in explicit]
+    available = [name for name in current if name not in explicit]
+    return subscribed, available
+
+
+def _persist_category_subscriptions(user, wanted_names, current_names):
+    """Replace this account's explicit opt-in set with `wanted_names`.
+
+    "Everything on" and "nothing selected" both collapse back to NO rows, the
+    documented no-preference state (see the model docstring), so a reader can
+    never be stranded with an empty set that silently kills their category mail.
+    """
+    wanted = {name for name in wanted_names if name in current_names}
+    CategorySubscription.objects.filter(user=user).delete()
+    if wanted and wanted != set(current_names):
+        CategorySubscription.objects.bulk_create(
+            [CategorySubscription(user=user, category=name) for name in wanted]
+        )
+
+
+class ProfileCategoryPreferencesView(View):
+    """GET the current email-category tag list, rendered as a fragment.
+
+    This is the refresh half of the feature: the toggle endpoint flips a row and
+    the page immediately re-fetches THIS over a plain GET, separate from the
+    page load, and swaps it in. Keeping the render server-side means the tags
+    always mirror the database instead of any client-side guess.
+    """
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Please sign in to update settings."}, status=401)
+
+        subscribed, available = _category_subscription_state(request.user)
+        return render(
+            request,
+            "HOME/partials/category_preferences.html",
+            {"subscribed_categories": subscribed, "available_categories": available},
+        )
+
+
+class ProfileCategoryPreferenceToggleView(View):
+    """POST one category on or off for new-story email alerts."""
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Please sign in to update settings."}, status=401)
+
+        remaining_seconds, limited = is_rate_limited(
+            request, timeout_window=10, max_requests=30, scope="profile_category_pref"
+        )
+        if limited:
+            return JsonResponse(
+                {"detail": f"Too many changes. Try again in {remaining_seconds} seconds."},
+                status=429,
+            )
+
+        if request.content_type == "application/json":
+            try:
+                data = json.loads(request.body or "{}")
+            except (TypeError, ValueError):
+                data = {}
+        else:
+            data = request.POST
+
+        category = str(data.get("category") or "").strip()
+        action = str(data.get("action") or "").strip().lower()
+
+        current = [name for name, _ in get_category_choices()]
+        if category not in current:
+            return JsonResponse({"detail": "That category no longer exists."}, status=400)
+        if action not in ("add", "remove"):
+            return JsonResponse({"detail": "Unknown action."}, status=400)
+
+        subscribed, _ = _category_subscription_state(request.user)
+        subscribed_set = set(subscribed)
+
+        if action == "add":
+            if category in subscribed_set:
+                return JsonResponse(
+                    {"detail": f"You are already receiving mail on {category}.", "reset": False}
+                )
+            _persist_category_subscriptions(request.user, subscribed_set | {category}, current)
+            return JsonResponse(
+                {"detail": f"You will start receiving mail on {category}.", "reset": False}
+            )
+
+        if category not in subscribed_set:
+            return JsonResponse(
+                {"detail": f"You are not receiving mail on {category}.", "reset": False}
+            )
+
+        wanted = subscribed_set - {category}
+        if not wanted:
+            #   Removing the very last category. By product rule this is "no
+            #   preference", so everything comes back on, and we point the
+            #   reader at the master switch if they truly want silence.
+            _persist_category_subscriptions(request.user, [], current)
+            return JsonResponse(
+                {
+                    "detail": "You unselected every category, so all of them are back on.",
+                    "reset": True,
+                    "hint": (
+                        "To stop receiving the newsletter, go to Account settings "
+                        "at the bottom of this page."
+                    ),
+                }
+            )
+
+        _persist_category_subscriptions(request.user, wanted, current)
+        return JsonResponse(
+            {"detail": f"You will stop receiving notifications on {category}.", "reset": False}
+        )
+
+
 class ProfileLoginAlert(View):
-    """Toggle Login Alert Wether to receive mail or not for login."""
 
     def post(self, request):
         remaining_seconds, limited = is_rate_limited(request, 3, 5,True)
@@ -2189,6 +2328,12 @@ class ProfileView(View):
         #   context, so non-admin pages pay nothing for it.
         is_admin = admin_only(request.user)
 
+        #   Email-category preferences for the profile control under the
+        #   logout button: an opt-in set that defaults to "every category".
+        subscribed_category_names, available_category_names = _category_subscription_state(
+            request.user
+        )
+
         #   Archive upload alerts are a superuser switch on the single
         #   SiteSettings row. Read defensively so the page still renders if the
         #   ADMIN migration that adds the column has not been applied yet.
@@ -2227,6 +2372,8 @@ class ProfileView(View):
             "is_staff_user": staff_only(request.user),
             "is_admin_user": is_admin,
             "archive_upload_alerts": archive_upload_alerts,
+            "subscribed_categories": subscribed_category_names,
+            "available_categories": available_category_names,
             "show_staff_dashboard": staff_only(request.user),
             "user_sessions": _user_sessions_for_profile(request.user, request),
             "gender_choices": GENDER_CHOICES,

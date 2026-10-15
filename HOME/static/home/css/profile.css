@@ -1640,6 +1640,109 @@ html.avatar-crop-open {
 .profile-list li[data-following-item].is-removing { opacity: 0; transform: translateX(14px); }
 
 /* =====================================================================
+   EMAIL CATEGORY PREFERENCES (the tag control under the profile logout)
+   ---------------------------------------------------------------------
+   Markup lives in HOME/templates/HOME/partials/category_preferences.html and
+   is re-fetched by interactions.js on every add/remove. It is the last child
+   of .profile-summary, which dissolves on desktop, so on mobile it sits right
+   under "Log out all sessions" and on desktop it lands just above the Account
+   settings card.
+   ===================================================================== */
+.cat-prefs {
+  /* margin-top: 20px; */
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+}
+
+.cat-prefs-head h4 {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.cat-prefs-head p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--slate);
+}
+
+.cat-prefs-group {
+  display: grid;
+  gap: 8px;
+}
+
+.cat-prefs-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.cat-prefs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cat-pref-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--input-fill);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease,
+    color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.cat-pref-tag:hover,
+.cat-pref-tag:focus-visible {
+  border-color: var(--ink);
+  transform: translateY(-1px);
+}
+
+/* `is-on` tags are the categories that will email the reader. */
+.cat-pref-tag.is-on {
+  background: var(--nav-bg);
+  border-color: var(--nav-bg);
+  color: var(--nav-fg);
+}
+
+.cat-pref-tag.is-on .cat-pref-tag__icon {
+  color: var(--amber);
+}
+
+.cat-pref-tag.is-pending {
+  opacity: 0.55;
+  cursor: wait;
+  transform: none;
+}
+
+.cat-pref-tag__icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.cat-prefs-empty {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--slate);
+}
+
+/* =====================================================================
    SIDE NAV (see the SIDE NAV LAYOUT note near .profile-side)
    ===================================================================== */
 @media (min-width: 900px) {
@@ -1664,6 +1767,10 @@ html.avatar-crop-open {
   .profile-identity-row { order: 1; }
   .profile-info-list { order: 2; }
   .profile-prefs { order: 3; }
+  /* Email-category control: same slot as account settings, but it comes
+     earlier in the DOM, so the tie puts it immediately ABOVE "Account
+     settings" -- i.e. right before the Login alerts block. */
+  .cat-prefs { order: 3; }
   .profile-image-actions { order: 4; }
   .profile-logout-all-block { order: 5; }
 
