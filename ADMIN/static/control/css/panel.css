@@ -274,6 +274,24 @@ html { scroll-behavior: smooth; }
 .panel-status.is-active { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
 .panel-status.is-suspended { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 
+/* ---------- Active logins: one account per row, expandable to its sessions ---------- */
+.panel-session-row { flex-wrap: wrap; align-items: flex-start; }
+.panel-session-row .panel-row-main { flex: 1 1 auto; }
+.panel-session-email { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 600; }
+.panel-session-toggle .ic { transition: transform .2s var(--panel-ease); }
+.panel-session-toggle[aria-expanded="true"] .ic { transform: rotate(180deg); }
+.panel-badge {
+  flex: 0 0 auto; padding: 1px 7px; border-radius: 999px;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.panel-badge-danger { color: var(--danger); border: 1px solid var(--danger); background: rgba(149, 25, 1, 0.1); }
+.panel-session-detail { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; margin: 6px 0 2px; padding-left: 10px; border-left: 2px solid var(--line); }
+.panel-session-detail[hidden] { display: none; }
+.panel-session-detail-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.panel-session-detail-row .panel-row-main { flex: 1 1 auto; }
+.panel-session-device { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 600; }
+
+
 /* Skeleton: shown by the panel shell until the user directory GET lands.
    Same geometry as the real rows so the swap does not jump. */
 .panel-skeleton-row { pointer-events: none; }

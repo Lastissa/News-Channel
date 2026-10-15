@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Auth, PasswordResetKey, UserSession
+from .models import Auth, KnownDevice, PasswordResetKey, UserSession
 
 
 class AuthAdmin(admin.ModelAdmin):
@@ -24,5 +24,5 @@ class AuthAdmin(admin.ModelAdmin):
             _release_account_assets(account_assets)
 
 
-admin.site.register([PasswordResetKey, UserSession])
+admin.site.register([PasswordResetKey, UserSession, KnownDevice])
 admin.site.register(Auth, AuthAdmin)

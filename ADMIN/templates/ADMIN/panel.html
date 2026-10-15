@@ -290,14 +290,28 @@
              data-has-next="{{ sessions_page_obj.has_next|yesno:'true,false' }}"
              data-has-previous="{{ sessions_page_obj.has_previous|yesno:'true,false' }}"
              data-endpoint="{% url 'control:panel_sessions' %}"
-             data-logout-endpoint="{% url 'control:panel_session_logout' 0 %}">
+             data-logout-endpoint="{% url 'control:panel_session_logout' 0 %}"
+             data-single-logout-endpoint="{% url 'control:panel_single_session_logout' 0 %}">
           {% for row in sessions_rows %}
-          <div class="panel-row" data-session-row data-account-id="{{ row.id }}">
+          <div class="panel-row panel-session-row" data-session-row data-account-id="{{ row.id }}">
             <span class="panel-row-main">
-              <span>{{ row.email_masked }}</span>
-              {% if row.logged_in_at %}<span class="panel-row-sub">{{ row.logged_in_at }}</span>{% endif %}
+              <span class="panel-session-email">{{ row.email_masked }}{% if row.suspicious_count %} <span class="panel-badge panel-badge-danger" title="Signed in from a device this account had not used before">Unrecognised</span>{% endif %}</span>
+              <span class="panel-row-sub">{{ row.session_count }} session{{ row.session_count|pluralize }}{% if row.logged_in_at %} · last sign-in {{ row.logged_in_at }}{% endif %}</span>
             </span>
-            <button type="button" class="panel-icon-btn panel-icon-danger" data-session-logout aria-label="Log out" title="Log out"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg></button>
+            <button type="button" class="panel-icon-btn panel-session-toggle" data-session-toggle aria-expanded="false" aria-label="Show sessions for {{ row.email_masked }}" title="Show sessions"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+            <button type="button" class="panel-icon-btn panel-icon-danger" data-session-logout aria-label="Log out {{ row.email_masked }}" title="Log out all"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg></button>
+            <div class="panel-session-detail" data-session-detail hidden>
+              {% for s in row.sessions %}
+              <div class="panel-session-detail-row" data-session-key="{{ s.session_key }}">
+                <span class="panel-row-main">
+                  <span class="panel-session-device">{{ s.device }}{% if s.is_suspicious %} <span class="panel-badge panel-badge-danger">Unrecognised</span>{% endif %}</span>
+                  <span class="panel-row-sub">{{ s.ip }} · signed in {{ s.logged_in_at }}</span>
+                  <span class="panel-row-sub">Last active {{ s.last_seen }}{% if s.expires_at %} · ends {{ s.expires_at }}{% endif %}</span>
+                </span>
+                <button type="button" class="panel-icon-btn panel-icon-danger" data-session-single-logout aria-label="End this session" title="End this session"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg></button>
+              </div>
+              {% endfor %}
+            </div>
           </div>
           {% empty %}
           <p class="panel-empty">Nobody is currently logged in.</p>

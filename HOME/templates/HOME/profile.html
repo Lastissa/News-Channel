@@ -44,7 +44,14 @@
                     hx-swap="innerHTML">Delete account</button>
           {% endif %}
         </div>
-        <div><span>Active sessions</span><strong>{{ user_sessions|length }}</strong></div>
+        <button type="button" class="profile-info-list-btn profile-active-sessions"
+                hx-get="{% url 'home:profile_sessions_placard' %}"
+                hx-target="[data-sessions-overlay]"
+                hx-swap="innerHTML"
+                aria-label="View active sessions">
+          <span>Active sessions</span>
+          <strong>{{ user_sessions|length }}</strong>
+        </button>
       </div>
 
       <div class="profile-actions profile-image-actions">
@@ -69,6 +76,12 @@
                 data-logout-all-sessions
                 data-endpoint="{% url 'home:profile_logout_all' %}">
           Log out all sessions
+        </button>
+        <button type="button" class="profile-action-btn view-sessions-btn"
+                hx-get="{% url 'home:profile_sessions_placard' %}"
+                hx-target="[data-sessions-overlay]"
+                hx-swap="innerHTML">
+          View all sessions
         </button>
         <p class="staff-record-feedback" data-logout-all-feedback role="status" aria-live="polite"></p>
       </div>
@@ -487,6 +500,9 @@
 
   {#   THE DELETE ACCOUNT PLACARD OVERLAY LANDS HERE, EMPTY UNTIL THE BUTTON IS PRESSED   #}
   <div data-delete-overlay></div>
+
+  {#   THE ACTIVE SESSIONS PLACARD OVERLAY LANDS HERE, EMPTY UNTIL THE COUNT/BUTTON IS PRESSED   #}
+  <div data-sessions-overlay></div>
 
   <div class="avatar-crop-layer" data-avatar-crop hidden>
     <div class="avatar-crop-backdrop"></div>

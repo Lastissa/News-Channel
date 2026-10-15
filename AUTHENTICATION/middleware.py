@@ -82,7 +82,7 @@ class AdminMaxPeriod:
             tracker = request.session.get('last_activity')
             if not tracker:
                 request.session['last_activity'] = time.time()
-            if tracker and time.time() - tracker > 3600*24:  # 1 day
+            if tracker and time.time() - tracker > getattr(settings, "ADMIN_MAX_AGE_TOO", 1*60*60):  # 1 day
                 logout(request)
                 from django.contrib import messages
                 messages.error(request, "ADMIN (logged out)!")

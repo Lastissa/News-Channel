@@ -115,6 +115,11 @@ class UserSession(models.Model):
     last_seen = models.DateTimeField(auto_now=True,)
     expires_at = models.DateTimeField(null=True,blank=True,db_index=True,help_text="When this session expires. Mirrors the Django session expiry.",
     )
+    #   Set when a login arrives from a device / network the account has never
+    #   used before (see AUTHENTICATION.signals.track_login). Surfaced in PANEL
+    #   and on the profile so a surprising sign-in stands out. It lives on the
+    #   session row, so ending that session removes the flag with it.
+    is_suspicious = models.BooleanField(default=False,db_index=True,help_text="Login came from a device the account had not used before.",)
 
     class Meta:
         ordering = ["-logged_in_at"]
@@ -128,3 +133,29 @@ class UserSession(models.Model):
         if self.expires_at is None:
             return False
         return self.expires_at < timezone.now()
+
+
+class KnownDevice(models.Model):
+    """One row per (account, device fingerprint) pair we have seen sign in.
+
+    Written on the first successful login from a given IP + user agent, and
+    touched on every later login from the same pair. A login from a pair that
+    is NOT already here -- on an account that has signed in from somewhere
+    before -- is what flags a session as suspicious. Rows are kept on logout on
+    purpose: once a device is known it stays known, so only genuinely new
+    devices raise the flag again.
+    """
+
+    user = models.ForeignKey(Auth,on_delete=models.CASCADE,related_name="known_devices",db_index=True,)
+    fingerprint = models.CharField(max_length=64,db_index=True,help_text="SHA-256 of the login IP + user agent.")
+    ip = models.CharField(max_length=45,blank=True,default="",)
+    user_agent = models.CharField(max_length=255,blank=True,default="",)
+    first_seen = models.DateTimeField(auto_now_add=True,db_index=True,)
+    last_seen = models.DateTimeField(auto_now=True,)
+
+    class Meta:
+        unique_together = ("user", "fingerprint")
+        ordering = ["-last_seen"]
+
+    def __str__(self):
+        return f"{self.user_id} · {self.ip or 'unknown ip'}"

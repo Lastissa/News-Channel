@@ -442,13 +442,74 @@
     autoTimer = window.requestAnimationFrame(tick);
   })();
 
-  /* ---------- active sessions: pager + logout ---------- */
+  /* ---------- active sessions: pager, per-account logout, per-session logout ---------- */
   (function () {
     var list = document.querySelector("[data-sessions-list]");
     var pager = document.querySelector("[data-sessions-pager]");
     if (!list || !pager) return;
 
     var logoutTemplate = list.dataset.logoutEndpoint || "";
+    var singleLogoutTemplate = list.dataset.singleLogoutEndpoint || "";
+
+    function accountEndpoint(accountId) {
+      return logoutTemplate.replace(/0\/logout\/?$/, accountId + "/logout/");
+    }
+
+    function singleEndpoint(accountId) {
+      return singleLogoutTemplate.replace(/0\/session-logout\/?$/, accountId + "/session-logout/");
+    }
+
+    /*  Build the nested per-session block shown when a row is expanded:
+        device, network, sign-in / last-seen / expiry per session, each with
+        its own End button. Mirrors the server-rendered markup exactly. */
+    function buildSessionDetail(row) {
+      var detail = document.createElement("div");
+      detail.className = "panel-session-detail";
+      detail.dataset.sessionDetail = "";
+      detail.hidden = true;
+
+      (row.sessions || []).forEach(function (session) {
+        var rowEl = document.createElement("div");
+        rowEl.className = "panel-session-detail-row";
+        rowEl.dataset.sessionKey = session.session_key;
+
+        var main = document.createElement("span");
+        main.className = "panel-row-main";
+
+        var device = document.createElement("span");
+        device.className = "panel-session-device";
+        device.textContent = session.device;
+        if (session.is_suspicious) {
+          var badge = document.createElement("span");
+          badge.className = "panel-badge panel-badge-danger";
+          badge.textContent = "Unrecognised";
+          device.appendChild(document.createTextNode(" "));
+          device.appendChild(badge);
+        }
+        main.appendChild(device);
+
+        var network = document.createElement("span");
+        network.className = "panel-row-sub";
+        network.textContent = session.ip + " · signed in " + session.logged_in_at;
+        main.appendChild(network);
+
+        var seen = "Last active " + session.last_seen;
+        if (session.expires_at) seen += " · ends " + session.expires_at;
+        var seenEl = document.createElement("span");
+        seenEl.className = "panel-row-sub";
+        seenEl.textContent = seen;
+        main.appendChild(seenEl);
+
+        var endBtn = iconButton("panel-icon-btn panel-icon-danger", "logout", "End this session");
+        endBtn.dataset.sessionSingleLogout = "";
+
+        rowEl.appendChild(main);
+        rowEl.appendChild(endBtn);
+        detail.appendChild(rowEl);
+      });
+
+      return detail;
+    }
 
     function renderRows(items) {
       list.innerHTML = "";
@@ -458,7 +519,7 @@
       }
       items.forEach(function (row) {
         var div = document.createElement("div");
-        div.className = "panel-row";
+        div.className = "panel-row panel-session-row";
         div.dataset.sessionRow = "";
         div.dataset.accountId = row.id;
 
@@ -466,21 +527,36 @@
         main.className = "panel-row-main";
 
         var email = document.createElement("span");
+        email.className = "panel-session-email";
         email.textContent = row.email_masked;
+        if (row.suspicious_count) {
+          var badge = document.createElement("span");
+          badge.className = "panel-badge panel-badge-danger";
+          badge.title = "Signed in from a device this account had not used before";
+          badge.textContent = "Unrecognised";
+          email.appendChild(document.createTextNode(" "));
+          email.appendChild(badge);
+        }
         main.appendChild(email);
 
-        if (row.logged_in_at) {
-          var loginInfo = document.createElement("span");
-          loginInfo.className = "panel-row-sub";
-          loginInfo.textContent = row.logged_in_at;
-          main.appendChild(loginInfo);
-        }
+        var sub = document.createElement("span");
+        sub.className = "panel-row-sub";
+        var count = row.session_count || 0;
+        sub.textContent = count + (count === 1 ? " session" : " sessions");
+        if (row.logged_in_at) sub.textContent += " · last sign-in " + row.logged_in_at;
+        main.appendChild(sub);
 
-        var btn = iconButton("panel-icon-btn panel-icon-danger", "logout", "Log out");
+        var toggle = iconButton("panel-icon-btn panel-session-toggle", "chevron", "Show sessions");
+        toggle.dataset.sessionToggle = "";
+        toggle.setAttribute("aria-expanded", "false");
+
+        var btn = iconButton("panel-icon-btn panel-icon-danger", "logout", "Log out all");
         btn.dataset.sessionLogout = "";
 
         div.appendChild(main);
+        div.appendChild(toggle);
         div.appendChild(btn);
+        div.appendChild(buildSessionDetail(row));
         list.appendChild(div);
       });
     }
@@ -516,13 +592,54 @@
     }
 
     list.addEventListener("click", function (event) {
+      /*  Expand / collapse the per-session detail for one account. */
+      var toggle = event.target.closest("[data-session-toggle]");
+      if (toggle) {
+        var toggleRow = toggle.closest("[data-session-row]");
+        var detail = toggleRow ? toggleRow.querySelector("[data-session-detail]") : null;
+        if (!detail) return;
+        detail.hidden = !detail.hidden;
+        toggle.setAttribute("aria-expanded", detail.hidden ? "false" : "true");
+        return;
+      }
+
+      /*  End ONE session. The account id in the URL and the session key in
+          the body both travel, so the server can prove they belong together. */
+      var endOne = event.target.closest("[data-session-single-logout]");
+      if (endOne) {
+        var oneRow = endOne.closest("[data-session-detail-row]");
+        var parentRow = endOne.closest("[data-session-row]");
+        if (!oneRow || !parentRow || endOne.dataset.pending === "true") return;
+        if (!window.confirm("End this session?")) return;
+
+        var oneKey = oneRow.dataset.sessionKey;
+        var oneData = new FormData();
+        oneData.append("session_key", oneKey);
+        endOne.dataset.pending = "true";
+        endOne.disabled = true;
+
+        postForm(singleEndpoint(parentRow.dataset.accountId), oneData).then(function (result) {
+          if (!result.ok) {
+            endOne.dataset.pending = "false";
+            endOne.disabled = false;
+            toast(extractDetail(result.text, "Could not end that session."), "error");
+            return;
+          }
+          oneRow.remove();
+          toast(extractDetail(result.text, "Session ended."));
+        });
+        return;
+      }
+
+      /*  End EVERY session the account holds. */
       var btn = event.target.closest("[data-session-logout]");
       if (!btn) return;
       var row = btn.closest("[data-session-row]");
       if (!row || btn.dataset.pending === "true") return;
+      if (!window.confirm("Log this account out of every device?")) return;
 
       var accountId = row.dataset.accountId;
-      var endpoint = logoutTemplate.replace(/0\/logout\/?$/, accountId + "/logout/");
+      var endpoint = accountEndpoint(accountId);
 
       btn.dataset.pending = "true";
       btn.disabled = true;

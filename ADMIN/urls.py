@@ -22,6 +22,7 @@ urlpatterns = [
     path("panel/gallery/", views.PanelStaffGalleryView.as_view(), name="panel_gallery"),
     path("panel/sessions/", views.PanelSessionsView.as_view(), name="panel_sessions"),
     path("panel/sessions/<int:account_id>/logout/", views.PanelSessionLogoutView.as_view(), name="panel_session_logout"),
+    path("panel/sessions/<int:account_id>/session-logout/", views.PanelSingleSessionLogoutView.as_view(), name="panel_single_session_logout"),
     path("panel/settings/", views.PanelSiteSettingsUpdateView.as_view(), name="panel_settings"),
     path("panel/categories/", views.PanelCategoryCreateView.as_view(), name="panel_category_create"),
     path("panel/categories/<int:category_id>/delete/", views.PanelCategoryDeleteView.as_view(), name="panel_category_delete"),

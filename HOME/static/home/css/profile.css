@@ -1853,3 +1853,158 @@ html.avatar-crop-open {
 @media (prefers-reduced-motion: reduce) {
   .profile-list-skeleton-pager span { animation: none; }
 }
+
+/* =====================================================================
+   ACTIVE SESSIONS (profile)
+   ---------------------------------------------------------------------
+   The "Active sessions" info row becomes a button that opens the sessions
+   placard; "Log out all sessions" gets a "View all sessions" sibling. The
+   placard stage reuses the delete-account overlay chrome (.delete-account-*)
+   so both dialogs look and behave the same.
+   ===================================================================== */
+
+/* Reset the info-list row button so it reads as a normal row but has a hit area. */
+.profile-info-list-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 0 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-info-list-btn:hover,
+.profile-info-list-btn:focus-visible {
+  background: var(--paper-dim, transparent);
+}
+
+.profile-info-list-btn span {
+  color: var(--ink);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.profile-info-list-btn strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.view-sessions-btn {
+  border-radius: 0%;
+}
+
+/* ---------- the placard itself ---------- */
+.sessions-placard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.sessions-placard-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.sessions-placard-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sessions-placard-device {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.sessions-placard-meta {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.sessions-placard-tag {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.sessions-placard-tag.is-current {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.sessions-placard-tag.is-suspicious {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  background: rgba(149, 25, 1, 0.12);
+}
+
+.sessions-placard-end {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sessions-placard-end:hover,
+.sessions-placard-end:focus-visible {
+  background: rgba(149, 25, 1, 0.08);
+}
+
+.sessions-placard-end:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.delete-account-error[hidden] {
+  display: none;
+}
+
+/* ---------- phones: logout-all and view-all share one row ---------- */
+@media (max-width: 899.98px) {
+  .profile-logout-all-block {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .profile-logout-all-block .logout-all-btn,
+  .profile-logout-all-block .view-sessions-btn {
+    flex: 1 1 auto;
+  }
+
+  .profile-logout-all-block .staff-record-feedback {
+    flex: 1 1 100%;
+  }
+}

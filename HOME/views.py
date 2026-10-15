@@ -50,7 +50,7 @@ from SERVICE_INTERNAL.images import (
 )
 from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
-from SERVICE_INTERNAL.sessions import drop_sessions_for
+from SERVICE_INTERNAL.sessions import drop_sessions_for, drop_single_session, describe_device, live_sessions_for
 from SERVICE_INTERNAL.story_validation import first_error_message, validate_story
 from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, StaffProfile
 
@@ -630,13 +630,19 @@ def _user_sessions_for_profile(user, request):
 
     current_key = request.session.session_key
 
-    rows = UserSession.objects.filter(user=user).order_by("-logged_in_at")
+    #   Only genuinely usable sessions: a row left behind by an expired
+    #   session must never be listed (or counted), or the profile shows
+    #   logins the account no longer holds.
+    rows = live_sessions_for(user)
     return [{
             "session_key": row.session_key,
             "ip": row.ip or "Unknown IP",
             "device": row.user_agent or "Unknown device",
+            "device_label": describe_device(row.user_agent),
             "logged_in_at": row.logged_in_at,
+            "last_seen": row.last_seen,
             "expires_at": row.expires_at,
+            "is_suspicious": row.is_suspicious,
             "is_current": row.session_key == current_key,
             }
             for row in rows
@@ -1808,6 +1814,74 @@ class ProfileLogoutAllSessionsView(View):
                 "sessions_ended": dropped,
                 "redirect_to": reverse("auth:login"),
             },
+            status=200,
+        )
+
+
+class ProfileSessionsPlacardView(View):
+    """HTMX fragment listing every live session the signed in user holds.
+
+    Fetched lazily the first time the "Active sessions" row or the "View all
+    sessions" button is pressed, then swapped into [data-sessions-overlay]
+    the same way the delete-account placard swaps into its overlay.
+    """
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return redirect("auth:login")
+
+        return render(
+            request,
+            "HOME/partials/sessions_placard.html",
+            {"user_sessions": _user_sessions_for_profile(request.user, request)},
+        )
+
+
+class ProfileSessionLogoutView(View):
+    """End ONE session of the signed in user.
+
+    The session key arrives in the POST body and must belong to the caller --
+    we never trust it to name someone else's session. When the key is the
+    session making the request, the browser is signed out too and the caller
+    is told where to go next.
+    """
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Please sign in first."}, status=401)
+
+        remaining_time, is_limited = is_rate_limited(request, 30, 3)
+        if is_limited:
+            return JsonResponse({"detail": f"Too many attempts. Wait {remaining_time} seconds."}, status=429)
+
+        session_key = (request.POST.get("session_key") or "").strip()
+        if not session_key:
+            return JsonResponse({"detail": "Missing session."}, status=400)
+
+        owns_session = UserSession.objects.filter(
+            user=request.user, session_key=session_key
+        ).exists()
+        if not owns_session:
+            return JsonResponse({"detail": "That session was not found."}, status=404)
+
+        is_current = session_key == request.session.session_key
+        drop_single_session(session_key)
+        info_logger(msg=f"ACCOUNT LOGOUT ONE: {request.user.email} ended one session")
+
+        if is_current:
+            auth_logout(request)
+            return JsonResponse(
+                {
+                    "detail": "Signed out of this session.",
+                    "removed": "current",
+                    "redirect_to": reverse("auth:login"),
+                },
+                status=200,
+            )
+
+        remaining = len(live_sessions_for(request.user))
+        return JsonResponse(
+            {"detail": "Session ended.", "removed": "other", "remaining": remaining},
             status=200,
         )
 

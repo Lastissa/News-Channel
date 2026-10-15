@@ -30,7 +30,14 @@ from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_sen
 from SERVICE_INTERNAL.images import ImageUploadError, destroy_archive_asset, upload_advert_image
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.passwords import first_password_error
-from SERVICE_INTERNAL.sessions import drop_sessions_for
+from SERVICE_INTERNAL.sessions import (
+    describe_device,
+    drop_sessions_for,
+    drop_single_session,
+    is_admin_inactive_too_long,
+    is_session_expired,
+    live_sessions_for,
+)
 from Partner.models import AdvertImage, Announcement
 from ADMIN.models import SiteSettings
 from STAFF.models import GENDER_CHOICES, StaffProfile
@@ -805,13 +812,59 @@ class PanelUserDirectoryView(View):
         )
 
 
+def _session_detail_rows(account, now):
+    """Per-session detail for one account, one dict per genuinely live session.
+
+    "Genuinely live" means the row is not past its expiry, its Django session
+    row still exists, and -- for admins -- the inactivity tracker is not past
+    ADMIN_MAX_AGE_TOO. The same check drives the count, so the list, the
+    number beside the account and any "all expired" hiding always agree."""
+    detail = []
+    for session in live_sessions_for(account, now):
+        detail.append(
+            {
+                "session_key": session.session_key,
+                "device": describe_device(session.user_agent),
+                "ip": session.ip or "Unknown IP",
+                "logged_in_at": timezone.localtime(session.logged_in_at).strftime("%b %d, %Y · %I:%M %p"),
+                "last_seen": timezone.localtime(session.last_seen).strftime("%b %d, %Y · %I:%M %p"),
+                "expires_at": (
+                    timezone.localtime(session.expires_at).strftime("%b %d, %Y · %I:%M %p")
+                    if session.expires_at else ""
+                ),
+                "is_suspicious": session.is_suspicious,
+            }
+        )
+    return detail
+
+
 def _active_sessions_page(page_number):
     """One row per account that currently holds at least one live session,
     not one row per session -- the logout button on that row drops every
-    session the account has, matching how drop_sessions_for already works."""
-    account_ids = list(
-        UserSession.objects.order_by().values_list("user_id", flat=True).distinct()
-    )
+    session the account has, matching how drop_sessions_for already works.
+
+    "Live" is judged on UserSession.expires_at (which mirrors the Django
+    session expiry) so rows left behind by an expired -- but never deleted --
+    session never inflate the count or the list. Admin accounts are also put
+    through the ADMIN_MAX_AGE_TOO inactivity check, because AdminMaxPeriod
+    signs them out at that limit but the row survives when they never come
+    back. Accounts whose sessions have all gone are dropped entirely."""
+    now = timezone.now()
+    live = UserSession.objects.filter(expires_at__isnull=False, expires_at__gt=now)
+
+    account_ids = list(live.order_by().values_list("user_id", flat=True).distinct())
+
+    #   An admin row can be past ADMIN_MAX_AGE_TOO while still being inside
+    #   its cookie lifetime; the middleware would sign it out on the next
+    #   request, so it is not a live session for counting purposes either.
+    timed_out_admin_ids = {
+        admin.pk
+        for admin in Auth.objects.filter(pk__in=account_ids, is_admin=True)
+        if not live_sessions_for(admin, now)
+    }
+    if timed_out_admin_ids:
+        account_ids = [i for i in account_ids if i not in timed_out_admin_ids]
+
     accounts = list(Auth.objects.filter(pk__in=account_ids).order_by("-date_joined"))
 
     paginator = Paginator(accounts, SESSIONS_PAGE_SIZE)
@@ -821,11 +874,12 @@ def _active_sessions_page(page_number):
 
     session_counts = {}
     latest_logins = {}
+    details = {}
     for account in page.object_list:
-        account_sessions = UserSession.objects.filter(user=account).order_by("-logged_in_at")
-        session_counts[account.pk] = account_sessions.count()
-        latest_session = account_sessions.first()
-        latest_logins[account.pk] = latest_session.logged_in_at if latest_session else None
+        account_sessions = live_sessions_for(account, now)
+        session_counts[account.pk] = len(account_sessions)
+        latest_logins[account.pk] = account_sessions[0].logged_in_at if account_sessions else None
+        details[account.pk] = _session_detail_rows(account, now)
 
     rows = [
         {
@@ -835,13 +889,18 @@ def _active_sessions_page(page_number):
             #   MOST RECENT LOGIN AMONG THIS ACCOUNT'S ACTIVE SESSIONS, SHOWN ON
             #   THE PANEL SO AN ADMIN CAN SEE WHEN SOMEONE ACTUALLY SIGNED IN.
             "logged_in_at": (
-                timezone.localtime(latest_logins[account.pk]).strftime("%b %d, %Y \u00b7 %I:%M %p")
+                timezone.localtime(latest_logins[account.pk]).strftime("%b %d, %Y · %I:%M %p")
                 if latest_logins.get(account.pk) else ""
             ),
+            "suspicious_count": sum(1 for item in details.get(account.pk, []) if item["is_suspicious"]),
+            "sessions": details.get(account.pk, []),
         }
         for account in page.object_list
+        if session_counts.get(account.pk, 0) > 0
     ]
-    return paginator, page, rows, len(accounts)
+    #   Total is the whole filtered candidate set, not just this page, so the
+    #   header count stays right once the list runs to more than one page.
+    return paginator, page, rows, paginator.count
 
 
 class PanelSessionsView(View):
@@ -888,6 +947,35 @@ class PanelSessionLogoutView(View):
         info_logger(msg=f"PANEL: {dropped} session(s) for {account.email} ended by {request.user.email}")
 
         return JsonResponse({"detail": f"{dropped} session(s) ended.", "sessions_dropped": dropped}, status=200)
+
+
+class PanelSingleSessionLogoutView(View):
+    """Ends exactly one session of an account (its session key is in the body).
+
+    The account id and the session key both have to agree before anything is
+    dropped, so a stale panel page cannot end a session that has since been
+    reissued to someone else."""
+
+    def post(self, request, account_id):
+        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        if limited:
+            return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        session_key = (request.POST.get("session_key") or "").strip()
+        if not session_key:
+            return JsonResponse({"detail": "Missing session."}, status=400)
+
+        belongs = UserSession.objects.filter(user_id=account_id, session_key=session_key).exists()
+        if not belongs:
+            return JsonResponse({"detail": "Session not found."}, status=404)
+
+        drop_single_session(session_key)
+        info_logger(
+            msg=f"PANEL: one session for account {account_id} ended by {request.user.email}"
+        )
+        return JsonResponse({"detail": "Session ended."}, status=200)
 
 
 class PanelSiteSettingsUpdateView(View):

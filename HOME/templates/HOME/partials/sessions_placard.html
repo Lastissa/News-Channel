@@ -1,0 +1,143 @@
+{% comment %}
+  ACTIVE SESSIONS PLACARD (htmx overlay fragment).
+
+  Fetched lazily by htmx the first time the "Active sessions" row or the
+  "View all sessions" button on the profile page is pressed, then swapped into
+  [data-sessions-overlay] exactly like the delete-account placard.
+  per-session "End" posts to profile_session_logout with htmx, swapping the
+  refreshed list back into the same overlay. The current device is tagged so
+  the reader knows which row is them.
+{% endcomment %}
+<div class="delete-account-layer" data-sessions-placard>
+  <div class="delete-account-backdrop" data-sessions-placard-close></div>
+  {% csrf_token %}
+
+  <div class="delete-account-placard sessions-placard" role="dialog" aria-modal="true" aria-labelledby="sessions-placard-title">
+    <div class="delete-account-placard-head">
+      <h3 id="sessions-placard-title">Active sessions</h3>
+      <span class="delete-account-step-tag">{{ user_sessions|length }} device{{ user_sessions|length|pluralize }}</span>
+    </div>
+
+    <p class="delete-account-sub">
+      These are the devices currently signed in to your account. End any session
+      you do not recognise.
+    </p>
+
+    <p class="delete-account-error" data-sessions-placard-error hidden></p>
+
+    <div class="sessions-placard-list">
+      {% for session in user_sessions %}
+      <div class="sessions-placard-row" data-session-key="{{ session.session_key }}">
+        <div class="sessions-placard-row-main">
+          <span class="sessions-placard-device">
+            {{ session.device_label }}
+            {% if session.is_current %}<span class="sessions-placard-tag is-current">This device</span>{% endif %}
+            {% if session.is_suspicious %}<span class="sessions-placard-tag is-suspicious">Unrecognised</span>{% endif %}
+          </span>
+          <span class="sessions-placard-meta">
+            IP {{ session.ip }} · signed in {{ session.logged_in_at|date:"M d, Y H:i" }}
+          </span>
+          <span class="sessions-placard-meta">
+            Last active {{ session.last_seen|date:"M d, Y H:i" }}{% if session.expires_at %} · ends {{ session.expires_at|date:"M d, Y H:i" }}{% endif %}
+          </span>
+        </div>
+        <button type="button" class="sessions-placard-end"
+                data-session-end
+                data-session-key="{{ session.session_key }}"
+                data-session-current="{{ session.is_current|yesno:'true,false' }}"
+                data-endpoint="{% url 'home:profile_session_logout' %}"
+                aria-label="End this session for {{ session.device_label }}">
+          End
+        </button>
+      </div>
+      {% empty %}
+      <p class="panel-empty">No other active sessions.</p>
+      {% endfor %}
+    </div>
+
+    <div class="delete-account-actions">
+      <button type="button" class="profile-action-btn" data-sessions-placard-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var layer = document.currentScript.previousElementSibling;
+    if (!layer || !layer.hasAttribute("data-sessions-placard")) return;
+
+    function closePlacard() {
+      var host = document.querySelector("[data-sessions-overlay]");
+      if (host) host.innerHTML = "";
+    }
+
+    layer.querySelectorAll("[data-sessions-placard-close]").forEach(function (node) {
+      node.addEventListener("click", closePlacard);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") closePlacard();
+    });
+
+    var errorBox = layer.querySelector("[data-sessions-placard-error]");
+
+    layer.addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-session-end]");
+      if (!btn || btn.disabled) return;
+
+      var endpoint = btn.dataset.endpoint;
+      var key = btn.dataset.sessionKey;
+      var isCurrent = btn.dataset.sessionCurrent === "true";
+      var label = isCurrent
+        ? "End this session? You will be signed out on this device."
+        : "End this session?";
+      if (!window.confirm(label)) return;
+
+      btn.disabled = true;
+      if (errorBox) { errorBox.hidden = true; errorBox.textContent = ""; }
+
+      var body = new URLSearchParams();
+      body.set("session_key", key);
+      var token = layer.querySelector("input[name='csrfmiddlewaretoken']");
+      if (token) body.set("csrfmiddlewaretoken", token.value);
+
+      fetch(endpoint, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body: body.toString(),
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok, data: data || {} };
+          });
+        })
+        .then(function (result) {
+          if (result.ok && result.data.redirect_to) {
+            window.location.href = result.data.redirect_to;
+            return;
+          }
+          if (!result.ok) {
+            btn.disabled = false;
+            if (errorBox) {
+              errorBox.hidden = false;
+              errorBox.textContent = result.data.detail || "Could not end that session.";
+            }
+            return;
+          }
+          var row = btn.closest("[data-session-key]");
+          if (row) row.remove();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          if (errorBox) {
+            errorBox.hidden = false;
+            errorBox.textContent = "Connection issue. The session was not ended.";
+          }
+        });
+    });
+  })();
+</script>

@@ -1,11 +1,18 @@
 from unittest import mock
 
-from django.contrib import admin
-from django.test import RequestFactory, TestCase
-from django.urls import reverse
+from datetime import timedelta
 
-from AUTHENTICATION.models import Auth
+from django.contrib import admin
+from django.contrib.sessions.models import Session
+from django.contrib.sessions.backends.db import SessionStore
+from django.core.cache import cache
+from django.test import Client, RequestFactory, TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from AUTHENTICATION.models import Auth, KnownDevice, UserSession
 from BLOG.models import Blog
+from SERVICE_INTERNAL.sessions import drop_single_session, live_sessions_for
 
 
 class AuthReturnPathTests(TestCase):
@@ -128,3 +135,211 @@ class AuthAdminDeleteReleasesCloudinaryAssetsTests(TestCase):
             {call.args for call in destroy_asset.call_args_list},
             {("abureport/news/admin-account", "image"), (f"abureport/avatars/user_{self.user_pk}",)},
         )
+
+
+def _login_from(email, password, ip, user_agent):
+    """Sign a brand new client in from a given network + browser so the login
+    signal records a session for that "device"."""
+    client = Client()
+    client.post(
+        "/auth/login/",
+        {"email": email, "password": password},
+        REMOTE_ADDR=ip,
+        HTTP_USER_AGENT=user_agent,
+    )
+    return client
+
+
+class SessionTrackingTests(TestCase):
+    """The login signal records a UserSession per sign-in and flags a login
+    from a device the account has never used before as suspicious. That flag
+    rides on the session row, so ending the session clears it."""
+
+    def setUp(self):
+        self.user = Auth.objects.create_user(email="sessions@example.com", password="secret123")
+        #   The login view rate-limits per IP and the cache outlives a test,
+        #   so clear it or a later test from the same IP is served a 429.
+        cache.clear()
+
+    def test_first_device_is_not_suspicious(self):
+        _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+
+        session = UserSession.objects.get(user=self.user)
+        self.assertFalse(session.is_suspicious)
+        self.assertTrue(KnownDevice.objects.filter(user=self.user).exists())
+
+    def test_login_from_a_new_device_is_suspicious(self):
+        _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        _login_from(self.user.email, "secret123", "10.0.0.2", "AgentB")
+
+        self.assertEqual(UserSession.objects.filter(user=self.user).count(), 2)
+        self.assertEqual(
+            UserSession.objects.filter(user=self.user, is_suspicious=True).count(), 1
+        )
+
+    def test_returning_device_stays_recognised(self):
+        _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        _login_from(self.user.email, "secret123", "10.0.0.2", "AgentB")
+        _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+
+        #   The third sign-in is from the already-known first device, so only
+        #   the second-device session carries the flag.
+        self.assertEqual(
+            UserSession.objects.filter(user=self.user, is_suspicious=True).count(), 1
+        )
+
+    def test_expired_sessions_are_not_live(self):
+        _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        session = UserSession.objects.get(user=self.user)
+        session.expires_at = timezone.now() - timedelta(minutes=1)
+        session.save(update_fields=["expires_at"])
+
+        self.assertEqual(live_sessions_for(self.user), [])
+
+    def test_sessions_without_a_django_row_are_not_live(self):
+        _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        session = UserSession.objects.get(user=self.user)
+        Session.objects.filter(session_key=session.session_key).delete()
+
+        self.assertEqual(live_sessions_for(self.user), [])
+
+    def test_drop_single_session_only_ends_that_one(self):
+        first_client = _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        _login_from(self.user.email, "secret123", "10.0.0.2", "AgentB")
+        first_key = first_client.session.session_key
+
+        self.assertTrue(drop_single_session(first_key))
+
+        remaining = UserSession.objects.filter(user=self.user)
+        self.assertEqual(remaining.count(), 1)
+        self.assertNotEqual(remaining.first().session_key, first_key)
+
+
+class ProfileSessionPlacardTests(TestCase):
+    """The profile "Active sessions" control opens a placard listing the live
+    sessions, and each row can end exactly one session."""
+
+    def setUp(self):
+        self.user = Auth.objects.create_user(email="placard@example.com", password="secret123")
+        self.client.force_login(self.user)
+
+    def _make_other_session(self):
+        store = SessionStore()
+        store.create()
+        UserSession.objects.create(
+            user=self.user,
+            session_key=store.session_key,
+            ip="10.0.0.9",
+            user_agent="OtherAgent/9.0",
+            expires_at=timezone.now() + timedelta(hours=1),
+            is_suspicious=True,
+        )
+        return store.session_key
+
+    def test_placard_lists_sessions_and_tags_the_current_one(self):
+        self._make_other_session()
+
+        response = self.client.get(reverse("home:profile_sessions_placard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Active sessions")
+        self.assertContains(response, "This device")
+        self.assertContains(response, "Unrecognised")
+
+    def test_ending_another_session_keeps_the_current_one(self):
+        other_key = self._make_other_session()
+
+        response = self.client.post(
+            reverse("home:profile_session_logout"), {"session_key": other_key}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["removed"], "other")
+        self.assertFalse(UserSession.objects.filter(session_key=other_key).exists())
+
+    def test_ending_the_current_session_signs_the_browser_out(self):
+        current_key = self.client.session.session_key
+
+        response = self.client.post(
+            reverse("home:profile_session_logout"), {"session_key": current_key}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["removed"], "current")
+        self.assertIn("redirect_to", response.json())
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_cannot_end_a_session_belonging_to_someone_else(self):
+        stranger = Auth.objects.create_user(email="stranger@example.com", password="secret123")
+        store = SessionStore()
+        store.create()
+        UserSession.objects.create(
+            user=stranger,
+            session_key=store.session_key,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.post(
+            reverse("home:profile_session_logout"), {"session_key": store.session_key}
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(UserSession.objects.filter(session_key=store.session_key).exists())
+
+
+class PanelActiveSessionsAccuracyTests(TestCase):
+    """PANEL's "Active Logins" list counts only sessions that are genuinely
+    live: an account whose only row is past its expiry is not listed at all."""
+
+    def test_expired_accounts_are_not_counted(self):
+        from ADMIN.views import _active_sessions_page
+
+        cache.clear()
+        live_user = Auth.objects.create_user(email="live-session@example.com", password="secret123")
+        gone_user = Auth.objects.create_user(email="gone-session@example.com", password="secret123")
+        _login_from(live_user.email, "secret123", "10.1.1.1", "Agent")
+        _login_from(gone_user.email, "secret123", "10.1.1.2", "Agent")
+
+        UserSession.objects.filter(user=gone_user).update(
+            expires_at=timezone.now() - timedelta(hours=1)
+        )
+
+        _paginator, _page, rows, total = _active_sessions_page(1)
+        ids = {row["id"] for row in rows}
+
+        self.assertIn(live_user.pk, ids)
+        self.assertNotIn(gone_user.pk, ids)
+        self.assertEqual(total, len(rows))
+
+    def test_live_row_exposes_per_session_detail(self):
+        from ADMIN.views import _active_sessions_page
+
+        cache.clear()
+        user = Auth.objects.create_user(email="detail-session@example.com", password="secret123")
+        _login_from(user.email, "secret123", "10.2.2.2", "DetailAgent/1.0")
+
+        _paginator, _page, rows, _total = _active_sessions_page(1)
+        row = next(item for item in rows if item["id"] == user.pk)
+
+        self.assertEqual(row["session_count"], 1)
+        self.assertEqual(row["sessions"][0]["ip"], "10.2.2.2")
+        self.assertIn("DetailAgent", row["sessions"][0]["device"])
+
+
+class PanelSessionsRenderTests(TestCase):
+    """The panel's Active Logins card ships the expandable per-session detail
+    (device label, network, timestamps) and the single-session logout hook."""
+
+    def test_panel_renders_session_detail_for_a_live_login(self):
+        admin_user = Auth.objects.create_admin(email="panel-admin@example.com", password="secret123")
+        member = Auth.objects.create_user(email="panel-member@example.com", password="secret123")
+        cache.clear()
+        _login_from(member.email, "secret123", "10.3.3.3", "PanelAgent/2.0")
+
+        self.client.force_login(admin_user)
+        response = self.client.get(reverse("control:panel"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "panel-session-detail")
+        self.assertContains(response, "PanelAgent")
+        self.assertContains(response, "/session-logout/")
