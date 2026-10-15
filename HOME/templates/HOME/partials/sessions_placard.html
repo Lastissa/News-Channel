@@ -63,20 +63,21 @@
 
 <script>
   (function () {
-    var layer = document.currentScript.previousElementSibling;
-    if (!layer || !layer.hasAttribute("data-sessions-placard")) return;
+    /*  Look the placard up inside the overlay instead of hanging off
+        document.currentScript: htmx does not guarantee currentScript while
+        evaluating swapped fragments, and this fragment can be swapped in
+        more than once (End refreshes the list). Escape is handled once on
+        the profile page, so no document level listener is added here. */
+    var host = document.querySelector("[data-sessions-overlay]");
+    var layer = host && host.querySelector("[data-sessions-placard]");
+    if (!layer) return;
 
     function closePlacard() {
-      var host = document.querySelector("[data-sessions-overlay]");
       if (host) host.innerHTML = "";
     }
 
     layer.querySelectorAll("[data-sessions-placard-close]").forEach(function (node) {
       node.addEventListener("click", closePlacard);
-    });
-
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") closePlacard();
     });
 
     var errorBox = layer.querySelector("[data-sessions-placard-error]");

@@ -45,6 +45,7 @@
           {% endif %}
         </div>
         <button type="button" class="profile-info-list-btn profile-active-sessions"
+                data-sessions-open
                 hx-get="{% url 'home:profile_sessions_placard' %}"
                 hx-target="[data-sessions-overlay]"
                 hx-swap="innerHTML"
@@ -78,6 +79,7 @@
           Log out all sessions
         </button>
         <button type="button" class="profile-action-btn view-sessions-btn"
+                data-sessions-open
                 hx-get="{% url 'home:profile_sessions_placard' %}"
                 hx-target="[data-sessions-overlay]"
                 hx-swap="innerHTML">
@@ -902,6 +904,119 @@
 
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape" && overlayHost.querySelector("[data-delete-wait]")) closeOverlay();
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      /*  ACTIVE SESSIONS PREVIEW: the placard is fetched lazily, so on a slow
+          network nothing appeared until the response landed and the window
+          then snapped open. Now the moment a sessions button is pressed the
+          backdrop goes up blurred and a shimmer skeleton mirroring the
+          placard is shown, so the reader can already preview what is coming.
+          htmx swaps the real placard over the skeleton; a failed request
+          swaps in an error card instead. */
+      var overlayHost = document.querySelector("[data-sessions-overlay]");
+      if (!overlayHost) return;
+
+      function isSessionsTrigger(elt) {
+        return !!(elt && elt.hasAttribute && elt.hasAttribute("data-sessions-open"));
+      }
+
+      function closeOverlay() {
+        overlayHost.innerHTML = "";
+      }
+
+      function bindClose() {
+        overlayHost.querySelectorAll("[data-sessions-wait-close]").forEach(function (node) {
+          node.addEventListener("click", closeOverlay);
+        });
+      }
+
+      function skeletonRow() {
+        return (
+          '<div class="sessions-placard-row sessions-skeleton-row">' +
+          '<div class="sessions-placard-row-main">' +
+          '<span class="sessions-skeleton-line sessions-skeleton-device"></span>' +
+          '<span class="sessions-skeleton-line sessions-skeleton-meta"></span>' +
+          '<span class="sessions-skeleton-line sessions-skeleton-meta sessions-skeleton-short"></span>' +
+          "</div>" +
+          '<span class="sessions-skeleton-btn"></span>' +
+          "</div>"
+        );
+      }
+
+      /*  Fires in htmx:beforeRequest, i.e. synchronously with the tap, before
+          the first byte has even left: blur plus skeleton are on screen at once. */
+      function showSkeleton() {
+        overlayHost.innerHTML =
+          '<div class="delete-account-layer" data-sessions-wait>' +
+          '<div class="delete-account-backdrop" data-sessions-wait-close></div>' +
+          '<div class="delete-account-placard sessions-placard" role="status" aria-busy="true">' +
+          '<div class="delete-account-placard-head">' +
+          "<h3>Active sessions</h3>" +
+          '<span class="sessions-skeleton-tag"></span>' +
+          "</div>" +
+          '<p class="delete-account-sub">These are the devices currently signed in to your account. End any session you do not recognise.</p>' +
+          '<div class="sessions-placard-list">' +
+          skeletonRow() + skeletonRow() + skeletonRow() +
+          "</div>" +
+          '<div class="delete-account-actions">' +
+          '<span class="sessions-skeleton-btn sessions-skeleton-wide"></span>' +
+          "</div>" +
+          "</div>" +
+          "</div>";
+        bindClose();
+      }
+
+      function showLoadError() {
+        overlayHost.innerHTML =
+          '<div class="delete-account-layer" data-sessions-wait>' +
+          '<div class="delete-account-backdrop" data-sessions-wait-close></div>' +
+          '<div class="delete-account-placard sessions-placard" role="alert">' +
+          '<div class="delete-account-placard-head"><h3>Active sessions</h3></div>' +
+          '<p class="delete-account-sub">Could not load your sessions. Check your connection and try again.</p>' +
+          '<div class="delete-account-actions">' +
+          '<button type="button" class="profile-action-btn" data-sessions-wait-close>Close</button>' +
+          "</div>" +
+          "</div>" +
+          "</div>";
+        bindClose();
+      }
+
+      document.body.addEventListener("htmx:beforeRequest", function (event) {
+        var elt = event.detail && event.detail.elt;
+        if (!isSessionsTrigger(elt)) return;
+        showSkeleton();
+      });
+
+      /*  If the reader closes the preview before the response arrives there is
+          nothing to swap into any more: drop the response instead of letting
+          the window pop back open on its own. */
+      document.body.addEventListener("htmx:beforeSwap", function (event) {
+        var elt = event.detail && event.detail.elt;
+        if (!isSessionsTrigger(elt)) return;
+        if (!overlayHost.querySelector("[data-sessions-wait]")) {
+          event.detail.shouldSwap = false;
+        }
+      });
+
+      ["htmx:responseError", "htmx:sendError", "htmx:timeout"].forEach(function (name) {
+        document.body.addEventListener(name, function (event) {
+          var elt = event.detail && event.detail.elt;
+          if (!isSessionsTrigger(elt)) return;
+          /*  Only replace the skeleton: a closed window or an already swapped
+              placard stays exactly as the reader left it. */
+          if (overlayHost.querySelector("[data-sessions-wait]")) showLoadError();
+        });
+      });
+
+      /*  Escape closes the sessions window whenever it holds anything: the
+          skeleton, the error card or the real placard. The placard fragment
+          no longer installs its own listener, so this is the single owner. */
+      document.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        if (overlayHost.firstElementChild) closeOverlay();
       });
     })();
   </script>

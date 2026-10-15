@@ -2008,3 +2008,77 @@ html.avatar-crop-open {
     flex: 1 1 100%;
   }
 }
+
+/* ---------- Active sessions: instant blur + shimmer skeleton preview ----------
+   The moment a sessions button is pressed (htmx:beforeRequest) this skeleton
+   is injected into [data-sessions-overlay]: the backdrop blurs the page and
+   three shimmer rows preview the placard that is still downloading, so a slow
+   network never shows a dead click. htmx swaps the real placard over it. */
+[data-sessions-overlay] .delete-account-backdrop {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+[data-sessions-overlay] [data-sessions-wait] {
+  animation: sessions-preview-in 160ms ease both;
+}
+
+@keyframes sessions-preview-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sessions-skeleton-line,
+.sessions-skeleton-tag,
+.sessions-skeleton-btn {
+  display: block;
+  background: linear-gradient(100deg, var(--line) 20%, var(--paper) 42%, var(--line) 64%);
+  background-size: 220% 100%;
+  animation: profile-skeleton-shimmer 1.55s ease-in-out infinite;
+}
+
+.sessions-skeleton-line {
+  height: 11px;
+  border-radius: 6px;
+}
+
+.sessions-skeleton-device { width: min(64%, 260px); height: 13px; }
+.sessions-skeleton-meta { width: min(82%, 320px); }
+.sessions-skeleton-short { width: min(46%, 190px); }
+
+.sessions-skeleton-tag {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 20px;
+  border-radius: 5px;
+}
+
+.sessions-skeleton-row .sessions-placard-row-main {
+  flex: 1;
+  gap: 7px;
+}
+
+/*  The rows are a picture of what is coming, not controls: ignore taps so a
+    stray touch cannot look like a dead button. */
+.sessions-skeleton-row { pointer-events: none; }
+
+.sessions-skeleton-btn {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 25px;
+  border-radius: 6px;
+}
+
+.sessions-skeleton-wide {
+  width: 100%;
+  height: 36px;
+}
+
+.delete-account-actions .sessions-skeleton-wide { flex: 1 1 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sessions-overlay] [data-sessions-wait] { animation: none; }
+  .sessions-skeleton-line,
+  .sessions-skeleton-tag,
+  .sessions-skeleton-btn { animation: none; }
+}
