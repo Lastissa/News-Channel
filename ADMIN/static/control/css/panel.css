@@ -298,6 +298,7 @@ html { scroll-behavior: smooth; }
 
 /* ---------- Announcements + image adverts (shared layout) ---------- */
 .ta-layout { display: grid; grid-template-columns: 1fr; gap: 22px; }
+.ta-layout > * { min-width: 0; }  /* let the feed column shrink; without this a wide file input overflows and the Save button is clipped */
 .ta-subhead { display: flex; align-items: center; margin: 0 0 12px; color: var(--slate); font-family: var(--font-body); }
 .ta-compose .panel-field textarea { min-height: 0; }
 .ta-add-btn { width: 100%; height: 42px; }
@@ -312,10 +313,10 @@ html { scroll-behavior: smooth; }
 }
 .ta-preview-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
 
-.ta-list { display: flex; flex-direction: column; gap: 10px; }
+.ta-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .ta-item {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--slate);
+  min-width: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--slate);
   border-radius: var(--radius-s);
   transition: border-color .2s var(--panel-ease), box-shadow .2s var(--panel-ease);
   animation: panelIn .3s var(--panel-ease) both;
@@ -367,9 +368,9 @@ html { scroll-behavior: smooth; }
 .ad-drop-caption-heading:empty, .ad-drop-caption-body:empty { display: none; }
 
 .ad-thumb { width: 84px; height: 63px; flex: 0 0 auto; object-fit: cover; border-radius: var(--radius-s); background: var(--paginator-bg); }
-.ad-editor-file { display: flex; align-items: center; gap: 12px; }
+.ad-editor-file { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-width: 0; }
 .ad-editor-file .ad-thumb { width: 72px; height: 54px; }
-.ad-editor-file .panel-file-input { position: static; width: auto; height: auto; opacity: 1; font-size: 0.8rem; min-width: 0; }
+.ad-editor-file .panel-file-input { position: static; width: auto; height: auto; opacity: 1; font-size: 0.8rem; min-width: 0; max-width: 100%; flex: 1 1 180px; }
 
 @media (min-width: 860px) {
   .ta-layout { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 30px; }
@@ -377,8 +378,18 @@ html { scroll-behavior: smooth; }
   .ta-list { max-height: 560px; overflow-y: auto; padding-right: 4px; }
   .ta-pair { grid-template-columns: 1fr 1fr; }
 }
-@media (max-width: 520px) {
-  .panel-card { padding: 14px; }
+@media (max-width: 640px) {
+  /* Phones: trim the page + card edges so inline editor action rows (Save /
+     Cancel) keep their button on screen, and let the feed column shrink
+     instead of pushing the Save button past the clip edge. */
+  .panel-shell { padding: 0 0 48px; }
+  .panel-nav { margin: 0 0 16px; padding: 6px 12px; }
+  .panel-grid { gap: 14px; }
+  .panel-card { padding: 12px; }
+  .ta-layout { gap: 18px; }
+  .ta-item { padding: 10px; }
+  .ta-editor-actions { flex-wrap: wrap; }
+  .ta-editor-actions .panel-primary-btn { flex: 1 1 auto; }
   .ta-item:not(.ta-editor) { flex-wrap: wrap; }
   .ta-item:not(.ta-editor) .ta-actions { margin-left: auto; }
   .ad-thumb { width: 64px; height: 48px; }
