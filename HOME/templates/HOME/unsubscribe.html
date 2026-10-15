@@ -7,116 +7,55 @@
 {% block extra_head %}
   {{ block.super }}
   <style>
-    /* Modernized unsubscribe page. Only site tokens from base.css are used
-       (light and dark both come free). Labels stay parallelograms and buttons
-       keep the small --radius-s corner, matching the /archive/ page. */
-    .legal-page { max-width: 640px; padding-top: 52px; padding-bottom: 88px; }
-
-    .unsub-head { margin-bottom: 20px; }
-    .unsub-eyebrow {
-      display: inline-block; background: var(--ink); color: var(--paper);
-      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
-      text-transform: uppercase; line-height: 1; padding: 5px 16px 5px 10px;
-      clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
-      margin-bottom: 14px;
+    /* Minimal unsubscribe landing page. Deliberately plain: small text, no
+       cards, no coloured side border and no accent buttons, so it reads as a
+       quiet utility page in both the light and dark themes. */
+    .unsub-page {
+      max-width: 440px; margin: 0 auto; padding: 56px 20px 88px;
+      color: var(--ink);
     }
-    .legal-page .unsub-head h1 {
-      margin: 0 0 10px; font-family: var(--font-display);
-      font-size: clamp(1.7rem, 4.4vw, 2.3rem); letter-spacing: -0.01em; line-height: 1.15;
+    .unsub-page h1 { font-size: 1rem; font-weight: 700; margin: 0 0 8px; }
+    .unsub-page p { font-size: 0.85rem; line-height: 1.6; color: var(--slate); margin: 0 0 14px; }
+    .unsub-page .unsub-email { color: var(--ink); font-weight: 600; }
+    .unsub-page a,
+    .unsub-page button.unsub-link {
+      color: var(--ink); font-size: 0.85rem; text-decoration: underline;
+      text-underline-offset: 2px;
     }
-    .unsub-intro {
-      margin: 0; color: var(--slate); font-size: 0.7rem; font-weight: 500; line-height: 1.55;
+    .unsub-page button.unsub-link {
+      background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer;
     }
-    .unsub-email {
-      font-family: monospace; font-weight: 700; color: var(--ink);
-      background: var(--paper-dim); border: 1px solid var(--line);
-      border-bottom: 2px solid var(--amber-alt); border-radius: var(--radius-s);
-      padding: 2px 8px; overflow-wrap: anywhere;
-    }
-
-    .unsub-card {
-      --unsub-accent: var(--amber-deep);
-      position: relative; margin-top: 24px;
-      border: 1px solid var(--line); border-left: 4px solid var(--unsub-accent);
-      border-radius: none; background: var(--surface);
-      box-shadow: var(--shadow-card); padding: 24px 22px 22px;
-      animation: unsubRise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
-    .unsub-card.is-success { --unsub-accent: var(--amber-alt); }
-    .unsub-card.is-error { --unsub-accent: var(--danger); }
-    @keyframes unsubRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
-    .legal-page .unsub-card p { font-size: 0.95rem; line-height: 1.6; margin: 0 0 14px; }
-    .legal-page .unsub-card p:last-child { margin-bottom: 0; }
-
-    .unsub-actions {
-      display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px;
-    }
-    .unsub-btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      border: 1px solid var(--line); border-radius: var(--radius-s);
-      background: var(--surface); color: var(--ink);
-      font: inherit; font-size: 0.88rem; font-weight: 700; line-height: 1.2;
-      padding: 11px 18px; text-decoration: none; cursor: pointer;
-      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
-    }
-    .unsub-btn:hover, .unsub-btn:focus-visible { border-color: var(--amber-alt); background: var(--paper-dim); }
-    .unsub-btn-primary { background: var(--amber-alt); border-color: var(--amber-alt); color: #fff; }
-    .unsub-btn-primary:hover, .unsub-btn-primary:focus-visible { background: var(--amber-alt-deep); border-color: var(--amber-alt-deep); }
-    .unsub-btn-danger { background: var(--careful-btn-bg); border-color: var(--careful-btn-bg); color: #fff; }
-    .unsub-btn-danger:hover, .unsub-btn-danger:focus-visible { background: var(--careful-btn-bg); border-color: var(--careful-btn-bg); opacity: 0.88; }
+    .unsub-page a:hover,
+    .unsub-page button.unsub-link:hover { color: var(--slate); }
+    .unsub-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; }
   </style>
 {% endblock %}
 
 {% block content %}
-<section class="legal-page">
-  <div class="unsub-head">
-    <span class="unsub-eyebrow">Email preferences</span>
-
-    {% if state == "confirm" %}
-      <h1>Unsubscribe</h1>
-      <p class="unsub-intro">Stop {{ label }} for <span class="unsub-email">{{ masked_email }}</span>?</p>
-    {% elif state == "done" %}
-      <h1>Unsubscribed</h1>
-      <p class="unsub-intro"><span class="unsub-email">{{ masked_email }}</span> will no longer get {{ label }}.</p>
-    {% elif state == "limited" %}
-      <h1>Please wait</h1>
-      <p class="unsub-intro">Too many requests. Try again in a minute.</p>
-    {% else %}
-      <h1>Invalid link</h1>
-      <p class="unsub-intro">This unsubscribe link is no longer valid.</p>
-    {% endif %}
-  </div>
-
+<section class="unsub-page">
   {% if state == "confirm" %}
-    <div class="unsub-card">
-      <p>Turn it back on from your profile at any time.</p>
-      <form method="post" class="unsub-actions">
-        {% csrf_token %}
-        <input type="hidden" name="type" value="{{ kind }}">
-        <input type="hidden" name="email" value="{{ email }}">
-        <button type="submit" class="unsub-btn unsub-btn-danger">Yes, unsubscribe</button>
-        <a class="unsub-btn" href="{% url 'home:home' %}">Cancel</a>
-      </form>
-    </div>
+    <h1>Unsubscribe</h1>
+    <p>Stop {{ label }} for <span class="unsub-email">{{ masked_email }}</span>?</p>
+    <form method="post" class="unsub-actions">
+      {% csrf_token %}
+      <input type="hidden" name="type" value="{{ kind }}">
+      <input type="hidden" name="email" value="{{ email }}">
+      <button type="submit" class="unsub-link">Yes, unsubscribe</button>
+      <a href="{% url 'home:home' %}">Cancel</a>
+    </form>
 
   {% elif state == "done" %}
-    <div class="unsub-card is-success">
-      <div class="unsub-actions">
-        <a class="unsub-btn unsub-btn-primary" href="{% url 'home:profile' %}">Turn it back on</a>
-        <a class="unsub-btn" href="{% url 'home:home' %}">Back to {{ project_name }}</a>
-      </div>
-    </div>
+    <h1>Unsubscribed</h1>
+    <p><span class="unsub-email">{{ masked_email }}</span> will no longer get {{ label }}.</p>
+    <p>Changed your mind? Turn it back on from your <a href="{% url 'home:profile' %}">profile</a>.</p>
 
   {% elif state == "limited" %}
-    <div class="unsub-card is-error">
-      <p>Wait a minute, then open the link in your email again.</p>
-    </div>
+    <h1>Please wait</h1>
+    <p>Too many requests. Try again in a minute.</p>
 
   {% else %}
-    <div class="unsub-card is-error">
-      <p>Manage your mail from your <a href="{% url 'home:profile' %}">profile</a>.</p>
-    </div>
+    <h1>Invalid link</h1>
+    <p>This unsubscribe link is no longer valid. Manage your mail from your <a href="{% url 'home:profile' %}">profile</a>.</p>
   {% endif %}
 </section>
 {% endblock content %}
