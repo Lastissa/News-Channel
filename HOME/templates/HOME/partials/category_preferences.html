@@ -19,8 +19,13 @@
      data-prefs-url="{% url 'home:profile_category_preferences' %}"
      data-toggle-url="{% url 'home:profile_category_preference_toggle' %}">
   <div class="cat-prefs-head">
-    <h4>This are the category we current you email on, edit as you wish</h4>
- </div>
+    <h4>Email categories</h4>
+    {% if user.send_newsletter %}
+    <p>This are the category we current you email on, edit as you wish</p>
+    {% else %}
+    <p>You are not receiving news alert emails right now. These choices are saved and will apply once you turn on <strong>News alerts</strong> in Account settings (BOTTOM OF THIS PAGE).</p>
+    {% endif %}
+  </div>
 
   {% if subscribed_categories %}
   <div class="cat-prefs-group">

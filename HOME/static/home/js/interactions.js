@@ -470,6 +470,28 @@
           label.textContent = result.payload.enabled ? onText : offText;
         }
         toast(result.payload.detail || "Setting updated.");
+
+        /*  The email-category control on this page tells the reader whether
+            they are getting the newsletter, so re-fetch it when THAT switch
+            changes -- otherwise its status line goes stale until a reload. */
+        if (targetUrl && targetUrl.indexOf("send-newsletter") !== -1) {
+          var catBox = document.querySelector("[data-category-prefs]");
+          var prefsUrl = catBox && catBox.dataset.prefsUrl;
+          if (prefsUrl) {
+            fetch(prefsUrl, {
+              headers: { "X-Requested-With": "XMLHttpRequest" },
+              credentials: "same-origin",
+            })
+              .then(function (response) { return response.ok ? response.text() : null; })
+              .then(function (html) {
+                if (html && html.indexOf("data-category-prefs") !== -1) {
+                  var current = document.querySelector("[data-category-prefs]");
+                  if (current) current.outerHTML = html;
+                }
+              })
+              .catch(function () { /* keep the copy already on screen */ });
+          }
+        }
       })
       .catch(function () {
         toggle.dataset.pending = "false";
