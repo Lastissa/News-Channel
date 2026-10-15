@@ -163,7 +163,7 @@
     feeds bio and uses it for the meta description and the Person schema. The
     card styles already exist.
   {% endcomment %}
-  {% if bio %}
+  {% comment %} {% if bio %}
   <div class="portfolio-grid portfolio-about">
     <article class="portfolio-card" id="portfolio-bio">
       <header class="portfolio-card-head">
@@ -173,7 +173,7 @@
       <p class="portfolio-prose">{{ bio|linebreaksbr }}</p>
     </article>
   </div>
-  {% endif %}
+  {% endif %} {% endcomment %}
 
   <div class="portfolio-content-layout">
     <section class="portfolio-feed" id="portfolio-feed"
