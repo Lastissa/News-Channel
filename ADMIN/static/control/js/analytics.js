@@ -114,7 +114,111 @@
     host.appendChild(svg);
   }
 
-  function renderLine(host, data) {
+  /* ---------- Point placard ---------- */
+  /* A pressed or tapped point opens a small placard listing every ENABLED
+     series at that intersection (only enabled series are ever drawn, so the
+     data already holds exactly the ticked boxes). The placard lives inside the
+     .analytics-chart root, which is position:relative, and is
+     pointer-events:none so it can never steal the hover back from the dot it
+     describes. On a phone the whole chart is a tap target: a press snaps to
+     the nearest intersection instead of demanding a hit on a tiny dot. */
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
+  }
+
+  function placardFor(root) {
+    var placard = root.querySelector(".analytics-placard");
+    if (!placard) {
+      placard = document.createElement("div");
+      placard.className = "analytics-placard";
+      placard.setAttribute("role", "status");
+      placard.hidden = true;
+      root.appendChild(placard);
+    }
+    return placard;
+  }
+
+  function hidePlacard(root) {
+    var placard = root.querySelector(".analytics-placard");
+    if (!placard) return;
+    placard.classList.remove("is-visible");
+    window.setTimeout(function () {
+      if (!placard.classList.contains("is-visible")) placard.hidden = true;
+    }, 200);
+  }
+
+  function showPlacard(root, svg, index) {
+    var meta = svg.__placard;
+    if (!meta || !(index >= 0 && index < meta.count)) return;
+    var data = meta.data;
+
+    var placard = placardFor(root);
+    var html = '<div class="analytics-placard-label">' + escapeHtml((data.labels || [])[index] || "") + "</div>";
+    (data.series || []).forEach(function (s) {
+      var value = (s.values && s.values[index]) || 0;
+      html += '<div class="analytics-placard-row">' +
+        '<span class="analytics-placard-swatch" style="background:' + escapeHtml(s.color) + '"></span>' +
+        '<span class="analytics-placard-name">' + escapeHtml(s.name) + "</span>" +
+        '<span class="analytics-placard-value">' + escapeHtml(value) + "</span>" +
+        "</div>";
+    });
+    placard.innerHTML = html;
+    placard.hidden = false;
+    placard.classList.remove("is-visible");
+
+    /* anchor on the highest point at that intersection, so the placard clears
+       the lines of every enabled series */
+    var x = MARGIN.left + (meta.count > 1 ? meta.stepX * index : meta.plotW / 2);
+    var y = MARGIN.top + meta.plotH;
+    (data.series || []).forEach(function (s) {
+      var value = (s.values && s.values[index]) || 0;
+      var py = MARGIN.top + meta.plotH - (meta.max ? meta.plotH * value / meta.max : 0);
+      if (py < y) y = py;
+    });
+
+    var svgRect = svg.getBoundingClientRect();
+    var rootRect = root.getBoundingClientRect();
+    var scale = svgRect.width / VIEW_W;
+    var pointX = (svgRect.left - rootRect.left) + x * scale;
+    var pointY = (svgRect.top - rootRect.top) + y * scale;
+
+    placard.style.visibility = "hidden";
+    var width = placard.offsetWidth;
+    var height = placard.offsetHeight;
+    var left = Math.max(4, Math.min(pointX - width / 2, rootRect.width - width - 4));
+    var top = pointY - height - 14;
+    if (top < 0) top = pointY + 16;
+    placard.style.left = left + "px";
+    placard.style.top = top + "px";
+    placard.style.visibility = "";
+    requestAnimationFrame(function () { placard.classList.add("is-visible"); });
+  }
+
+  function indexFromEvent(svg, event) {
+    var meta = svg.__placard;
+    if (!meta || meta.count <= 1) return 0;
+    var rect = svg.getBoundingClientRect();
+    var x = (event.clientX - rect.left) * (VIEW_W / rect.width);
+    return Math.max(0, Math.min(meta.count - 1, Math.round((x - MARGIN.left) / meta.stepX)));
+  }
+
+  function attachPlacard(svg, root) {
+    function hoveredDot(event) {
+      return event.target && event.target.closest ? event.target.closest(".analytics-dot") : null;
+    }
+    svg.addEventListener("click", function (event) {
+      showPlacard(root, svg, indexFromEvent(svg, event));
+    });
+    svg.addEventListener("mouseover", function (event) {
+      if (hoveredDot(event)) showPlacard(root, svg, indexFromEvent(svg, event));
+    });
+    root.addEventListener("mouseleave", function () { hidePlacard(root); });
+  }
+
+  function renderLine(host, data, root) {
     var series = data.series || [];
     var labels = data.labels || [];
     var count = labels.length;
@@ -146,14 +250,13 @@
       });
       var d = points.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
       svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: s.color, "stroke-width": 2.5, "class": "analytics-line" }));
-      points.forEach(function (p, i) {
-        var dot = svgEl("circle", { cx: p[0], cy: p[1], r: 3, fill: s.color, "class": "analytics-dot" });
-        var tip = svgEl("title");
-        tip.textContent = s.name + " \u2014 " + labels[i] + ": " + values[i];
-        dot.appendChild(tip);
-        svg.appendChild(dot);
+      points.forEach(function (p) {
+        svg.appendChild(svgEl("circle", { cx: p[0], cy: p[1], r: 3, fill: s.color, "class": "analytics-dot" }));
       });
     });
+
+    svg.__placard = { data: data, count: count, stepX: stepX, plotW: plotW, plotH: plotH, max: max };
+    attachPlacard(svg, root);
     host.appendChild(svg);
   }
 
@@ -168,7 +271,9 @@
 
     root.setAttribute("data-rendered", "1");
     canvas.innerHTML = "";
-    if (data.type === "line") renderLine(canvas, data);
+    var stalePlacard = root.querySelector(".analytics-placard");
+    if (stalePlacard) stalePlacard.remove();
+    if (data.type === "line") renderLine(canvas, data, root);
     else renderBar(canvas, data);
 
     var body = root.parentElement;
@@ -185,6 +290,15 @@
      data-rendered guard makes a full rescan cheap and idempotent. */
   document.addEventListener("htmx:afterSwap", renderAll);
   document.addEventListener("htmx:afterSettle", renderAll);
+
+  /* a press outside a chart closes any open placard (a tap on the chart
+     itself keeps it open, so a phone reader can read it without the pointer
+     disappearing on them) */
+  document.addEventListener("click", function (event) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-chart]"), function (root) {
+      if (!root.contains(event.target)) hidePlacard(root);
+    });
+  });
 
   window.AnalyticsCharts = { render: renderAll };
 })();

@@ -1,0 +1,107 @@
+{% comment %}
+  htmx fragment: the ANALYTICS "Members" table body.
+
+  Read only. Returned to a GET against control:analytics_members with the
+  filter values already applied by ADMIN.analytics.member_directory_queryset,
+  so this template only ever lays out the page it is handed. Addresses are
+  already masked by the view. The pager is the project's standard
+  .story-pagination window (base.css); each button asks only for ?page=N and
+  the shell's filter form is pulled in with hx-include, so paging keeps the
+  active filters without the URL having to echo them back.
+{% endcomment %}
+<p class="analytics-members-summary">
+  <strong>{{ total }}</strong> member{{ total|pluralize }} match these filters
+  {% if subscribed_total %}<span class="analytics-members-sep">·</span> {{ subscribed_total }} with news alerts on{% endif %}
+</p>
+
+<div class="analytics-members-scroll">
+  <table class="analytics-members-table">
+    <thead>
+      <tr>
+        <th scope="col">Member</th>
+        <th scope="col">Status</th>
+        <th scope="col">News alerts</th>
+        <th scope="col">Categories</th>
+        <th scope="col">Last read</th>
+        <th scope="col">Last sign-in</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>
+          <span class="analytics-member-id">
+            <span class="analytics-member-avatar{% if not row.profile_img %} analytics-member-avatar--initial{% endif %}">
+              {% if row.profile_img %}<img src="{{ row.profile_img }}" alt="" loading="lazy">{% else %}{{ row.initial }}{% endif %}
+            </span>
+            <span class="analytics-member-main">
+              <span class="analytics-member-email">{{ row.email_masked }}</span>
+              <span class="analytics-member-sub">Joined {{ row.joined_at }}{% if row.is_newsletter_signup %} · newsletter sign-up{% endif %}</span>
+            </span>
+          </span>
+        </td>
+        <td>
+          <span class="analytics-badge {% if row.is_active %}is-on{% else %}is-off{% endif %}">{% if row.is_active %}Active{% else %}Suspended{% endif %}</span>
+        </td>
+        <td>
+          <span class="analytics-badge {% if row.send_newsletter %}is-on{% else %}is-off{% endif %}">{% if row.send_newsletter %}On{% else %}Off{% endif %}</span>
+        </td>
+        <td class="analytics-member-cats">
+          {% if row.categories %}
+            {% for name in row.categories %}<span class="analytics-chip">{{ name }}</span>{% endfor %}
+          {% else %}
+            <span class="analytics-chip analytics-chip--muted">All categories</span>
+          {% endif %}
+        </td>
+        <td class="analytics-member-when">
+          {% if row.last_read_label %}
+            {{ row.last_read_label }}{% if row.read_recently %} <span class="analytics-recent-dot" title="Read in the last day"></span>{% endif %}
+            <span class="analytics-member-sub">{{ row.stories_read }} read · follows {{ row.following }}</span>
+          {% else %}
+            <span class="analytics-muted">Never</span>
+          {% endif %}
+        </td>
+        <td class="analytics-member-when">
+          {% if row.is_newsletter_signup %}
+            <span class="analytics-muted">Never</span>
+            <span class="analytics-member-sub">newsletter sign-up</span>
+          {% else %}
+            {{ row.last_login_label }}
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="analytics-members-empty">No members match these filters.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="story-pagination analytics-members-pagination" aria-label="Member pages"
+     hx-target="#analytics-members-body" hx-swap="innerHTML"
+     hx-include="#analytics-members-filters">
+  {% if page.has_previous %}
+  <button type="button" class="story-page-btn page-nav"
+          hx-get="{% url 'control:analytics_members' %}?page={{ page.previous_page_number }}">Prev</button>
+  {% endif %}
+
+  {% for number in page_range %}
+    {% if number == page.paginator.ELLIPSIS %}
+  <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ number }}</span>
+    {% else %}
+  <button type="button" class="story-page-btn{% if number == page.number %} is-active{% endif %}"
+          hx-get="{% url 'control:analytics_members' %}?page={{ number }}"
+          aria-label="Go to page {{ number }}"
+          {% if number == page.number %}aria-current="page"{% endif %}>{{ number }}</button>
+    {% endif %}
+  {% endfor %}
+
+  {% if page.has_next %}
+  <button type="button" class="story-page-btn page-nav"
+          hx-get="{% url 'control:analytics_members' %}?page={{ page.next_page_number }}">Next</button>
+  {% endif %}
+</nav>
+{% endif %}

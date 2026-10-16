@@ -25,13 +25,19 @@
 .analytics-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--ink); }
 
 /* ---------- Grid + cards ---------- */
-.analytics-grid { display: grid; gap: 20px; }
+/* minmax(0, 1fr): a plain single `auto` column grows to the widest child's
+   max-content, which let the six-column Members table push the whole page
+   sideways instead of scrolling inside its own box. */
+.analytics-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 
+/* Sections are flush: no outer margin and no corner rounding (the border and
+   background stay), and each one is split from the next by a plain <hr>. */
 .analytics-card {
   background: var(--paper); border: 1px solid var(--line);
-  border-radius: var(--radius-m); box-shadow: var(--shadow-card);
-  padding: 16px 18px 8px;
+  border-radius: 0; box-shadow: none;
+  margin: 0; padding: 16px 18px 8px;
 }
+.analytics-divider { border: 0; border-top: 1px solid var(--line); margin: 10px 0; }
 .analytics-card-header {
   display: flex; align-items: center; gap: 12px;
   margin-bottom: 4px;
@@ -103,16 +109,134 @@
 .analytics-bar-value { fill: var(--ink); font-size: 12px; font-weight: 700; font-family: inherit; }
 
 .analytics-line { stroke-linejoin: round; stroke-linecap: round; }
-.analytics-dot { transition: r .15s ease; }
+.analytics-dot { transition: r .15s ease; cursor: pointer; }
 .analytics-dot:hover { r: 5; }
+/* invisible larger tap target so a dot is easy to press on a phone */
+.analytics-dot-hit { fill: transparent; cursor: pointer; }
+
+/* ---------- Point placard (pressed/tapped dot) ---------- */
+/* Positioned by analytics.js inside .analytics-chart; pointer-events:none so
+   it can never steal the hover from the dot it belongs to. */
+.analytics-chart { position: relative; }
+.analytics-placard {
+  position: absolute; z-index: 6; min-width: 150px; max-width: 250px;
+  padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--paper); box-shadow: var(--shadow-card); color: var(--ink);
+  font-size: 0.8rem; pointer-events: none;
+  opacity: 0; transform: translateY(6px) scale(.96); transform-origin: bottom center;
+  transition: opacity .18s ease, transform .18s cubic-bezier(.22, 1, .36, 1);
+}
+.analytics-placard.is-visible { opacity: 1; transform: translateY(0) scale(1); }
+.analytics-placard-label { font-weight: 700; margin-bottom: 5px; }
+.analytics-placard-row { display: flex; align-items: center; gap: 7px; line-height: 1.5; }
+.analytics-placard-swatch { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; }
+.analytics-placard-name { color: var(--slate); }
+.analytics-placard-value { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+html[data-theme="dark"] .analytics-placard { background: var(--paper-dim); }
+@media (prefers-reduced-motion: reduce) { .analytics-placard { transition: none; } }
 
 .analytics-empty { fill: var(--slate); font-size: 14px; font-family: inherit; }
 .analytics-loading { color: var(--slate); font-size: 0.92rem; padding: 24px 0; margin: 0; }
 
 html[data-theme="dark"] .analytics-card { background: var(--paper-dim); }
 
+/* ---------- Members table (fragment from analytics_members.html) ---------- */
+/* The filter row reuses .analytics-controls; the search box matches a select. */
+.analytics-select input[type="search"] {
+  padding: 8px 10px; font-size: 0.9rem; font-family: inherit;
+  color: var(--ink); background: var(--paginator-bg);
+  border: 1px solid var(--paginator-border); border-radius: var(--radius-s);
+  min-width: 180px;
+}
+.analytics-select input[type="search"]:focus-visible { outline: 1.5px solid var(--amber-deep); outline-offset: 2px; }
+
+.analytics-members { padding: 2px 0 16px; }
+.analytics-members-summary { margin: 0 0 12px; color: var(--slate); font-size: 0.9rem; }
+.analytics-members-summary strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.analytics-members-sep { padding: 0 3px; }
+
+.analytics-members-scroll { overflow-x: auto; }
+.analytics-members-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.analytics-members-table th {
+  text-align: left; white-space: nowrap;
+  padding: 8px 12px; border-bottom: 1px solid var(--line);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--slate);
+}
+.analytics-members-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle;
+}
+.analytics-members-table tbody tr:last-child td { border-bottom: 0; }
+.analytics-members-table tbody tr:hover { background: var(--paginator-bg); }
+
+.analytics-member-id { display: inline-flex; align-items: center; gap: 10px; }
+.analytics-member-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+  background: var(--paginator-bg); color: var(--brand-deep);
+}
+.analytics-member-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.analytics-member-avatar--initial { font-weight: 700; }
+.analytics-member-main { display: flex; flex-direction: column; min-width: 0; }
+.analytics-member-email { font-weight: 600; color: var(--ink); }
+.analytics-member-sub { font-size: 0.76rem; color: var(--slate); white-space: nowrap; }
+
+.analytics-badge {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+  border: 1px solid var(--line); color: var(--slate);
+}
+.analytics-badge.is-on {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--success) 42%, transparent);
+}
+.analytics-badge.is-off { color: var(--slate); background: var(--paginator-bg); }
+
+.analytics-member-cats { max-width: 230px; }
+.analytics-chip {
+  display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px; border-radius: 999px;
+  font-size: 0.72rem; color: var(--ink);
+  background: var(--paginator-bg); border: 1px solid var(--line);
+}
+.analytics-chip--muted { color: var(--slate); font-style: italic; }
+
+.analytics-member-when { white-space: nowrap; }
+.analytics-muted { color: var(--slate); }
+.analytics-recent-dot {
+  display: inline-block; width: 7px; height: 7px; margin-left: 5px;
+  border-radius: 50%; background: var(--success); vertical-align: middle;
+}
+.analytics-members-empty { color: var(--slate); text-align: center; padding: 20px 12px; }
+
+/* The pager itself is the shared .story-pagination (base.css): centred,
+   numbered page buttons. Only a little breathing room is needed here. */
+.analytics-members-pagination { margin-top: 16px; }
+
+/* ---------- Members loading (analytics_members.js) ---------- */
+/* While a filter/pager request is in flight the body is swapped for this
+   shimmer, and its height is locked, so the page below never jumps. */
+.analytics-member-skeleton { display: grid; gap: 10px; padding: 4px 0 8px; }
+.analytics-member-skeleton-row { display: flex; align-items: center; gap: 12px; pointer-events: none; }
+.analytics-member-skeleton-avatar,
+.analytics-member-skeleton-bar,
+.analytics-member-skeleton-chip {
+  background: var(--paginator-bg); animation: panelPulse 1.4s var(--panel-ease) infinite;
+}
+.analytics-member-skeleton-avatar { width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto; }
+.analytics-member-skeleton-lines { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.analytics-member-skeleton-bar { height: 10px; border-radius: 5px; width: min(46%, 260px); }
+.analytics-member-skeleton-bar.is-short { width: min(28%, 160px); height: 8px; }
+.analytics-member-skeleton-chip { width: 68px; height: 22px; border-radius: 999px; flex: 0 0 auto; }
+.analytics-member-skeleton-lines + .analytics-member-skeleton-chip { margin-left: auto; }
+/* Typing in the email box only dims the rows; it never flashes a skeleton. */
+.analytics-members.is-searching { opacity: .55; transition: opacity .18s ease; }
+
 @media (max-width: 640px) {
   .analytics-card-header { align-items: flex-start; }
   .analytics-controls { width: 100%; }
   .analytics-select { flex: 1 1 auto; }
+  .analytics-select input[type="search"] { min-width: 0; width: 100%; }
+  .analytics-member-sub { white-space: normal; }
 }

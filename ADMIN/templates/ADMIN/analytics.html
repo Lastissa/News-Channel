@@ -21,6 +21,8 @@
   <symbol id="i-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
   <symbol id="i-bar-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
 </svg>
 
 <section class="analytics-shell" data-analytics>
@@ -62,6 +64,8 @@
         <p class="analytics-loading">Loading chart&hellip;</p>
       </div>
     </section>
+
+    <hr class="analytics-divider">
 
     <section class="analytics-card" aria-labelledby="analytics-trends-title">
       <header class="analytics-card-header">
@@ -117,6 +121,108 @@
       </div>
     </section>
 
+    <hr class="analytics-divider">
+
+    <section class="analytics-card" aria-labelledby="analytics-members-title">
+      {% comment %}
+        MEMBERS. Read only, members only. The shell carries the filter controls
+        and an empty target; the rows come from control:analytics_members on
+        load and whenever a control changes, so the page never ships a member
+        list in its first paint. "Newsletter sign-ups" are accounts that never
+        signed in (empty last_login), distinct from the news-alert flag.
+      {% endcomment %}
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <h2 id="analytics-members-title">Members</h2>
+      </header>
+
+      <form class="analytics-controls"
+            id="analytics-members-filters"
+            hx-get="{% url 'control:analytics_members' %}"
+            hx-target="#analytics-members-body"
+            hx-swap="innerHTML"
+            hx-trigger="change">
+        <label class="analytics-select">
+          <span class="analytics-select-label">Status</span>
+          <select name="state">
+            {% for value, label in member_state_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="analytics-select">
+          <span class="analytics-select-label">News alerts</span>
+          <select name="newsletter">
+            {% for value, label in member_newsletter_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="analytics-select">
+          <span class="analytics-select-label">Category</span>
+          <select name="category">
+            {% for value, label in member_category_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="analytics-select">
+          <span class="analytics-select-label">Activity</span>
+          <select name="activity">
+            {% for value, label in member_activity_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="analytics-select">
+          <span class="analytics-select-label">Account</span>
+          <select name="kind">
+            {% for value, label in member_kind_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="analytics-select analytics-select--search">
+          <span class="analytics-select-label">Email</span>
+          <input type="search" name="q" placeholder="Search email" autocomplete="off"
+                 hx-get="{% url 'control:analytics_members' %}"
+                 hx-include="closest form"
+                 hx-target="#analytics-members-body"
+                 hx-swap="innerHTML"
+                 hx-trigger="keyup changed delay:400ms, search">
+        </label>
+      </form>
+
+      <div class="analytics-members" id="analytics-members-body"
+           data-page-size="{{ member_page_size }}"
+           hx-get="{% url 'control:analytics_members' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        {% comment %}Shimmer skeleton. analytics_members.js swaps it in on every
+           filter/pager request and keeps the body's height locked to a full
+           page, so a shorter later page never makes the page underneath jump.{% endcomment %}
+        <div class="analytics-member-skeleton" aria-hidden="true">
+          {% for _ in "123456789012" %}
+          <div class="analytics-member-skeleton-row">
+            <span class="analytics-member-skeleton-avatar"></span>
+            <span class="analytics-member-skeleton-lines">
+              <span class="analytics-member-skeleton-bar"></span>
+              <span class="analytics-member-skeleton-bar is-short"></span>
+            </span>
+            <span class="analytics-member-skeleton-chip"></span>
+            <span class="analytics-member-skeleton-chip"></span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
   </div>
 </section>
 {% endblock %}
@@ -125,6 +231,7 @@
   {{ block.super }}
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script src="{% static 'control/js/analytics.js' %}" defer></script>
+  <script src="{% static 'control/js/analytics_members.js' %}" defer></script>
 {% endblock %}
 
 {% block footer %}{% endblock %}

@@ -6,6 +6,7 @@ work stays in HOME.views; this module only holds the extra authority an admin
 """
 
 import logging
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.core.exceptions import ValidationError
@@ -45,11 +46,19 @@ from ADMIN.analytics import (
     DEFAULT_STORY_PERIOD,
     DEFAULT_TREND_BUCKET,
     DEFAULT_TREND_RANGE,
+    MEMBER_ACTIVITY_CHOICES,
+    MEMBER_CATEGORY_ANY,
+    MEMBER_KIND_CHOICES,
+    MEMBER_NEWSLETTER_CHOICES,
+    MEMBER_STATE_CHOICES,
     SERIES_META,
     STORY_PERIODS,
     STORY_PERIOD_CHOICES,
     TREND_BUCKET_CHOICES,
     TREND_RANGE_CHOICES,
+    member_category_filter_choices,
+    member_directory_queryset,
+    member_page_details,
     stories_per_week,
     trends,
 )
@@ -693,6 +702,7 @@ GALLERY_PAGE_SIZE = 12   #   staff gallery strip, bigger than the old 5-row list
 SESSIONS_PAGE_SIZE = 5
 SPECIALITY_PAGE_SIZE = 5
 USER_DIRECTORY_PAGE_SIZE = 20   #   the whole point is to browse members, so page bigger than the action lists
+MEMBER_PAGE_SIZE = 12   #   ANALYTICS Members table: six columns, so a dozen rows fit before paging
 
 
 def _mask_email(email):
@@ -779,6 +789,12 @@ class AnalyticsView(View):
                 "trend_ranges": TREND_RANGE_CHOICES,
                 "default_trend_range": DEFAULT_TREND_RANGE,
                 "series_meta": SERIES_META,
+                "member_state_choices": MEMBER_STATE_CHOICES,
+                "member_newsletter_choices": MEMBER_NEWSLETTER_CHOICES,
+                "member_category_choices": member_category_filter_choices(),
+                "member_activity_choices": MEMBER_ACTIVITY_CHOICES,
+                "member_kind_choices": MEMBER_KIND_CHOICES,
+                "member_page_size": MEMBER_PAGE_SIZE,
             },
         )
 
@@ -831,6 +847,68 @@ class AnalyticsTrendsChartView(View):
         )
 
 
+def _member_choice(request, name, choices, default="all"):
+    """Read one Members filter, snapping anything unknown back to its default.
+
+    The dropdowns are the only legitimate source of these values, so a hand
+    typed querystring must never reach the ORM as a surprise value.
+    """
+    allowed = {value for value, _ in choices}
+    value = (request.GET.get(name) or default).strip()
+    return value if value in allowed else default
+
+
+class AnalyticsMembersView(View):
+    """htmx fragment: the ANALYTICS "Members" table.
+
+    Admin only and read only. Filters are validated against the fixed choice
+    lists in ADMIN.analytics (and the live category names), so an unknown value
+    can only ever fall back to its default -- exactly like the chart fragments.
+    The shell ships a loading placeholder and this fills it on load and whenever
+    a control changes.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        state = _member_choice(request, "state", MEMBER_STATE_CHOICES)
+        newsletter = _member_choice(request, "newsletter", MEMBER_NEWSLETTER_CHOICES)
+        activity = _member_choice(request, "activity", MEMBER_ACTIVITY_CHOICES)
+        kind = _member_choice(request, "kind", MEMBER_KIND_CHOICES)
+
+        category_choices = member_category_filter_choices()
+        category = _member_choice(request, "category", category_choices, default=MEMBER_CATEGORY_ANY)
+        search = (request.GET.get("q") or "").strip()[:100]
+
+        queryset = member_directory_queryset(
+            state=state, newsletter=newsletter, category=category, activity=activity, kind=kind, search=search
+        )
+
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
+        paginator = Paginator(queryset, MEMBER_PAGE_SIZE)
+        if page_number > paginator.num_pages and paginator.num_pages:
+            raise Http404("Page not found.")
+        page = paginator.get_page(page_number)
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_members.html",
+            {
+                "rows": member_directory_rows(page.object_list),
+                "page": page,
+                #   The standard project pager (base.css .story-pagination),
+                #   windowed exactly like the profile lists. The page buttons
+                #   carry only ?page=N and reach the active filters through the
+                #   hx-include on the shell's filter form, so nothing has to be
+                #   echoed back here and an unknown value is re-validated above.
+                "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+                "total": paginator.count,
+                "subscribed_total": queryset.filter(send_newsletter=True).count(),
+            },
+        )
+
+
 class PanelStaffGalleryView(View):
     """JSON feed powering the horizontal auto-scroll staff strip. Bigger page
     size than the old admin_only staff_directory list since this is meant to
@@ -879,6 +957,61 @@ def user_directory_rows(account_list):
                 "profile_img": account.profile_img or "",
                 "joined_at": timezone.localtime(account.date_joined).strftime("%b %d, %Y"),
                 "is_active": account.is_active,
+            }
+        )
+    return rows
+
+
+def _since_label(when, now):
+    """'Today' / 'Yesterday' / 'N days ago' / a dated fallback, in local time.
+
+    Both endpoints are localised first so a stored UTC instant never reads as a
+    day off around midnight, and the fallback switches to an absolute date once
+    "N days ago" stops being useful to scan.
+    """
+    if when is None:
+        return ""
+    days = (timezone.localtime(now).date() - timezone.localtime(when).date()).days
+    if days <= 0:
+        return "Today"
+    if days == 1:
+        return "Yesterday"
+    if days < 30:
+        return f"{days} days ago"
+    return timezone.localtime(when).strftime("%b %d, %Y")
+
+
+def member_directory_rows(account_list):
+    """Shape a page of member accounts into the row payload the ANALYTICS
+    Members table renders. The address is only ever exposed masked, and the
+    per-account reading/category aggregates come from one fixed set of
+    page-wide queries (member_page_details), never one query per row."""
+    accounts = list(account_list)
+    details = member_page_details(accounts)
+    now = timezone.now()
+
+    rows = []
+    for account in accounts:
+        info = details.get(account.pk, {})
+        last_read = info.get("last_read")
+        last_login = account.last_login
+        local = (account.email or "").partition("@")[0]
+        rows.append(
+            {
+                "id": account.pk,
+                "email_masked": _mask_email(account.email),
+                "initial": (local[:1] or "?").upper(),
+                "profile_img": account.profile_img or "",
+                "joined_at": timezone.localtime(account.date_joined).strftime("%b %d, %Y"),
+                "is_active": account.is_active,
+                "send_newsletter": account.send_newsletter,
+                "categories": info.get("categories", []),
+                "last_read_label": _since_label(last_read, now) if last_read else "",
+                "read_recently": bool(last_read and last_read >= now - timedelta(days=1)),
+                "last_login_label": _since_label(last_login, now) if last_login else "Never",
+                "is_newsletter_signup": last_login is None,
+                "stories_read": info.get("stories_read", 0),
+                "following": info.get("following", 0),
             }
         )
     return rows

@@ -18,10 +18,13 @@ Design notes
 from datetime import timedelta
 
 from django.db import DatabaseError, transaction
+from django.db.models import Count, Max
 from django.utils import timezone
 
 from AUTHENTICATION.models import Auth
-from BLOG.models import Blog, BlogLike, StoryView
+from BLOG.models import Blog, BlogLike, StoryView, get_category_choices
+from HOME.models import CategorySubscription, ReadingHistory
+from STAFF.models import AuthorFollow
 
 #   -------------------------------------------------------------------------
 #   PERIODS THE UI CAN ASK FOR
@@ -45,6 +48,8 @@ TREND_BUCKETS = {
 DEFAULT_TREND_BUCKET = "day"
 
 TREND_RANGES = {
+    "7d": 7,
+    "14d": 14,
     "30d": 30,
     "90d": 90,
     "6m": 182,
@@ -75,6 +80,8 @@ TREND_BUCKET_CHOICES = [
     ("week", "Per week"),
 ]
 TREND_RANGE_CHOICES = [
+    ("7d", "Last 7 days"),
+    ("14d", "Last 14 days"),
     ("30d", "Last 30 days"),
     ("90d", "Last 90 days"),
     ("6m", "Last 6 months"),
@@ -212,3 +219,153 @@ def trends(bucket, selected_range, series_keys):
         "bucket": bucket,
         "range": selected_range,
     }
+
+
+#   -------------------------------------------------------------------------
+#   MEMBER DIRECTORY -- the "Members" table on ANALYTICS
+#   -------------------------------------------------------------------------
+#   Members only: the exact complement of ADMIN.views.staff_directory_queryset
+#   and the same group the PANEL "Users" card and the mass-email "Member"
+#   toggle reach. Read only -- nothing in this module can change an account.
+
+MEMBER_STATE_CHOICES = [
+    ("all", "Any status"),
+    ("active", "Active"),
+    ("suspended", "Suspended"),
+]
+MEMBER_NEWSLETTER_CHOICES = [
+    ("all", "Any news-alert setting"),
+    ("on", "News alerts on"),
+    ("off", "News alerts off"),
+]
+MEMBER_ACTIVITY_CHOICES = [
+    ("all", "Any reading activity"),
+    ("recent", "Read a story in the last day"),
+    ("never", "Never read a story"),
+]
+MEMBER_KIND_CHOICES = [
+    ("all", "All member accounts"),
+    ("signup", "Newsletter sign-ups (never signed in)"),
+    ("regular", "Has signed in before"),
+]
+
+#   A story read within this window counts as "recent" activity.
+MEMBER_ACTIVITY_WINDOW = timedelta(days=1)
+
+#   The category dropdown's two non-category values. Real category names come
+#   from get_category_choices() (short codes such as NEWS), so neither clashes.
+MEMBER_CATEGORY_ANY = "any"   #   no category filter at all
+MEMBER_CATEGORY_ALL = "all"   #   the documented "no rows == every category" default
+
+
+def member_category_filter_choices():
+    """Category dropdown options: any / the no-preference default / each one."""
+    return [
+        (MEMBER_CATEGORY_ANY, "Any category"),
+        (MEMBER_CATEGORY_ALL, "All categories (no preference)"),
+    ] + list(get_category_choices())
+
+
+def member_directory_queryset(
+    state="all", newsletter="all", category=MEMBER_CATEGORY_ANY, activity="all", kind="all", search=""
+):
+    """Regular member accounts narrowed by the ANALYTICS Members filters.
+
+    Every narrowing is a pk__in / exclude subquery rather than a JOIN, so the
+    queryset keeps one row per account: the paginator's count stays honest and
+    the per-page aggregates in member_page_details can never be multiplied by a
+    join. Unknown filter values simply fall back to "all" -- the same
+    forgiving-at-the-edge rule the chart fragments follow.
+    """
+    members = Auth.objects.filter(is_staff=False, is_admin=False, is_superuser=False)
+
+    if state == "active":
+        members = members.filter(is_active=True)
+    elif state == "suspended":
+        members = members.filter(is_active=False)
+
+    if newsletter == "on":
+        members = members.filter(send_newsletter=True)
+    elif newsletter == "off":
+        members = members.filter(send_newsletter=False)
+
+    #   A newsletter-only account is recognised by an empty last_login: the
+    #   footer signup creates a real account but never signs it in. A normal
+    #   member has signed in at least once, so this is the "newsletter user"
+    #   filter, deliberately separate from the news-alert flag above.
+    if kind == "signup":
+        members = members.filter(last_login__isnull=True)
+    elif kind == "regular":
+        members = members.filter(last_login__isnull=False)
+
+    current_names = [name for name, _ in get_category_choices()]
+    preference_ids = CategorySubscription.objects.filter(category__in=current_names).values_list("user_id", flat=True)
+    if category == MEMBER_CATEGORY_ALL:
+        members = members.exclude(pk__in=preference_ids)
+    elif category in current_names:
+        members = members.filter(
+            pk__in=CategorySubscription.objects.filter(category=category).values_list("user_id", flat=True)
+        )
+
+    if activity == "recent":
+        cutoff = timezone.now() - MEMBER_ACTIVITY_WINDOW
+        members = members.filter(
+            pk__in=ReadingHistory.objects.filter(read_at__gte=cutoff).values_list("user_id", flat=True)
+        )
+    elif activity == "never":
+        members = members.exclude(pk__in=ReadingHistory.objects.values_list("user_id", flat=True))
+
+    search = (search or "").strip()
+    if search:
+        members = members.filter(email__icontains=search)
+
+    return members.order_by("-date_joined")
+
+
+def member_page_details(account_list):
+    """Per-account aggregates for one page of members, keyed by account id.
+
+    Four small, fixed queries for the whole page instead of N per row. Accounts
+    with no data still get an entry, so the row builder never has to guess.
+    """
+    accounts = list(account_list)
+    ids = [account.pk for account in accounts]
+    details = {
+        account.pk: {"categories": [], "last_read": None, "stories_read": 0, "following": 0}
+        for account in accounts
+    }
+    if not ids:
+        return details
+
+    current_names = {name for name, _ in get_category_choices()}
+    for user_id, name in CategorySubscription.objects.filter(user_id__in=ids).values_list("user_id", "category"):
+        if name in current_names:   #   a row for a category since removed never counts
+            details[user_id]["categories"].append(name)
+    for info in details.values():
+        info["categories"].sort()
+
+    for row in (
+        ReadingHistory.objects.filter(user_id__in=ids)
+        .values("user_id")
+        .annotate(last=Max("read_at"))
+        .order_by()
+    ):
+        details[row["user_id"]]["last_read"] = row["last"]
+
+    for row in (
+        ReadingHistory.objects.filter(user_id__in=ids)
+        .values("user_id")
+        .annotate(n=Count("id"))
+        .order_by()
+    ):
+        details[row["user_id"]]["stories_read"] = row["n"]
+
+    for row in (
+        AuthorFollow.objects.filter(follower_id__in=ids)
+        .values("follower_id")
+        .annotate(n=Count("id"))
+        .order_by()
+    ):
+        details[row["follower_id"]]["following"] = row["n"]
+
+    return details

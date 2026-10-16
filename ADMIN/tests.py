@@ -18,9 +18,10 @@ from django.utils import timezone
 
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, StoryView, get_category_choices
+from HOME.models import CategorySubscription, ReadingHistory
 from SERVICE_INTERNAL import email_single
 from SERVICE_INTERNAL.config import About
-from STAFF.models import StaffProfile
+from STAFF.models import AuthorFollow, StaffProfile
 
 ISOLATED_CACHE = {
     "default": {
@@ -692,3 +693,149 @@ class AdminPageRedirectTests(TestCase):
         response = self.client.get(reverse("control:panel"))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("home:profile"))
+
+
+@override_settings(CACHES=ISOLATED_CACHE)
+class AnalyticsMembersTests(TestCase):
+    """The ANALYTICS "Members" table fragment (ADMIN.views.AnalyticsMembersView).
+
+    Members only, read only, and every filter is pinned: account status, the
+    news-alert flag, the category preference, reading activity and the
+    "newsletter sign-up" account type (recognised by an empty last_login).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(cache.clear)
+
+        #   A real category has to exist for the category filter to have any
+        #   values; clear the cache afterwards so the first read rebuilds it.
+        Category.objects.get_or_create(name="NEWS")
+        cache.clear()
+
+        #   Distinct staff/admin addresses, so "not listed" is provable: their
+        #   masked forms must never appear in a members-only table.
+        self.admin = Auth.objects.create_admin(email="zulu-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="zulu-writer@example.com")
+
+        #   alpha signed up through the footer newsletter form: never signed in,
+        #   no category rows (so "all categories"), and no reading history.
+        self.alpha = Auth.objects.create_user(email="alpha@example.com", send_newsletter=True)
+
+        #   bravo is a normal member: has signed in, switched news alerts off,
+        #   narrowed to NEWS, and read a story a moment ago.
+        self.bravo = Auth.objects.create_user(email="bravo@example.com", send_newsletter=False)
+        Auth.objects.filter(pk=self.bravo.pk).update(last_login=timezone.now())
+        CategorySubscription.objects.create(user=self.bravo, category="NEWS")
+        self.story = Blog.objects.create(
+            author=self.writer, heading="Members read story", category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        ReadingHistory.objects.create(user=self.bravo, blog=self.story)
+
+        #   charlie was suspended: news alerts still on, but has read nothing.
+        self.charlie = Auth.objects.create_user(
+            email="charlie@example.com", send_newsletter=True, is_active=False
+        )
+        Auth.objects.filter(pk=self.charlie.pk).update(last_login=timezone.now())
+
+        self.url = reverse("control:analytics_members")
+
+    def rows(self, **params):
+        self.client.force_login(self.admin)
+        return self.client.get(self.url, params).content.decode()
+
+    #   ------------------------------------------------------------ access
+    def test_only_admins_can_read_the_fragment(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)   # anonymous
+        for user in [self.writer, self.alpha]:
+            with self.subTest(user=user.email):
+                self.client.force_login(user)
+                self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    #   ------------------------------------------------------------ membership
+    def test_only_regular_members_are_listed_never_staff_or_admins(self):
+        html = self.rows()
+        self.assertIn("A***A@EXAMPLE.COM", html)     # alpha
+        self.assertIn("B***O@EXAMPLE.COM", html)     # bravo
+        self.assertIn("C***E@EXAMPLE.COM", html)     # charlie
+        self.assertNotIn("Z***R@EXAMPLE.COM", html)  # writer
+        self.assertNotIn("Z***N@EXAMPLE.COM", html)  # admin
+
+    def test_the_newsletter_signup_filter_finds_never_signed_in_accounts(self):
+        html = self.rows(kind="signup")
+        self.assertIn("A***A@EXAMPLE.COM", html)          # never signed in
+        self.assertNotIn("B***O@EXAMPLE.COM", html)       # has signed in
+        self.assertNotIn("C***E@EXAMPLE.COM", html)
+
+    def test_the_regular_filter_excludes_never_signed_in_accounts(self):
+        html = self.rows(kind="regular")
+        self.assertNotIn("A***A@EXAMPLE.COM", html)
+        self.assertIn("B***O@EXAMPLE.COM", html)
+        self.assertIn("C***E@EXAMPLE.COM", html)
+
+    #   ------------------------------------------------------------ filters
+    def test_the_news_alert_filter_separates_on_from_off(self):
+        on = self.rows(newsletter="on")
+        self.assertIn("A***A@EXAMPLE.COM", on)
+        self.assertIn("C***E@EXAMPLE.COM", on)
+        self.assertNotIn("B***O@EXAMPLE.COM", on)
+
+        off = self.rows(newsletter="off")
+        self.assertIn("B***O@EXAMPLE.COM", off)
+        self.assertNotIn("A***A@EXAMPLE.COM", off)
+
+    def test_the_status_filter_finds_suspended_accounts(self):
+        html = self.rows(state="suspended")
+        self.assertIn("C***E@EXAMPLE.COM", html)
+        self.assertNotIn("A***A@EXAMPLE.COM", html)
+
+    def test_the_activity_filter_uses_recent_reads_and_never_reads(self):
+        recent = self.rows(activity="recent")
+        self.assertIn("B***O@EXAMPLE.COM", recent)
+        self.assertNotIn("A***A@EXAMPLE.COM", recent)
+
+        never = self.rows(activity="never")
+        self.assertIn("A***A@EXAMPLE.COM", never)
+        self.assertIn("C***E@EXAMPLE.COM", never)
+        self.assertNotIn("B***O@EXAMPLE.COM", never)
+
+    def test_a_member_with_no_category_rows_reads_as_all_categories(self):
+        html = self.rows(category="all")
+        self.assertIn("A***A@EXAMPLE.COM", html)          # no preference
+        self.assertIn("C***E@EXAMPLE.COM", html)
+        self.assertNotIn("B***O@EXAMPLE.COM", html)       # narrowed to NEWS
+
+    def test_the_category_filter_matches_the_subscribed_category(self):
+        html = self.rows(category="NEWS")
+        self.assertIn("B***O@EXAMPLE.COM", html)
+        self.assertNotIn("A***A@EXAMPLE.COM", html)
+        self.assertNotIn("C***E@EXAMPLE.COM", html)
+
+    #   ------------------------------------------------------------ rendering
+    def test_the_category_cell_shows_either_chips_or_the_default(self):
+        html = self.rows()
+        self.assertIn("analytics-chip--muted", html)   # the "All categories" chip
+        self.assertIn(">NEWS<", html)                  # bravo's chip
+
+    def test_a_never_signed_in_account_reads_as_a_newsletter_signup(self):
+        html = self.rows(kind="signup")
+        self.assertIn("newsletter sign-up", html)
+
+    def test_an_unknown_filter_value_falls_back_to_the_default(self):
+        html = self.rows(state="bogus", kind="bogus", category="bogus")
+        self.assertIn("A***A@EXAMPLE.COM", html)
+        self.assertNotIn("bogus", html)
+
+    @mock.patch("ADMIN.views.MEMBER_PAGE_SIZE", 1)
+    def test_the_pager_carries_the_active_filters_forward(self):
+        html = self.rows(state="active")
+        #   The standard project pager: each page button asks only for ?page=N
+        #   and the shell's filter form is pulled in through hx-include, so the
+        #   active filters travel with the request without being echoed in a URL.
+        self.assertIn("analytics-members-pagination", html)
+        self.assertIn('hx-include="#analytics-members-filters"', html)
+        self.assertIn("page=2", html)
+
+    def test_a_single_page_has_no_pager(self):
+        self.assertNotIn("analytics-members-pagination", self.rows())
