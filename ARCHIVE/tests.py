@@ -536,3 +536,94 @@ class ArchiveManageSearchTests(TestCase):
         self.assertContains(response, "Load more")
         self.assertContains(response, '"descr": "Team"')
 
+
+class _FakeUpstream:
+    """Stand-in for a requests.Response with stream=True."""
+
+    def __init__(self, status_code=200, headers=None, body=b""):
+        self.status_code = status_code
+        self.headers = headers or {}
+        self._body = body
+        self.closed = False
+
+    @property
+    def text(self):
+        return self._body.decode("utf-8", "replace")
+
+    def iter_content(self, chunk_size=1):
+        for index in range(0, len(self._body), chunk_size):
+            yield self._body[index:index + chunk_size]
+
+    def close(self):
+        self.closed = True
+
+
+@override_settings(CLOUDINARY_CLOUD_NAME="test-cloud")
+class CloudinaryProxyViewTests(TestCase):
+    """The proxy hands publicly-deliverable media to Cloudinary and only
+    relays the rest, so page views never spend this server's bandwidth --
+    see ARCHIVE.views.CloudinaryProxyView."""
+
+    IMAGE = "/archive/cdn/image/upload/v123/abureport/archive/photo.jpg"
+    RAW = "/archive/cdn/raw/upload/v123/abureport/archive/report.pdf"
+    RAW_VIDEO = "/archive/cdn/raw/upload/v123/abureport/archive/clip.mp4"
+
+    def test_a_picture_is_redirected_to_cloudinary(self):
+        response = self.client.get(self.IMAGE)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            "https://res.cloudinary.com/test-cloud/image/upload/v123/abureport/archive/photo.jpg",
+        )
+        self.assertIn("max-age", response["Cache-Control"])
+
+    def test_a_raw_video_is_redirected_too(self):
+        response = self.client.get(self.RAW_VIDEO)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            "https://res.cloudinary.com/test-cloud/raw/upload/v123/abureport/archive/clip.mp4",
+        )
+
+    def test_a_forced_download_streams_through_the_server(self):
+        upstream = _FakeUpstream(
+            headers={"Content-Type": "application/pdf", "Content-Length": "4"},
+            body=b"%PDF",
+        )
+        with mock.patch("ARCHIVE.views.requests.get", return_value=upstream) as get:
+            response = self.client.get(self.RAW, {"filename": "my report.pdf"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"%PDF")
+        self.assertEqual(response["Content-Disposition"], 'attachment; filename="my report.pdf"')
+        #   The forced-download name is ours alone -- Cloudinary never sees it.
+        self.assertEqual(
+            get.call_args[0][0],
+            "https://res.cloudinary.com/test-cloud/raw/upload/v123/abureport/archive/report.pdf",
+        )
+
+    def test_a_client_range_is_forwarded_and_the_206_preserved(self):
+        upstream = _FakeUpstream(
+            status_code=206,
+            headers={"Content-Type": "video/mp4", "Content-Range": "bytes 0-1/10"},
+            body=b"ab",
+        )
+        with mock.patch("ARCHIVE.views.requests.get", return_value=upstream) as get:
+            response = self.client.get(
+                self.RAW_VIDEO, {"filename": "clip.mp4"}, HTTP_RANGE="bytes=0-1"
+            )
+
+        self.assertEqual(response.status_code, 206)
+        self.assertEqual(response["Content-Range"], "bytes 0-1/10")
+        self.assertEqual(get.call_args.kwargs["headers"], {"Range": "bytes=0-1"})
+        self.assertEqual(b"".join(response.streaming_content), b"ab")
+
+    def test_an_upstream_error_becomes_a_502(self):
+        upstream = _FakeUpstream(status_code=401, body=b"not allowed")
+        with mock.patch("ARCHIVE.views.requests.get", return_value=upstream):
+            response = self.client.get(self.RAW, {"filename": "report.pdf"})
+
+        self.assertEqual(response.status_code, 502)
+

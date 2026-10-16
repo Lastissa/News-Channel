@@ -11,7 +11,13 @@ import requests
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import IntegrityError
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseRedirect,
+    JsonResponse,
+    StreamingHttpResponse,
+)
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.dateparse import parse_date
@@ -893,25 +899,38 @@ class ArchiveItemDeleteView(View):
 class CloudinaryProxyView(View):
     """Serves every Cloudinary-hosted asset in the project -- pictures and
     plain files alike, any Cloudinary `resource_type` (image/raw/video) --
-    from *this* domain instead of res.cloudinary.com, so nobody looking at
-    a page (or its <img src>/download link) can tell Cloudinary is
-    involved at all, and every asset URL on the site shares this project's
-    own domain for SEO/link-authority purposes.
+    under *this* domain rather than res.cloudinary.com, so every asset URL
+    on the site shares this project's own domain for SEO/link-authority
+    purposes.
 
     `cloud_path` is exactly what Cloudinary itself expects after the cloud
     name, e.g. "image/upload/v1699999999/abureport/archive/x.jpg" or
     "raw/upload/v1699999999/abureport/archive/report.pdf" -- the part of a
     secure_url that comes after "https://res.cloudinary.com/<cloud_name>/".
-    This view rebuilds that real Cloudinary URL behind the scenes, fetches
-    it, and streams back exactly what Cloudinary returned: same bytes,
-    same content type, just served under our own domain.
+
+    BANDWIDTH: this view used to pull *every* byte through django (fetch the
+    whole asset into memory, hand it back). On a host that bills egress, a
+    single image-heavy page (10-40 pictures) or one large video then costs
+    real money, and a full-file buffer per request is a memory risk on top.
+    So every asset Cloudinary delivers publicly -- pictures, clips and raw
+    uploads alike -- is answered with a 302 to the real Cloudinary URL: the
+    browser fetches the bytes straight from Cloudinary's CDN and nothing but
+    the redirect (a few hundred bytes) passes through this server. The one
+    exception is a forced download, which streams through here (see below).
+
+    (Cloudinary itself refuses two raw types -- PDF and ZIP -- with a 401;
+    that is an account-level "dangerous file" policy, so those archive
+    downloads cannot be served from here either. Formatting an attachment
+    URL Cloudinary-side (`fl_attachment`) is not available on this account,
+    which is why forced downloads cannot simply be redirected too.)
 
     An optional `?filename=` query parameter forces the browser to
     download the response under that exact name (used for archive FILE
     items, whose Cloudinary public id rarely matches the original
     filename a human uploaded -- see ARCHIVE/templates/ARCHIVE/partials/
-    gallery_grid.html and manage_list.html). It is stripped out before the
-    upstream request is made, so Cloudinary itself never sees it.
+    gallery_grid.html and manage_list.html). Any request that carries it is
+    streamed through here so the attachment header survives; it is stripped
+    out before the upstream request is made, so Cloudinary never sees it.
 
     Nothing calls this view directly with a hand-built URL -- every link to
     it is produced by the `cloudinary_proxy` template filter (see
@@ -921,39 +940,110 @@ class CloudinaryProxyView(View):
     visitor typed in.
     """
 
-    def get(self, request, cloud_path):
-        query_params = request.GET.copy()
-        requested_filename = (query_params.pop("filename", [""])[0] or "").strip()
+    #   A month, so a browser (or an intermediary) re-uses both the redirect
+    #   and the bytes instead of asking us again; Cloudinary asset URLs are
+    #   content-addressed, so this is safe (avatars overwrite in place but
+    #   carry a fresh query string).
+    CACHE_CONTROL = "public, max-age=2592000"
+    #   Cloudinary delivers image/, video/ and raw/ uploads publicly, so any
+    #   of those can be bounced to the CDN. Only forced downloads stay here.
+    REDIRECTABLE_PREFIXES = ("image/", "video/", "raw/")
+    STREAM_CHUNK = 64 * 1024
 
+    def _real_url(self, cloud_path, query_params):
         real_url = f"https://res.cloudinary.com/{settings.CLOUDINARY_CLOUD_NAME}/{cloud_path}"
         query_string = query_params.urlencode()
-        if query_string:
-            real_url = f"{real_url}?{query_string}"
+        return f"{real_url}?{query_string}" if query_string else real_url
+
+    def _split_query(self):
+        query_params = self.request.GET.copy()
+        requested_filename = (query_params.pop("filename", [""])[0] or "").strip()
+        return query_params, requested_filename
+
+    def get(self, request, cloud_path):
+        query_params, requested_filename = self._split_query()
+        real_url = self._real_url(cloud_path, query_params)
+
+        if cloud_path.startswith(self.REDIRECTABLE_PREFIXES) and not requested_filename:
+            response = HttpResponseRedirect(real_url)
+            response["Cache-Control"] = self.CACHE_CONTROL
+            return response
+
+        return self._stream(real_url, requested_filename, cloud_path)
+
+    def head(self, request, cloud_path):
+        """Answer a HEAD with Cloudinary's own headers and no body, so a bot
+        (or a browser checking for a resumable download) never makes this
+        server pull a whole file just to describe it."""
+        query_params, requested_filename = self._split_query()
+        real_url = self._real_url(cloud_path, query_params)
+
+        if cloud_path.startswith(self.REDIRECTABLE_PREFIXES) and not requested_filename:
+            response = HttpResponseRedirect(real_url)
+            response["Cache-Control"] = self.CACHE_CONTROL
+            return response
 
         try:
-            upstream = requests.get(real_url, timeout=8)
+            upstream = requests.head(real_url, timeout=8, allow_redirects=True)
         except requests.RequestException as exc:
-            error_logger(msg=f"CLOUDINARY PROXY FETCH FAILED ({cloud_path}): {exc}")
+            error_logger(msg=f"CLOUDINARY PROXY HEAD FAILED ({cloud_path}): {exc}")
             raise Http404("Image not found.")
 
         if upstream.status_code == 404:
             raise Http404("Image not found.")
         if upstream.status_code >= 400:
-            error_logger(msg=f"CLOUDINARY PROXY UPSTREAM {upstream.status_code} for {real_url} :: {upstream.text[:300]}")
             return HttpResponse(status=502)
 
-        response = HttpResponse(
-            upstream.content,
-            content_type=upstream.headers.get("Content-Type", "application/octet-stream"),
-        )
-        #   Cloudinary asset URLs are content-addressed / overwrite-in-place
-        #   only for avatars (see SERVICE_INTERNAL.images), so a long,
-        #   cacheable lifetime is safe here; fall back to Cloudinary's own
-        #   Cache-Control if it sent one.
-        response["Cache-Control"] = upstream.headers.get("Cache-Control") or "public, max-age=604800, immutable"
-        for header in ("Content-Disposition", "ETag", "Last-Modified"):
+        response = HttpResponse(status=200)
+        for header in ("Content-Type", "Content-Length", "Accept-Ranges", "ETag", "Last-Modified"):
             if header in upstream.headers:
                 response[header] = upstream.headers[header]
+        response["Cache-Control"] = upstream.headers.get("Cache-Control") or self.CACHE_CONTROL
+        return response
+
+    def _stream(self, real_url, requested_filename, cloud_path):
+        """Relay the asset a chunk at a time, forwarding the client's Range
+        header so a video seek asks Cloudinary for just that slice (206)
+        instead of re-pulling the whole file, and caching the bytes so a
+        replay costs nothing."""
+        upstream_headers = {}
+        range_header = self.request.headers.get("Range")
+        if range_header:
+            upstream_headers["Range"] = range_header
+
+        try:
+            upstream = requests.get(real_url, headers=upstream_headers, stream=True, timeout=(8, 60))
+        except requests.RequestException as exc:
+            error_logger(msg=f"CLOUDINARY PROXY FETCH FAILED ({cloud_path}): {exc}")
+            raise Http404("Image not found.")
+
+        if upstream.status_code == 404:
+            upstream.close()
+            raise Http404("Image not found.")
+        if upstream.status_code >= 400:
+            body_snippet = upstream.text[:300]
+            upstream.close()
+            error_logger(msg=f"CLOUDINARY PROXY UPSTREAM {upstream.status_code} for {real_url} :: {body_snippet}")
+            return HttpResponse(status=502)
+
+        def chunks():
+            try:
+                for chunk in upstream.iter_content(chunk_size=self.STREAM_CHUNK):
+                    if chunk:
+                        yield chunk
+            finally:
+                upstream.close()
+
+        response = StreamingHttpResponse(
+            chunks(),
+            status=206 if upstream.status_code == 206 else 200,
+            content_type=upstream.headers.get("Content-Type", "application/octet-stream"),
+        )
+        for header in ("Content-Length", "Content-Range", "Content-Disposition", "ETag", "Last-Modified"):
+            if header in upstream.headers:
+                response[header] = upstream.headers[header]
+        response["Accept-Ranges"] = upstream.headers.get("Accept-Ranges", "bytes")
+        response["Cache-Control"] = upstream.headers.get("Cache-Control") or self.CACHE_CONTROL
         if requested_filename:
             safe_filename = requested_filename.replace('"', "").replace("\r", "").replace("\n", "")
             response["Content-Disposition"] = f'attachment; filename="{safe_filename}"'

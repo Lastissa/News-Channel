@@ -189,12 +189,11 @@ CLOUDINARY_API_SECRET = os.getenv('cloudinary_api_secret')
 IMAGE_UPLOAD_MAX_MB = int(os.getenv('image_upload_max_mb', 5))
 #   NON-IMAGE FILE uploads to the /archive/ gallery (see
 #   SERVICE_INTERNAL.images.upload_archive_file). Two ceilings, never one:
-#   videos (mp4/mov) get ARCHIVE_VIDEO_UPLOAD_MAX_MB (default 10 -- the same
-#   as Cloudinary's raw-upload ceiling, so an oversized video is rejected
-#   HERE with a clear message instead of failing at Cloudinary with a
-#   cryptic "file size too large" error), and every other file kind is kept
-#   much smaller with ARCHIVE_FILE_UPLOAD_MAX_MB (default 3).
-ARCHIVE_VIDEO_UPLOAD_MAX_MB = int(os.getenv('archive_video_upload_max_mb', 10))
+#   videos (mp4/mov) get ARCHIVE_VIDEO_UPLOAD_MAX_MB (default 5 -- kept
+#   small so a single clip can never burn a big slice of hosting bandwidth),
+#   and every other file kind is kept much smaller with
+#   ARCHIVE_FILE_UPLOAD_MAX_MB (default 3).
+ARCHIVE_VIDEO_UPLOAD_MAX_MB = int(os.getenv('archive_video_upload_max_mb', 5))
 ARCHIVE_FILE_UPLOAD_MAX_MB = int(os.getenv('archive_file_upload_max_mb', 3))
 
 RESEND_API_KEY = os.getenv('resend_api_key')

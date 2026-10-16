@@ -216,15 +216,14 @@ def upload_advert_image(file, public_id: str | None = None) -> dict:
 #   nothing with the image presets above beyond the Cloudinary client.
 #
 #   Two separate size caps, not one: videos are allowed up to ARCHIVE_VIDEO
-#   _UPLOAD_MAX_MB (default 10 -- also the Cloudinary raw-upload ceiling, so
-#   an oversized video can never pass our check and then die at Cloudinary
-#   with a cryptic "File size too large" error), while every other file kind
-#   is held to the much smaller ARCHIVE_FILE_UPLOAD_MAX_MB (default 3). Both
-#   are overridable with the matching environment variables.
+#   _UPLOAD_MAX_MB (default 5 -- kept small so one clip can never burn a big
+#   slice of hosting bandwidth), while every other file kind is held to the
+#   much smaller ARCHIVE_FILE_UPLOAD_MAX_MB (default 3). Both are overridable
+#   with the matching environment variables.
 
 VIDEO_FILE_EXTENSIONS = {"mp4", "mov"}
 
-ARCHIVE_VIDEO_MAX_BYTES = getattr(settings, "ARCHIVE_VIDEO_UPLOAD_MAX_MB", 10) * 1024 * 1024
+ARCHIVE_VIDEO_MAX_BYTES = getattr(settings, "ARCHIVE_VIDEO_UPLOAD_MAX_MB", 5) * 1024 * 1024
 ARCHIVE_FILE_MAX_BYTES = getattr(settings, "ARCHIVE_FILE_UPLOAD_MAX_MB", 3) * 1024 * 1024
 
 #   Deliberately an allow list, not a block list: anything not on here is
