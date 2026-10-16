@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from BLOG.models import Blog, BlogLike, Category, Comment
+from BLOG.models import Blog, BlogLike, Category, Comment, StoryView
 
 
 class BlogAdmin(admin.ModelAdmin):
@@ -29,5 +29,5 @@ class BlogAdmin(admin.ModelAdmin):
             _release_story_image(public_id)
 
 
-admin.site.register([BlogLike, Category, Comment])
+admin.site.register([BlogLike, Category, Comment, StoryView])
 admin.site.register(Blog, BlogAdmin)

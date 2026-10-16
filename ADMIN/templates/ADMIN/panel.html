@@ -39,21 +39,29 @@
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
 </svg>
 
 <section class="panel-shell" data-panel>
 
-  <nav class="panel-nav" aria-label="Panel sections" data-panel-nav>
-    <a class="panel-nav-link" href="#panel-staff-gallery" aria-label="Staff" title="Staff"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></a>
-    <a class="panel-nav-link" href="#panel-users" aria-label="Users" title="Users"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></a>
-    <a class="panel-nav-link" href="#panel-announcements" aria-label="Announcements" title="Announcements"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></a>
-    <a class="panel-nav-link" href="#panel-image-adverts" aria-label="Image adverts" title="Image adverts"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg></a>
-    <a class="panel-nav-link" href="#panel-mass-email" aria-label="Mass email" title="Mass email"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg></a>
-    <a class="panel-nav-link" href="#panel-sessions" aria-label="Active sessions" title="Active sessions"><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg></a>
-    <a class="panel-nav-link" href="#panel-socials" aria-label="Site socials" title="Site socials"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg></a>
-    <a class="panel-nav-link" href="#panel-categories" aria-label="News categories" title="News categories"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg></a>
-    <a class="panel-nav-link" href="#panel-speciality" aria-label="Search staff by speciality" title="Search staff by speciality"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></a>
-  </nav>
+  <aside class="panel-aside">
+    <nav class="panel-nav" aria-label="Panel sections" data-panel-nav>
+      <a class="panel-nav-link" href="#panel-staff-gallery" aria-label="Staff" title="Staff"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="panel-nav-text">Staff</span></a>
+      <a class="panel-nav-link" href="#panel-users" aria-label="Users" title="Users"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg><span class="panel-nav-text">Users</span></a>
+      <a class="panel-nav-link" href="#panel-announcements" aria-label="Announcements" title="Announcements"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg><span class="panel-nav-text">Announcements</span></a>
+      <a class="panel-nav-link" href="#panel-image-adverts" aria-label="Image adverts" title="Image adverts"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg><span class="panel-nav-text">Image adverts</span></a>
+      <a class="panel-nav-link" href="#panel-mass-email" aria-label="Mass email" title="Mass email"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span class="panel-nav-text">Mass email</span></a>
+      <a class="panel-nav-link" href="#panel-sessions" aria-label="Active sessions" title="Active sessions"><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg><span class="panel-nav-text">Active sessions</span></a>
+      <a class="panel-nav-link" href="#panel-socials" aria-label="Site socials" title="Site socials"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg><span class="panel-nav-text">Site socials</span></a>
+      <a class="panel-nav-link" href="#panel-categories" aria-label="News categories" title="News categories"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg><span class="panel-nav-text">News categories</span></a>
+      <a class="panel-nav-link" href="#panel-speciality" aria-label="Search staff by speciality" title="Search staff by speciality"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="panel-nav-text">Speciality search</span></a>
+    </nav>
+
+    <a class="panel-analytics-btn" href="{% url 'control:analytics' %}">
+      <svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg>
+      <span>Analytics</span>
+    </a>
+  </aside>
 
   <div class="panel-grid">
 
@@ -429,3 +437,5 @@
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script src="{% static 'control/js/panel.js' %}" defer></script>
 {% endblock %}
+
+{% block footer %}{% endblock %}

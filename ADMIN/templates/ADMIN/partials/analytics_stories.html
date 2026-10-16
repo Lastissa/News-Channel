@@ -1,0 +1,12 @@
+{% comment %}
+  htmx fragment: the "stories per week" bar chart body.
+
+  The data is embedded as a JSON <script> that analytics.js reads and draws an
+  SVG from. This partial is only ever returned to an htmx GET against
+  control:analytics_stories -- it is never rendered into the shell page.
+{% endcomment %}
+<div class="analytics-chart" data-chart data-chart-kind="bar">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Stories published per week over the selected period"></div>
+  {{ chart|json_script:"analytics-stories-data" }}
+</div>

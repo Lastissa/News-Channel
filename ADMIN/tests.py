@@ -6,12 +6,18 @@ seconds and these tests post far more than that.
 """
 from unittest import mock
 
+import json
+import re
+from urllib.parse import urlencode
+
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.db import connections
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from AUTHENTICATION.models import Auth
-from BLOG.models import Blog, Category, get_category_choices
+from BLOG.models import Blog, BlogLike, Category, StoryView, get_category_choices
 from SERVICE_INTERNAL import email_single
 from SERVICE_INTERNAL.config import About
 from STAFF.models import StaffProfile
@@ -439,3 +445,250 @@ class DispatcherStillBehavesForExistingSendersTests(TestCase):
             self.assertTrue(email_single._dispatch_email("a@example.com", "S", "<p>x</p>", no_async=True))
             send.side_effect = Exception("down")
             self.assertFalse(email_single._dispatch_email("a@example.com", "S", "<p>x</p>", no_async=True))
+
+
+def _chart_data(test, response, element_id):
+    """Pull the JSON payload back out of a chart fragment's json_script tag."""
+    match = re.search(
+        r'<script id="%s" type="application/json">(.*?)</script>' % element_id,
+        response.content.decode(),
+        re.S,
+    )
+    if not match:
+        test.fail(f"no {element_id} payload in the fragment")
+    return json.loads(match.group(1))
+
+
+class AnalyticsPageTests(TestCase):
+    """ANALYTICS shell + its two htmx chart fragments (ADMIN.views.Analytics*).
+
+    The shell must carry the controls and NO numbers; every figure arrives from
+    a separate GET fragment. These tests pin that split down.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="analytics-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="analytics-writer@example.com")
+        self.member = Auth.objects.create_user(email="analytics-member@example.com")
+
+        self.page_url = reverse("control:analytics")
+        self.stories_url = reverse("control:analytics_stories")
+        self.trends_url = reverse("control:analytics_trends")
+
+    def make_story(self, heading):
+        story = Blog.objects.create(
+            author=self.writer, heading=heading, category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        #   date_created is auto_now_add, so pin it into the window by hand.
+        Blog.objects.filter(pk=story.pk).update(date_created=timezone.now())
+        return story
+
+    #   ------------------------------------------------------------ access
+    def test_only_admins_and_superusers_can_open_the_page(self):
+        self.assertEqual(self.client.get(self.page_url).status_code, 302)   # anonymous
+        for user in [self.writer, self.member]:
+            with self.subTest(user=user.email):
+                self.client.force_login(user)
+                self.assertEqual(self.client.get(self.page_url).status_code, 302)
+
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.page_url).status_code, 200)
+
+    def test_both_fragments_are_admin_only(self):
+        for url in [self.stories_url, self.trends_url]:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.force_login(self.writer)
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.logout()
+
+    #   ------------------------------------------------------------ shell
+    def test_shell_carries_the_controls_but_no_chart_data(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.page_url).content.decode()
+        self.assertIn("analytics-stories-body", body)
+        self.assertIn("analytics-trends-body", body)
+        self.assertIn("analytics/stories/", body)
+        self.assertIn("analytics/trends/", body)
+        #   prove the figures come over htmx: no baked-in payload in the shell
+        self.assertNotIn("analytics-stories-data", body)
+        self.assertNotIn("analytics-trends-data", body)
+
+    #   ------------------------------------------------------------ stories bar
+    def test_stories_fragment_returns_a_week_bar_chart(self):
+        self.client.force_login(self.admin)
+        self.make_story("Analytics story one")
+        self.make_story("Analytics story two")
+
+        chart = _chart_data(self, self.client.get(self.stories_url, {"period": "1m"}), "analytics-stories-data")
+        self.assertEqual(chart["type"], "bar")
+        self.assertEqual(len(chart["labels"]), 4)                       # one month => four weeks
+        self.assertEqual(sum(chart["series"][0]["values"]), 2)
+
+    def test_a_longer_period_returns_more_week_bars(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.stories_url, {"period": "1y"}), "analytics-stories-data")
+        self.assertEqual(len(chart["labels"]), 52)
+
+    def test_an_unknown_period_falls_back_to_one_month(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.stories_url, {"period": "banana"}), "analytics-stories-data")
+        self.assertEqual(len(chart["labels"]), 4)
+
+    #   ------------------------------------------------------------ trends line
+    def test_first_load_shows_every_series(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.trends_url), "analytics-trends-data")
+        self.assertEqual(chart["type"], "line")
+        self.assertEqual([s["key"] for s in chart["series"]], ["users", "views", "stories", "likes"])
+
+    def test_only_the_ticked_boxes_are_plotted(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            self.trends_url,
+            {"submitted": "1", "bucket": "week", "range": "90d", "series": ["likes", "users"]},
+        )
+        chart = _chart_data(self, response, "analytics-trends-data")
+        #   order follows the fixed legend order, not the query order
+        self.assertEqual([s["key"] for s in chart["series"]], ["users", "likes"])
+        self.assertEqual(chart["bucket"], "week")
+        self.assertEqual(chart["range"], "90d")
+
+    def test_clearing_every_box_draws_an_empty_chart(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.trends_url, {"submitted": "1"}), "analytics-trends-data")
+        self.assertEqual(chart["series"], [])
+
+    def test_the_new_users_series_counts_the_accounts_in_the_window(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.trends_url, {"submitted": "1", "series": ["users"]}), "analytics-trends-data")
+        self.assertEqual(chart["series"][0]["key"], "users")
+        #   setUp made three accounts, all indexed "now" and so inside the window
+        self.assertGreaterEqual(sum(chart["series"][0]["values"]), 3)
+
+    def test_the_likes_series_reads_blog_likes_not_the_cached_counter(self):
+        self.client.force_login(self.admin)
+        story = self.make_story("A liked story")
+        BlogLike.objects.create(blog=story, user=self.member)
+        response = self.client.get(self.trends_url, {"submitted": "1", "bucket": "day", "range": "30d", "series": ["likes"]})
+        chart = _chart_data(self, response, "analytics-trends-data")
+        self.assertEqual(sum(chart["series"][0]["values"]), 1)
+
+
+class StoryViewHistoryTests(TransactionTestCase):
+    """Every counted story open leaves a timestamped StoryView row: the source
+    the ANALYTICS "total views" series reads.
+
+    The migration that creates the table is the owner's to run, so until it is
+    applied this class builds the table in the (throwaway) test database itself
+    and drops it again. Once the migration exists the table is already there and
+    neither hook does anything. TransactionTestCase, not TestCase: SQLite refuses
+    to create a foreign-key table from inside the class-wide atomic a TestCase
+    opens, and this DDL has to run outside one.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._added_table = StoryView._meta.db_table not in connections["default"].introspection.table_names()
+        if cls._added_table:
+            with connections["default"].schema_editor() as editor:
+                editor.create_model(StoryView)
+
+    @classmethod
+    def tearDownClass(cls):
+        if getattr(cls, "_added_table", False):
+            with connections["default"].schema_editor() as editor:
+                editor.delete_model(StoryView)
+        super().tearDownClass()
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.author = Auth.objects.create_staff(email="view-history@example.com")
+        StaffProfile.objects.create(
+            auth=self.author, gender="M", full_name="View History Author", get_blog_notification=False
+        )
+
+    def test_a_counted_open_writes_a_history_row(self):
+        story = Blog.objects.create(
+            author=self.author, heading="View history story", category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        response = self.client.get(
+            f"/story/{story.slug}/",
+            REMOTE_ADDR="192.0.2.30",
+            HTTP_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36",
+        )
+        story.refresh_from_db()
+        #   the counter and the timestamped row are written in the same branch,
+        #   so they must always agree
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(story.views, 1)
+        self.assertEqual(StoryView.objects.filter(blog=story).count(), 1)
+
+    def test_a_deduplicated_refresh_does_not_add_a_second_row(self):
+        story = Blog.objects.create(
+            author=self.author, heading="Deduplicated view story", category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        kwargs = {
+            "REMOTE_ADDR": "192.0.2.31",
+            "HTTP_USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36",
+        }
+        self.client.get(f"/story/{story.slug}/", **kwargs)
+        self.client.get(f"/story/{story.slug}/", **kwargs)
+        self.assertEqual(StoryView.objects.filter(blog=story).count(), 1)
+
+    def test_deleting_a_viewers_account_keeps_the_view_history(self):
+        """A served view is never taken back. Deleting the reader's account
+        nulls the user FK (SET_NULL) but leaves the StoryView row in place, so
+        the ANALYTICS "total views" count can never shrink."""
+        viewer = Auth.objects.create_user(email="viewer-to-delete@example.com", password="pw123456")
+        story = Blog.objects.create(
+            author=self.author, heading="View history survives the reader", category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        StoryView.objects.create(blog=story, user=viewer)
+
+        viewer.delete()
+
+        rows = StoryView.objects.filter(blog=story)
+        self.assertEqual(rows.count(), 1)
+        self.assertIsNone(rows.first().user)
+
+
+class AdminPageRedirectTests(TestCase):
+    """A control page an admin cannot open must send an anonymous visitor
+    through the login screen carrying the page they wanted. That way the
+    inactivity logout followed by a fresh sign-in returns them to the PANEL
+    instead of dropping them on the profile."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.member = Auth.objects.create_user(email="redirect-member@example.com")
+
+    def test_anonymous_visitors_are_sent_to_login_with_the_target(self):
+        for name in ["control:panel", "control:analytics"]:
+            with self.subTest(name=name):
+                target = reverse(name)
+                response = self.client.get(target)
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(
+                    response.url,
+                    f"{reverse('auth:login')}?{urlencode({'to': target})}",
+                )
+
+    def test_signed_in_non_admins_still_go_to_the_profile(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("control:panel"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("home:profile"))

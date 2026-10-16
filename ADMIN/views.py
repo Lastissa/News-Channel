@@ -6,6 +6,7 @@ work stays in HOME.views; this module only holds the extra authority an admin
 """
 
 import logging
+from urllib.parse import urlencode
 
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
@@ -40,11 +41,37 @@ from SERVICE_INTERNAL.sessions import (
 )
 from Partner.models import AdvertImage, Announcement
 from ADMIN.models import SiteSettings
+from ADMIN.analytics import (
+    DEFAULT_STORY_PERIOD,
+    DEFAULT_TREND_BUCKET,
+    DEFAULT_TREND_RANGE,
+    SERIES_META,
+    STORY_PERIODS,
+    STORY_PERIOD_CHOICES,
+    TREND_BUCKET_CHOICES,
+    TREND_RANGE_CHOICES,
+    stories_per_week,
+    trends,
+)
 from STAFF.models import GENDER_CHOICES, StaffProfile
 
 logger = logging.getLogger(__name__)
 
 STAFF_PAGE_SIZE = 5  #   COPIES THE BOOKMARK / READING HISTORY PANELS
+
+
+def admin_page_redirect(request):
+    """Where a page an admin may not open sends the visitor.
+
+    A signed-in user without admin authority goes to their own profile. An
+    anonymous visitor -- which is exactly what an admin becomes the moment the
+    inactivity middleware logs them out -- is sent to the login page carrying
+    the page they were reaching for, so signing back in lands them on the
+    PANEL they meant to open instead of dropping them on the profile.
+    """
+    if request.user.is_authenticated:
+        return redirect("home:profile")
+    return redirect(f"{reverse('auth:login')}?{urlencode({'to': request.get_full_path()})}")
 
 
 def staff_directory_queryset():
@@ -176,7 +203,7 @@ class StaffDetailView(View):
 
     def get(self, request, staff_id):
         if not admin_only(request.user):
-            return redirect("home:profile")
+            return admin_page_redirect(request)
 
         account = _staff_account_or_404(staff_id)
         profile = StaffProfile.objects.filter(auth=account).first()
@@ -565,7 +592,7 @@ class StaffCreateView(View):
 
     def get(self, request):
         if not admin_only(request.user):
-            return redirect("home:profile")
+            return admin_page_redirect(request)
 
         return self._render(request)
 
@@ -576,7 +603,7 @@ class StaffCreateView(View):
         if not admin_only(request.user):
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse({"detail": "Admin access is required."}, status=403)
-            return redirect("home:profile")
+            return admin_page_redirect(request)
 
         email = (request.POST.get("email") or "").strip()
         password = (request.POST.get("password") or "").strip()
@@ -699,7 +726,7 @@ class PanelView(View):
 
     def get(self, request):
         if not admin_only(request.user):
-            return redirect("home:profile")
+            return admin_page_redirect(request)
 
         own_profile = StaffProfile.objects.filter(auth=request.user).first()
 
@@ -725,6 +752,82 @@ class PanelView(View):
                 "sessions_total_people": sessions_total_people,
                 "sessions_page_obj": sessions_page,
             },
+        )
+
+
+class AnalyticsView(View):
+    """ANALYTICS shell. Admin and superuser only, like PANEL.
+
+    This page deliberately carries NO numbers: it renders the controls and an
+    empty target per chart, and each chart is filled by its own htmx GET
+    (fired on load, and re-fired whenever a control changes). So the shell is
+    cheap and every figure arrives from a fragment endpoint below.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+
+        return render(
+            request,
+            "ADMIN/analytics.html",
+            {
+                "story_periods": STORY_PERIOD_CHOICES,
+                "default_story_period": DEFAULT_STORY_PERIOD,
+                "trend_buckets": TREND_BUCKET_CHOICES,
+                "default_trend_bucket": DEFAULT_TREND_BUCKET,
+                "trend_ranges": TREND_RANGE_CHOICES,
+                "default_trend_range": DEFAULT_TREND_RANGE,
+                "series_meta": SERIES_META,
+            },
+        )
+
+
+class AnalyticsStoriesChartView(View):
+    """htmx fragment: the "stories per week" bar chart.
+
+    Read only, admin only, and never linked from anywhere but ANALYTICS. The
+    period is validated against STORY_PERIODS inside stories_per_week(), so an
+    unknown value simply falls back to the one month default.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        period = (request.GET.get("period") or DEFAULT_STORY_PERIOD).strip()
+        return render(
+            request,
+            "ADMIN/partials/analytics_stories.html",
+            {"chart": stories_per_week(period), "period": period if period in STORY_PERIODS else DEFAULT_STORY_PERIOD},
+        )
+
+
+class AnalyticsTrendsChartView(View):
+    """htmx fragment: the multi-series trend line chart.
+
+    The four checkboxes in the shell decide which series are drawn. On the
+    very first (load) request the browser sends no `submitted` marker, so all
+    four series are shown by default; once the form has fired, the ticked set
+    is honoured exactly -- including the case where every box is cleared,
+    which draws an empty chart rather than silently re-adding them all.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        bucket = (request.GET.get("bucket") or DEFAULT_TREND_BUCKET).strip()
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        if "submitted" in request.GET:
+            series_keys = set(request.GET.getlist("series"))
+        else:
+            series_keys = {meta["key"] for meta in SERIES_META}
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_trends.html",
+            {"chart": trends(bucket, selected_range, series_keys)},
         )
 
 

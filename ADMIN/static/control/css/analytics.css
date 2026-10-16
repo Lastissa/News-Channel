@@ -1,0 +1,118 @@
+/* ANALYTICS page (ADMIN.views.AnalyticsView + its htmx fragment charts).
+   Shares the PANEL look: same icons (<svg class="ic">), same theme variables
+   from base.css. The charts themselves are plain SVG drawn by analytics.js. */
+
+.analytics-shell {
+  max-width: 1180px; margin: 0 auto; padding: 0 16px 56px;
+}
+
+/* ---------- Top bar ---------- */
+.analytics-topbar {
+  display: flex; align-items: center; gap: 14px;
+  margin: 0 -16px 20px; padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  position: sticky; top: var(--header-h, 64px); z-index: 80;
+}
+.analytics-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: var(--radius-s);
+  color: var(--slate); text-decoration: none; font-size: 0.92rem; font-weight: 600;
+  border: 1px solid var(--line); background: var(--paginator-bg);
+  transition: color .2s var(--panel-ease, ease), border-color .2s ease, background-color .2s ease;
+}
+.analytics-back:hover { color: var(--ink); border-color: var(--paginator-hover-border); }
+.analytics-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--ink); }
+
+/* ---------- Grid + cards ---------- */
+.analytics-grid { display: grid; gap: 20px; }
+
+.analytics-card {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius-m); box-shadow: var(--shadow-card);
+  padding: 16px 18px 8px;
+}
+.analytics-card-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 4px;
+}
+.analytics-card-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: var(--radius-s);
+  background: var(--paginator-bg); color: var(--brand-deep); flex: 0 0 auto;
+}
+.analytics-card-header h2 { margin: 0; font-size: 1.05rem; min-width: 0; }
+
+/* ---------- Controls ---------- */
+/* A full-width row under the card title. It wraps a whole control at a time
+   (never mid-field), so selects and the series legend stay aligned. */
+.analytics-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: 12px 18px; margin: 10px 0 14px;
+}
+
+.analytics-select { display: flex; flex-direction: column; gap: 4px; }
+.analytics-select-label {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--slate);
+}
+.analytics-select select {
+  appearance: none;
+  padding: 8px 30px 8px 10px; font-size: 0.9rem; font-family: inherit;
+  color: var(--ink); background: var(--paginator-bg);
+  border: 1px solid var(--paginator-border); border-radius: var(--radius-s);
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--slate) 50%), linear-gradient(135deg, var(--slate) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+}
+.analytics-select select:focus-visible { outline: 1.5px solid var(--amber-deep); outline-offset: 2px; }
+
+.analytics-series {
+  display: flex; flex-wrap: wrap; gap: 10px 16px;
+  margin: 0; padding: 0; border: 0; align-items: center;
+}
+.analytics-series-option {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.88rem; color: var(--ink); cursor: pointer;
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--paginator-bg);
+  transition: border-color .2s ease, opacity .2s ease;
+}
+.analytics-series-option input { accent-color: var(--series-color, var(--brand-deep)); cursor: pointer; margin: 0; }
+.analytics-series-swatch {
+  width: 11px; height: 11px; border-radius: 3px;
+  background: var(--series-color, var(--brand-deep)); flex: 0 0 auto;
+}
+/* Dim a series a reader has switched off so the legend reads at a glance. */
+.analytics-series-option:has(input:not(:checked)) { opacity: 0.5; }
+
+/* ---------- Chart body ---------- */
+.analytics-chart-body { padding: 4px 0 16px; min-height: 220px; }
+.analytics-chart { width: 100%; }
+.analytics-chart-canvas { width: 100%; }
+.analytics-svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.analytics-gridline { stroke: var(--line); stroke-width: 1; }
+.analytics-gridline--base { stroke: var(--slate); opacity: 0.6; }
+.analytics-axis-label { fill: var(--slate); font-size: 12px; font-family: inherit; }
+.analytics-axis-label--y { font-variant-numeric: tabular-nums; }
+
+.analytics-bar { transition: opacity .15s ease; }
+.analytics-bar:hover { opacity: 0.82; }
+.analytics-bar-value { fill: var(--ink); font-size: 12px; font-weight: 700; font-family: inherit; }
+
+.analytics-line { stroke-linejoin: round; stroke-linecap: round; }
+.analytics-dot { transition: r .15s ease; }
+.analytics-dot:hover { r: 5; }
+
+.analytics-empty { fill: var(--slate); font-size: 14px; font-family: inherit; }
+.analytics-loading { color: var(--slate); font-size: 0.92rem; padding: 24px 0; margin: 0; }
+
+html[data-theme="dark"] .analytics-card { background: var(--paper-dim); }
+
+@media (max-width: 640px) {
+  .analytics-card-header { align-items: flex-start; }
+  .analytics-controls { width: 100%; }
+  .analytics-select { flex: 1 1 auto; }
+}

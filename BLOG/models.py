@@ -282,7 +282,43 @@ class BlogLike(models.Model):
 
     def __str__(self):
         return f"{self.user.email} liked {self.blog.heading}"
-    
+
+
+class StoryView(models.Model):
+    """One row per counted story open.
+
+    `Blog.views` stays the fast cumulative counter the story page reads; this
+    table is the timestamped history behind it, so ANALYTICS can chart views
+    over a period. A row is written in the very same branch that bumps
+    `Blog.views` (BLOG.views.StoryDetailView), so bot traffic and htmx/partial
+    requests never land here either -- the two counters always agree.
+
+    `user` is set for a signed-in reader and left null for an anonymous one.
+    On account deletion the row survives (SET_NULL) so a historical view count
+    never shrinks.
+    """
+
+    blog = models.ForeignKey(
+        Blog,
+        on_delete=models.CASCADE,
+        related_name="view_events",
+    )
+    user = models.ForeignKey(
+        "AUTHENTICATION.Auth",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="story_views",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"View of {self.blog_id} at {self.created_at:%Y-%m-%d %H:%M}"
+
+
 class Comment(models.Model):
     """Comment / Feedback under the blog post"""
     blog = models.ForeignKey(Blog, on_delete=models.CASCADE, related_name='comments')

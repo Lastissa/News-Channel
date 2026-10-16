@@ -20,7 +20,7 @@ from django.views import View
 from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from ARCHIVE.models import ArchiveImage
-from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
+from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, error_logger, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
 from SERVICE_INTERNAL.email_single import (
     _build_email_html,
     _dispatch_email,
@@ -30,7 +30,7 @@ from SERVICE_INTERNAL.email_single import (
     _try_send_story_views_alert_email,
 )
 from STAFF.models import AuthorFollow, StaffProfile
-from .models import Blog, BlogLike, Comment
+from .models import Blog, BlogLike, Comment, StoryView
 
 logger = logging.getLogger(__name__)
 
@@ -542,6 +542,22 @@ class StoryDetailView(View):
             if cache.add(view_dedupe_key, "1", timeout=10):
                 Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
                 blog.refresh_from_db(fields=["views"])
+
+                #   TIMESTAMPED HISTORY behind Blog.views, so ANALYTICS can
+                #   chart views per period instead of just the running total.
+                #   Written in the SAME dedupe branch as the counter bump, so
+                #   the two can never disagree. The inner atomic() is a
+                #   savepoint: if the write fails -- the table is not migrated
+                #   yet, say -- only the savepoint rolls back, the story page
+                #   still renders and the request is never 500'd.
+                try:
+                    with transaction.atomic():
+                        StoryView.objects.create(
+                            blog=blog,
+                            user=request.user if request.user.is_authenticated else None,
+                        )
+                except Exception as exc:
+                    error_logger(msg=f"STORY VIEW LOG FAILED: blog={blog.pk} error={exc}")
 
                 alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
                 if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:

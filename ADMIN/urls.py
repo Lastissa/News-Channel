@@ -19,6 +19,9 @@ urlpatterns = [
     path("me/role/", views.OwnRoleUpdateView.as_view(), name="own_role"),
 
     path("panel/", views.PanelView.as_view(), name="panel"),
+    path("panel/analytics/", views.AnalyticsView.as_view(), name="analytics"),
+    path("panel/analytics/stories/", views.AnalyticsStoriesChartView.as_view(), name="analytics_stories"),
+    path("panel/analytics/trends/", views.AnalyticsTrendsChartView.as_view(), name="analytics_trends"),
     path("panel/gallery/", views.PanelStaffGalleryView.as_view(), name="panel_gallery"),
     path("panel/sessions/", views.PanelSessionsView.as_view(), name="panel_sessions"),
     path("panel/sessions/<int:account_id>/logout/", views.PanelSessionLogoutView.as_view(), name="panel_session_logout"),

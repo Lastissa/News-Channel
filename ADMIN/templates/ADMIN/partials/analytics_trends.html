@@ -1,0 +1,13 @@
+{% comment %}
+  htmx fragment: the multi-series trend line chart body.
+
+  Which series appear is decided by the checkboxes in the ANALYTICS shell, so
+  the JSON below can carry one, several or (if every box is cleared) none.
+  analytics.js reads it and draws the SVG. Only ever returned to an htmx GET
+  against control:analytics_trends.
+{% endcomment %}
+<div class="analytics-chart" data-chart data-chart-kind="line">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Trend lines for the selected series over the selected time frame"></div>
+  {{ chart|json_script:"analytics-trends-data" }}
+</div>
