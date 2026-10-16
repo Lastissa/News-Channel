@@ -1270,7 +1270,20 @@ html.archive-locked { overflow: hidden; }
   .archive-search.is-open { flex: 1 1 100%; justify-content: flex-end; }
   .archive-js .archive-search.is-open .archive-search-field { flex: 1 1 auto; width: auto; }
 
-  .archive-filter-field { min-width: 0; flex: 1 1 100%; }
+  /* Category + Added by scroll sideways instead of stacking, so both stay
+     reachable without pushing the grid down the page. */
+  .archive-filters-form {
+    flex-wrap: nowrap;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+  }
+  .archive-filters-form::-webkit-scrollbar { height: 6px; }
+  .archive-filters-form::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+  .archive-filter-field { min-width: 170px; flex: 0 0 auto; }
 
   .archive-modal-layer { padding: 8px; }
   .archive-modal-card { padding: 18px 14px 14px; }

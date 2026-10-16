@@ -82,23 +82,25 @@
            distinguishable from the first load, which shows all series. {% endcomment %}
         <input type="hidden" name="submitted" value="1">
 
-        <label class="analytics-select">
-          <span class="analytics-select-label">Time frame</span>
-          <select name="bucket">
-            {% for value, label in trend_buckets %}
-            <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+        <div class="analytics-filter-row">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Time frame</span>
+            <select name="bucket">
+              {% for value, label in trend_buckets %}
+              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="analytics-select">
-          <span class="analytics-select-label">Range</span>
-          <select name="range">
-            {% for value, label in trend_ranges %}
-            <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+          <label class="analytics-select">
+            <span class="analytics-select-label">Range</span>
+            <select name="range">
+              {% for value, label in trend_ranges %}
+              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
 
         <fieldset class="analytics-series">
           <legend class="panel-sr">Series to plot</legend>
@@ -142,60 +144,62 @@
             hx-target="#analytics-members-body"
             hx-swap="innerHTML"
             hx-trigger="change">
-        <label class="analytics-select">
-          <span class="analytics-select-label">Status</span>
-          <select name="state">
-            {% for value, label in member_state_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+        <div class="analytics-filter-row">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Status</span>
+            <select name="state">
+              {% for value, label in member_state_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="analytics-select">
-          <span class="analytics-select-label">News alerts</span>
-          <select name="newsletter">
-            {% for value, label in member_newsletter_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+          <label class="analytics-select">
+            <span class="analytics-select-label">News alerts</span>
+            <select name="newsletter">
+              {% for value, label in member_newsletter_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="analytics-select">
-          <span class="analytics-select-label">Category</span>
-          <select name="category">
-            {% for value, label in member_category_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+          <label class="analytics-select">
+            <span class="analytics-select-label">Category</span>
+            <select name="category">
+              {% for value, label in member_category_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="analytics-select">
-          <span class="analytics-select-label">Activity</span>
-          <select name="activity">
-            {% for value, label in member_activity_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+          <label class="analytics-select">
+            <span class="analytics-select-label">Activity</span>
+            <select name="activity">
+              {% for value, label in member_activity_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="analytics-select">
-          <span class="analytics-select-label">Account</span>
-          <select name="kind">
-            {% for value, label in member_kind_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+          <label class="analytics-select">
+            <span class="analytics-select-label">Account</span>
+            <select name="kind">
+              {% for value, label in member_kind_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="analytics-select analytics-select--search">
-          <span class="analytics-select-label">Email</span>
-          <input type="search" name="q" placeholder="Search email" autocomplete="off"
-                 hx-get="{% url 'control:analytics_members' %}"
-                 hx-include="closest form"
-                 hx-target="#analytics-members-body"
-                 hx-swap="innerHTML"
-                 hx-trigger="keyup changed delay:400ms, search">
-        </label>
+          <label class="analytics-select analytics-select--search">
+            <span class="analytics-select-label">Email</span>
+            <input type="search" name="q" placeholder="Search email" autocomplete="off"
+                   hx-get="{% url 'control:analytics_members' %}"
+                   hx-include="closest form"
+                   hx-target="#analytics-members-body"
+                   hx-swap="innerHTML"
+                   hx-trigger="keyup changed delay:400ms, search">
+          </label>
+        </div>
       </form>
 
       <div class="analytics-members" id="analytics-members-body"

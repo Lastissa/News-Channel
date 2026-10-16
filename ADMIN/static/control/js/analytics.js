@@ -2,16 +2,28 @@
    The page shell holds no numbers: each chart is an htmx GET that returns an
    HTML fragment carrying the data as a JSON <script> plus an empty SVG mount.
    This file reads that JSON and draws a plain SVG chart (no chart library),
-   then re-runs whenever htmx swaps a fragment in. */
+   then re-runs whenever htmx swaps a fragment in.
+
+   The chart is drawn in real CSS pixels rather than a fixed 920x400 box: the
+   viewBox is set to the measured width of the mount, so an axis label is 12px
+   on a phone exactly as it is on a desktop (a fixed viewBox scaled down to a
+   phone width made every label about 5px tall). A resize/orientation change
+   re-draws at the new width. */
 (function () {
   "use strict";
 
   var SVG_NS = "http://www.w3.org/2000/svg";
-  var VIEW_W = 920;
-  var VIEW_H = 400;
-  var GRID_INTERVALS = 5;      /* horizontal gridlines above the baseline */
-  var MAX_X_LABELS = 9;        /* thin x labels past this many buckets */
-  var MARGIN = { top: 24, right: 18, bottom: 52, left: 52 };
+  var DESKTOP_H = 400;          /* plot height on a wide screen */
+  var COMPACT_H = 250;          /* taller relative plot on a phone */
+  var COMPACT_W = 560;          /* mount widths under this use the compact frame */
+  var MIN_W = 220;              /* unmeasurable mount: fall back to the wide frame */
+  var FALLBACK_W = 920;
+  var GRID_INTERVALS = 5;       /* horizontal gridlines above the baseline */
+  var MAX_X_LABELS = 9;         /* never crowd the x-axis past this many labels */
+  var LABEL_ROOM = 58;          /* rough px a date label needs, incl. its gap */
+
+  var DESKTOP_MARGIN = { top: 24, right: 18, bottom: 52, left: 52 };
+  var COMPACT_MARGIN = { top: 14, right: 12, bottom: 42, left: 40 };
 
   function svgEl(name, attrs) {
     var node = document.createElementNS(SVG_NS, name);
@@ -47,53 +59,94 @@
     return niceStep(Math.ceil(maxValue / GRID_INTERVALS)) * GRID_INTERVALS;
   }
 
-  function labelStride(count) {
-    return count <= MAX_X_LABELS ? 1 : Math.ceil(count / MAX_X_LABELS);
+  /* The drawing frame: measured width, an adaptive height and the matching
+     margin. Small screens get a tighter margin (fewer wasted pixels) and a
+     relatively taller plot so the lines are not squashed into a sliver. */
+  function frameFor(host) {
+    var w = host ? Math.round(host.clientWidth) : 0;
+    if (!w || w < MIN_W) w = FALLBACK_W;
+    var compact = w < COMPACT_W;
+    return {
+      w: w,
+      h: compact ? COMPACT_H : DESKTOP_H,
+      margin: compact ? COMPACT_MARGIN : DESKTOP_MARGIN,
+      compact: compact
+    };
   }
 
-  function emptySvg(label) {
-    var svg = svgEl("svg", { viewBox: "0 0 " + VIEW_W + " " + VIEW_H, "class": "analytics-svg", role: "img", "aria-label": label });
-    svg.appendChild(svgText(VIEW_W / 2, VIEW_H / 2, "No data for this selection.", "analytics-empty", "middle"));
+  function plotBox(frame) {
+    return {
+      w: frame.w - frame.margin.left - frame.margin.right,
+      h: frame.h - frame.margin.top - frame.margin.bottom
+    };
+  }
+
+  /* Thin the x labels to what the width can actually carry. */
+  function labelStride(count, plotW) {
+    var room = Math.floor(plotW / LABEL_ROOM);
+    var maxLabels = Math.max(3, Math.min(MAX_X_LABELS, room));
+    return count <= maxLabels ? 1 : Math.ceil(count / maxLabels);
+  }
+
+  /* Keep the first and last ticks from overhanging the plot edges. */
+  function xAnchor(index, count) {
+    if (count <= 1) return "middle";
+    if (index === 0) return "start";
+    if (index === count - 1) return "end";
+    return "middle";
+  }
+
+  function svgClass(frame) {
+    return "analytics-svg" + (frame.compact ? " analytics-svg--compact" : "");
+  }
+
+  function emptySvg(label, frame) {
+    var svg = svgEl("svg", { viewBox: "0 0 " + frame.w + " " + frame.h, "class": svgClass(frame), role: "img", "aria-label": label });
+    svg.appendChild(svgText(frame.w / 2, frame.h / 2, "No data for this selection.", "analytics-empty", "middle"));
     return svg;
   }
 
-  function newSvg(label) {
-    return svgEl("svg", { viewBox: "0 0 " + VIEW_W + " " + VIEW_H, "class": "analytics-svg", role: "img", "aria-label": label });
+  function newSvg(label, frame) {
+    return svgEl("svg", { viewBox: "0 0 " + frame.w + " " + frame.h, "class": svgClass(frame), role: "img", "aria-label": label });
   }
 
-  function drawAxes(svg, max, plotW, plotH) {
+  function drawAxes(svg, max, frame, box) {
+    var m = frame.margin;
     for (var i = 0; i <= GRID_INTERVALS; i++) {
-      var y = MARGIN.top + plotH - (plotH * i / GRID_INTERVALS);
+      var y = m.top + box.h - (box.h * i / GRID_INTERVALS);
       svg.appendChild(svgEl("line", {
-        x1: MARGIN.left, y1: y,
-        x2: MARGIN.left + plotW, y2: y,
+        x1: m.left, y1: y,
+        x2: m.left + box.w, y2: y,
         "class": "analytics-gridline" + (i === 0 ? " analytics-gridline--base" : "")
       }));
-      svg.appendChild(svgText(MARGIN.left - 10, y + 4, String(Math.round(max * i / GRID_INTERVALS)), "analytics-axis-label analytics-axis-label--y", "end"));
+      svg.appendChild(svgText(m.left - 8, y + 4, String(Math.round(max * i / GRID_INTERVALS)), "analytics-axis-label analytics-axis-label--y", "end"));
     }
   }
 
   function renderBar(host, data) {
     var values = (data.series && data.series[0] ? data.series[0].values : []) || [];
     var count = values.length;
-    if (!count) { host.appendChild(emptySvg("Stories published per week")); return; }
+    var frame = frameFor(host);
+    if (!count) { host.appendChild(emptySvg("Stories published per week", frame)); return; }
 
-    var plotW = VIEW_W - MARGIN.left - MARGIN.right;
-    var plotH = VIEW_H - MARGIN.top - MARGIN.bottom;
+    var box = plotBox(frame);
+    var m = frame.margin;
     var max = axisMax(Math.max.apply(null, values.concat([0])));
-    var svg = newSvg("Stories published per week");
-    drawAxes(svg, max, plotW, plotH);
+    var svg = newSvg("Stories published per week", frame);
+    drawAxes(svg, max, frame, box);
 
-    var slot = plotW / count;
+    var slot = box.w / count;
     var barW = Math.max(Math.min(slot * 0.6, 56), 3);
-    var stride = labelStride(count);
+    var stride = labelStride(count, box.w);
     var colour = data.series[0].color || "#2563eb";
+    /* Counts above a bar need room; drop them once the bars get thin. */
+    var showValues = slot >= 22;
 
     for (var i = 0; i < count; i++) {
       var value = values[i] || 0;
-      var height = max ? (plotH * value / max) : 0;
-      var x = MARGIN.left + slot * i + (slot - barW) / 2;
-      var y = MARGIN.top + plotH - height;
+      var height = max ? (box.h * value / max) : 0;
+      var x = m.left + slot * i + (slot - barW) / 2;
+      var y = m.top + box.h - height;
       var rect = svgEl("rect", {
         x: x, y: y, width: barW,
         height: Math.max(height, value > 0 ? 2 : 0),
@@ -104,11 +157,12 @@
       rect.appendChild(tip);
       svg.appendChild(rect);
 
-      if (value > 0) {
+      if (value > 0 && showValues) {
         svg.appendChild(svgText(x + barW / 2, y - 7, String(value), "analytics-bar-value", "middle"));
       }
       if (i % stride === 0 || i === count - 1) {
-        svg.appendChild(svgText(x + barW / 2, MARGIN.top + plotH + 22, data.labels[i], "analytics-axis-label analytics-axis-label--x", "middle"));
+        var lx = m.left + slot * i + slot / 2;
+        svg.appendChild(svgText(lx, m.top + box.h + 22, data.labels[i], "analytics-axis-label analytics-axis-label--x", xAnchor(i, count)));
       }
     }
     host.appendChild(svg);
@@ -127,6 +181,19 @@
     return String(value).replace(/[&<>"']/g, function (ch) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
     });
+  }
+
+  /* The step against the previous dot. Colour carries the direction (green up,
+     red down), so only the size is written. The first point has no
+     predecessor, so it gets nothing at all. */
+  function deltaLabel(delta) {
+    return String(Math.abs(delta));
+  }
+
+  function deltaHtml(delta) {
+    if (delta === null) return "";
+    var tone = delta > 0 ? " is-up" : delta < 0 ? " is-down" : " is-flat";
+    return '<span class="analytics-placard-delta' + tone + '">' + escapeHtml(deltaLabel(delta)) + "</span>";
   }
 
   function placardFor(root) {
@@ -158,11 +225,15 @@
     var placard = placardFor(root);
     var html = '<div class="analytics-placard-label">' + escapeHtml((data.labels || [])[index] || "") + "</div>";
     (data.series || []).forEach(function (s) {
-      var value = (s.values && s.values[index]) || 0;
+      var values = s.values || [];
+      var value = values[index] || 0;
+      var hasPrevious = index > 0 && index - 1 < values.length;
+      var delta = hasPrevious ? value - (values[index - 1] || 0) : null;
       html += '<div class="analytics-placard-row">' +
         '<span class="analytics-placard-swatch" style="background:' + escapeHtml(s.color) + '"></span>' +
         '<span class="analytics-placard-name">' + escapeHtml(s.name) + "</span>" +
         '<span class="analytics-placard-value">' + escapeHtml(value) + "</span>" +
+        deltaHtml(delta) +
         "</div>";
     });
     placard.innerHTML = html;
@@ -171,17 +242,17 @@
 
     /* anchor on the highest point at that intersection, so the placard clears
        the lines of every enabled series */
-    var x = MARGIN.left + (meta.count > 1 ? meta.stepX * index : meta.plotW / 2);
-    var y = MARGIN.top + meta.plotH;
+    var x = meta.margin.left + (meta.count > 1 ? meta.stepX * index : meta.plotW / 2);
+    var y = meta.margin.top + meta.plotH;
     (data.series || []).forEach(function (s) {
       var value = (s.values && s.values[index]) || 0;
-      var py = MARGIN.top + meta.plotH - (meta.max ? meta.plotH * value / meta.max : 0);
+      var py = meta.margin.top + meta.plotH - (meta.max ? meta.plotH * value / meta.max : 0);
       if (py < y) y = py;
     });
 
     var svgRect = svg.getBoundingClientRect();
     var rootRect = root.getBoundingClientRect();
-    var scale = svgRect.width / VIEW_W;
+    var scale = svgRect.width / meta.viewW;
     var pointX = (svgRect.left - rootRect.left) + x * scale;
     var pointY = (svgRect.top - rootRect.top) + y * scale;
 
@@ -201,8 +272,8 @@
     var meta = svg.__placard;
     if (!meta || meta.count <= 1) return 0;
     var rect = svg.getBoundingClientRect();
-    var x = (event.clientX - rect.left) * (VIEW_W / rect.width);
-    return Math.max(0, Math.min(meta.count - 1, Math.round((x - MARGIN.left) / meta.stepX)));
+    var x = (event.clientX - rect.left) * (meta.viewW / rect.width);
+    return Math.max(0, Math.min(meta.count - 1, Math.round((x - meta.margin.left) / meta.stepX)));
   }
 
   function attachPlacard(svg, root) {
@@ -215,37 +286,42 @@
     svg.addEventListener("mouseover", function (event) {
       if (hoveredDot(event)) showPlacard(root, svg, indexFromEvent(svg, event));
     });
-    root.addEventListener("mouseleave", function () { hidePlacard(root); });
+    /* bind once per root: the svg is rebuilt on every resize, the root is not */
+    if (!root.__placardBound) {
+      root.__placardBound = true;
+      root.addEventListener("mouseleave", function () { hidePlacard(root); });
+    }
   }
 
   function renderLine(host, data, root) {
     var series = data.series || [];
     var labels = data.labels || [];
     var count = labels.length;
-    if (!series.length || !count) { host.appendChild(emptySvg("Trend lines")); return; }
+    var frame = frameFor(host);
+    if (!series.length || !count) { host.appendChild(emptySvg("Trend lines", frame)); return; }
 
-    var plotW = VIEW_W - MARGIN.left - MARGIN.right;
-    var plotH = VIEW_H - MARGIN.top - MARGIN.bottom;
+    var box = plotBox(frame);
+    var m = frame.margin;
     var all = [];
     series.forEach(function (s) { all = all.concat(s.values || []); });
     var max = axisMax(Math.max.apply(null, all.concat([0])));
 
-    var svg = newSvg("Trend lines for the selected series");
-    drawAxes(svg, max, plotW, plotH);
+    var svg = newSvg("Trend lines for the selected series", frame);
+    drawAxes(svg, max, frame, box);
 
-    var stepX = count > 1 ? plotW / (count - 1) : 0;
-    var stride = labelStride(count);
+    var stepX = count > 1 ? box.w / (count - 1) : 0;
+    var stride = labelStride(count, box.w);
     for (var i = 0; i < count; i++) {
       if (i % stride !== 0 && i !== count - 1) continue;
-      var lx = MARGIN.left + (count > 1 ? stepX * i : plotW / 2);
-      svg.appendChild(svgText(lx, MARGIN.top + plotH + 22, labels[i], "analytics-axis-label analytics-axis-label--x", "middle"));
+      var lx = m.left + (count > 1 ? stepX * i : box.w / 2);
+      svg.appendChild(svgText(lx, m.top + box.h + 22, labels[i], "analytics-axis-label analytics-axis-label--x", xAnchor(i, count)));
     }
 
     series.forEach(function (s) {
       var values = s.values || [];
       var points = values.map(function (value, i) {
-        var x = MARGIN.left + (count > 1 ? stepX * i : plotW / 2);
-        var y = MARGIN.top + plotH - (max ? plotH * value / max : 0);
+        var x = m.left + (count > 1 ? stepX * i : box.w / 2);
+        var y = m.top + box.h - (max ? box.h * value / max : 0);
         return [x, y];
       });
       var d = points.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
@@ -255,13 +331,17 @@
       });
     });
 
-    svg.__placard = { data: data, count: count, stepX: stepX, plotW: plotW, plotH: plotH, max: max };
+    svg.__placard = {
+      data: data, count: count, stepX: stepX,
+      plotW: box.w, plotH: box.h, max: max,
+      margin: m, viewW: frame.w, viewH: frame.h
+    };
     attachPlacard(svg, root);
     host.appendChild(svg);
   }
 
-  function renderChart(root) {
-    if (root.getAttribute("data-rendered") === "1") return;
+  function renderChart(root, force) {
+    if (!force && root.getAttribute("data-rendered") === "1") return;
     var canvas = root.querySelector("[data-chart-canvas]");
     var script = root.querySelector('script[type="application/json"]');
     if (!canvas || !script) return;
@@ -282,7 +362,22 @@
   }
 
   function renderAll() {
-    Array.prototype.forEach.call(document.querySelectorAll("[data-chart]"), renderChart);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-chart]"), function (root) {
+      renderChart(root, false);
+    });
+  }
+
+  /* Redraw at the new width after a resize or a phone rotation. Debounced so a
+     drag of the window does not redraw on every frame. */
+  var resizeTimer = null;
+  function redrawAll() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-chart]"), function (root) {
+      renderChart(root, true);
+    });
+  }
+  function onViewportChange() {
+    if (resizeTimer) window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(redrawAll, 150);
   }
 
   document.addEventListener("DOMContentLoaded", renderAll);
@@ -290,6 +385,9 @@
      data-rendered guard makes a full rescan cheap and idempotent. */
   document.addEventListener("htmx:afterSwap", renderAll);
   document.addEventListener("htmx:afterSettle", renderAll);
+
+  window.addEventListener("resize", onViewportChange);
+  window.addEventListener("orientationchange", onViewportChange);
 
   /* a press outside a chart closes any open placard (a tap on the chart
      itself keeps it open, so a phone reader can read it without the pointer
@@ -300,5 +398,5 @@
     });
   });
 
-  window.AnalyticsCharts = { render: renderAll };
+  window.AnalyticsCharts = { render: renderAll, redraw: redrawAll };
 })();

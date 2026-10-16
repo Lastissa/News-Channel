@@ -908,8 +908,21 @@
 
 .profile-logout-all-block {
   margin-top: 20px;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+/* the two actions sit beside each other; they share the row evenly and are
+   allowed to shrink, so a long label never forces them to stack */
+.profile-logout-all-block .logout-all-btn,
+.profile-logout-all-block .view-sessions-btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.profile-logout-all-block .staff-record-feedback {
+  flex: 1 1 100%;
 }
 
 .logout-all-btn {
@@ -1991,23 +2004,8 @@ html.avatar-crop-open {
   display: none;
 }
 
-/* ---------- phones: logout-all and view-all share one row ---------- */
-@media (max-width: 899.98px) {
-  .profile-logout-all-block {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .profile-logout-all-block .logout-all-btn,
-  .profile-logout-all-block .view-sessions-btn {
-    flex: 1 1 auto;
-  }
-
-  .profile-logout-all-block .staff-record-feedback {
-    flex: 1 1 100%;
-  }
-}
+/* ---------- logout-all and view-all share one row ----------
+   (handled by the base .profile-logout-all-block rule above, at every width) */
 
 /* ---------- Active sessions: instant blur + shimmer skeleton preview ----------
    The moment a sessions button is pressed (htmx:beforeRequest) this skeleton
