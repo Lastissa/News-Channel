@@ -1838,7 +1838,7 @@ class ProfileSessionsPlacardView(View):
 
     def get(self, request):
         if not request.user.is_authenticated:
-            return redirect("auth:login")
+            return redirect(reverse("auth:login") + "?" + urlencode({"to": reverse("home:profile")}))
 
         return render(
             request,
@@ -2354,7 +2354,7 @@ class ProfileView(View):
     def get(self, request):
         if not request.user.is_authenticated:
             messages.info(request, "sign in to open your profile.")
-            return redirect("auth:login")
+            return redirect(reverse("auth:login") + "?" + urlencode({"to": request.get_full_path()}))
 
         profile = StaffProfile.objects.filter(auth=request.user).first()
         bookmark_qs = Bookmark.objects.filter(user=request.user).select_related("blog").order_by("-created_at")

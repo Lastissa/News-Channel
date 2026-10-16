@@ -144,7 +144,10 @@ def _try_send_new_story_batch_email(blog: object):
             main_content=main_content,
             end_note=f"{About.project_name} Team",
             unsubscribe_query=f"type=author_post&email={quote(email)}",
-            preference_note="To personalize the categories of mail you receive, contact us at support@abureport.com.ng or visit your profile.",
+            preference_note=(
+                "You can choose the kind of email you receive from us in your "
+                f'<a href="{About.domain}/profile/">profile</a>.'
+            ),
         )
 
     _EMAIL_EXECUTOR.submit(_dispatch_batch_email, recipients, subject, build_html_for)

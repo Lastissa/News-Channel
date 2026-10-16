@@ -1,7 +1,9 @@
 import itertools
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
@@ -19,7 +21,12 @@ from BLOG.models import Blog, Category, get_category_choices, refresh_category_c
 from HOME.models import ReadingHistory, CategorySubscription, CategorySubscription
 from Partner.models import AdvertImage
 from SERVICE_INTERNAL import email_batch
-from SERVICE_INTERNAL.config import custom_context_processors
+from SERVICE_INTERNAL.config import About, custom_context_processors
+from SERVICE_INTERNAL.email_single import (
+    _try_send_new_comment_email,
+    _try_send_new_follower_email,
+    _try_send_story_like_email,
+)
 from STAFF.models import AuthorFollow, StaffProfile
 
 
@@ -445,6 +452,92 @@ class NewStoryAlertTests(QuietTestCase):
         lowered = [r.lower() for r in recipients]
         self.assertIn("neutral@example.com", lowered)
         self.assertNotIn("muted@example.com", lowered)
+
+    def test_alert_mail_tells_readers_they_can_filter_from_their_profile(self):
+        Auth.objects.create_user(email="reader@example.com", send_newsletter=True)
+
+        with mock.patch("HOME.views.ping_indexnow"), mock.patch(
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR"
+        ) as executor:
+            response = self._publish()
+
+        self.assertEqual(response.status_code, 201)
+        _, _, _, build_html_for = executor.submit.call_args[0]
+        html = build_html_for("reader@example.com")
+        self.assertIn("choose the kind of email you receive", html)
+        self.assertIn(f'href="{About.domain}/profile/"', html)
+
+
+class ProfileSignInRedirectTests(QuietTestCase):
+    """A guest who lands on their profile is sent to sign in, and the profile
+    is carried through as the return path so signing in lands them back there."""
+
+    def test_guest_profile_redirects_to_login_with_profile_as_return_path(self):
+        response = self.client.get(reverse("home:profile"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(reverse("auth:login")))
+        self.assertEqual(
+            parse_qs(urlsplit(response["Location"]).query).get("to"),
+            ["/profile/"],
+        )
+
+    def test_signing_in_from_that_redirect_returns_to_profile(self):
+        user = Auth.objects.create_user(email="guest@example.com", password="secret123")
+
+        response = self.client.post(
+            reverse("auth:login"),
+            {"email": user.email, "password": "secret123", "to": "/profile/"},
+        )
+
+        self.assertRedirects(response, reverse("home:profile"), fetch_redirect_response=False)
+
+
+class EngagementEmailCopyTests(TestCase):
+    """The like / comment / new-follower alerts use a plain action headline
+    (not the raw story heading) and point readers at their profile to manage
+    the mail they receive."""
+
+    def _capture(self, sender, *args):
+        with mock.patch("SERVICE_INTERNAL.email_single._dispatch_email") as dispatch:
+            sender(*args)
+        dispatch.assert_called_once()
+        receiver, subject, html = dispatch.call_args[0]
+        return subject, html
+
+    def test_story_like_email_has_a_clear_headline_and_profile_link(self):
+        author = SimpleNamespace(email="author@example.com")
+        blog = SimpleNamespace(heading="Campus shuttle routes change", likes=3, slug="shuttle", pk=1)
+
+        subject, html = self._capture(_try_send_story_like_email, author, blog, "Ada")
+
+        self.assertIn("New like on your story", subject)
+        self.assertIn("New like on your story", html)
+        self.assertIn("Campus shuttle routes change", html)
+        self.assertIn(f'href="{About.domain}/profile/"', html)
+        self.assertNotIn("Keep up the great work", html)
+
+    def test_comment_email_has_a_clear_headline_and_profile_link(self):
+        author = SimpleNamespace(email="author@example.com")
+        blog = SimpleNamespace(heading="Campus shuttle routes change", slug="shuttle", pk=1)
+        comment = SimpleNamespace(content="Great report, thanks for the detail.")
+
+        subject, html = self._capture(_try_send_new_comment_email, author, blog, comment, "Ada")
+
+        self.assertIn("New comment on your story", subject)
+        self.assertIn("New comment on your story", html)
+        self.assertIn("Campus shuttle routes change", html)
+        self.assertIn(f'href="{About.domain}/profile/"', html)
+
+    def test_follower_email_has_a_clear_headline_and_profile_link(self):
+        author = SimpleNamespace(email="author@example.com")
+
+        subject, html = self._capture(_try_send_new_follower_email, author, "Ada", 4)
+
+        self.assertIn("You have a new follower", subject)
+        self.assertIn("You have a new follower", html)
+        self.assertIn(f'href="{About.domain}/profile/"', html)
+        self.assertNotIn("<p>Hi,</p>", html)
 
 
 class CategoryEmailPreferenceTests(QuietTestCase):

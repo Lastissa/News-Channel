@@ -247,22 +247,24 @@ def _try_send_story_like_email(author: object, blog: object, liker_label: str):
     reader's full name when they have a staff profile, otherwise a masked
     email, so no reader address is handed out in full.
 
-    The story heading is the email's headline so the author sees which story
-    was liked before any filler copy.
+    The headline is a plain action ("New like on your story") so the mail
+    reads as a notification, not as the story itself; the heading is named in
+    the body instead.
     """
     safe_heading = " ".join(blog.heading.splitlines())
-    subject = f"{safe_heading} was liked on {About.project_name}"
+    subject = f"New like on your story: {safe_heading}"
     main_content = (
-        f"<p><strong>{escape(liker_label)}</strong> liked your story. "
-        f"It now has <strong>{blog.likes}</strong> like{'' if blog.likes == 1 else 's'}.</p>"
+        f"<p><strong>{escape(liker_label)}</strong> liked your story "
+        f"<strong>{escape(blog.heading)}</strong>. It now has "
+        f"<strong>{blog.likes}</strong> like{'' if blog.likes == 1 else 's'}.</p>"
         f'<p><a href="{About.domain}/story/{blog.slug}/">Open the story</a></p>'
     )
     html_message = _build_email_html(
-        title=escape(blog.heading),
+        title="New like on your story",
         main_content=main_content,
-        end_note=f"Keep up the great work,<br>{About.project_name} Team",
+        end_note=f"{About.project_name} Team",
         unsubscribe_query=None,
-        preference_note="You can turn like alerts off from your profile settings at any time.",
+        preference_note=f'You can turn like alerts off in your <a href="{About.domain}/profile/">profile</a>.',
     )
     _dispatch_email(author.email, subject, html_message)
     info_logger(msg=f"EMAIL: story like alert sent to {author.email} for blog={blog.pk}")
@@ -300,24 +302,25 @@ def _try_send_new_comment_email(author: object, blog: object, comment: object, c
     (BLOG.views.CommentCreateView) checks the author's StaffProfile
     'get_comment_notification' preference and skips self-comments.
 
-    The story heading is the email's headline, then the commenter and the
-    comment itself, so the author knows at a glance which story got the
-    comment.
+    The headline is a plain action ("New comment on your story") and the body
+    names the story plus the comment itself, so the author knows at a glance
+    which story got the comment.
     """
     safe_heading = " ".join(blog.heading.splitlines())
-    subject = f"New comment on {safe_heading}"
+    subject = f"New comment on your story: {safe_heading}"
     excerpt = comment.content if len(comment.content) <= 240 else comment.content[:237] + "..."
     main_content = (
-        f"<p><strong>{escape(commenter_label)}</strong> commented on your story:</p>"
+        f"<p><strong>{escape(commenter_label)}</strong> commented on "
+        f"<strong>{escape(blog.heading)}</strong>:</p>"
         f"<blockquote>{escape(excerpt)}</blockquote>"
         f'<p><a href="{About.domain}/story/{blog.slug}/">Open the story</a></p>'
     )
     html_message = _build_email_html(
-        title=escape(blog.heading),
+        title="New comment on your story",
         main_content=main_content,
         end_note=f"{About.project_name} Team",
         unsubscribe_query=None,
-        preference_note="You can turn comment alerts off from your profile settings at any time.",
+        preference_note=f'You can turn comment alerts off in your <a href="{About.domain}/profile/">profile</a>.',
     )
     _dispatch_email(author.email, subject, html_message)
     info_logger(msg=f"EMAIL: new comment alert sent to {author.email} for blog={blog.pk}")
@@ -409,18 +412,16 @@ def _try_send_new_follower_email(author: object, follower_label: str, follower_c
     """
     subject = f"You have a new follower on {About.project_name}"
     main_content = (
-        "<p>Hi,</p>"
-        f"<p><strong>{escape(follower_label)}</strong> just started following you on {About.project_name}.</p>"
-        f"<p>You now have <strong>{follower_count}</strong> follower{'' if follower_count == 1 else 's'}. "
-        "They will get your new stories in their inbox.</p>"
+        f"<p><strong>{escape(follower_label)}</strong> started following you. "
+        f"You now have <strong>{follower_count}</strong> follower{'' if follower_count == 1 else 's'}.</p>"
         f'<p><a href="{About.domain}/profile/">Open your profile</a></p>'
     )
     html_message = _build_email_html(
-        title="New Follower",
+        title="You have a new follower",
         main_content=main_content,
-        end_note=f"Keep up the great work,<br>{About.project_name} Team",
+        end_note=f"{About.project_name} Team",
         unsubscribe_query=f"type=new_follower_alert&email={quote(author.email)}",
-        preference_note="You can turn new follower alerts off from your profile settings at any time.",
+        preference_note=f'You can turn new follower alerts off in your <a href="{About.domain}/profile/">profile</a>.',
     )
     _dispatch_email(author.email, subject, html_message)
     info_logger(msg=f"EMAIL: new follower alert sent to {author.email} (followers={follower_count})")
