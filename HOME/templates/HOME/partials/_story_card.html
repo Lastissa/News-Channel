@@ -22,11 +22,11 @@
               data-endpoint="{% url 'home:bookmark' post.id %}"
               data-saved="{% if post.id in saved_ids %}true{% else %}false{% endif %}"
               aria-pressed="{% if post.id in saved_ids %}true{% else %}false{% endif %}"
-              aria-label="Save story">
+              aria-label="{% if post.id in saved_ids %}Remove from bookmarks{% else %}Save story{% endif %}">
         <svg viewBox="0 0 20 20" class="bookmark-icon" aria-hidden="true">
           <path d="M5 3.5h10a1 1 0 011 1V18l-6-3.6L4 18V4.5a1 1 0 011-1z" fill="{% if post.id in saved_ids %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
         </svg>
-        <span class="bookmark-label">Read later</span>
+        <span class="bookmark-label">{% if post.id in saved_ids %}Bookmarked{% else %}Read later{% endif %}</span>
       </button>
     </div>
   </div>

@@ -124,4 +124,7 @@ def custom_context_processors(request):
         'mobile': About.mobile,
         'customer_support_mobile': customer_support_mobile,
         'theme_preference': theme,
+        #   Exposed so templates can gate production-only third-party tags
+        #   (e.g. Google AdSense in base.html) off localhost/dev entirely.
+        'debug': settings.DEBUG,
     }

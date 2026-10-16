@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, logout as auth_logout
 from django.contrib.sessions.models import Session
 from django.core.exceptions import BadRequest, ValidationError
-from django.core.paginator import Paginator, EmptyPage
+from django.core.paginator import Paginator, EmptyPage, Page
 from django.core.validators import URLValidator
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Prefetch
@@ -24,7 +24,6 @@ from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark, CategorySubscription
 from Partner.models import AdvertImage
 from SERVICE_INTERNAL.abstract import (
-    _optimization,
     _response,
     cache_or_run,
     get_cache,
@@ -56,7 +55,7 @@ from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, Staff
 
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE = 25  #   THE AMOUNT OF NEWs  TO FIRDT LOAD + THE PAGINATION AS WELL
+PAGE_SIZE = 25  #   THE AMOUNT OF NEWs  TO FIRDT LOAD excluding the feratured + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
 TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
 
@@ -73,8 +72,8 @@ CONTINUE_GUEST_MIN = 3  #   PREFER A RANDOM CATEGORY WITH AT LEAST THIS MANY STO
 #   read many times in a session, so it shows at most once an hour. The two use
 #   separate storage scopes, so seeing it on the home page does not suppress it
 #   on a story (and the other way round).
-CONTINUE_COOLDOWN_HOME_MS = 12 * 60 * 60 * 1000  #   12 HOURS
-CONTINUE_COOLDOWN_STORY_MS = 60 * 60 * 1000  #   1 HOUR
+CONTINUE_COOLDOWN_HOME_MS = 12 * 60 * 60 * 1000  #   12 HOURS # INSIDE THE HOME PAGE
+CONTINUE_COOLDOWN_STORY_MS = 60 * 60 * 1000  #   1 HOUR       # INSIDE THE STORY PAGE
 
 
 NOTFOUND_SUGGESTION_COUNT = 3  #   HOW MANY LATEST STORIES THE 404 PAGES SUGGEST
@@ -399,23 +398,60 @@ def _page_context(page, user):
     }
 
 
-def _featured_home_posts():
-    """The FEATURED_COUNT newest stories -- the only slice of the home page
-    that is cached.
+class _HomeFirstPagePaginator(Paginator):
+    """Paginator for the cached home page 1.
 
-    Bounded (one small row set) and held under a single shared key with a sane
-    TTL. The BLOG/STAFF/ADMIN signals clear that key the moment a story, staff
-    profile or site setting changes, so publishing or editing is reflected on
-    the very next request instead of lingering in a never-expiring list. The
-    rest of the grid is fetched one page at a time straight from the database
-    (see HomeView and LoadMoreView), so the full story table is never loaded
-    into memory.
+    Page 1 is served from a cached snapshot, so there is no queryset left to run
+    COUNT against. `total` is the cached grid total across every page; feeding it
+    through `count` lets the inherited num_pages / page_range / has_next all work
+    without a database round trip.
     """
+
+    def __init__(self, object_list, per_page, total):
+        super().__init__(object_list, per_page)
+        self._total = total
+
+    @property
+    def count(self):
+        return self._total
+
+
+def _build_home_first_page():
+    """Assemble the page-1 snapshot: the hero head plus the first grid page.
+
+    One shared key covers both halves so they can never disagree about which
+    stories are "featured" (the grid is everything except them) while the cache
+    is being refilled. Only the first request after an invalidation pays for it;
+    until a story, staff profile or site setting changes (the signals clear the
+    key) every home request is a cache hit. The rest of the grid is sliced from
+    the database one page at a time, so the full story table is never loaded.
+    """
+    featured = list(_home_blog_queryset()[:FEATURED_COUNT])
+    featured_ids = {post.id for post in featured}
+    grid_qs = _home_blog_queryset().exclude(id__in=featured_ids)
+    return {
+        "featured": featured,
+        "grid": list(grid_qs[:PAGE_SIZE]),
+        "total": grid_qs.count(),
+    }
+
+
+def _home_first_page():
+    """The cached home page-1 snapshot (hero head + first grid page)."""
     return cache_or_run(
         HOME_BLOGS_CACHE_KEY,
-        fn=lambda: {"posts": list(_home_blog_queryset()[:FEATURED_COUNT])},
+        fn=_build_home_first_page,
         timeout=HOME_BLOGS_CACHE_TTL,
-    )["posts"]
+    )
+
+
+def _featured_home_posts():
+    """The FEATURED_COUNT newest stories -- the hero head of page 1.
+
+    Kept as a small accessor for the later pages: LoadMoreView and HomeView
+    page 2+ read it purely to know which stories the grid must leave out.
+    """
+    return _home_first_page()["featured"]
 
 
 def _continue_recent_stories(user, exclude_ids=None):
@@ -708,17 +744,26 @@ class HomeView(View):
 
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
 
-        #   FEATURED: the small, cached head of the page. GRID: everything
-        #   else, sliced by the database (Paginator on a queryset runs COUNT +
-        #   LIMIT) instead of materialising every story in the project.
-        featured = _featured_home_posts()
-        featured_ids = {post.id for post in featured}
-        grid_qs = _home_blog_queryset().exclude(id__in=featured_ids)
-        paginator = Paginator(grid_qs, PAGE_SIZE)
+        #   PAGE 1 is served from the cache: the hero head and the first grid
+        #   page live under one key (see _home_first_page) so the vast majority
+        #   of readers, who never leave page 1, never touch the story table.
+        #   Later pages still slice the database; the per-user overlays
+        #   (saved_ids, continue reading) are always live and never cached.
+        if page_number == 1:
+            blob = _home_first_page()
+            featured = blob["featured"]
+            grid_items = blob["grid"]
+            paginator = _HomeFirstPagePaginator(grid_items, PAGE_SIZE, blob["total"])
+            page = Page(grid_items, 1, paginator)
+        else:
+            featured = _featured_home_posts()
+            featured_ids = {post.id for post in featured}
+            grid_qs = _home_blog_queryset().exclude(id__in=featured_ids)
+            paginator = Paginator(grid_qs, PAGE_SIZE)
 
-        if page_number > paginator.num_pages and paginator.num_pages:
-            raise Http404("Page not found.")
-        page = paginator.get_page(page_number)
+            if page_number > paginator.num_pages and paginator.num_pages:
+                raise Http404("Page not found.")
+            page = paginator.get_page(page_number)
 
         #   HEADLINE TICKER: same continuous marquee behaviour as the top-of-page
         #   reading ticker on the story page (BLOG.views.build_ticker_text /

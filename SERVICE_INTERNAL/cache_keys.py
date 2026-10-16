@@ -16,4 +16,4 @@ HOME_BLOGS_CACHE_KEY = "home_page_blogs_v2"
 #   Seconds. A TTL is a safety net only: the signals above clear the key the
 #   moment content changes, so the cache is normally invalidated long before
 #   this expires.
-HOME_BLOGS_CACHE_TTL = 300
+HOME_BLOGS_CACHE_TTL = 60*60 # I CHANGED THE TTL TO 1 HOUR 

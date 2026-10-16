@@ -308,6 +308,11 @@
     btn.classList.toggle("is-saved", saved);
     var path = btn.querySelector("path");
     if (path) path.setAttribute("fill", saved ? "currentColor" : "none");
+    var label = btn.querySelector(".bookmark-label");
+    if (label) {
+      label.textContent = saved ? "Bookmarked" : "Read later";
+      btn.setAttribute("aria-label", saved ? "Remove from bookmarks" : "Save story");
+    }
     if (btn.classList.contains("profile-bookmark-toggle")) {
       btn.setAttribute("aria-label", saved ? "Remove bookmark" : "Save bookmark");
       btn.setAttribute("title", saved ? "Remove bookmark" : "Save bookmark");
