@@ -860,7 +860,12 @@ class StoryReportView(View):
 
 class CommentCreateView(View):
     def post(self, request, blog_id):
-        remaining_time, limited = is_rate_limited(request, 5, 3, )
+        remaining_time, limited = is_rate_limited(
+            request,
+            timeout_window=5,
+            max_requests=3,
+            scope="comment",
+        )
         if limited:
             return JsonResponse({'detail': f'too many request, wait {remaining_time} seconds and retry'}, status = 429)
         blog = get_object_or_404(Blog, pk=blog_id)

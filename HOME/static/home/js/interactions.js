@@ -1483,7 +1483,12 @@
     }
 
     var formData = new FormData(commentForm);
-    fetch("/story/" + document.querySelector("[data-story-like-form]").dataset.endpoint.split("/")[2] + "/comment/", {
+    //   Post to the comment form's OWN action (the {% url %} the server already
+    //   rendered). Deriving the story id out of the like form's endpoint used to
+    //   throw on any page without a like form and made the commenter depend on
+    //   an unrelated element.
+    var commentEndpoint = commentForm.getAttribute("action") || commentForm.action;
+    fetch(commentEndpoint, {
       method: "POST",
       headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
       credentials: "same-origin",
@@ -1523,7 +1528,7 @@
         textarea.value = "";
         refreshCommentCount();
         ensureEmptyCommentPlaceholder();
-        bottomboast(payload.detail || "Comment posted.");
+        bottomtoast(payload.detail || "Comment posted.");
       })
       .catch(function () {
         if (submitBtn) {
