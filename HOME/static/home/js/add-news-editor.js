@@ -670,12 +670,26 @@
       body: data,
     })
       .then(function (response) {
-        return response.text().then(function (text) { return { ok: response.ok, status: response.status, text: text }; });
+        var contentType = response.headers.get("Content-Type") || "";
+        return response.text().then(function (text) {
+          return { ok: response.ok, status: response.status, text: text, isJson: contentType.indexOf("application/json") !== -1 };
+        });
       })
       .then(function (result) {
         setPublishPending(false);
         var payload = {};
         try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* ignore */ }
+
+        /* The session can expire while the editor sits open. The server now
+           answers a signed-out publish with 401 JSON instead of a login-page
+           redirect. If an older or proxied server still redirects, the fetch
+           follows it and we get HTML with a 200 -- never treat that as a
+           published story either. */
+        if (result.status === 401 || result.status === 403 || (result.ok && !result.isJson)) {
+          toast(extractDetail(result.text, "Your session has expired. Refresh the page and sign in again to publish."), "error");
+          window.setTimeout(function () { window.location.reload(); }, 1200);
+          return;
+        }
 
         /* advisory notes: tell the author, then let THEM decide */
         if (result.status === 409 && payload.needs_confirmation && payload.warnings && payload.warnings.length) {

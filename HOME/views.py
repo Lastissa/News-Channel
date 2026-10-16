@@ -974,6 +974,16 @@ class AddNewsView(View):
 
     def dispatch(self, request, *args, **kwargs):
         if not staff_only(request.user):
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                # The editor publishes by fetch. A redirect to the login page
+                # would be followed silently, so the browser would hand the
+                # script the login page's HTML with a 200 and it would look
+                # like a successful publish. Answer the request itself with a
+                # status the script can recognise instead.
+                return _response(
+                    {"detail": "You are not signed in. Refresh the page and sign in again to publish."},
+                    status=401,
+                )
             messages.info(request, "Sign in to open the editor.")
             url = reverse("auth:login") + "?" + urlencode({"to": "/add-news"})
             return redirect(url)

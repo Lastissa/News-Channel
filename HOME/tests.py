@@ -318,6 +318,34 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Blog.objects.get(author=self.author).content, content)
 
+    def test_signed_out_xhr_publish_returns_401_json_not_a_redirect(self, _ping):
+        self.client.logout()
+        response = self.client.post(
+            self.url,
+            {"heading": "Some heading", "category": "GENERAL", "content": "Some body."},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        # A redirect would be followed silently by fetch and its HTML would look
+        # like a successful publish; the editor must get a status it can read.
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("application/json", response["Content-Type"])
+        self.assertIn("sign", response.json()["detail"].lower())
+        self.assertFalse(Blog.objects.exists())
+
+    def test_signed_out_form_post_still_redirects_to_login(self, _ping):
+        self.client.logout()
+        response = self.client.post(self.url, {"heading": "Some heading"})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("auth:login"), response["Location"])
+
+    def test_formatting_guide_tells_authors_to_avoid_unverifiable_claims(self, _ping):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Avoid claims we cannot independently verify while writing news.")
+
 
 class NewStoryAlertTests(QuietTestCase):
     """Publishing a story (HOME.views.AddNewsView) must queue the new-story
@@ -750,6 +778,10 @@ class EditNewsViewTests(QuietTestCase):
         self.assertIn("disabled", heading_input)
         self.assertNotIn("name=", heading_input)
 
+    def test_edit_guide_tells_authors_to_avoid_unverifiable_claims(self, _ping):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Avoid claims we cannot independently verify while writing news.")
+
     def test_get_keeps_a_retired_category_selectable(self, _ping):
         legacy = make_story(self.author, heading="Old one", category="SECURITY")
         response = self.client.get(reverse("home:edit_news", args=[legacy.id]))
@@ -1095,6 +1127,11 @@ class AuthorHandbookViewTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Author handbook")
         self.assertContains(response, "Using AI")
+
+    def test_handbook_tells_authors_to_avoid_unverifiable_claims(self):
+        self.client.force_login(make_staff())
+        response = self.client.get(self.url)
+        self.assertContains(response, "Avoid claims we cannot independently verify while writing news.")
 
     def test_members_are_sent_away(self):
         member = Auth.objects.create_user(email="member@example.com")
