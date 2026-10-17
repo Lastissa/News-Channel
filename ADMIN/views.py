@@ -703,7 +703,6 @@ level people never reach here -- every view below is admin_only.
 GALLERY_PAGE_SIZE = 12   #   staff gallery strip, bigger than the old 5-row list since it scrolls horizontally
 SESSIONS_PAGE_SIZE = 5
 SPECIALITY_PAGE_SIZE = 5
-USER_DIRECTORY_PAGE_SIZE = 20   #   the whole point is to browse members, so page bigger than the action lists
 MEMBER_PAGE_SIZE = 12   #   ANALYTICS Members table: six columns, so a dozen rows fit before paging
 
 
@@ -995,32 +994,6 @@ class PanelStaffGalleryView(View):
         )
 
 
-def user_directory_queryset():
-    """Every regular member account -- the exact complement of
-    staff_directory_queryset: no staff, no admin, no superuser authority.
-    This is the same group the mass-email "Member" toggle reaches."""
-    return Auth.objects.filter(is_staff=False, is_admin=False, is_superuser=False).order_by("-date_joined")
-
-
-def user_directory_rows(account_list):
-    """Shape regular accounts into the row payload panel.js renders. The
-    address is only ever exposed masked, never raw."""
-    rows = []
-    for account in account_list:
-        local = (account.email or "").partition("@")[0]
-        rows.append(
-            {
-                "id": account.pk,
-                "email_masked": _mask_email(account.email),
-                "initial": (local[:1] or "?").upper(),
-                "profile_img": account.profile_img or "",
-                "joined_at": timezone.localtime(account.date_joined).strftime("%b %d, %Y"),
-                "is_active": account.is_active,
-            }
-        )
-    return rows
-
-
 def _since_label(when, now):
     """'Today' / 'Yesterday' / 'N days ago' / a dated fallback, in local time.
 
@@ -1074,37 +1047,6 @@ def member_directory_rows(account_list):
             }
         )
     return rows
-
-
-class PanelUserDirectoryView(View):
-    """Admin-only JSON feed of regular member accounts for the panel's "Users"
-    card. Deliberately never rendered into the panel shell: the card ships a
-    skeleton and panel.js GETs this the moment the page arrives, so the
-    directory is not part of the first paint. Read only by design."""
-
-    def get(self, request):
-        if not admin_only(request.user):
-            return JsonResponse({"detail": "Admin access is required to view This Page."}, status=403)
-
-        page_number = _resolve_page_number(request.GET.get("page"), default=1)
-        paginator = Paginator(user_directory_queryset(), USER_DIRECTORY_PAGE_SIZE)
-        if page_number > paginator.num_pages and paginator.num_pages:
-            raise Http404("Page not found.")
-        page = paginator.get_page(page_number)
-
-        return JsonResponse(
-            {
-                "items": user_directory_rows(list(page.object_list)),
-                "page": page.number,
-                "num_pages": paginator.num_pages,
-                "has_next": page.has_next(),
-                "next_page": page.next_page_number() if page.has_next() else None,
-                "has_previous": page.has_previous(),
-                "previous_page": page.previous_page_number() if page.has_previous() else None,
-                "total_people": paginator.count,
-            },
-            status=200,
-        )
 
 
 def _session_detail_rows(account, now):
