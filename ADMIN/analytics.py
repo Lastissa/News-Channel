@@ -89,15 +89,25 @@ TREND_RANGE_CHOICES = [
 ]
 
 
+#   The project's week runs Sunday to Saturday (Python: Monday is 0, Sunday is
+#   6). STAFF.views uses the same rule for "author of the week", so every part
+#   of the site agrees on where a week begins.
+WEEK_START_WEEKDAY = 6
+
+#   Overview window. "Last 30 days" is a rolling window rather than a calendar
+#   month, so it always means the same span wherever it is read.
+OVERVIEW_MONTH_DAYS = 30
+
+
 def _local_midnight(moment):
     """Midnight, local time, for the day `moment` falls on."""
     return timezone.localtime(moment).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def _monday_midnight(moment):
-    """Midnight of the Monday of the week `moment` falls in."""
+def _week_start(moment):
+    """Midnight of the Sunday that begins the week `moment` falls in."""
     local = _local_midnight(moment)
-    return local - timedelta(days=local.weekday())
+    return local - timedelta(days=(local.weekday() - WEEK_START_WEEKDAY) % 7)
 
 
 def _safe_values(queryset, field):
@@ -137,14 +147,14 @@ def _fmt_range(start, end):
 
 
 def stories_per_week(period):
-    """Bar chart data: one bar per Monday aligned week in the selected window.
+    """Bar chart data: one bar per Sunday aligned week in the selected window.
 
     Returns a ready to render dict:
         {type, labels, tooltips, series: [ {name, color, values} ], total}
     """
     weeks = STORY_PERIODS.get(period, STORY_PERIODS[DEFAULT_STORY_PERIOD])
     now = timezone.localtime()
-    start = _monday_midnight(now - timedelta(weeks=weeks - 1))
+    start = _week_start(now - timedelta(weeks=weeks - 1))
 
     stamps = _safe_values(Blog.objects.filter(date_created__gte=start), "date_created")
     values = _bucket_counts(stamps, start, timedelta(days=7), weeks)
@@ -181,7 +191,7 @@ def trends(bucket, selected_range, series_keys):
     now = timezone.localtime()
 
     if bucket == "week":
-        start = _monday_midnight(now - timedelta(days=range_days - 1))
+        start = _week_start(now - timedelta(days=range_days - 1))
     else:
         start = _local_midnight(now - timedelta(days=range_days - 1))
 
@@ -219,6 +229,86 @@ def trends(bucket, selected_range, series_keys):
         "bucket": bucket,
         "range": selected_range,
     }
+
+
+#   -------------------------------------------------------------------------
+#   MEMBER OVERVIEW -- the "Quick overview" card and its top-bar badge
+#   -------------------------------------------------------------------------
+#   Three member figures, each counted over the same windows: today, the
+#   current week (Sunday to now) and the last 30 days.
+#
+#   "Change since last week" is the current (unfinished) week measured against
+#   the whole of the previous week, which is what the owner asked for. Weeks
+#   start on Sunday, so both sides of the comparison are Sunday anchored.
+
+def _count_since(queryset, field, start, end=None):
+    """Count the rows in `queryset` whose `field` falls in [start, end)."""
+    rows = queryset.filter(**{f"{field}__gte": start})
+    if end is not None:
+        rows = rows.filter(**{f"{field}__lt": end})
+    return rows.count()
+
+
+def _new_users(start, end=None):
+    """Accounts created in the window."""
+    return _count_since(Auth.objects.all(), "date_joined", start, end)
+
+
+def _active_readers(start, end=None):
+    """Distinct accounts that opened a story in the window.
+
+    Counted from ReadingHistory (one row per reader/story pair, user always
+    set) rather than StoryView, so this matches the Members table's own "read a
+    story" activity filter instead of also counting anonymous opens.
+    """
+    rows = ReadingHistory.objects.filter(read_at__gte=start)
+    if end is not None:
+        rows = rows.filter(read_at__lt=end)
+    return rows.values("user_id").distinct().count()
+
+
+def _stories_published(start, end=None):
+    """Stories whose publish timestamp falls in the window."""
+    return _count_since(Blog.objects.all(), "date_created", start, end)
+
+
+def member_overview():
+    """The Quick overview card: new users, active readers, stories published."""
+    now = timezone.localtime()
+    today = _local_midnight(now)
+    week = _week_start(now)
+    last_week = week - timedelta(days=7)
+    month = today - timedelta(days=OVERVIEW_MONTH_DAYS - 1)
+
+    users_week = _new_users(week)
+    last_week_users = _new_users(last_week, week)
+    delta = users_week - last_week_users
+
+    return {
+        "users": {
+            "today": _new_users(today),
+            "month": _new_users(month),
+            #   Signed so the direction is readable without relying on colour
+            #   alone: +8 / -3 / 0.
+            "delta_display": f"+{delta}" if delta > 0 else (f"-{abs(delta)}" if delta < 0 else "0"),
+            "delta_tone": "is-up" if delta > 0 else ("is-down" if delta < 0 else "is-flat"),
+        },
+        "readers": {
+            "today": _active_readers(today),
+            "week": _active_readers(week),
+            "month": _active_readers(month),
+        },
+        "stories": {
+            "today": _stories_published(today),
+            "week": _stories_published(week),
+            "month": _stories_published(month),
+        },
+    }
+
+
+def member_new_today():
+    """The top-bar badge figure: accounts created since local midnight."""
+    return _new_users(_local_midnight(timezone.localtime()))
 
 
 #   -------------------------------------------------------------------------

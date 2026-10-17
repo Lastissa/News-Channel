@@ -31,13 +31,17 @@ html { scroll-behavior: smooth; }
 }
 .panel-aside { display: block; }
 
-/* The ANALYTICS button sits at the foot of the section sidebar on desktop
+/* The ANALYTICS buttons sit at the foot of the section sidebar on desktop
    (below the icon + label links) and directly below the horizontal section
-   bar on phones -- never over it. */
+   bar on phones -- never over it. All three chambers are stacked here. */
+.panel-analytics-group {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 0 16px;
+}
 .panel-analytics-btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 11px 16px; margin: 0 0 20px; border-radius: var(--radius-s);
-  font-size: 0.92rem; font-weight: 700; text-decoration: none;
+  padding: 10px 16px; border-radius: var(--radius-s);
+  font-size: 0.9rem; font-weight: 700; text-decoration: none;
   color: var(--paper); background: var(--brand-deep);
   box-shadow: var(--shadow-card);
   transition: transform .15s var(--panel-ease), filter .15s var(--panel-ease);
@@ -107,7 +111,6 @@ html { scroll-behavior: smooth; }
     transform: scaleY(0); transform-origin: top;
   }
   .panel-nav-link.is-active::after { transform: scaleY(1); }
-  .panel-analytics-btn { margin: 0; }
 }
 
 /* ---------- Grid + cards ---------- */

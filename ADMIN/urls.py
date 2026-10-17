@@ -20,9 +20,13 @@ urlpatterns = [
 
     path("panel/", views.PanelView.as_view(), name="panel"),
     path("panel/analytics/", views.AnalyticsView.as_view(), name="analytics"),
+    path("panel/analytics/overview/", views.AnalyticsOverviewView.as_view(), name="member_overview"),
+    path("panel/analytics/new-today/", views.AnalyticsNewTodayView.as_view(), name="member_new_today"),
     path("panel/analytics/stories/", views.AnalyticsStoriesChartView.as_view(), name="analytics_stories"),
     path("panel/analytics/trends/", views.AnalyticsTrendsChartView.as_view(), name="analytics_trends"),
     path("panel/analytics/members/", views.AnalyticsMembersView.as_view(), name="analytics_members"),
+    path("panel/analytics/staff/", views.StaffLyticsView.as_view(), name="staff_lytics"),
+    path("panel/analytics/partner/", views.PartnerLyticsView.as_view(), name="partner_lytics"),
     path("panel/gallery/", views.PanelStaffGalleryView.as_view(), name="panel_gallery"),
     path("panel/sessions/", views.PanelSessionsView.as_view(), name="panel_sessions"),
     path("panel/sessions/<int:account_id>/logout/", views.PanelSessionLogoutView.as_view(), name="panel_session_logout"),

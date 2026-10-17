@@ -1,0 +1,8 @@
+{% comment %}
+  htmx fragment: the "N new users today" badge.
+
+  Returned to an htmx GET against control:member_new_today and swapped into
+  the top bar of the ANALYTICS shell. Kept separate from the overview card so
+  it can refresh on its own.
+{% endcomment %}
+<span class="analytics-new-today"><strong>{{ count }}</strong> new user{{ count|pluralize }} today</span>

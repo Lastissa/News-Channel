@@ -1,0 +1,41 @@
+{% comment %}
+  htmx fragment: the "Quick overview" card.
+
+  Three member figures, each counted over today / this week / the last 30 days.
+  New users leads the card, but its "today" figure lives in the top-bar badge,
+  so the lead shows the week-on-week change and the month instead of repeating
+  the badge.
+
+  This partial is only ever returned to an htmx GET against
+  control:member_overview -- it is never rendered into the shell page.
+{% endcomment %}
+<div class="analytics-overview">
+  <div class="analytics-overview-lead">
+    <p class="analytics-overview-label">New users</p>
+    <div class="analytics-overview-figures">
+      <span class="analytics-overview-figure">
+        <strong class="analytics-overview-value {{ stats.users.delta_tone }}">{{ stats.users.delta_display }}</strong>
+        <span class="analytics-overview-caption">since last week</span>
+      </span>
+      <span class="analytics-overview-figure">
+        <strong class="analytics-overview-value">{{ stats.users.month }}</strong>
+        <span class="analytics-overview-caption">last 30 days</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="analytics-overview-tiles">
+    <div class="analytics-tile">
+      <p class="analytics-tile-label">Active readers</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.today }}</span> today</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.week }}</span> this week</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.month }}</span> last 30 days</p>
+    </div>
+    <div class="analytics-tile">
+      <p class="analytics-tile-label">Stories published</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.stories.today }}</span> today</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.stories.week }}</span> this week</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.stories.month }}</span> last 30 days</p>
+    </div>
+  </div>
+</div>

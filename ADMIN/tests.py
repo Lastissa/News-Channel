@@ -8,6 +8,7 @@ from unittest import mock
 
 import json
 import re
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.core.cache import cache
@@ -16,6 +17,7 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from ADMIN.analytics import _week_start, member_new_today, member_overview
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
@@ -839,3 +841,157 @@ class AnalyticsMembersTests(TestCase):
 
     def test_a_single_page_has_no_pager(self):
         self.assertNotIn("analytics-members-pagination", self.rows())
+
+
+class AnalyticsOverviewTests(TestCase):
+    """The ANALYTICS "Quick overview" card and the "new users today" badge.
+
+    Both are member-facing figures read from columns the database already has
+    (Auth.date_joined, ReadingHistory.read_at, Blog.date_created), fetched by
+    their own htmx GET and admin only. Windows: today, the current week (Sunday
+    to now) and the last 30 days; the change since last week is the current
+    week measured against the whole of the previous one.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="overview-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="overview-writer@example.com")
+        #   Push the two fixtures far outside every window so the numbers a
+        #   test reads are only ever the accounts that test created.
+        Auth.objects.filter(pk__in=[self.admin.pk, self.writer.pk]).update(
+            date_joined=timezone.now() - timedelta(days=400)
+        )
+
+        self.overview_url = reverse("control:member_overview")
+        self.badge_url = reverse("control:member_new_today")
+
+    def account_joined(self, email, when):
+        account = Auth.objects.create_user(email=email)
+        Auth.objects.filter(pk=account.pk).update(date_joined=when)
+        return account
+
+    def make_story(self, heading):
+        return Blog.objects.create(
+            author=self.writer, heading=heading, category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+
+    #   ------------------------------------------------------------ access
+    def test_both_endpoints_are_admin_only(self):
+        for url in [self.overview_url, self.badge_url]:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.force_login(self.writer)
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.logout()
+
+    def test_an_admin_can_read_both(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.overview_url).status_code, 200)
+        self.assertEqual(self.client.get(self.badge_url).status_code, 200)
+
+    #   ------------------------------------------------------------ shell
+    def test_the_shell_ships_both_targets_but_no_numbers(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:analytics")).content.decode()
+        self.assertIn("analytics-overview-body", body)
+        self.assertIn("analytics-new-today", body)
+        self.assertIn("analytics/overview/", body)
+        self.assertIn("analytics/new-today/", body)
+        self.assertNotIn("analytics-overview-data", body)
+
+    #   ------------------------------------------------------------ new users
+    def test_the_badge_counts_only_accounts_created_today(self):
+        self.account_joined("today@example.com", timezone.now())
+        self.account_joined("lastweek@example.com", timezone.now() - timedelta(days=8))
+        self.assertEqual(member_new_today(), 1)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.badge_url).content.decode()
+        self.assertIn("1", body)
+        self.assertIn("new user today", body)
+
+    def test_the_month_window_is_a_rolling_thirty_days(self):
+        self.account_joined("ten@example.com", timezone.now() - timedelta(days=10))
+        self.account_joined("forty@example.com", timezone.now() - timedelta(days=40))
+        stats = member_overview()
+        self.assertEqual(stats["users"]["today"], 0)
+        self.assertEqual(stats["users"]["month"], 1)
+
+    def test_this_week_is_measured_against_all_of_last_week(self):
+        #   One account this week, none last week -> +1.
+        self.account_joined("thisweek@example.com", timezone.now())
+        stats = member_overview()
+        self.assertEqual(stats["users"]["delta_display"], "+1")
+        self.assertEqual(stats["users"]["delta_tone"], "is-up")
+
+    def test_a_quiet_week_reports_a_negative_change(self):
+        #   No account this week; one on the previous week's Sunday.
+        last_sunday = _week_start(timezone.localtime()) - timedelta(days=7)
+        self.account_joined("lastweek@example.com", last_sunday + timedelta(hours=12))
+        stats = member_overview()
+        self.assertEqual(stats["users"]["delta_display"], "-1")
+        self.assertEqual(stats["users"]["delta_tone"], "is-down")
+
+    def test_an_empty_week_reads_as_zero_not_a_dash(self):
+        stats = member_overview()
+        self.assertEqual(stats["users"]["delta_display"], "0")
+        self.assertEqual(stats["users"]["delta_tone"], "is-flat")
+
+    #   ------------------------------------------------------------ readers + stories
+    def test_active_readers_counts_distinct_readers(self):
+        reader = self.account_joined("reader@example.com", timezone.now() - timedelta(days=5))
+        for index in range(2):
+            ReadingHistory.objects.create(user=reader, blog=self.make_story(f"Read story {index}"))
+        stats = member_overview()
+        self.assertEqual(stats["readers"]["today"], 1)
+        self.assertEqual(stats["readers"]["month"], 1)
+
+    def test_stories_published_counts_todays_stories(self):
+        self.make_story("Fresh overview story")
+        stats = member_overview()
+        self.assertEqual(stats["stories"]["today"], 1)
+
+    #   ------------------------------------------------------------ rendering
+    def test_the_overview_fragment_renders_the_three_metrics(self):
+        self.account_joined("today@example.com", timezone.now())
+        self.client.force_login(self.admin)
+        body = self.client.get(self.overview_url).content.decode()
+        self.assertIn("analytics-overview", body)
+        self.assertIn("since last week", body)
+        self.assertIn("Active readers", body)
+        self.assertIn("Stories published", body)
+
+
+class AnalyticsChamberPlaceholderTests(TestCase):
+    """The staff and partner analytics pages are placeholders for now, and the
+    PANEL sidebar links to all three chambers."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.admin = Auth.objects.create_admin(email="chamber-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="chamber-writer@example.com")
+
+    def test_the_placeholders_are_admin_only(self):
+        for name in ["control:staff_lytics", "control:partner_lytics"]:
+            with self.subTest(name=name):
+                self.assertEqual(self.client.get(reverse(name)).status_code, 302)
+                self.client.force_login(self.writer)
+                self.assertEqual(self.client.get(reverse(name)).status_code, 302)
+                self.client.logout()
+                self.client.force_login(self.admin)
+                self.assertEqual(self.client.get(reverse(name)).status_code, 200)
+                self.client.logout()
+
+    def test_the_panel_links_to_all_three_chambers(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:panel")).content.decode()
+        self.assertIn("Member lytics", body)
+        self.assertIn("Staff lytics", body)
+        self.assertIn("Partner lytics", body)

@@ -58,10 +58,20 @@
       <a class="panel-nav-link" href="#panel-speciality" aria-label="Search staff by speciality" title="Search staff by speciality"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="panel-nav-text">Speciality search</span></a>
     </nav>
 
-    <a class="panel-analytics-btn" href="{% url 'control:analytics' %}">
-      <svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg>
-      <span>Analytics</span>
-    </a>
+    <div class="panel-analytics-group">
+      <a class="panel-analytics-btn" href="{% url 'control:analytics' %}">
+        <svg class="ic" aria-hidden="true"><use href="#i-user"/></svg>
+        <span>Member lytics</span>
+      </a>
+      <a class="panel-analytics-btn" href="{% url 'control:staff_lytics' %}">
+        <svg class="ic" aria-hidden="true"><use href="#i-users"/></svg>
+        <span>Staff lytics</span>
+      </a>
+      <a class="panel-analytics-btn" href="{% url 'control:partner_lytics' %}">
+        <svg class="ic" aria-hidden="true"><use href="#i-image"/></svg>
+        <span>Partner lytics</span>
+      </a>
+    </div>
   </aside>
 
   <div class="panel-grid">

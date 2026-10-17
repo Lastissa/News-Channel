@@ -58,6 +58,8 @@ from ADMIN.analytics import (
     TREND_RANGE_CHOICES,
     member_category_filter_choices,
     member_directory_queryset,
+    member_new_today,
+    member_overview,
     member_page_details,
     stories_per_week,
     trends,
@@ -906,6 +908,63 @@ class AnalyticsMembersView(View):
                 "total": paginator.count,
                 "subscribed_total": queryset.filter(send_newsletter=True).count(),
             },
+        )
+
+
+class AnalyticsOverviewView(View):
+    """htmx fragment: the ANALYTICS "Quick overview" card.
+
+    Read only and admin only, like every other figure endpoint. The whole card
+    is one GET carrying no controls, so the shell stays number-free and the
+    figures always arrive from a fragment.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        return render(request, "ADMIN/partials/analytics_overview.html", {"stats": member_overview()})
+
+
+class AnalyticsNewTodayView(View):
+    """htmx fragment: the "N new users today" badge in the ANALYTICS top bar.
+
+    Its own GET, separate from the overview card, so the badge can refresh on
+    its own without redrawing everything else.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        return render(request, "ADMIN/partials/analytics_new_today.html", {"count": member_new_today()})
+
+
+class StaffLyticsView(View):
+    """Placeholder for the staff chamber of analytics (not built yet)."""
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+
+        return render(
+            request,
+            "ADMIN/analytics_placeholder.html",
+            {"heading": "Staff lytics", "message": "Staff analytics is not built yet. It will cover story production and authors."},
+        )
+
+
+class PartnerLyticsView(View):
+    """Placeholder for the partner chamber of analytics (not built yet)."""
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+
+        return render(
+            request,
+            "ADMIN/analytics_placeholder.html",
+            {"heading": "Partner lytics", "message": "Partner analytics is not built yet. It will cover adverts and announcements."},
         )
 
 

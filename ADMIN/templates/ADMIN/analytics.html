@@ -2,7 +2,7 @@
 {% block adsense %}{% endblock %}
 {% load static %}
 
-{% block title %}Analytics · {{ project_name }}{% endblock %}
+{% block title %}Member lytics · {{ project_name }}{% endblock %}
 {% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 
 {% block extra_head %}
@@ -33,10 +33,35 @@
       <svg class="ic" aria-hidden="true"><use href="#i-left"/></svg>
       <span>Panel</span>
     </a>
-    <h1 class="analytics-title">Analytics</h1>
+    <h1 class="analytics-title">Member lytics</h1>
+    {% comment %}The badge owns the "new users today" figure and fetches it on
+       its own, so it can refresh without redrawing the overview card.{% endcomment %}
+    <div class="analytics-new-today-slot" id="analytics-new-today"
+         hx-get="{% url 'control:member_new_today' %}"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         aria-live="polite" aria-busy="true">
+      <span class="analytics-new-today analytics-new-today--loading">New users today&hellip;</span>
+    </div>
   </div>
 
   <div class="analytics-grid">
+
+    <section class="analytics-card" aria-labelledby="analytics-overview-title">
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <h2 id="analytics-overview-title">Quick overview</h2>
+      </header>
+      <div class="analytics-overview-body" id="analytics-overview-body"
+           hx-get="{% url 'control:member_overview' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading overview&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
 
     <section class="analytics-card" aria-labelledby="analytics-stories-title">
       <header class="analytics-card-header">
