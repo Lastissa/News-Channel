@@ -1013,6 +1013,21 @@ class BookmarkView(View):
         return _response({"detail": "Saved to bookmarks.", "bookmarked": True, "bookmark_count": blog.bookmarked_by.count()}, status=201)
 
 
+def _toc_mode_from_post(request):
+    """Read Blog.toc_mode off the editor's POST. The editor sends one of the
+    Blog.TOC_* integers; anything missing, non-numeric or out of range falls
+    back to TOC_OFF, so a tampered or stale form can never store a mode the
+    reader-side branch in BLOG.views.enhance_story_body does not understand."""
+    raw = (request.POST.get("toc_mode") or "").strip()
+    try:
+        mode = int(raw)
+    except (TypeError, ValueError):
+        return Blog.TOC_OFF
+    if mode in dict(Blog.TOC_MODE_CHOICES):
+        return mode
+    return Blog.TOC_OFF
+
+
 class AddNewsView(View):
     """Staff only two pane story editor. GET serves the split loading page,
     POST validates and publishes the story."""
@@ -1116,6 +1131,8 @@ class AddNewsView(View):
             )
 
         try:
+            toc_mode = _toc_mode_from_post(request)
+
             blog_data = dict(
                 author=request.user,
                 heading=heading,
@@ -1123,6 +1140,7 @@ class AddNewsView(View):
                 image_public_id=image_public_id,
                 category=category,
                 content=content,
+                toc_mode=toc_mode,
             )
             if image_info:
                 blog_data["image_info"] = image_info
@@ -1216,6 +1234,7 @@ class EditNewsView(View):
         image_info = (request.POST.get("image_info") or "").strip() or default_image_info
         category = (request.POST.get("category") or "").strip().upper()
         content = (request.POST.get("content") or "").strip()
+        toc_mode = _toc_mode_from_post(request)
 
         allowed_categories = {value for value, _ in get_category_choices()} | {blog.category}
         if category not in allowed_categories:
@@ -1283,7 +1302,8 @@ class EditNewsView(View):
             or new_public_id != blog.image_public_id
             or image_info != blog.image_info
         )
-        if not (changed_content or changed_banner):
+        changed_toc = bool(toc_mode != blog.toc_mode)
+        if not (changed_content or changed_banner or changed_toc):
             return _response({"detail": "No changes to save.", "changed": False, "story_url": story_path, "id": blog.pk}, status=200)
 
         #   AN UPLOADED FILE ALWAYS WINS OVER A PASTED URL, same rule as Add.
@@ -1311,6 +1331,7 @@ class EditNewsView(View):
         blog.image_info = image_info
         blog.category = category
         blog.content = content
+        blog.toc_mode = toc_mode
 
         #   update_fields, not a bare save(): a full save would write back the
         #   `views` / `likes` this request loaded and wipe any that came in while
@@ -1321,8 +1342,11 @@ class EditNewsView(View):
         #   or the BODY changed. A banner only save (new picture, new caption)
         #   is cosmetic, so it leaves both untouched: the reader facing "last
         #   updated" notice stays put and the sitemap lastmod / dateModified
-        #   JSON-LD do not move for a swapped picture.
-        update_fields = ["image_1", "image_public_id", "image_info", "category", "content"]
+        #   JSON-LD do not move for a swapped picture. The table of contents
+        #   dropdown works the same way: picking a new level (or turning the list
+        #   off) is saved (the story page must render it) but it is a display
+        #   choice, never an edit, so the last-published clock stays put.
+        update_fields = ["image_1", "image_public_id", "image_info", "category", "content", "toc_mode"]
         if changed_content:
             blog.last_edited = timezone.now()
             update_fields += ["last_edited", "last_updated"]
@@ -1344,6 +1368,14 @@ class EditNewsView(View):
 
         #   TELL BING/INDEXNOW THE PAGE CHANGED, same fire-and-forget ping Add uses
         ping_indexnow(f"{About.domain.rstrip('/')}{story_path}")
+
+        #   Clear the cached story page so the table of contents (and any other
+        #   changes) show immediately, even if the original cache was written
+        #   before this save.
+        try:
+            invalidate_cache(f"blog-{blog.slug}")
+        except Exception:
+            pass
 
         return _response(
             {"detail": "Story updated.", "changed": True, "story_url": story_path, "id": blog.pk},

@@ -68,6 +68,16 @@
   --doc-dont-wash: rgba(179, 64, 42, 0.11);
   --doc-note: #8A5300;
   --doc-note-wash: rgba(232, 163, 36, 0.18);
+  /* ---- Story table of contents: an always-dark "content section" ----
+     A deliberately different surface from the paper page. --toc-accent is a
+     solid signal border and the radius is large, so the section reads as its
+     own block rather than a box drawn on the article. */
+  --toc-bg: #07101C;
+  --toc-bg-soft: #0C1B2B;
+  --toc-fg: #E6F3F8;
+  --toc-muted: rgba(230, 243, 248, 0.62);
+  --toc-accent: #22D3EE;
+  --toc-rule: rgba(34, 211, 238, 0.20);
   color-scheme: light;
 }
 
@@ -116,6 +126,14 @@ html[data-theme="dark"] {
   --doc-dont-wash: rgba(255, 136, 118, 0.14);
   --doc-note: #EDB35A;
   --doc-note-wash: rgba(237, 179, 90, 0.16);
+  /* Story table of contents, dark theme: a deeper teal that still stands
+     apart from the --paper (#0B1420) it sits on. */
+  --toc-bg: #062632;
+  --toc-bg-soft: #0A3746;
+  --toc-fg: #EAFBFF;
+  --toc-muted: rgba(234, 251, 255, 0.66);
+  --toc-accent: #22D3EE;
+  --toc-rule: rgba(34, 211, 238, 0.24);
   color-scheme: dark;
 }
 
@@ -1245,12 +1263,169 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   font-size: 25px; line-height: 1.24; margin-top: 24px; margin-bottom: 12px; color: var(--ink);
 }
 .story-body h4 { font-size: 21px; line-height: 1.28; margin-top: 20px; margin-bottom: 10px; color: var(--ink); }
+/*  Every heading is a jump target for the story's table of contents, so an
+    anchor scroll must leave the sticky .site-header (height --header-h) its
+    room instead of hiding the heading underneath it. */
+.story-body h2, .story-body h3, .story-body h4 {
+  scroll-margin-top: calc(var(--header-h, 64px) + 14px);
+  /*  Lets the "you landed here" wash below fade back out after a table-of-
+      contents jump. Under prefers-reduced-motion the global rule shortens the
+      transition to nothing; the wash still shows for its full duration, it
+      just appears and clears without a fade. */
+  transition: background-color 0.5s ease, box-shadow 0.5s ease;
+}
+/*  Briefly wash the heading a reader jumped to, so it is obvious where the
+    table of contents landed even when the page hardly had to move. story-
+    toc.js adds .story-toc-target on the link's target and clears it again. */
+.story-body .story-toc-target {
+  background-color: rgba(34, 211, 238, 0.16);
+  box-shadow: inset 4px 0 0 0 var(--toc-accent);
+  border-radius: 6px;
+}
 .story-body p { margin: 0 0 21px; }
 .story-body ul, .story-body ol {
   padding-left: 1.4rem; margin-top: 0;
 }
 .story-body li { margin-bottom: 9px; }
 .story-body a { color: var(--amber-deep); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- story table of contents ----------
+   Built by BLOG.views.enhance_story_body and spliced in right after the
+   story's first paragraph, only when the author picked a Blog.toc_mode
+   other than "Off". A deliberate dark "content section" against the paper
+   page: a solid signal border, a clearly visible radius and a chevron
+   dropdown instead of the old + / - glyph.
+
+   Three collapse levels are chosen by the author:
+     1  title only   -- the outer disclosure starts closed
+     2  top sections -- outer open, every branch closed (# rows visible,
+                        each with a chevron for its ## / ### children)
+     3  fully open   -- outer open, every branch open
+
+   Lives in base.css (not blog/css/story-detail.css) because it is a
+   .story-body element: the news editor's live preview loads base.css too,
+   so author and reader see exactly the same list. Each row keeps
+   data-level (2/3/4) to show the #/##/### hierarchy the author wrote. */
+.story-toc {
+  margin: 4px 0 28px;
+  background: var(--toc-bg);
+  color: var(--toc-fg);
+  border: 2px solid var(--toc-accent);
+  border-radius: 20px;
+  overflow: hidden;
+  /*  Opening or closing a branch changes the section's height. Without this,
+      the browser's scroll anchoring re-anchors on whatever is below and yanks
+      the page up or down by the height that changed -- the "jump" a reader
+      sees. Opting the section out of anchoring keeps the page still. */
+  overflow-anchor: none;
+}
+.story-toc > details { margin: 0; }
+
+/*  Head row: the fixed "TABLE OF CONTENT" label, always shown. */
+.story-toc summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  padding: 16px 20px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.98rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  color: var(--toc-accent);
+  background: var(--toc-bg-soft);
+}
+.story-toc summary::-webkit-details-marker { display: none; }
+.story-toc summary::marker { content: ""; }
+.story-toc details[open] > summary { border-bottom: 1px solid var(--toc-rule); }
+
+/*  Chevron dropdown icon; points down when its disclosure is closed and up
+    when it is open. No transition: the reader asked for no animation. */
+.story-toc-chevron {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--toc-accent);
+}
+.story-toc details[open] > summary .story-toc-chevron { transform: rotate(180deg); }
+.story-toc-branch[aria-expanded="true"] .story-toc-chevron { transform: rotate(180deg); }
+
+.story-body .story-toc-list,
+.story-body .story-toc-children {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.story-body .story-toc-children { padding-left: 18px; }
+.story-body .story-toc-item { margin: 0; }
+.story-body .story-toc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 14px;
+  border-top: 1px solid var(--toc-rule);
+}
+.story-body .story-toc-list > .story-toc-item:first-child > .story-toc-row { border-top: none; }
+
+/*  A nested row that still has its own children gets a bullet in front of it,
+    so a sub-section that opens further reads differently from a plain
+    sub-heading at a glance. Top-level # sections are left alone. */
+.story-body .story-toc-children > .story-toc-item--has-children > .story-toc-row::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--toc-accent);
+}
+
+/*  The .story-body a rule colours every link amber and underlines it; the
+    TOC rows are scoped deeper so a contents row keeps its own colour until
+    it is hovered. */
+.story-body .story-toc-link {
+  flex: 1 1 auto;
+  display: block;
+  padding: 11px 0 11px 20px;
+  color: var(--toc-fg);
+  text-decoration: none;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.story-body .story-toc-children .story-toc-link { padding-left: 4px; }
+.story-body .story-toc-item[data-level="3"] > .story-toc-row > .story-toc-link,
+.story-body .story-toc-item[data-level="4"] > .story-toc-row > .story-toc-link {
+  color: var(--toc-muted);
+}
+.story-body .story-toc-item[data-level="4"] > .story-toc-row > .story-toc-link { font-size: 0.9rem; }
+.story-body .story-toc-link:hover,
+.story-body .story-toc-link:focus-visible {
+  color: var(--toc-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.story-toc-branch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--toc-accent);
+  cursor: pointer;
+}
+.story-toc-branch:hover,
+.story-toc-branch:focus-visible { background: var(--toc-rule); }
+.story-toc-children[hidden] { display: none; }
+
 .article-actions {
   margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line);
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;

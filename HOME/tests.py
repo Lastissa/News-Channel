@@ -325,6 +325,48 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Blog.objects.get(author=self.author).content, content)
 
+    def test_add_page_shows_the_table_of_contents_picker_off_by_default(self, _ping):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="toc_mode"')
+        self.assertContains(response, "data-editor-toc-mode")
+        html = response.content.decode()
+        #   Off is the pre-selected option, so a new story has no list.
+        self.assertIn('<option value="0" selected>Off - no contents list</option>', html)
+        self.assertNotIn('<option value="2" selected>', html)
+        #   The note that changing this never moves the published time.
+        self.assertContains(response, "not</strong> change the story's last published time")
+
+    def test_publishing_with_a_toc_level_stores_it(self, _ping):
+        response = self.post_story(
+            "University announces a new student transport schedule",
+            PUBLISHABLE_BODY,
+            toc_mode="2",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Blog.objects.get(author=self.author).toc_mode, Blog.TOC_TOP_LEVEL)
+
+    def test_publishing_without_a_toc_choice_leaves_it_off(self, _ping):
+        response = self.post_story(
+            "University announces a new student transport schedule",
+            PUBLISHABLE_BODY,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Blog.objects.get(author=self.author).toc_mode, Blog.TOC_OFF)
+
+    def test_publishing_with_a_bad_toc_value_falls_back_to_off(self, _ping):
+        response = self.post_story(
+            "University announces a new student transport schedule",
+            PUBLISHABLE_BODY,
+            toc_mode="99",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Blog.objects.get(author=self.author).toc_mode, Blog.TOC_OFF)
+
     def test_signed_out_xhr_publish_returns_401_json_not_a_redirect(self, _ping):
         self.client.logout()
         response = self.client.post(
@@ -1019,6 +1061,70 @@ class EditNewsViewTests(QuietTestCase):
         self.assertEqual(self.blog.image_info, "A brand new caption.")
         self.assertIsNone(self.blog.last_edited)
         self.assertEqual(self.blog.last_updated, before)
+
+    #   ------------------------------------------------------------ POST: table of contents picker
+    def test_choosing_a_toc_level_saves_it_without_marking_the_story_edited(self, _ping):
+        before = self.blog.last_updated
+        response = self.post(toc_mode="3")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["changed"])
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.toc_mode, Blog.TOC_FULL)
+        #   A display preference is NOT an edit: the reader facing "last updated"
+        #   notice must not move just because the author changed the contents list.
+        self.assertIsNone(self.blog.last_edited)
+        self.assertEqual(self.blog.last_updated, before)
+
+    def test_turning_the_toc_off_saves_it_without_marking_the_story_edited(self, _ping):
+        Blog.objects.filter(pk=self.blog.pk).update(toc_mode=Blog.TOC_FULL)
+        self.blog.refresh_from_db()
+        before = self.blog.last_updated
+
+        response = self.post(toc_mode="0")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["changed"])
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.toc_mode, Blog.TOC_OFF)
+        self.assertIsNone(self.blog.last_edited)
+        self.assertEqual(self.blog.last_updated, before)
+
+    def test_toc_change_alongside_a_body_change_still_marks_the_story_edited(self, _ping):
+        response = self.post(content="Changed body.", toc_mode="2")
+        self.assertEqual(response.status_code, 200)
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.content, "Changed body.")
+        self.assertEqual(self.blog.toc_mode, Blog.TOC_TOP_LEVEL)
+        self.assertIsNotNone(self.blog.last_edited)
+
+    def test_toc_only_edit_is_still_saved_even_though_it_is_not_an_edit(self, _ping):
+        #   Guards the exact trap the feature was asked to avoid: the picker is
+        #   persisted (the story page must render the list) while the public clock
+        #   stays put. So the save DOES happen, it is just not called an edit.
+        with mock.patch.object(Blog, "save", autospec=True, side_effect=Blog.save) as spy:
+            self.post(toc_mode="1")
+        fields = spy.call_args.kwargs["update_fields"]
+        self.assertIn("toc_mode", fields)
+        self.assertNotIn("last_edited", fields)
+        self.assertNotIn("last_updated", fields)
+
+    def test_an_out_of_range_toc_value_is_stored_as_off(self, _ping):
+        response = self.post(toc_mode="99")
+        self.assertEqual(response.status_code, 200)
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.toc_mode, Blog.TOC_OFF)
+
+    def test_get_reflects_the_saved_toc_choice(self, _ping):
+        html = self.client.get(self.url).content.decode()
+        toc_select = html[html.index('id="editor-toc-mode"'):]
+        toc_select = toc_select[: toc_select.index("</select>")]
+        self.assertIn('<option value="0" selected>', toc_select)
+
+        Blog.objects.filter(pk=self.blog.pk).update(toc_mode=Blog.TOC_TOP_LEVEL)
+        html = self.client.get(self.url).content.decode()
+        toc_select = html[html.index('id="editor-toc-mode"'):]
+        toc_select = toc_select[: toc_select.index("</select>")]
+        self.assertIn('<option value="2" selected>', toc_select)
 
     def test_first_upload_on_a_story_with_a_pasted_link_saves_the_new_public_id(self, _ping):
         upload = SimpleUploadedFile("pic.png", b"fake-bytes", content_type="image/png")

@@ -163,6 +163,34 @@ class Blog(models.Model):
     #   decision, not a quiet edit.
     heading = models.CharField(max_length=100, blank=False, null=False)
     content = models.TextField(blank=False, null=False)
+    #   AUTHOR CHOICE FOR THE STORY'S TABLE OF CONTENTS. "Off" by default, so an
+    #   older story renders exactly as it always did. Any other value turns each
+    #   #/##/### heading into a jump target and splices a "TABLE OF CONTENT"
+    #   section in right after the opening paragraph (see
+    #   BLOG.views.enhance_story_body). The value picks how much of the list is
+    #   open when a reader first lands on the story:
+    #     TOC_OFF        no list at all
+    #     TOC_TITLE_ONLY  the outer disclosure starts closed (title only)
+    #     TOC_TOP_LEVEL   outer open, only # rows shown, each with a chevron
+    #     TOC_FULL        outer open and every branch open
+    #   It is a DISPLAY PREFERENCE, not content: changing it never touches
+    #   `content` and never moves `last_edited` (see HOME.views.EditNewsView),
+    #   so switching the list on, off or between levels is not "an edit".
+    TOC_OFF = 0
+    TOC_TITLE_ONLY = 1
+    TOC_TOP_LEVEL = 2
+    TOC_FULL = 3
+    TOC_MODE_CHOICES = [
+        (TOC_OFF, "Off - no contents list"),
+        (TOC_TITLE_ONLY, "Level 1 - title only"),
+        (TOC_TOP_LEVEL, "Level 2 - top sections"),
+        (TOC_FULL, "Level 3 - fully open"),
+    ]
+    toc_mode = models.PositiveSmallIntegerField(
+        default=TOC_OFF,
+        choices=TOC_MODE_CHOICES,
+        help_text="How the story's table of contents starts out (Off or one of three collapse levels)",
+    )
     views = models.PositiveIntegerField(default=0, db_index=True)
     likes = models.PositiveIntegerField(default=0)
     non_anonymous_viewer = models.ManyToManyField("AUTHENTICATION.Auth", related_name="non_anonymous_viewer", blank=True)   #   TRACKIG THE PEOPLE WHO VEIWED SO I CAN CREATE THEIR HISTORY

@@ -107,6 +107,13 @@ Rule:
 - The page title itself is the main h1 and should not be written as a content heading marker.
 - The parser should only treat lines that begin with # as headings.
 - No second syntax should be used for headings.
+- Headings are also the story's jump targets. The editor's "Table of contents"
+  dropdown decides whether the story page shows a "TABLE OF CONTENT" section
+  right after the opening paragraph, and how much of it opens on arrival:
+  Off (no list), Level 1 - title only, Level 2 - top sections, or Level 3 -
+  fully open. It is Off by default and only the author can change it; the
+  choice is a display setting, not an edit, so it never moves the story's last
+  published time.
 
 ### 5) ITALIC TEXT
 

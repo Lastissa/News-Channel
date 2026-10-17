@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import escape, linebreaks
+from django.utils.text import slugify
 from django.views import View
 
 from ADMIN.models import SiteSettings
@@ -386,6 +387,178 @@ def parse_story_content(content):
     return '\n'.join(blocks)
 
 
+#   STORY TABLE OF CONTENTS
+#   parse_story_content above returns the whole story body as one HTML
+#   string. A long story is far easier to skim when every heading is a jump
+#   target, so enhance_story_body runs over that HTML and (a) gives each
+#   heading a stable, unique `id` and (b) inserts a "TABLE OF CONTENT"
+#   section right after the first paragraph. Only #-style headings exist
+#   (DOCS/NEWS_CONTENT_CONVENTION.MD) and parse_story_content maps them to
+#   h2/h3/h4, so the heading pattern below never has to think about h1/h5.
+#   This runs on the parsed HTML in the VIEW only, so parse_story_content's
+#   exact output -- which the news editor's JavaScript preview mirrors word
+#   for word -- is never touched.
+#
+#   THE AUTHOR DECIDES. Blog.toc_mode (a dropdown on the add/edit editor) is
+#   what turns this on and picks how much of the list is open on arrival:
+#   Off returns the parser's output untouched (byte-for-byte, so nothing is
+#   imposed on a reader who never asked for a list); the three on-levels are
+#   "title only", "top sections" and "fully open". See Blog.TOC_* in
+#   BLOG.models. The list itself is a nested tree of the #/##/### headings,
+#   so a "top sections" reader sees just the # rows with a chevron beside
+#   each one that has children.
+_STORY_HEADING_RE = re.compile(r"<h([2-4])>(.*?)</h\1>", re.DOTALL)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_TOC_CHEVRON = (
+    '<svg class="story-toc-chevron" viewBox="0 0 16 16" width="18" height="18" '
+    'aria-hidden="true" focusable="false"><path d="M4 6.5 8 10.5 12 6.5" '
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+    'stroke-linejoin="round"/></svg>'
+)
+
+
+def _toc_slug(text, seen):
+    """A unique, URL-safe id for one heading. slugify drops the markdown
+    noise (a heading can hold a link or bold text), and a repeated heading --
+    or two different headings that slugify the same way -- gets a -2/-3
+    suffix so no id collides and every anchor lands on the right section. A
+    heading of only punctuation or emoji falls back to "part". Every id is
+    prefixed with "section-": that keeps a heading whose text happens to
+    slugify to one of the page's own ids (e.g. "story-heading",
+    "main-content", "comments-title") from hijacking that element and
+    sending the jump link to the wrong place."""
+    base = slugify(text) or "part"
+    candidate = f"section-{base}"
+    suffix = 2
+    while candidate in seen:
+        candidate = f"section-{base}-{suffix}"
+        suffix += 1
+    seen.add(candidate)
+    return candidate
+
+
+def _toc_tree(headings):
+    """Turn the flat [(level, slug, text), ...] list into a nested tree so the
+    table of contents can show the #/##/### hierarchy. A heading nests under
+    the nearest previous heading of a lower level; a jump straight from # to
+    ### (a skipped level) simply nests the ### under that #. Each node is
+    {"level", "slug", "text", "children"}."""
+    roots = []
+    stack = []
+    for level, slug, text in headings:
+        node = {"level": level, "slug": slug, "text": text, "children": []}
+        while stack and stack[-1]["level"] >= level:
+            stack.pop()
+        (stack[-1]["children"] if stack else roots).append(node)
+        stack.append(node)
+    return roots
+
+
+def _render_toc_nodes(nodes, branches_open):
+    """One <li> per node. A node with children gets a chevron dropdown button
+    that reveals its nested <ol>; the "fully open" level starts every branch
+    open, the other on-levels start them closed. A leaf is just its link."""
+    items = []
+    for node in nodes:
+        link = (
+            f'<a class="story-toc-link" href="#{node["slug"]}">'
+            f'{escape(node["text"])}</a>'
+        )
+        if node["children"]:
+            expanded = "true" if branches_open else "false"
+            hidden = "" if branches_open else " hidden"
+            items.append(
+                f'<li class="story-toc-item story-toc-item--has-children" data-level="{node["level"]}">'
+                '<div class="story-toc-row">'
+                f"{link}"
+                '<button type="button" class="story-toc-branch" '
+                f'aria-expanded="{expanded}" aria-label="Toggle subsections">'
+                f"{_TOC_CHEVRON}</button>"
+                "</div>"
+                f'<ol class="story-toc-children"{hidden}>'
+                f'{_render_toc_nodes(node["children"], branches_open)}</ol>'
+                "</li>"
+            )
+        else:
+            items.append(
+                f'<li class="story-toc-item" data-level="{node["level"]}">'
+                f'<div class="story-toc-row">{link}</div>'
+                "</li>"
+            )
+    return "".join(items)
+
+
+def _story_toc_html(headings, toc_mode):
+    """The <nav> block itself. The outer <details> starts open for levels 2
+    and 3 and closed for level 1 ("title only"), and the branch buttons start
+    open only for level 3. That is the whole difference between the three
+    collapse levels: the same tree, three different starting states. The
+    "TABLE OF CONTENT" label is always visible in the summary row, so even a
+    level-1 reader sees the section exists."""
+    branches_open = toc_mode == Blog.TOC_FULL
+    shell_open = " open" if toc_mode in (Blog.TOC_TOP_LEVEL, Blog.TOC_FULL) else ""
+    rows = _render_toc_nodes(_toc_tree(headings), branches_open)
+    return (
+        '<nav class="story-toc" aria-label="Table of contents" '
+        f'data-story-toc data-toc-mode="{toc_mode}">'
+        f'<details class="story-toc-shell"{shell_open}>'
+        '<summary class="story-toc-head">'
+        '<span class="story-toc-title">TABLE OF CONTENT</span>'
+        f"{_TOC_CHEVRON}"
+        "</summary>"
+        f'<ol class="story-toc-list">{rows}</ol>'
+        "</details></nav>"
+    )
+
+
+def enhance_story_body(html_body, toc_mode=0):
+    """When the author chose a table of contents for a story (Blog.toc_mode
+    other than "Off"), give every heading in the parsed body a stable `id`
+    and splice the "TABLE OF CONTENT" section in right after the first
+    paragraph. With the mode off -- the default, and every story written
+    before this existed -- the parsed body is returned untouched. Called only
+    by StoryDetailView, never by parse_story_content, so the parser stays
+    byte-for-byte identical for the editor preview and its tests."""
+    if not html_body or not toc_mode:
+        return html_body
+
+    headings = []
+    seen_slugs = set()
+
+    def _tag_heading(match):
+        level = int(match.group(1))
+        inner = match.group(2)
+        #   The plain, tag-free heading text is what the link shows and what
+        #   the id is built from -- a heading holding <a>/<strong> must not
+        #   leak its markup into either.
+        plain = html.unescape(_HTML_TAG_RE.sub("", inner)).strip()
+        slug = _toc_slug(plain, seen_slugs)
+        headings.append((level, slug, plain))
+        return f'<h{level} id="{slug}">{inner}</h{level}>'
+
+    with_ids = _STORY_HEADING_RE.sub(_tag_heading, html_body)
+
+    #   No headings means there is nothing to list; the body (with no ids
+    #   added) is returned as the parser made it.
+    if not headings:
+        return with_ids
+
+    #   Blocks are newline-joined (see parse_story_content), so walk them and
+    #   drop the TOC just after the first real paragraph -- one that starts
+    #   with a bare "<p>". The button row ("<p class=...>") deliberately does
+    #   not match: it is not prose, so the TOC should not be pushed below it.
+    #   A body that opens with a picture, video, list or heading and has no
+    #   paragraph at all still gets the TOC, at the very top.
+    blocks = with_ids.split("\n")
+    insert_at = 0
+    for index, block in enumerate(blocks):
+        if block.startswith("<p>"):
+            insert_at = index + 1
+            break
+    blocks.insert(insert_at, _story_toc_html(headings, toc_mode))
+    return "\n".join(blocks)
+
+
 TICKER_MARKER_RE = re.compile(r"^(#{1,6}\s*|\*\s+|\d+\.\s+)")
 
 
@@ -495,7 +668,10 @@ class StoryDetailView(View):
             and BlogLike.objects.filter(blog=blog, user=request.user).exists()
         )
 
-        blog_content = parse_story_content(blog.content)
+        #   `blog` can arrive from a 100s Redis cache, so a row pickled just
+        #   before this field shipped would not carry `toc_mode`. getattr keeps
+        #   that first request from 500-ing; the cache self-heals in 100s.
+        blog_content = enhance_story_body(parse_story_content(blog.content), getattr(blog, "toc_mode", 0))
         ticker_text = build_ticker_text(blog.content)
 
         comments = blog.comments.select_related("author__staffprofile").order_by("id")

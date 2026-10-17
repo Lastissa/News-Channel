@@ -24,6 +24,7 @@
   var imageInfoInput = shell.querySelector("[data-editor-image-info]");
   var categorySelect = shell.querySelector("[data-editor-category]");
   var contentInput = shell.querySelector("[data-editor-content]");
+  var tocModeSelect = shell.querySelector("[data-editor-toc-mode]");
   var output = shell.querySelector("[data-editor-preview-output]");
   var toggleBtn = shell.querySelector("[data-editor-preview-toggle]");
   var publishBtn = shell.querySelector("[data-editor-publish]");
@@ -411,6 +412,98 @@
     return blocks.join("\n");
   }
 
+  /* ---------- table of contents (mirrors BLOG.views.enhance_story_body) ----------
+     When the author picks any Table of contents mode other than Off, give every
+     heading an id and splice the "TABLE OF CONTENT" section in right after the
+     first paragraph, exactly as the published page will. The list is the same
+     nested #/##/### tree with the same three starting states: level 2 and 3 open
+     the outer disclosure, level 3 also opens every branch. Kept off the
+     parseStoryContent path so the preview body still mirrors the parser. */
+  var TOC_CHEVRON = '<svg class="story-toc-chevron" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" focusable="false"><path d="M4 6.5 8 10.5 12 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function plainHeadingText(inner) {
+    var host = document.createElement("div");
+    host.innerHTML = inner;
+    return (host.textContent || "").trim();
+  }
+
+  function tocSlug(text) {
+    var value = String(text || "");
+    if (value.normalize) value = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    value = value.replace(/[^\w\s-]/g, "").toLowerCase();
+    value = value.replace(/[-\s]+/g, "-");
+    return value.replace(/^[-_]+|[-_]+$/g, "");
+  }
+
+  function tocTree(headings) {
+    var roots = [];
+    var stack = [];
+    headings.forEach(function (heading) {
+      var node = { level: heading.level, slug: heading.slug, text: heading.text, children: [] };
+      while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop();
+      (stack.length ? stack[stack.length - 1].children : roots).push(node);
+      stack.push(node);
+    });
+    return roots;
+  }
+
+  function renderTocNodes(nodes, branchesOpen) {
+    return nodes.map(function (node) {
+      var link = '<a class="story-toc-link" href="#' + node.slug + '">' + escapeHtml(node.text) + "</a>";
+      if (node.children.length) {
+        var expanded = branchesOpen ? "true" : "false";
+        var hidden = branchesOpen ? "" : " hidden";
+        return '<li class="story-toc-item story-toc-item--has-children" data-level="' + node.level + '">' +
+          '<div class="story-toc-row">' + link +
+          '<button type="button" class="story-toc-branch" aria-expanded="' + expanded + '" aria-label="Toggle subsections">' +
+          TOC_CHEVRON + "</button></div>" +
+          '<ol class="story-toc-children"' + hidden + ">" +
+          renderTocNodes(node.children, branchesOpen) + "</ol></li>";
+      }
+      return '<li class="story-toc-item" data-level="' + node.level + '">' +
+        '<div class="story-toc-row">' + link + "</div></li>";
+    }).join("");
+  }
+
+  function enhanceStoryBody(htmlBody, tocMode) {
+    var mode = parseInt(tocMode, 10) || 0;
+    if (!htmlBody || !mode) return htmlBody;
+
+    var headings = [];
+    var seen = {};
+    var withIds = htmlBody.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, function (match, level, inner) {
+      var plain = plainHeadingText(inner);
+      var base = tocSlug(plain) || "part";
+      var slug = "section-" + base;
+      var suffix = 2;
+      while (Object.prototype.hasOwnProperty.call(seen, slug)) {
+        slug = "section-" + base + "-" + suffix;
+        suffix += 1;
+      }
+      seen[slug] = true;
+      headings.push({ level: parseInt(level, 10), slug: slug, text: plain });
+      return "<h" + level + ' id="' + slug + '">' + inner + "</h" + level + ">";
+    });
+
+    if (!headings.length) return withIds;
+
+    var branchesOpen = mode === 3;
+    var shellOpen = (mode === 2 || mode === 3) ? " open" : "";
+    var rows = renderTocNodes(tocTree(headings), branchesOpen);
+    var toc = '<nav class="story-toc" aria-label="Table of contents" data-story-toc data-toc-mode="' + mode + '">' +
+      '<details class="story-toc-shell"' + shellOpen + ">" +
+      '<summary class="story-toc-head"><span class="story-toc-title">TABLE OF CONTENT</span>' + TOC_CHEVRON + "</summary>" +
+      '<ol class="story-toc-list">' + rows + "</ol></details></nav>";
+
+    var blocks = withIds.split("\n");
+    var insertAt = 0;
+    for (var index = 0; index < blocks.length; index += 1) {
+      if (blocks[index].indexOf("<p>") === 0) { insertAt = index + 1; break; }
+    }
+    blocks.splice(insertAt, 0, toc);
+    return blocks.join("\n");
+  }
+
   /* ---------- preview ---------- */
   var debounceTimer = null;
 
@@ -430,7 +523,8 @@
     var imageUrl = selectedImageObjectUrl || imageInput.value.trim();
     var imageInfo = imageInfoInput.value.trim() || "The image is self explanatory.";
     var categoryLabel = currentCategoryLabel();
-    var bodyHtml = parseStoryContent(contentInput.value);
+    var tocMode = tocModeSelect ? parseInt(tocModeSelect.value, 10) || 0 : 0;
+    var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode);
 
     var html = '<div class="editor-preview-frame"><article class="story-article no-inner-shell">';
     html += '<header class="story-header">';
@@ -756,6 +850,13 @@
   imageInfoInput.addEventListener("input", schedulePreview);
   categorySelect.addEventListener("change", schedulePreview);
   contentInput.addEventListener("input", schedulePreview);
+
+  /*  Changing the Table of contents level only changes how the list looks, so
+      it refreshes the preview immediately. The select shows its own value, so
+      there is no separate state word to keep in sync. */
+  if (tocModeSelect) {
+    tocModeSelect.addEventListener("change", schedulePreview);
+  }
 
   renderPreview();
   applyPreviewState(shell.classList.contains("preview-off"));

@@ -89,6 +89,30 @@ html.editor-modal-open { overflow: hidden; }
 /* ---------- fields ---------- */
 .editor-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
+/* Table of contents picker. The author chooses Off or one of three collapse
+   levels; this only changes how the contents list looks, never the story's
+   last published time (the note under the select says so). */
+.editor-toc {
+  border: 1px solid var(--line);
+  background: var(--input-fill);
+  padding: 12px 14px;
+  gap: 8px;
+  border-radius: 0;
+}
+
+.editor-toc select {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.editor-toc-note {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.editor-toc-note strong { color: var(--ink); }
+
 .editor-field label {
   font-size: 0.74rem;
   font-weight: 700;

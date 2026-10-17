@@ -17,7 +17,7 @@ from hypothesis.extra.django import TestCase as HypothesisTestCase
 from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Comment
-from BLOG.views import parse_story_content, StoryDetailView
+from BLOG.views import parse_story_content, StoryDetailView, enhance_story_body
 from SERVICE_INTERNAL.abstract import is_bot_request
 from STAFF.models import StaffProfile
 
@@ -1001,3 +1001,245 @@ class BotDetectionTests(TestCase):
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         self.assertFalse(is_bot_request(self._request(ua)))
+
+
+class StoryTableOfContentsTests(TestCase):
+    """The table of contents built by BLOG.views.enhance_story_body: when the
+    author picks a Blog.toc_mode other than Off, headings become jump targets
+    and the "TABLE OF CONTENT" section lands right after the first paragraph as
+    a nested #/##/### tree, opened to the level the author chose. With it Off
+    the body is untouched."""
+
+    def test_toc_follows_the_first_paragraph_and_links_every_heading(self):
+        body = enhance_story_body(
+            parse_story_content(
+                "Opening paragraph sets the scene.\n\n"
+                "# Admission Process\n\n"
+                "## Key requirements\n\n"
+                "Details here.\n\n"
+                "### Documents\n\n"
+                "* A passport photo\n"
+            ),
+            toc_mode=Blog.TOC_FULL
+        )
+
+        #   The intro paragraph comes first, then the nav, then the headings.
+        self.assertLess(body.index("Opening paragraph"), body.index("story-toc"))
+        self.assertLess(body.index("story-toc"), body.index("Admission Process"))
+        #   Every heading carries an id and the TOC links to it.
+        self.assertIn('<h2 id="section-admission-process">Admission Process</h2>', body)
+        self.assertIn('<h3 id="section-key-requirements">Key requirements</h3>', body)
+        self.assertIn('<h4 id="section-documents">Documents</h4>', body)
+        self.assertIn('href="#section-admission-process"', body)
+        self.assertIn('href="#section-key-requirements"', body)
+        self.assertIn('href="#section-documents"', body)
+        #   data-level keeps the written hierarchy visible in the markup.
+        self.assertIn('data-level="2"', body)
+        self.assertIn('data-level="3"', body)
+        self.assertIn('data-level="4"', body)
+
+    def test_a_single_heading_gets_a_one_entry_toc_when_the_toggle_is_on(self):
+        #   The old automatic "needs two headings" rule is gone: the author
+        #   decides, so even one section is listed if they asked for it.
+        body = enhance_story_body(
+            parse_story_content("Intro.\n\n# Only section\n\nMore copy."),
+            toc_mode=Blog.TOC_FULL,
+        )
+
+        self.assertIn('<h2 id="section-only-section">Only section</h2>', body)
+        self.assertIn('href="#section-only-section"', body)
+        self.assertIn("story-toc", body)
+
+    def test_the_toc_off_returns_the_parser_output_untouched(self):
+        parsed = parse_story_content("Intro.\n\n# Only section\n\nMore copy.")
+
+        #   Default is off, and an explicit False changes nothing at all: no
+        #   ids, no nav, so a story without the toggle renders exactly as the
+        #   parser always made it.
+        self.assertEqual(enhance_story_body(parsed), parsed)
+        self.assertEqual(enhance_story_body(parsed, toc_mode=Blog.TOC_OFF), parsed)
+
+    def test_repeated_headings_get_unique_ids(self):
+        body = enhance_story_body(
+            parse_story_content("Intro.\n\n# Update\n\nOne.\n\n# Update\n\nTwo.\n"),
+            toc_mode=Blog.TOC_FULL,
+        )
+
+        self.assertIn('id="section-update"', body)
+        self.assertIn('id="section-update-2"', body)
+        self.assertIn('href="#section-update"', body)
+        self.assertIn('href="#section-update-2"', body)
+
+    def test_heading_markup_never_leaks_into_the_toc_link_or_its_id(self):
+        body = enhance_story_body(
+            parse_story_content(
+                "Intro.\n\n"
+                "# Read [the guide](https://example.edu/guide) first\n\n"
+                "## **Bold** sub\n\n"
+                "Copy.\n"
+            ),
+            toc_mode=Blog.TOC_FULL
+        )
+
+        #   The visible label is plain text; the id is slugified from it too.
+        self.assertIn('<h2 id="section-read-the-guide-first">'
+                      'Read <a href="https://example.edu/guide"', body)
+        self.assertIn('href="#section-read-the-guide-first"', body)
+        self.assertIn('href="#section-bold-sub"', body)
+        #   The TOC link itself holds the words, not the anchor markup.
+        self.assertIn('>Read the guide first</a>', body)
+
+    def test_a_heading_slug_never_collides_with_the_pages_own_ids(self):
+        #   "Story heading" would slugify to the page's <h1 id="story-heading">;
+        #   the section- prefix keeps the jump link pointing at the section.
+        body = enhance_story_body(
+            parse_story_content("Intro.\n\n# Story heading\n\n## Main content\n\nCopy.\n"),
+            toc_mode=Blog.TOC_FULL
+        )
+
+        self.assertIn('id="section-story-heading"', body)
+        self.assertIn('id="section-main-content"', body)
+        self.assertIn('href="#section-story-heading"', body)
+        self.assertNotIn('href="#story-heading"', body)
+        self.assertNotIn('href="#main-content"', body)
+
+    def test_a_body_without_a_paragraph_still_gets_the_toc_at_the_top(self):
+        body = enhance_story_body(
+            parse_story_content("# First\n\n# Second\n"),
+            toc_mode=Blog.TOC_FULL
+        )
+
+        self.assertTrue(body.startswith("<nav class=\"story-toc\""), body)
+
+    def test_level_one_shows_only_the_label_until_opened(self):
+        body = enhance_story_body(
+            parse_story_content("Intro.\n\n# One\n\n## Two\n\nCopy.\n"),
+            toc_mode=Blog.TOC_TITLE_ONLY,
+        )
+
+        #   The outer disclosure starts closed, so the reader meets the
+        #   "TABLE OF CONTENT" label first; the tree is still built under it.
+        self.assertIn('<details class="story-toc-shell">', body)
+        self.assertNotIn('<details class="story-toc-shell" open>', body)
+        self.assertIn("TABLE OF CONTENT</span>", body)
+        self.assertIn('aria-expanded="false"', body)
+        self.assertIn('<ol class="story-toc-children" hidden>', body)
+
+    def test_level_two_opens_the_outer_list_but_not_the_branches(self):
+        body = enhance_story_body(
+            parse_story_content("Intro.\n\n# One\n\n## Two\n\nCopy.\n"),
+            toc_mode=Blog.TOC_TOP_LEVEL,
+        )
+
+        #   Outer list open, so the # rows show; each # with children keeps a
+        #   shut chevron beside it.
+        self.assertIn('<details class="story-toc-shell" open>', body)
+        self.assertIn("story-toc-branch", body)
+        self.assertIn('aria-expanded="false"', body)
+        self.assertIn('<ol class="story-toc-children" hidden>', body)
+
+    def test_level_three_starts_fully_open(self):
+        body = enhance_story_body(
+            parse_story_content("Intro.\n\n# One\n\n## Two\n\nCopy.\n"),
+            toc_mode=Blog.TOC_FULL,
+        )
+
+        self.assertIn('<details class="story-toc-shell" open>', body)
+        self.assertIn('aria-expanded="true"', body)
+        self.assertNotIn('<ol class="story-toc-children" hidden>', body)
+
+    def test_the_tree_nests_a_section_under_its_parent(self):
+        body = enhance_story_body(
+            parse_story_content("# Parent\n\n## Child\n\n### Grandchild\n\nCopy.\n"),
+            toc_mode=Blog.TOC_FULL,
+        )
+
+        #   A parent row carries the chevron button right after its link, and
+        #   its children sit in a nested list inside the same <li>.
+        self.assertIn('href="#section-parent">Parent</a>'
+                      '<button type="button" class="story-toc-branch"', body)
+        #   A section that still has its own children is flagged in the markup
+        #   so the stylesheet can put a bullet in front of it; a leaf is not.
+        self.assertIn('<ol class="story-toc-children">'
+                      '<li class="story-toc-item story-toc-item--has-children" data-level="3">',
+                      body)
+        self.assertIn('<ol class="story-toc-children">'
+                      '<li class="story-toc-item" data-level="4">', body)
+
+    def test_no_headings_means_no_empty_contents_section(self):
+        body = enhance_story_body(
+            parse_story_content("Just a paragraph, no headings at all."),
+            toc_mode=Blog.TOC_FULL,
+        )
+
+        self.assertNotIn("story-toc", body)
+
+    def test_parse_story_content_output_is_unchanged(self):
+        #   The parser stays byte-for-byte identical (the editor preview and
+        #   its tests depend on it); only enhance_story_body adds ids/TOC.
+        html = parse_story_content("# Admissions\n\nBody copy.")
+        self.assertIn("<h2>Admissions</h2>", html)
+        self.assertNotIn("id=\"admissions\"", html)
+        self.assertNotIn("story-toc", html)
+
+    def test_story_page_renders_jump_links_for_a_story_with_headings(self):
+        author = _make_staff_with_profile(email="toc-page@example.com")
+        story = Blog.objects.create(
+            author=author,
+            category="GENERAL",
+            heading="Story with sections",
+            toc_mode=Blog.TOC_FULL,
+            content=(
+                "The lead paragraph.\n\n"
+                "# Section one\n\n"
+                "First section body.\n\n"
+                "## Sub section\n\n"
+                "Sub section body.\n"
+            ),
+        )
+
+        response = self.client.get(reverse("blog:story_detail", args=[story.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('data-story-toc', content)
+        self.assertIn('data-toc-mode="3"', content)
+        self.assertIn('id="section-section-one"', content)
+        self.assertIn('id="section-sub-section"', content)
+        #   Sits after the lead paragraph it introduces. Scope to the story
+        #   body: the reading ticker at the top repeats the heading text.
+        body_html = content[content.index("data-story-body"):]
+        self.assertLess(body_html.index("The lead paragraph."), body_html.index("story-toc"))
+        self.assertLess(body_html.index("story-toc"), body_html.index('id="section-section-one"'))
+
+    def test_story_page_has_no_toc_when_the_author_left_it_off(self):
+        author = _make_staff_with_profile(email="toc-off-page@example.com")
+        story = Blog.objects.create(
+            author=author,
+            category="GENERAL",
+            heading="Story without a contents list",
+            content="The lead paragraph.\n\n# Section one\n\nBody copy.\n",
+        )
+
+        response = self.client.get(reverse("blog:story_detail", args=[story.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn("data-story-toc", content)
+        #   Off means no injected heading ids either: the body is exactly what
+        #   the parser produced.
+        self.assertNotIn('id="section-section-one"', content)
+
+    def test_whatsapp_share_text_still_reads_only_the_first_paragraph(self):
+        #   The share button runs blog_content_html through filter_copy_btn_text,
+        #   which keeps just the first line -- the TOC (a later block) must not
+        #   end up pasted into a reader's message or preview card.
+        from HOME.templatetags.format_copy_btn import filter_copy_btn_text
+
+        body = enhance_story_body(
+            parse_story_content("The lead paragraph.\n\n# Section one\n\nBody.\n"),
+            toc_mode=Blog.TOC_FULL
+        )
+        share_text = filter_copy_btn_text(body)
+
+        self.assertEqual(share_text, "** JUST IN **\n\nThe lead paragraph.")

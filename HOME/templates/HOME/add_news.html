@@ -236,6 +236,17 @@
             </select>
           </div>
 
+          <div class="editor-field editor-toc">
+            <label for="editor-toc-mode">Table of contents</label>
+            <select id="editor-toc-mode" name="toc_mode" data-editor-toc-mode>
+              <option value="0" selected>Off - no contents list</option>
+              <option value="1">Level 1 - title only</option>
+              <option value="2">Level 2 - top sections</option>
+              <option value="3">Level 3 - fully open</option>
+            </select>
+            <small class="editor-toc-note">This only changes how the contents list looks. It does <strong>not</strong> change the story's last published time.</small>
+          </div>
+
           <div class="editor-field">
           <label for="editor-content">Content</label>
           <div class="editor-insert-bar" role="toolbar" aria-label="Insert formatting" data-insert-bar>
@@ -313,6 +324,7 @@
   </div>
 </section>
 
+<script src="{% static 'blog/js/story-toc.js' %}?v=20261017-2" defer></script>
 <script>
   /* LIGHT PHASE: runs at parse time, before the heavy editor. It tells the
      user the page is still fetching its parts, then pulls them in. The heavy
