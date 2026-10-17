@@ -25,6 +25,7 @@ urlpatterns = [
     path("panel/analytics/stories/", views.AnalyticsStoriesChartView.as_view(), name="analytics_stories"),
     path("panel/analytics/trends/", views.AnalyticsTrendsChartView.as_view(), name="analytics_trends"),
     path("panel/analytics/members/", views.AnalyticsMembersView.as_view(), name="analytics_members"),
+    path("panel/analytics/week/", views.AnalyticsWeekStoriesView.as_view(), name="member_week_stories"),
     path("panel/analytics/staff/", views.StaffLyticsView.as_view(), name="staff_lytics"),
     path("panel/analytics/partner/", views.PartnerLyticsView.as_view(), name="partner_lytics"),
     path("panel/gallery/", views.PanelStaffGalleryView.as_view(), name="panel_gallery"),

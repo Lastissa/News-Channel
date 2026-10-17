@@ -63,6 +63,8 @@ from ADMIN.analytics import (
     member_page_details,
     stories_per_week,
     trends,
+    week_stories,
+    week_window,
 )
 from STAFF.models import GENDER_CHOICES, StaffProfile
 
@@ -846,6 +848,28 @@ class AnalyticsTrendsChartView(View):
             "ADMIN/partials/analytics_trends.html",
             {"chart": trends(bucket, selected_range, series_keys)},
         )
+
+
+class AnalyticsWeekStoriesView(View):
+    """Fetch fragment: the stories behind one bar of the Stories-per-week chart.
+
+    Read only and admin only, like every other analytics view. The bar passes
+    an ISO date naming the week it stands for (any day of it); an unknown,
+    missing or not-yet-started week answers 400, so the placard can only ever
+    describe a real week. analytics.js requests it on demand, so the chart
+    fragment itself still ships counts and nothing else.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        window = week_window(request.GET.get("week"))
+        if window is None:
+            return JsonResponse({"detail": "A past week is required."}, status=400)
+
+        start, end = window
+        return render(request, "ADMIN/partials/analytics_week_stories.html", week_stories(start, end))
 
 
 def _member_choice(request, name, choices, default="all"):

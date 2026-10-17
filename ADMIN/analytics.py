@@ -15,11 +15,12 @@ Design notes
     QuerySet, so a template can ship them straight to the chart renderer.
 """
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.db import DatabaseError, transaction
 from django.db.models import Count, Max
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, StoryView, get_category_choices
@@ -161,10 +162,15 @@ def stories_per_week(period):
 
     labels = []
     tooltips = []
+    #   One ISO week-start per bar: the key analytics.js hands back to the week
+    #   endpoint when a bar is pressed, so the queryset never has to re-derive
+    #   the chart's own frame.
+    bucket_starts = []
     for index in range(weeks):
         bucket_start = start + timedelta(weeks=index)
         bucket_end = bucket_start + timedelta(days=6)
         labels.append(_fmt_day(bucket_start))
+        bucket_starts.append(bucket_start.date().isoformat())
         count = values[index]
         tooltips.append(
             f"Week of {_fmt_range(bucket_start, bucket_end)} \u2014 "
@@ -175,8 +181,67 @@ def stories_per_week(period):
         "type": "bar",
         "labels": labels,
         "tooltips": tooltips,
+        "bucket_starts": bucket_starts,
         "series": [{"name": "Stories", "color": "#2563eb", "values": values}],
         "total": sum(values),
+    }
+
+
+def _week_start_date(day):
+    """The Sunday on or before `day` (a datetime.date)."""
+    return day - timedelta(days=(day.weekday() - WEEK_START_WEEKDAY) % 7)
+
+
+def week_window(value):
+    """Turn a `week` querystring value into that week's (start, end).
+
+    `value` names any day of the week as an ISO date; the window is the local
+    Sunday and the following Sunday (exclusive), so both halves of this card
+    agree on where a week begins. A missing or malformed value, and a week
+    that has not started yet, give None -- the endpoint answers 400 rather
+    than showing an empty placard that reads like "nothing was published".
+    """
+    day = parse_date((value or "").strip())
+    if day is None:
+        return None
+
+    start_date = _week_start_date(day)
+    if start_date > _week_start_date(timezone.localdate()):
+        return None
+
+    start = timezone.make_aware(datetime.combine(start_date, time.min))
+    return start, start + timedelta(days=7)
+
+
+def week_stories(start, end):
+    """The stories behind one bar: everything published in [start, end).
+
+    Oldest first, so the placard reads in the order the week happened, and
+    shaped into plain dicts the partial lays out -- the same rule every other
+    helper here follows. `updated` is the story's real post-publish edit time
+    (`last_edited`, not the auto_now `last_updated`, which is stamped at
+    creation too), so it stays blank until a staff member edits the story.
+    """
+    stories = (
+        Blog.objects.filter(date_created__gte=start, date_created__lt=end)
+        .select_related("author")
+        .order_by("date_created", "pk")
+    )
+    rows = [
+        {
+            "heading": story.heading,
+            "slug": story.slug,
+            "author": story.author_name,
+            "posted": timezone.localtime(story.date_created),
+            "updated": timezone.localtime(story.last_edited) if story.last_edited else None,
+        }
+        for story in stories
+    ]
+    last_day = end - timedelta(days=1)
+    return {
+        "label": f"Week of {_fmt_range(start, last_day)}, {last_day.year}",
+        "count": len(rows),
+        "stories": rows,
     }
 
 

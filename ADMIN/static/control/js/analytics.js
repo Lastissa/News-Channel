@@ -123,7 +123,7 @@
     }
   }
 
-  function renderBar(host, data) {
+  function renderBar(host, data, root) {
     var values = (data.series && data.series[0] ? data.series[0].values : []) || [];
     var count = values.length;
     var frame = frameFor(host);
@@ -141,20 +141,34 @@
     var colour = data.series[0].color || "#2563eb";
     /* Counts above a bar need room; drop them once the bars get thin. */
     var showValues = slot >= 22;
+    /* Bars are only pressable when the fragment carried one week per bar and
+       a week endpoint to fetch that week's stories from. */
+    var weeks = data.bucket_starts || [];
+    var endpoint = root ? root.getAttribute("data-week-endpoint") : "";
+    var pressable = !!endpoint && weeks.length === count;
 
     for (var i = 0; i < count; i++) {
       var value = values[i] || 0;
       var height = max ? (box.h * value / max) : 0;
       var x = m.left + slot * i + (slot - barW) / 2;
       var y = m.top + box.h - height;
+      var tipText = (data.tooltips && data.tooltips[i]) || (data.labels[i] + ": " + value);
       var rect = svgEl("rect", {
         x: x, y: y, width: barW,
         height: Math.max(height, value > 0 ? 2 : 0),
         rx: 4, "class": "analytics-bar", fill: colour
       });
       var tip = svgEl("title");
-      tip.textContent = (data.tooltips && data.tooltips[i]) || (data.labels[i] + ": " + value);
+      tip.textContent = tipText;
       rect.appendChild(tip);
+
+      if (pressable) {
+        rect.setAttribute("class", "analytics-bar analytics-bar--pressable");
+        rect.setAttribute("tabindex", "0");
+        rect.setAttribute("role", "button");
+        rect.setAttribute("data-week", weeks[i]);
+        rect.setAttribute("aria-label", tipText + ". Opens this week's stories.");
+      }
       svg.appendChild(rect);
 
       if (value > 0 && showValues) {
@@ -165,6 +179,7 @@
         svg.appendChild(svgText(lx, m.top + box.h + 22, data.labels[i], "analytics-axis-label analytics-axis-label--x", xAnchor(i, count)));
       }
     }
+    if (pressable && root) attachWeekPress(svg, root);
     host.appendChild(svg);
   }
 
@@ -354,7 +369,7 @@
     var stalePlacard = root.querySelector(".analytics-placard");
     if (stalePlacard) stalePlacard.remove();
     if (data.type === "line") renderLine(canvas, data, root);
-    else renderBar(canvas, data);
+    else renderBar(canvas, data, root);
 
     var body = root.parentElement;
     while (body && !body.classList.contains("analytics-chart-body")) { body = body.parentElement; }
@@ -397,6 +412,122 @@
       if (!root.contains(event.target)) hidePlacard(root);
     });
   });
+
+  var WEEK_DIALOG_ID = "analytics-week";
+  var WEEK_TOAST_ID = "analytics-week-toast";
+
+  function ensureWeekDialog() {
+    var d = document.getElementById(WEEK_DIALOG_ID);
+    if (d) return d;
+    d = document.createElement("div");
+    d.id = WEEK_DIALOG_ID;
+    d.className = "analytics-week-dialog";
+    d.setAttribute("role", "dialog");
+    d.setAttribute("aria-modal", "true");
+    d.setAttribute("aria-labelledby", WEEK_DIALOG_ID + "-title");
+    d.hidden = true;
+    d.innerHTML =
+      '<div class="analytics-week-backdrop" data-week-close></div>' +
+      '<div class="analytics-week-content" role="document">' +
+        '<header class="analytics-week-header">' +
+          '<h3 class="analytics-week-title" id="' + WEEK_DIALOG_ID + '-title"></h3>' +
+          '<button type="button" class="analytics-week-close" data-week-close aria-label="Close">&times;</button>' +
+        '</header>' +
+        '<div class="analytics-week-body" data-week-body></div>' +
+        '<div class="analytics-week-footer">' +
+          '<button type="button" class="analytics-week-btn" data-week-close>Close</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(d);
+    return d;
+  }
+
+  function ensureWeekToast() {
+    var t = document.getElementById(WEEK_TOAST_ID);
+    if (t) return t;
+    t = document.createElement("div");
+    t.id = WEEK_TOAST_ID;
+    t.className = "analytics-toast";
+    t.setAttribute("role", "status");
+    t.setAttribute("aria-live", "polite");
+    t.hidden = true;
+    document.body.appendChild(t);
+    return t;
+  }
+
+  function showWeekToast(msg) {
+    var t = ensureWeekToast();
+    t.textContent = msg || "";
+    t.hidden = false;
+    clearTimeout(t._hide);
+    t._hide = setTimeout(function () { t.hidden = true; }, 2200);
+  }
+
+  function closeWeekDialog() {
+    if (window._weekTrap) { window._weekTrap.release(); window._weekTrap = null; }
+    var d = document.getElementById(WEEK_DIALOG_ID);
+    if (d) d.hidden = true;
+    if (window._weekLastFocus && window._weekLastFocus.focus) { window._weekLastFocus.focus(); window._weekLastFocus = null; }
+  }
+
+  function trapFocus(dialog) {
+    var focusables = dialog.querySelectorAll('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
+    if (!focusables.length) return { release: function () {} };
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); closeWeekDialog(); return; }
+      if (e.key === "Tab") {
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    dialog.addEventListener("keydown", onKey);
+    first.focus();
+    return { release: function () { dialog.removeEventListener("keydown", onKey); } };
+  }
+
+  function openWeekDialog(title, html) {
+    var d = ensureWeekDialog();
+    d.querySelector("#" + WEEK_DIALOG_ID + "-title").textContent = title || "Week stories";
+    d.querySelector("[data-week-body]").innerHTML = html;
+    window._weekLastFocus = document.activeElement;
+    d.hidden = false;
+    window._weekTrap = trapFocus(d);
+    d.addEventListener("click", function (ev) { if (ev.target.matches("[data-week-close]")) closeWeekDialog(); }, { once: true });
+  }
+
+  function fetchWeekStories(root, week, labelHint) {
+    var endpoint = root ? root.getAttribute("data-week-endpoint") : "";
+    if (!endpoint) return Promise.reject(new Error("no-endpoint"));
+    var url = new URL(endpoint, window.location.origin);
+    url.searchParams.set("week", week);
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 8000);
+    return fetch(url, { headers: { "X-Requested-With": "fetch" }, signal: controller.signal })
+      .then(function (r) { clearTimeout(timeout); if (!r.ok) throw new Error(String(r.status)); return r.text(); })
+      .then(function (html) { openWeekDialog(labelHint || "Week stories", html); });
+  }
+
+  function attachWeekPress(svg, root) {
+    if (!svg || svg._weekBound) return;
+    svg._weekBound = true;
+    svg.addEventListener("click", function (ev) {
+      var btn = ev.target.closest && ev.target.closest(".analytics-bar--pressable");
+      if (!btn) return;
+      var week = btn.getAttribute("data-week");
+      var tip = btn.querySelector("title");
+      var hint = tip ? tip.textContent : "Week";
+      fetchWeekStories(root, week, hint).catch(function (err) {
+        showWeekToast(err && err.name === "AbortError" ? "Week stories took too long. Try again." : "Couldn't load week stories. Try again.");
+      });
+    });
+    svg.addEventListener("keydown", function (ev) {
+      var btn = ev.target.closest && ev.target.closest(".analytics-bar--pressable");
+      if (!btn) return;
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); btn.click(); }
+    });
+  }
 
   window.AnalyticsCharts = { render: renderAll, redraw: redrawAll };
 })();

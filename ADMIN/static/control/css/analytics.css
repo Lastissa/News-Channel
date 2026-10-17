@@ -182,6 +182,8 @@ html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
 
 .analytics-bar { transition: opacity .15s ease; }
 .analytics-bar:hover { opacity: 0.82; }
+.analytics-bar--pressable { cursor: pointer; opacity: .9; }
+.analytics-bar--pressable:hover, .analytics-bar--pressable:focus { opacity: 1; outline: 2px solid rgba(37,99,235,0.3); outline-offset: 2px; }
 .analytics-bar-value { fill: var(--ink); font-size: 12px; font-weight: 700; font-family: inherit; }
 
 .analytics-line { stroke-linejoin: round; stroke-linecap: round; }
@@ -224,6 +226,34 @@ html[data-theme="dark"] .analytics-placard { background: var(--paper-dim); }
 .analytics-loading { color: var(--slate); font-size: 0.92rem; padding: 24px 0; margin: 0; }
 
 html[data-theme="dark"] .analytics-card { background: var(--paper-dim); }
+
+/* Week stories dialog + toast */
+.analytics-week-dialog { position: fixed; inset: 0; z-index: 1000; }
+.analytics-week-dialog[hidden] { display: none; }
+.analytics-week-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.45); }
+.analytics-week-content {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(640px, calc(100% - 24px)); max-height: calc(100% - 48px); overflow: auto;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-m);
+  box-shadow: var(--shadow-card); display: flex; flex-direction: column;
+}
+html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); }
+.analytics-week-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.analytics-week-title { margin: 0; font-size: 0.98rem; font-weight: 700; }
+.analytics-week-close { background: transparent; border: 1px solid var(--line); border-radius: var(--radius-s); padding: 4px 8px; cursor: pointer; }
+.analytics-week-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.analytics-week-item { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; }
+.analytics-week-row { display: flex; flex-direction: column; gap: 4px; }
+.analytics-week-heading { font-weight: 600; color: var(--ink); }
+.analytics-week-meta { color: var(--slate); font-size: 0.88rem; }
+.analytics-week-footer { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+.analytics-week-btn { padding: 7px 12px; border-radius: var(--radius-s); border: 1px solid var(--line); background: var(--paginator-bg); cursor: pointer; }
+.analytics-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  padding: 8px 14px; border-radius: 999px; background: rgba(15,23,42,0.9); color: #fff;
+  font-size: 0.9rem; z-index: 1001; box-shadow: 0 10px 30px rgba(2,6,23,0.25);
+}
+.analytics-toast[hidden] { display: none; }
 
 /* ---------- Members table (fragment from analytics_members.html) ---------- */
 /* The filter row reuses .analytics-controls; the search box matches a select. */
