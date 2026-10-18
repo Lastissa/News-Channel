@@ -26,17 +26,26 @@
 
 /* ---------- Top-bar badge: "N new users today" ---------- */
 /* Right-aligned in the top bar and fetched on its own, so it can refresh
-   without redrawing the overview card. Holds a plain pill until it lands. */
+   without redrawing the overview card. Reads as a soft card rather than a
+   tinted pill, so it holds its own in both themes and does not clash with the
+   sticky bar behind it. */
 .analytics-new-today-slot { margin-left: auto; }
 .analytics-new-today {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: 999px; white-space: nowrap;
-  font-size: 0.82rem; font-weight: 600;
-  color: var(--brand-deep); background: color-mix(in srgb, var(--brand-deep) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand-deep) 34%, transparent);
+  display: inline-flex; align-items: baseline; gap: 7px;
+  padding: 7px 14px; border-radius: var(--radius-s); white-space: nowrap;
+  font-size: 0.84rem; font-weight: 600;
+  color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); box-shadow: var(--shadow-card);
 }
-.analytics-new-today strong { font-size: 0.95rem; font-variant-numeric: tabular-nums; }
-.analytics-new-today--loading { color: var(--slate); background: var(--paginator-bg); border-color: var(--line); }
+html[data-theme="dark"] .analytics-new-today { background: var(--paper-dim); }
+.analytics-new-today strong {
+  font-size: 1.05rem; font-weight: 800; color: var(--brand-deep);
+  font-variant-numeric: tabular-nums;
+}
+.analytics-new-today--loading {
+  color: var(--slate); background: var(--paginator-bg);
+  border-color: var(--line); box-shadow: none;
+}
 
 /* ---------- Quick overview ---------- */
 /* New users lead on the left; active readers and stories published sit as
@@ -138,14 +147,29 @@ html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
 .analytics-select select {
   appearance: none;
   padding: 8px 30px 8px 10px; font-size: 0.9rem; font-family: inherit;
-  color: var(--ink); background: var(--paginator-bg);
-  border: 1px solid var(--paginator-border); border-radius: var(--radius-s);
+  color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); border-radius: var(--radius-s);
   cursor: pointer;
   background-image: linear-gradient(45deg, transparent 50%, var(--slate) 50%), linear-gradient(135deg, var(--slate) 50%, transparent 50%);
   background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
   background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-.analytics-select select:focus-visible { outline: 1.5px solid var(--amber-deep); outline-offset: 2px; }
+/* The closed select and the popup both follow the current theme (paper/line/
+   ink tokens flip with data-theme, like the navbar dropdown) instead of
+   staying white the way an unstyled native control does. */
+html[data-theme="dark"] .analytics-select select { background-color: var(--paper-dim); }
+/* Style the option list itself (best-effort: the popup follows the theme in
+   every browser that lets <option> take a background). */
+.analytics-select select option { background: var(--paper); color: var(--ink); }
+html[data-theme="dark"] .analytics-select select option { background: var(--paper-dim); color: var(--ink); }
+.analytics-select select:hover { border-color: var(--slate); }
+.analytics-select select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  outline-offset: 2px;
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent);
+}
 
 .analytics-series {
   display: flex; flex-wrap: wrap; gap: 10px 16px;
@@ -167,9 +191,28 @@ html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
 .analytics-series-option:has(input:not(:checked)) { opacity: 0.5; }
 
 /* ---------- Chart body ---------- */
-.analytics-chart-body { padding: 4px 0 16px; min-height: 220px; }
+.analytics-chart-body { padding: 4px 0 16px; min-height: 220px; position: relative; }
+/* On a slow network the moment a control changes this section is marked
+   is-loading: its old contents are hidden behind a pulsing panel and a plain
+   "Loading…" label shows, so the reader is never left guessing whether the
+   numbers in front of them are the ones they just asked for. */
+.analytics-chart-body.is-loading > * { visibility: hidden; }
+.analytics-chart-body.is-loading::before {
+  content: "Loading\2026"; position: absolute; inset: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--slate); font-size: 0.92rem;
+}
+.analytics-chart-body.is-loading::after {
+  content: ""; position: absolute; inset: 0; border-radius: var(--radius-s);
+  background: var(--paginator-bg);
+  animation: panelPulse 1.4s var(--panel-ease, ease) infinite;
+}
+@media (prefers-reduced-motion: reduce) { .analytics-chart-body.is-loading::after { animation: none; } }
 .analytics-chart { width: 100%; }
 .analytics-chart-canvas { width: 100%; }
+.analytics-chart-note { margin: 0 0 10px; font-size: 0.84rem; color: var(--slate); }
+.analytics-chart-note strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.analytics-chart-empty { margin: 0; padding: 26px 0; text-align: center; color: var(--slate); }
 .analytics-svg { display: block; width: 100%; height: auto; overflow: visible; }
 
 .analytics-gridline { stroke: var(--line); stroke-width: 1; }
@@ -183,7 +226,7 @@ html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
 .analytics-bar { transition: opacity .15s ease; }
 .analytics-bar:hover { opacity: 0.82; }
 .analytics-bar--pressable { cursor: pointer; opacity: .9; }
-.analytics-bar--pressable:hover, .analytics-bar--pressable:focus { opacity: 1; outline: 2px solid rgba(37,99,235,0.3); outline-offset: 2px; }
+.analytics-bar--pressable:hover, .analytics-bar--pressable:focus { opacity: 1; outline: 2px solid color-mix(in srgb, var(--brand) 40%, transparent); outline-offset: 2px; }
 .analytics-bar-value { fill: var(--ink); font-size: 12px; font-weight: 700; font-family: inherit; }
 
 .analytics-line { stroke-linejoin: round; stroke-linecap: round; }
@@ -197,16 +240,17 @@ html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
    it can never steal the hover from the dot it belongs to. */
 .analytics-chart { position: relative; }
 .analytics-placard {
-  position: absolute; z-index: 6; min-width: 150px; max-width: 250px;
-  padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-s);
+  position: absolute; z-index: 6; min-width: 130px; max-width: 210px;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-s);
   background: var(--paper); box-shadow: var(--shadow-card); color: var(--ink);
-  font-size: 0.8rem; pointer-events: none;
+  font-size: 0.75rem; pointer-events: none;
   opacity: 0; transform: translateY(6px) scale(.96); transform-origin: bottom center;
   transition: opacity .18s ease, transform .18s cubic-bezier(.22, 1, .36, 1);
+  gap: 3px; display: flex; flex-direction: column;
 }
 .analytics-placard.is-visible { opacity: 1; transform: translateY(0) scale(1); }
-.analytics-placard-label { font-weight: 700; margin-bottom: 5px; }
-.analytics-placard-row { display: flex; align-items: center; gap: 7px; line-height: 1.5; }
+.analytics-placard-label { font-weight: 700; margin: 0; }
+.analytics-placard-row { display: flex; align-items: center; gap: 5px; line-height: 1.35; }
 .analytics-placard-swatch { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; }
 .analytics-placard-name { color: var(--slate); }
 .analytics-placard-value { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -223,7 +267,7 @@ html[data-theme="dark"] .analytics-placard { background: var(--paper-dim); }
 @media (prefers-reduced-motion: reduce) { .analytics-placard { transition: none; } }
 
 .analytics-empty { fill: var(--slate); font-size: 14px; font-family: inherit; }
-.analytics-loading { color: var(--slate); font-size: 0.92rem; padding: 24px 0; margin: 0; }
+.analytics-loading { color: var(--slate); font-size: 0.92rem; padding: 18px 0; margin: 0; }
 
 html[data-theme="dark"] .analytics-card { background: var(--paper-dim); }
 
@@ -238,16 +282,53 @@ html[data-theme="dark"] .analytics-card { background: var(--paper-dim); }
   box-shadow: var(--shadow-card); display: flex; flex-direction: column;
 }
 html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); }
-.analytics-week-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); }
-.analytics-week-title { margin: 0; font-size: 0.98rem; font-weight: 700; }
-.analytics-week-close { background: transparent; border: 1px solid var(--line); border-radius: var(--radius-s); padding: 4px 8px; cursor: pointer; }
-.analytics-week-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-.analytics-week-item { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; }
-.analytics-week-row { display: flex; flex-direction: column; gap: 4px; }
+/* Enter motion: the backdrop fades and the card lifts into place, so the week
+   dialog never just pops in. Replays on every open because [hidden] removes
+   the subtree from layout. */
+.analytics-week-dialog:not([hidden]) .analytics-week-backdrop { animation: analyticsFadeIn .18s ease both; }
+.analytics-week-dialog:not([hidden]) .analytics-week-content {
+  animation: analyticsWeekPop .24s cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes analyticsFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes analyticsWeekPop {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .analytics-week-dialog:not([hidden]) .analytics-week-backdrop,
+  .analytics-week-dialog:not([hidden]) .analytics-week-content { animation: none; }
+}
+.analytics-week-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.analytics-week-title { margin: 0; font-size: 0.95rem; font-weight: 700; }
+.analytics-week-close { background: transparent; border: 1px solid var(--line); border-radius: var(--radius-s); padding: 3px 7px; cursor: pointer; color: var(--ink); }
+.analytics-week-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.analytics-week-item { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; }
+.analytics-week-row { display: flex; flex-direction: column; gap: 3px; }
 .analytics-week-heading { font-weight: 600; color: var(--ink); }
-.analytics-week-meta { color: var(--slate); font-size: 0.88rem; }
-.analytics-week-footer { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
-.analytics-week-btn { padding: 7px 12px; border-radius: var(--radius-s); border: 1px solid var(--line); background: var(--paginator-bg); cursor: pointer; }
+.analytics-week-meta { color: var(--slate); font-size: 0.86rem; }
+.analytics-week-footer { padding: 8px 12px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+.analytics-week-btn { padding: 6px 11px; border-radius: var(--radius-s); border: 1px solid var(--line); background: var(--paginator-bg); cursor: pointer; color: var(--ink); }
+
+/* Skimmer shown in the dialog body while the week's stories are fetched. */
+.analytics-week-skimmer { display: grid; gap: 8px; }
+.analytics-week-skel-item {
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;
+}
+.analytics-week-skel-bar {
+  height: 10px; border-radius: 5px; width: min(60%, 280px);
+  background: var(--paginator-bg); animation: panelPulse 1.4s var(--panel-ease, ease) infinite;
+}
+.analytics-week-skel-bar.is-short { width: min(35%, 160px); height: 8px; }
+@media (prefers-reduced-motion: reduce) { .analytics-week-skel-bar { animation: none; } }
+
+.analytics-week-error { margin: 0; color: var(--slate); text-align: center; padding: 8px 0; }
+.analytics-week-retry {
+  margin-left: 6px; padding: 4px 10px; border-radius: var(--radius-s);
+  border: 1px solid var(--line); background: var(--paginator-bg); color: var(--ink);
+  font-size: 0.86rem; font-weight: 600; cursor: pointer;
+}
+.analytics-week-retry:hover { border-color: var(--paginator-hover-border); }
 .analytics-toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
   padding: 8px 14px; border-radius: 999px; background: rgba(15,23,42,0.9); color: #fff;
@@ -256,14 +337,64 @@ html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); 
 .analytics-toast[hidden] { display: none; }
 
 /* ---------- Members table (fragment from analytics_members.html) ---------- */
-/* The filter row reuses .analytics-controls; the search box matches a select. */
-.analytics-select input[type="search"] {
+/* The filter row reuses .analytics-controls; the search and date boxes match a
+   select, and follow the theme the same way. */
+.analytics-select input[type="search"],
+.analytics-select input[type="date"] {
   padding: 8px 10px; font-size: 0.9rem; font-family: inherit;
-  color: var(--ink); background: var(--paginator-bg);
-  border: 1px solid var(--paginator-border); border-radius: var(--radius-s);
+  color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); border-radius: var(--radius-s);
   min-width: 180px;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-.analytics-select input[type="search"]:focus-visible { outline: 1.5px solid var(--amber-deep); outline-offset: 2px; }
+.analytics-select input[type="date"] { min-width: 150px; }
+html[data-theme="dark"] .analytics-select input[type="search"],
+html[data-theme="dark"] .analytics-select input[type="date"] { background: var(--paper-dim); }
+.analytics-select input[type="search"]:hover,
+.analytics-select input[type="date"]:hover { border-color: var(--slate); }
+.analytics-select input[type="search"]:focus-visible,
+.analytics-select input[type="date"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  outline-offset: 2px;
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent);
+}
+
+/* The "Apply" button beside a pair of date boxes; a plain themed button. */
+.analytics-apply {
+  padding: 8px 14px; font-size: 0.88rem; font-weight: 600; font-family: inherit;
+  color: var(--ink); background: var(--paginator-bg);
+  border: 1px solid var(--line); border-radius: var(--radius-s); cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.analytics-apply:hover { border-color: var(--paginator-hover-border); }
+.analytics-date-hint { flex: 1 1 100%; margin: 0; font-size: 0.72rem; color: var(--slate); }
+
+/* The moved "Stories published" tile sits above its chart with a little air. */
+.analytics-stories-tiles { margin-bottom: 14px; }
+
+/* ---------- Story picker (Story performance card) ---------- */
+.analytics-story-picker { flex: 1 1 320px; }
+.analytics-story-chosen { font-size: 0.82rem; color: var(--slate); align-self: center; }
+.analytics-story-chosen strong { color: var(--ink); }
+.analytics-story-results { flex: 1 1 100%; }
+.analytics-story-result-list {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 0;
+  max-height: 264px; overflow: auto;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--paper);
+}
+html[data-theme="dark"] .analytics-story-result-list { background: var(--paper-dim); }
+.analytics-story-result {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  padding: 9px 11px; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; color: var(--ink); cursor: pointer; font-family: inherit;
+}
+.analytics-story-result-list li:last-child .analytics-story-result { border-bottom: 0; }
+.analytics-story-result:hover, .analytics-story-result:focus-visible { background: var(--paginator-bg); }
+.analytics-story-result-title { font-weight: 600; font-size: 0.9rem; }
+.analytics-story-result-meta { font-size: 0.76rem; color: var(--slate); }
+.analytics-story-no-results { margin: 0; font-size: 0.86rem; color: var(--slate); }
 
 .analytics-members { padding: 2px 0 16px; }
 .analytics-members-summary { margin: 0 0 12px; color: var(--slate); font-size: 0.9rem; }
@@ -348,10 +479,77 @@ html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); 
 /* Typing in the email box only dims the rows; it never flashes a skeleton. */
 .analytics-members.is-searching { opacity: .55; transition: opacity .18s ease; }
 
+/* ---------- Reading & editorial (fragment from analytics_reading.html) ---------- */
+.analytics-reading-range {
+  margin: 2px 0 12px; font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate);
+}
+.analytics-reading-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; padding-bottom: 6px;
+}
+.analytics-reading-block {
+  min-width: 0; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--paginator-bg);
+}
+html[data-theme="dark"] .analytics-reading-block { background: var(--paper-dim); }
+.analytics-reading-heading {
+  margin: 0 0 10px; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate);
+}
+.analytics-reading-note { margin: 8px 0 0; font-size: 0.78rem; color: var(--slate); }
+.analytics-reading-empty { margin: 0; font-size: 0.86rem; color: var(--slate); }
+.analytics-reading-stat {
+  margin: 0; font-size: 1.9rem; font-weight: 800; line-height: 1.05;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.analytics-reading-cat {
+  margin-left: 8px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--slate); white-space: nowrap;
+}
+
+.analytics-reading-scroll { overflow-x: auto; }
+.analytics-reading-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.analytics-reading-table th {
+  text-align: left; white-space: nowrap; padding: 4px 8px 6px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--slate); border-bottom: 1px solid var(--line);
+}
+.analytics-reading-table td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.analytics-reading-table tbody tr:last-child td { border-bottom: 0; }
+.analytics-reading-table th:not(:first-child),
+.analytics-reading-table td.analytics-reading-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.analytics-reading-story { color: var(--ink); font-weight: 600; text-decoration: none; }
+.analytics-reading-story:hover { text-decoration: underline; }
+
+.analytics-reading-cats { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.analytics-reading-cat-row {
+  display: grid; grid-template-columns: minmax(56px, auto) 1fr auto;
+  grid-template-areas: "name bar num" "sub sub sub";
+  align-items: center; gap: 4px 10px;
+}
+.analytics-reading-cat-name { grid-area: name; font-size: 0.82rem; font-weight: 600; color: var(--ink); }
+.analytics-reading-bar {
+  grid-area: bar; display: block; height: 8px; border-radius: 999px;
+  background: var(--line); overflow: hidden;
+}
+.analytics-reading-bar-fill {
+  display: block; height: 100%; min-width: 2px;
+  background: var(--brand-deep); border-radius: 999px;
+}
+.analytics-reading-cat-num { grid-area: num; font-size: 0.82rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.analytics-reading-cat-sub { grid-area: sub; font-size: 0.72rem; color: var(--slate); }
+
+.analytics-reading-cold { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.analytics-reading-cold-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 0; font-size: 0.84rem; }
+.analytics-reading-cold-date { margin-left: auto; font-size: 0.72rem; color: var(--slate); white-space: nowrap; }
+
 @media (max-width: 640px) {
   .analytics-shell { padding: 0 12px 44px; }
   .analytics-topbar { gap: 10px; }
   .analytics-title { font-size: 1.15rem; }
+  .analytics-new-today-slot { margin-left: 0; }
   .analytics-card { padding: 14px 13px 6px; }
   .analytics-card-header { align-items: flex-start; }
 

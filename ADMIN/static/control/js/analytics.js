@@ -416,6 +416,8 @@
   var WEEK_DIALOG_ID = "analytics-week";
   var WEEK_TOAST_ID = "analytics-week-toast";
 
+  function initTrendRange() {}
+
   function ensureWeekDialog() {
     var d = document.getElementById(WEEK_DIALOG_ID);
     if (d) return d;
@@ -493,8 +495,20 @@
     d.querySelector("[data-week-body]").innerHTML = html;
     window._weekLastFocus = document.activeElement;
     d.hidden = false;
+    /* release a trap from a previous open/retry before installing a new one */
+    if (window._weekTrap) { window._weekTrap.release(); window._weekTrap = null; }
     window._weekTrap = trapFocus(d);
-    d.addEventListener("click", function (ev) { if (ev.target.matches("[data-week-close]")) closeWeekDialog(); }, { once: true });
+    /* one delegated handler for close and retry (bound once on the dialog) */
+    if (!d._actionsBound) {
+      d._actionsBound = true;
+      d.addEventListener("click", function (ev) {
+        if (ev.target.closest && ev.target.closest("[data-week-close]")) { closeWeekDialog(); return; }
+        if (ev.target.closest && ev.target.closest("[data-week-retry]")) {
+          var week = d._week;
+          if (week) fetchWeekStories(d._weekRoot, week, d._weekHint).catch(function () {});
+        }
+      });
+    }
   }
 
   function fetchWeekStories(root, week, labelHint) {
@@ -504,9 +518,35 @@
     url.searchParams.set("week", week);
     var controller = new AbortController();
     var timeout = setTimeout(function () { controller.abort(); }, 8000);
+    /* Open the dialog straight away with a skimmer in the body, so a tap
+       always shows something immediately instead of a dead pause. */
+    openWeekDialog(labelHint || "Week stories", weekSkimmerHtml());
+    var d = document.getElementById(WEEK_DIALOG_ID);
+    if (d) { d._weekRoot = root; d._week = week; d._weekHint = labelHint; }
     return fetch(url, { headers: { "X-Requested-With": "fetch" }, signal: controller.signal })
       .then(function (r) { clearTimeout(timeout); if (!r.ok) throw new Error(String(r.status)); return r.text(); })
-      .then(function (html) { openWeekDialog(labelHint || "Week stories", html); });
+      .then(function (html) { setWeekBody(html); })
+      .catch(function (err) {
+        clearTimeout(timeout);
+        setWeekBody('<p class="analytics-week-error">Couldn\'t load this week. <button type="button" class="analytics-week-retry" data-week-retry>Retry</button></p>');
+        throw err;
+      });
+  }
+
+  /* A small shimmer body shown while the week's stories are fetched. */
+  function weekSkimmerHtml() {
+    var row =
+      '<div class="analytics-week-skel-item" aria-hidden="true">' +
+        '<div class="analytics-week-skel-bar"></div>' +
+        '<div class="analytics-week-skel-bar is-short"></div>' +
+      "</div>";
+    return '<div class="analytics-week-skimmer">' + row + row + row + "</div>";
+  }
+
+  function setWeekBody(html) {
+    var d = document.getElementById(WEEK_DIALOG_ID);
+    if (!d) return;
+    d.querySelector("[data-week-body]").innerHTML = html;
   }
 
   function attachWeekPress(svg, root) {
@@ -519,7 +559,7 @@
       var tip = btn.querySelector("title");
       var hint = tip ? tip.textContent : "Week";
       fetchWeekStories(root, week, hint).catch(function (err) {
-        showWeekToast(err && err.name === "AbortError" ? "Week stories took too long. Try again." : "Couldn't load week stories. Try again.");
+        showWeekToast(err && err.name === "AbortError" ? "Week stories took too long. Retry." : "Couldn't load week stories. Retry.");
       });
     });
     svg.addEventListener("keydown", function (ev) {
@@ -530,4 +570,53 @@
   }
 
   window.AnalyticsCharts = { render: renderAll, redraw: redrawAll };
+
+  /* ---------- Slow-network loading state ---------- */
+  /* Every chart lives in an .analytics-chart-body. On a slow link the old
+     chart would otherwise sit there unchanged until the new fragment lands,
+     so a reader cannot tell whether their change took. Marking the body
+     is-loading the instant a request starts (and clearing it on swap, settle
+     or any error) makes every section acknowledge the change immediately.
+     On an error htmx leaves the target untouched, so clearing the class
+     simply reveals the previous chart again. */
+  function chartBodyOf(el) {
+    return el && el.classList && el.classList.contains("analytics-chart-body") ? el : null;
+  }
+  function setChartLoading(el, isLoading) {
+    if (!el) return;
+    el.classList.toggle("is-loading", isLoading);
+    el.setAttribute("aria-busy", isLoading ? "true" : "false");
+  }
+  document.addEventListener("htmx:beforeRequest", function (event) {
+    setChartLoading(chartBodyOf(event.detail.target), true);
+  });
+  ["htmx:afterSwap", "htmx:afterSettle", "htmx:responseError", "htmx:sendError", "htmx:timeout"].forEach(function (name) {
+    document.addEventListener(name, function (event) {
+      setChartLoading(chartBodyOf(event.detail.target), false);
+    });
+  });
+
+  /* ---------- Story performance picker ---------- */
+  /* Pressing a search result records the story id in the form's hidden field,
+     shows the title, clears the list and asks the form to load that story's
+     chart. Kept in JS rather than a submit button so the search box's own
+     change event can never masquerade as a story choice. */
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest(".analytics-story-result");
+    if (!button) return;
+    var form = button.closest("form");
+    if (!form) return;
+
+    var field = form.querySelector('input[name="story"]');
+    if (field) field.value = button.getAttribute("data-story") || "";
+    var chosen = form.querySelector("[data-story-chosen]");
+    if (chosen) {
+      chosen.innerHTML = "Showing <strong>" + button.getAttribute("data-story-title") + "</strong>";
+    }
+    var results = document.getElementById("analytics-story-results");
+    if (results) results.innerHTML = "";
+
+    if (form.requestSubmit) form.requestSubmit();
+    else if (window.htmx) window.htmx.trigger(form, "submit");
+  });
 })();

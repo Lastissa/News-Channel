@@ -1494,7 +1494,7 @@
           renderRows(data.items || []);
           renderPager(data, query);
         })
-        .catch(function () { toast("Could not search staff.", "error"); });
+        .catch(function () { toast("Server Error, Could not search staff.", "error"); });
     }
 
     var runSearch = debounce(function () { load(input.value.trim(), 1); }, 300);

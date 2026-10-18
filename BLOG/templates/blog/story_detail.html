@@ -162,13 +162,15 @@
             <button type="button" class="share-btn share-btn-whatsapp" data-share-platform="whatsapp"
                     data-share-url="{{ site_domain }}{{ request.path }}"
                     data-share-title="{{ blog.heading }}"
-                    data-share-text="{{ blog.heading }}
+                    data-share-text="
+{{ blog.heading }}
 
 {{ blog_content_html|filter_copy_btn_text }}
 
-Written by {{ blog.author_name }} | ABUREPORT TEAM
+full details 👇
+{{ site_domain }}{{ request.path }}
 
-visit https://www.abureport.com.ng for more up to date news."
+ABUREPORT"
                     aria-label="Share on WhatsApp">
               <img class="share-icon" src="{% static 'blog/file/WhatsApp-icon.svg' %}" alt="" width="16" height="16" loading="lazy">
               {% comment %} <span>WhatsApp</span> {% endcomment %}

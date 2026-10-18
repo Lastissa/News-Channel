@@ -1,0 +1,99 @@
+{% comment %}
+  htmx fragment: the ANALYTICS "Reading & editorial" card.
+
+  Everything here is measured over one range (the same choices as Trends):
+  the top-read stories, per-category published-vs-read, the never-viewed
+  backlog, and the median wait for a fresh story's first reader. "Views" are
+  StoryView events inside that window, never the all-time Blog.views counter,
+  so changing the range changes the leaderboard. Only ever returned to an htmx
+  GET against control:analytics_reading -- never rendered into the shell.
+{% endcomment %}
+<p class="analytics-reading-range">{{ range_label }}</p>
+
+<div class="analytics-reading-grid">
+
+  <section class="analytics-reading-block" aria-labelledby="analytics-reading-top">
+    <h3 id="analytics-reading-top" class="analytics-reading-heading">Top-read stories</h3>
+    {% if top_stories %}
+    <div class="analytics-reading-scroll">
+      <table class="analytics-reading-table">
+        <thead>
+          <tr>
+            <th scope="col">Story</th>
+            <th scope="col">Views</th>
+            <th scope="col">Likes</th>
+            <th scope="col">Engaged</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for story in top_stories %}
+          <tr>
+            <td>
+              <a class="analytics-reading-story" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
+              <span class="analytics-reading-cat">{{ story.category }}</span>
+            </td>
+            <td class="analytics-reading-num">{{ story.views }}</td>
+            <td class="analytics-reading-num">{{ story.likes }}</td>
+            <td class="analytics-reading-num">{{ story.engagement }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="analytics-reading-empty">No stories were read in this range.</p>
+    {% endif %}
+  </section>
+
+  <section class="analytics-reading-block" aria-labelledby="analytics-reading-cats">
+    <h3 id="analytics-reading-cats" class="analytics-reading-heading">Published vs read</h3>
+    {% if top_categories %}
+    <ul class="analytics-reading-cats">
+      {% for cat in top_categories %}
+      <li class="analytics-reading-cat-row">
+        <span class="analytics-reading-cat-name">{{ cat.category }}</span>
+        <span class="analytics-reading-bar" role="img" aria-label="{{ cat.views }} views across {{ cat.published }} stor{{ cat.published|pluralize:"y,ies" }}">
+          <span class="analytics-reading-bar-fill" style="width: {{ cat.bar_percent }}%"></span>
+        </span>
+        <span class="analytics-reading-cat-num">{{ cat.views }}</span>
+        <span class="analytics-reading-cat-sub">{{ cat.published }} published · {{ cat.avg_views }} avg</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="analytics-reading-empty">Nothing was published or read in this range.</p>
+    {% endif %}
+  </section>
+
+  <section class="analytics-reading-block" aria-labelledby="analytics-reading-cold">
+    <h3 id="analytics-reading-cold" class="analytics-reading-heading">Cold stories</h3>
+    <p class="analytics-reading-note">Never viewed, published at least {{ cold_stories.older_than }} days ago.</p>
+    {% if cold_stories.items %}
+    <ul class="analytics-reading-cold">
+      {% for story in cold_stories.items %}
+      <li class="analytics-reading-cold-row">
+        <a class="analytics-reading-story" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
+        <span class="analytics-reading-cat">{{ story.category }}</span>
+        <span class="analytics-reading-cold-date">{{ story.posted|date:"M j, Y" }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if cold_stories.remaining %}
+    <p class="analytics-reading-note">and {{ cold_stories.remaining }} more.</p>
+    {% endif %}
+    {% else %}
+    <p class="analytics-reading-empty">Nothing cold. every older story has been read.</p>
+    {% endif %}
+  </section>
+
+  <section class="analytics-reading-block" aria-labelledby="analytics-reading-speed">
+    <h3 id="analytics-reading-speed" class="analytics-reading-heading">Time to first read</h3>
+    {% if first_read.sample %}
+    <p class="analytics-reading-stat">{{ first_read.median_label }}</p>
+    <p class="analytics-reading-note">median, across {{ first_read.sample }} stor{{ first_read.sample|pluralize:"y,ies" }} published in this range.</p>
+    {% else %}
+    <p class="analytics-reading-empty">No reads recorded for stories published in this range.</p>
+    {% endif %}
+  </section>
+
+</div>

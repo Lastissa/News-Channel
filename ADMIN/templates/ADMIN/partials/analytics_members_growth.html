@@ -1,0 +1,12 @@
+{% comment %}
+  htmx fragment: the "Members over time" running-total line chart on Member
+  lytics. Always a single cumulative series, so the JSON carries one line that
+  steps up as accounts are created. Only ever returned to an htmx GET against
+  control:member_growth.
+{% endcomment %}
+<p class="analytics-chart-note"><strong>{{ chart.total }}</strong> members by the end of this window.</p>
+<div class="analytics-chart" data-chart data-chart-kind="line">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Running total of members over the selected time frame"></div>
+  {{ chart|json_script:"analytics-members-growth-data" }}
+</div>

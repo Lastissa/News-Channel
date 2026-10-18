@@ -1,0 +1,22 @@
+{% comment %}
+  htmx fragment: story matches for the Story performance picker.
+
+  A short, scrollable list of buttons. Pressing one is handled in analytics.js:
+  it records the story id and loads that story's chart. Only ever returned to
+  an htmx GET against control:analytics_story_search.
+{% endcomment %}
+{% if results %}
+<ul class="analytics-story-result-list">
+  {% for story in results %}
+  <li>
+    <button type="button" class="analytics-story-result"
+            data-story="{{ story.id }}" data-story-title="{{ story.heading }}">
+      <span class="analytics-story-result-title">{{ story.heading }}</span>
+      <span class="analytics-story-result-meta">{{ story.category }} &middot; {{ story.author }} &middot; {{ story.posted|date:"M j, Y" }}</span>
+    </button>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="analytics-story-no-results">No stories match that title.</p>
+{% endif %}

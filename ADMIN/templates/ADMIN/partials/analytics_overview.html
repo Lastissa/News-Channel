@@ -1,10 +1,11 @@
 {% comment %}
   htmx fragment: the "Quick overview" card.
 
-  Three member figures, each counted over today / this week / the last 30 days.
-  New users leads the card, but its "today" figure lives in the top-bar badge,
-  so the lead shows the week-on-week change and the month instead of repeating
-  the badge.
+  Member figures counted over today / this week / the last 30 days. New users
+  leads the card, but its "today" figure lives in the top-bar badge, so the
+  lead shows this week's sign-ups and spells out what the week-on-week change
+  compares against (this partial week against ALL of last week) instead of a
+  bare "since last week". Stories published has moved to Story lytics.
 
   This partial is only ever returned to an htmx GET against
   control:member_overview -- it is never rendered into the shell page.
@@ -14,8 +15,12 @@
     <p class="analytics-overview-label">New users</p>
     <div class="analytics-overview-figures">
       <span class="analytics-overview-figure">
+        <strong class="analytics-overview-value">{{ stats.users.week }}</strong>
+        <span class="analytics-overview-caption">joined this week</span>
+      </span>
+      <span class="analytics-overview-figure">
         <strong class="analytics-overview-value {{ stats.users.delta_tone }}">{{ stats.users.delta_display }}</strong>
-        <span class="analytics-overview-caption">since last week</span>
+        <span class="analytics-overview-caption">vs last week ({{ stats.users.last_week }})</span>
       </span>
       <span class="analytics-overview-figure">
         <strong class="analytics-overview-value">{{ stats.users.month }}</strong>
@@ -26,16 +31,14 @@
 
   <div class="analytics-overview-tiles">
     <div class="analytics-tile">
+      <p class="analytics-tile-label">Current members total</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.members_total }}</span> accounts</p>
+    </div>
+    <div class="analytics-tile">
       <p class="analytics-tile-label">Active readers</p>
       <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.today }}</span> today</p>
       <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.week }}</span> this week</p>
       <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.month }}</span> last 30 days</p>
-    </div>
-    <div class="analytics-tile">
-      <p class="analytics-tile-label">Stories published</p>
-      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.stories.today }}</span> today</p>
-      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.stories.week }}</span> this week</p>
-      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.stories.month }}</span> last 30 days</p>
     </div>
   </div>
 </div>

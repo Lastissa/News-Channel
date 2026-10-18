@@ -43,6 +43,7 @@ from SERVICE_INTERNAL.sessions import (
 from Partner.models import AdvertImage, Announcement
 from ADMIN.models import SiteSettings
 from ADMIN.analytics import (
+    DEFAULT_STORY_PERFORMANCE_SERIES,
     DEFAULT_STORY_PERIOD,
     DEFAULT_TREND_BUCKET,
     DEFAULT_TREND_RANGE,
@@ -52,16 +53,23 @@ from ADMIN.analytics import (
     MEMBER_NEWSLETTER_CHOICES,
     MEMBER_STATE_CHOICES,
     SERIES_META,
+    STORY_PERFORMANCE_SERIES,
     STORY_PERIODS,
     STORY_PERIOD_CHOICES,
     TREND_BUCKET_CHOICES,
     TREND_RANGE_CHOICES,
+    TREND_RANGES,
     member_category_filter_choices,
     member_directory_queryset,
     member_new_today,
     member_overview,
     member_page_details,
+    members_growth,
+    reading_editorial,
+    stories_overview,
     stories_per_week,
+    story_performance,
+    story_search,
     trends,
     week_stories,
     week_window,
@@ -792,6 +800,8 @@ class AnalyticsView(View):
                 "trend_ranges": TREND_RANGE_CHOICES,
                 "default_trend_range": DEFAULT_TREND_RANGE,
                 "series_meta": SERIES_META,
+                "story_performance_series": STORY_PERFORMANCE_SERIES,
+                "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
                 "member_state_choices": MEMBER_STATE_CHOICES,
                 "member_newsletter_choices": MEMBER_NEWSLETTER_CHOICES,
                 "member_category_choices": member_category_filter_choices(),
@@ -818,7 +828,11 @@ class AnalyticsStoriesChartView(View):
         return render(
             request,
             "ADMIN/partials/analytics_stories.html",
-            {"chart": stories_per_week(period), "period": period if period in STORY_PERIODS else DEFAULT_STORY_PERIOD},
+            {
+                "chart": stories_per_week(period),
+                "period": period if period in STORY_PERIODS else DEFAULT_STORY_PERIOD,
+                "stories": stories_overview(),
+            },
         )
 
 
@@ -838,6 +852,8 @@ class AnalyticsTrendsChartView(View):
 
         bucket = (request.GET.get("bucket") or DEFAULT_TREND_BUCKET).strip()
         selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
         if "submitted" in request.GET:
             series_keys = set(request.GET.getlist("series"))
         else:
@@ -846,7 +862,78 @@ class AnalyticsTrendsChartView(View):
         return render(
             request,
             "ADMIN/partials/analytics_trends.html",
-            {"chart": trends(bucket, selected_range, series_keys)},
+            {"chart": trends(bucket, selected_range, series_keys, start_iso, end_iso)},
+        )
+
+
+class AnalyticsMembersGrowthView(View):
+    """htmx fragment: the "Members over time" running-total line chart.
+
+    Read only and admin only. Takes the same bucket / range / custom-date
+    controls as Trends, but always draws the one cumulative series.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        bucket = (request.GET.get("bucket") or DEFAULT_TREND_BUCKET).strip()
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_members_growth.html",
+            {"chart": members_growth(bucket, selected_range, start_iso, end_iso)},
+        )
+
+
+class AnalyticsStoryPerformanceView(View):
+    """htmx fragment: one story's views / likes / comments over time.
+
+    Read only and admin only. A missing or unknown story id draws the "pick a
+    story" note; otherwise the chosen signals are bucketed exactly like Trends.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        raw_id = (request.GET.get("story") or "").strip()
+        blog_id = int(raw_id) if raw_id.isdigit() else None
+        bucket = (request.GET.get("bucket") or DEFAULT_TREND_BUCKET).strip()
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+        if "submitted" in request.GET:
+            series_keys = set(request.GET.getlist("series"))
+        else:
+            series_keys = set(DEFAULT_STORY_PERFORMANCE_SERIES)
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_story_performance.html",
+            {"chart": story_performance(blog_id, bucket, selected_range, series_keys, start_iso, end_iso)},
+        )
+
+
+class AnalyticsStorySearchView(View):
+    """htmx fragment: story matches for the Story performance picker.
+
+    Read only and admin only. Returns a short list of buttons; pressing one
+    submits the picker form and loads that story's chart.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        query = (request.GET.get("story_q") or "").strip()[:100]
+        return render(
+            request,
+            "ADMIN/partials/analytics_story_search.html",
+            {"results": story_search(query)},
         )
 
 
@@ -963,6 +1050,30 @@ class AnalyticsNewTodayView(View):
         return render(request, "ADMIN/partials/analytics_new_today.html", {"count": member_new_today()})
 
 
+class AnalyticsReadingView(View):
+    """htmx fragment: the ANALYTICS "Reading & editorial" card.
+
+    Read only and admin only, like every other figure endpoint. The single
+    Range dropdown reuses the Trends ranges; an unknown value falls back to the
+    30 day default here, so a hand typed querystring can never widen the window
+    past a choice the menu offers.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        if selected_range not in TREND_RANGES:
+            selected_range = DEFAULT_TREND_RANGE
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_reading.html",
+            reading_editorial(selected_range),
+        )
+
+
 class StaffLyticsView(View):
     """Placeholder for the staff chamber of analytics (not built yet)."""
 
@@ -988,6 +1099,49 @@ class PartnerLyticsView(View):
             request,
             "ADMIN/analytics_placeholder.html",
             {"heading": "Partner lytics", "message": "Partner analytics is not built yet. It will cover adverts and announcements."},
+        )
+
+
+class AuthorLyticsView(View):
+    """Placeholder for the author chamber of analytics (not built yet)."""
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+
+        return render(
+            request,
+            "ADMIN/analytics_placeholder.html",
+            {"heading": "Author lytics", "message": "Author analytics is not built yet. It will cover authors and their production."},
+        )
+
+
+class StoryLyticsView(View):
+    """The Story lytics chamber: stories produced, how they read and perform.
+
+    Hosts the pieces that belong to stories rather than members -- the
+    Stories-per-week bar chart and its published figure, the Reading &
+    editorial card, and the per-story performance chart. Each figure still
+    arrives from its own htmx fragment, so the shell stays cheap.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+
+        return render(
+            request,
+            "ADMIN/story_lytics.html",
+            {
+                "story_periods": STORY_PERIOD_CHOICES,
+                "default_story_period": DEFAULT_STORY_PERIOD,
+                "trend_buckets": TREND_BUCKET_CHOICES,
+                "default_trend_bucket": DEFAULT_TREND_BUCKET,
+                "trend_ranges": TREND_RANGE_CHOICES,
+                "default_trend_range": DEFAULT_TREND_RANGE,
+                "story_performance_series": STORY_PERFORMANCE_SERIES,
+                "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
+            },
         )
 
 

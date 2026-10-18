@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from ADMIN.analytics import _week_start, member_new_today, member_overview
 from AUTHENTICATION.models import Auth
-from BLOG.models import Blog, BlogLike, Category, StoryView, get_category_choices
+from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
 from SERVICE_INTERNAL import email_single
 from SERVICE_INTERNAL.config import About
@@ -514,13 +514,16 @@ class AnalyticsPageTests(TestCase):
     def test_shell_carries_the_controls_but_no_chart_data(self):
         self.client.force_login(self.admin)
         body = self.client.get(self.page_url).content.decode()
-        self.assertIn("analytics-stories-body", body)
         self.assertIn("analytics-trends-body", body)
-        self.assertIn("analytics/stories/", body)
+        self.assertIn("analytics-growth-body", body)
         self.assertIn("analytics/trends/", body)
+        self.assertIn("analytics/members-growth/", body)
         #   prove the figures come over htmx: no baked-in payload in the shell
-        self.assertNotIn("analytics-stories-data", body)
         self.assertNotIn("analytics-trends-data", body)
+        self.assertNotIn("analytics-members-growth-data", body)
+        #   stories and reading have moved to Story lytics
+        self.assertNotIn("analytics-stories-body", body)
+        self.assertNotIn("analytics-reading-body", body)
 
     #   ------------------------------------------------------------ stories bar
     def test_stories_fragment_returns_a_week_bar_chart(self):
@@ -581,6 +584,105 @@ class AnalyticsPageTests(TestCase):
         response = self.client.get(self.trends_url, {"submitted": "1", "bucket": "day", "range": "30d", "series": ["likes"]})
         chart = _chart_data(self, response, "analytics-trends-data")
         self.assertEqual(sum(chart["series"][0]["values"]), 1)
+
+    def test_a_custom_range_overrides_the_range_preset(self):
+        self.client.force_login(self.admin)
+        today = timezone.localdate()
+        start = (today - timedelta(days=3)).isoformat()
+        end = today.isoformat()
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.trends_url,
+                {"submitted": "1", "series": ["users"], "bucket": "day", "range": "30d", "start": start, "end": end},
+            ),
+            "analytics-trends-data",
+        )
+        #   three days back through today inclusive => four daily buckets
+        self.assertEqual(len(chart["labels"]), 4)
+
+    def test_an_invalid_custom_range_falls_back_to_the_preset(self):
+        self.client.force_login(self.admin)
+        today = timezone.localdate()
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.trends_url,
+                {
+                    "submitted": "1", "series": ["users"], "bucket": "day", "range": "7d",
+                    "start": today.isoformat(), "end": (today - timedelta(days=3)).isoformat(),
+                },
+            ),
+            "analytics-trends-data",
+        )
+        self.assertEqual(len(chart["labels"]), 7)
+
+    def test_the_month_bucket_builds_calendar_month_labels(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.trends_url, {"submitted": "1", "series": ["users"], "bucket": "month", "range": "1y"}),
+            "analytics-trends-data",
+        )
+        self.assertGreaterEqual(len(chart["labels"]), 12)
+        for label in chart["labels"]:
+            self.assertRegex(label, r"^[A-Z][a-z]{2} \d{4}$")
+
+    #   ------------------------------------------------------------ week stories endpoint
+    def test_week_stories_requires_admin(self):
+        url = reverse("control:member_week_stories")
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_week_stories_rejects_bad_missing_or_future_week(self):
+        url = reverse("control:member_week_stories")
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(url).status_code, 400)  # missing
+        self.assertEqual(self.client.get(url, {"week": "not-a-date"}).status_code, 400)  # bad
+        # future week should be rejected
+        from datetime import date, timedelta
+        future = (date.today() + timedelta(days=14)).isoformat()
+        self.assertEqual(self.client.get(url, {"week": future}).status_code, 400)
+
+    def test_week_stories_returns_fragment_with_story_and_author_button(self):
+        url = reverse("control:member_week_stories")
+        self.client.force_login(self.admin)
+        from django.utils import timezone
+        from datetime import timedelta
+        from ADMIN.analytics import _week_start
+        # create story this week
+        story = self.make_story("Week story one")
+        # get this week's Sunday
+        week_start = _week_start(timezone.localtime(story.date_created))
+        resp = self.client.get(url, {"week": week_start.date().isoformat()})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn("Week story one", body)
+        # author button has data-author-toast
+        self.assertIn('data-author-toast="Author analytics is not built yet. It will live in Staff lytics."', body)
+
+    def test_week_stories_wednesday_and_sunday_return_same_fragment(self):
+        url = reverse("control:member_week_stories")
+        self.client.force_login(self.admin)
+        from django.utils import timezone
+        from ADMIN.analytics import _week_start
+        from datetime import timedelta
+        story = self.make_story("Week identity")
+        ws = _week_start(timezone.localtime(story.date_created))
+        wed = ws + timedelta(days=3)
+        r_sun = self.client.get(url, {"week": ws.date().isoformat()})
+        r_wed = self.client.get(url, {"week": wed.date().isoformat()})
+        self.assertEqual(r_sun.content, r_wed.content)
+
+    def test_stories_per_week_bucket_starts_matches_labels(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.stories_url, {"period": "1m"}), "analytics-stories-data")
+        self.assertEqual(chart["type"], "bar")
+        self.assertIn("bucket_starts", chart)
+        self.assertEqual(len(chart["bucket_starts"]), len(chart["labels"]))
 
 
 class StoryViewHistoryTests(TransactionTestCase):
@@ -957,19 +1059,316 @@ class AnalyticsOverviewTests(TestCase):
         self.assertEqual(stats["stories"]["today"], 1)
 
     #   ------------------------------------------------------------ rendering
-    def test_the_overview_fragment_renders_the_three_metrics(self):
+    def test_the_overview_fragment_renders_the_metrics(self):
         self.account_joined("today@example.com", timezone.now())
         self.client.force_login(self.admin)
         body = self.client.get(self.overview_url).content.decode()
         self.assertIn("analytics-overview", body)
-        self.assertIn("since last week", body)
+        self.assertIn("vs last week", body)
+        self.assertIn("Current members total", body)
         self.assertIn("Active readers", body)
-        self.assertIn("Stories published", body)
+        #   stories published moved to Story lytics
+        self.assertNotIn("Stories published", body)
+
+
+class AnalyticsReadingTests(TestCase):
+    """The ANALYTICS "Reading & editorial" card.
+
+    All four blocks are windowed to one range (the Trends ranges) and read only
+    from existing tables: StoryView events for "views", Blog.category for the
+    published-vs-read split, the stored Blog.views counter for the cold backlog,
+    and Blog.date_created -> first StoryView for time-to-first-read.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="reading-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="reading-writer@example.com")
+        self.member = Auth.objects.create_user(email="reading-member@example.com")
+
+        self.url = reverse("control:analytics_reading")
+
+    def make_story(self, heading, category="NEWS", age_days=0, views=0):
+        story = Blog.objects.create(
+            author=self.writer, heading=heading, category=category,
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        #   date_created and views are pinned by hand: auto_now_add would file
+        #   every fixture under "now".
+        Blog.objects.filter(pk=story.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days), views=views
+        )
+        return story
+
+    def add_view(self, story, age_days=0):
+        view = StoryView.objects.create(blog=story)
+        StoryView.objects.filter(pk=view.pk).update(created_at=timezone.now() - timedelta(days=age_days))
+        return view
+
+    #   ------------------------------------------------------------ access
+    def test_the_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    #   ------------------------------------------------------------ shell
+    def test_the_shell_ships_the_reading_target_but_no_numbers(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("analytics-reading-body", body)
+        self.assertIn("analytics/reading/", body)
+        self.assertNotIn("analytics-reading-data", body)
+
+    #   ------------------------------------------------------------ top stories
+    def test_top_stories_rank_by_views_inside_the_window(self):
+        busy = self.make_story("Reading busiest")
+        quiet = self.make_story("Reading quiet")
+        stale = self.make_story("Reading stale")
+        for _ in range(3):
+            self.add_view(busy)
+        self.add_view(quiet)
+        for _ in range(9):
+            self.add_view(stale, age_days=200)   # outside even a year-long range? no: outside 30d
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "30d"}).content.decode()
+        self.assertIn("Reading busiest", body)
+        self.assertIn("Reading quiet", body)
+        self.assertNotIn("Reading stale", body)
+        self.assertLess(body.index("Reading busiest"), body.index("Reading quiet"))
+
+    def test_a_longer_range_pulls_in_older_views(self):
+        story = self.make_story("Reading older win")
+        self.add_view(story, age_days=60)
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "90d"}).content.decode()
+        self.assertIn("Reading older win", body)
+
+    #   ------------------------------------------------------------ cold backlog
+    def test_cold_stories_lists_only_old_never_viewed_stories(self):
+        self.make_story("Cold story", age_days=10)
+        self.make_story("Warm story", age_days=10, views=4)
+        self.make_story("Fresh story", age_days=2)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "30d"}).content.decode()
+        self.assertIn("Cold story", body)
+        self.assertNotIn("Warm story", body)
+        self.assertNotIn("Fresh story", body)
+
+    #   ------------------------------------------------------------ speed
+    def test_time_to_first_read_reports_the_median_wait(self):
+        story = self.make_story("Slow starter", age_days=2)
+        self.add_view(story, age_days=1)   # its first reader arrived one day after publish
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "30d"}).content.decode()
+        self.assertIn("1.0 days", body)
+        self.assertIn("Time to first read", body)
+
+    #   ------------------------------------------------------------ range guard
+    def test_an_unknown_range_falls_back_to_the_default(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "banana"}).content.decode()
+        self.assertIn("Last 30 days", body)
+
+    #   ------------------------------------------------------------ categories
+    def test_categories_compare_published_and_read(self):
+        news = self.make_story("Category news", category="NEWS")
+        self.make_story("Category sport", category="SPORT")
+        self.add_view(news)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "30d"}).content.decode()
+        self.assertIn("NEWS", body)
+        self.assertIn("SPORT", body)
+        self.assertIn("Published vs read", body)
+
+
+class AnalyticsMembersGrowthTests(TestCase):
+    """The "Members over time" running-total line chart (control:member_growth).
+
+    Cumulative, not per-period: each bucket carries every member that existed by
+    its end, with members from before the window as the baseline, so the line
+    never resets, and an empty project is a flat line at zero.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="growth-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="growth-writer@example.com")
+        #   Staff are not members; still push them far back so they can never
+        #   leak into a fixture window.
+        Auth.objects.filter(pk__in=[self.admin.pk, self.writer.pk]).update(
+            date_joined=timezone.now() - timedelta(days=800)
+        )
+        self.url = reverse("control:member_growth")
+
+    def member_joined(self, email, when):
+        account = Auth.objects.create_user(email=email)
+        Auth.objects.filter(pk=account.pk).update(date_joined=when)
+        return account
+
+    def test_the_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_the_line_is_a_running_total_not_a_per_bucket_count(self):
+        self.member_joined("old@example.com", timezone.now() - timedelta(days=10))
+        self.member_joined("a@example.com", timezone.now())
+        self.member_joined("b@example.com", timezone.now())
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.url, {"bucket": "day", "range": "30d"}), "analytics-members-growth-data")
+        values = chart["series"][0]["values"]
+        self.assertEqual(values, sorted(values))            # never steps down
+        self.assertEqual(values[-1], chart["total"])
+        self.assertEqual(chart["total"], 3)
+
+    def test_members_before_the_window_are_carried_as_the_baseline(self):
+        self.member_joined("ancient@example.com", timezone.now() - timedelta(days=200))
+        self.member_joined("fresh@example.com", timezone.now())
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.url, {"bucket": "day", "range": "30d"}), "analytics-members-growth-data")
+        self.assertEqual(chart["baseline"], 1)
+        self.assertEqual(chart["series"][0]["values"][0], 1)
+        self.assertEqual(chart["total"], 2)
+
+    def test_an_empty_project_reads_as_a_flat_zero_line(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.url), "analytics-members-growth-data")
+        self.assertEqual(chart["total"], 0)
+        self.assertEqual(set(chart["series"][0]["values"]), {0})
+
+    def test_the_month_bucket_labels_are_calendar_months(self):
+        self.member_joined("m@example.com", timezone.now())
+        self.client.force_login(self.admin)
+        chart = _chart_data(self, self.client.get(self.url, {"bucket": "month", "range": "1y"}), "analytics-members-growth-data")
+        self.assertGreaterEqual(len(chart["labels"]), 12)
+        for label in chart["labels"]:
+            self.assertRegex(label, r"^[A-Z][a-z]{2} \d{4}$")
+
+    def test_a_custom_range_overrides_the_range_preset(self):
+        self.member_joined("old@example.com", timezone.now() - timedelta(days=200))
+        self.client.force_login(self.admin)
+        today = timezone.localdate()
+        start = (today - timedelta(days=5)).isoformat()
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"range": "30d", "start": start, "end": today.isoformat()}),
+            "analytics-members-growth-data",
+        )
+        #   six daily buckets: five days back through today inclusive
+        self.assertEqual(len(chart["labels"]), 6)
+        self.assertEqual(chart["series"][0]["values"][0], 1)   # the baseline member
+
+
+class AnalyticsStoryPerformanceTests(TestCase):
+    """The Story performance card: one story's views, likes and comments over
+    time, plus the search endpoint behind its picker."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="perf-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="perf-writer@example.com")
+        self.member = Auth.objects.create_user(email="perf-member@example.com")
+
+        self.url = reverse("control:analytics_story_performance")
+        self.search_url = reverse("control:analytics_story_search")
+        self.story = self.make_story("Performance story")
+
+    def make_story(self, heading):
+        story = Blog.objects.create(
+            author=self.writer, heading=heading, category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        Blog.objects.filter(pk=story.pk).update(date_created=timezone.now())
+        return story
+
+    def add_view(self, story, age_days=0):
+        view = StoryView.objects.create(blog=story)
+        StoryView.objects.filter(pk=view.pk).update(created_at=timezone.now() - timedelta(days=age_days))
+
+    #   ------------------------------------------------------------ access
+    def test_both_endpoints_are_admin_only(self):
+        for url in [self.url, self.search_url]:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.force_login(self.writer)
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.logout()
+
+    #   ------------------------------------------------------------ chart
+    def test_no_story_selected_draws_a_prompt_not_a_chart(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url).content.decode()
+        self.assertIn("Pick a story", body)
+        self.assertNotIn("analytics-story-performance-data", body)
+
+    def test_the_chart_counts_views_likes_and_comments(self):
+        self.add_view(self.story)
+        self.add_view(self.story)
+        BlogLike.objects.create(blog=self.story, user=self.member)
+        Comment.objects.create(blog=self.story, author=self.member, content="Good read.")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"story": self.story.pk, "bucket": "day", "range": "30d"}),
+            "analytics-story-performance-data",
+        )
+        totals = {s["key"]: sum(s["values"]) for s in chart["series"]}
+        self.assertEqual(totals, {"views": 2, "likes": 1, "comments": 1})
+
+    def test_only_the_chosen_series_are_drawn(self):
+        self.add_view(self.story)
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"submitted": "1", "story": self.story.pk, "series": ["views"]}),
+            "analytics-story-performance-data",
+        )
+        self.assertEqual([s["key"] for s in chart["series"]], ["views"])
+
+    def test_an_unknown_story_id_draws_the_prompt(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"story": "999999"}).content.decode()
+        self.assertIn("Pick a story", body)
+
+    #   ------------------------------------------------------------ picker search
+    def test_search_matches_by_heading(self):
+        self.make_story("A different topic")
+        self.client.force_login(self.admin)
+        body = self.client.get(self.search_url, {"story_q": "Performance"}).content.decode()
+        self.assertIn("Performance story", body)
+        self.assertNotIn("A different topic", body)
+
+    def test_search_with_no_query_shows_the_latest_stories(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.search_url).content.decode()
+        self.assertIn("Performance story", body)
 
 
 class AnalyticsChamberPlaceholderTests(TestCase):
     """The staff and partner analytics pages are placeholders for now, and the
-    PANEL sidebar links to all three chambers."""
+    PANEL sidebar links to every chamber."""
 
     def setUp(self):
         super().setUp()
@@ -989,9 +1388,23 @@ class AnalyticsChamberPlaceholderTests(TestCase):
                 self.assertEqual(self.client.get(reverse(name)).status_code, 200)
                 self.client.logout()
 
-    def test_the_panel_links_to_all_three_chambers(self):
+    def test_the_panel_links_to_every_chamber(self):
         self.client.force_login(self.admin)
         body = self.client.get(reverse("control:panel")).content.decode()
         self.assertIn("Member lytics", body)
         self.assertIn("Staff lytics", body)
+        self.assertIn("Story lytics", body)
         self.assertIn("Partner lytics", body)
+
+    def test_the_story_chamber_is_a_real_shell_not_a_placeholder(self):
+        self.assertEqual(self.client.get(reverse("control:story_lytics")).status_code, 302)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(reverse("control:story_lytics")).status_code, 302)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("Story lytics", body)
+        self.assertIn("analytics-stories-body", body)
+        self.assertIn("analytics-reading-body", body)
+        self.assertIn("analytics-story-perf-body", body)
+        self.assertNotIn("analytics-placeholder", body)

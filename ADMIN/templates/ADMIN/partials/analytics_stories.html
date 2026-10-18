@@ -1,10 +1,24 @@
 {% comment %}
-  htmx fragment: the "stories per week" bar chart body.
+  htmx fragment: the "Stories per week" card body on STORY LYTICS.
 
-  The data is embedded as a JSON <script> that analytics.js reads and draws an
-  SVG from. This partial is only ever returned to an htmx GET against
-  control:analytics_stories -- it is never rendered into the shell page.
+  Opens with the Stories-published tile (moved here from the Member lytics
+  overview), then the bar chart. The data is embedded as a JSON <script> that
+  analytics.js reads and draws an SVG from. Only ever returned to an htmx GET
+  against control:analytics_stories -- it is never rendered into the shell.
 {% endcomment %}
+<div class="analytics-overview-tiles analytics-stories-tiles">
+  <div class="analytics-tile">
+    <p class="analytics-tile-label">Stories published</p>
+    <p class="analytics-tile-row">
+      <span class="analytics-tile-value">{{ stories.today }}</span> today
+      <span class="analytics-members-sep">&middot;</span>
+      <span class="analytics-tile-value">{{ stories.week }}</span> this week
+      <span class="analytics-members-sep">&middot;</span>
+      <span class="analytics-tile-value">{{ stories.month }}</span> last 30 days
+    </p>
+  </div>
+</div>
+
 <div class="analytics-chart" data-chart data-chart-kind="bar"
      data-week-endpoint="{% url 'control:member_week_stories' %}">
   <div class="analytics-chart-canvas" data-chart-canvas role="img"

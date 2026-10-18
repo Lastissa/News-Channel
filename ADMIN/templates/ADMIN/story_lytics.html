@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block adsense %}{% endblock %}
+{% load static %}
+
+{% block title %}Story lytics · {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
+  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}">
+{% endblock %}
+
+{% block content %}
+{% comment %}
+  STORY LYTICS page shell. Stories moved here from Member lytics: how much is
+  published, what gets read, and how one chosen story performs over time. Like
+  the other chambers it holds no numbers itself -- every figure is an htmx GET
+  against the fragment endpoints in ADMIN.urls.
+{% endcomment %}
+<svg class="panel-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <symbol id="i-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-bar-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
+  <symbol id="i-reading" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+</svg>
+
+<section class="analytics-shell" data-analytics>
+
+  <div class="analytics-topbar">
+    <a class="analytics-back" href="{% url 'control:panel' %}">
+      <svg class="ic" aria-hidden="true"><use href="#i-left"/></svg>
+      <span>Panel</span>
+    </a>
+    <h1 class="analytics-title">Story lytics</h1>
+  </div>
+
+  <div class="analytics-grid">
+
+    <section class="analytics-card" aria-labelledby="analytics-stories-title">
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
+        <h2 id="analytics-stories-title">Stories per week</h2>
+      </header>
+      <form class="analytics-controls"
+            hx-get="{% url 'control:analytics_stories' %}"
+            hx-target="#analytics-stories-body"
+            hx-swap="innerHTML"
+            hx-trigger="change">
+        <label class="analytics-select">
+          <span class="analytics-select-label">Period</span>
+          <select name="period">
+            {% for value, label in story_periods %}
+            <option value="{{ value }}"{% if value == default_story_period %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </form>
+      <div class="analytics-chart-body" id="analytics-stories-body"
+           hx-get="{% url 'control:analytics_stories' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading chart&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
+
+    <section class="analytics-card" aria-labelledby="analytics-reading-title">
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-reading"/></svg></span>
+        <h2 id="analytics-reading-title">Reading &amp; editorial</h2>
+      </header>
+
+      {% comment %}One range control, reusing the Trends ranges, drives all four
+         blocks: top-read stories, category published-vs-read, the never-viewed
+         backlog, and the median wait for a fresh story's first reader.{% endcomment %}
+      <form class="analytics-controls"
+            hx-get="{% url 'control:analytics_reading' %}"
+            hx-target="#analytics-reading-body"
+            hx-swap="innerHTML"
+            hx-trigger="change">
+        <label class="analytics-select">
+          <span class="analytics-select-label">Range</span>
+          <select name="range">
+            {% for value, label in trend_ranges %}
+            <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </form>
+
+      <div class="analytics-chart-body" id="analytics-reading-body"
+           hx-get="{% url 'control:analytics_reading' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading reading&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
+
+    <section class="analytics-card" aria-labelledby="analytics-perf-title">
+      {% comment %}Pick one story, then overlay its views, likes and comments
+         over the same kind of window as Trends. The picker searches as you
+         type and pressing a match loads that story's chart.{% endcomment %}
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
+        <h2 id="analytics-perf-title">Story performance</h2>
+      </header>
+
+      <form class="analytics-controls"
+            id="analytics-story-perf-form"
+            hx-get="{% url 'control:analytics_story_performance' %}"
+            hx-target="#analytics-story-perf-body"
+            hx-swap="innerHTML"
+            hx-trigger="change, submit">
+        <input type="hidden" name="submitted" value="1">
+        <input type="hidden" name="story" value="">
+
+        <label class="analytics-select analytics-select--search analytics-story-picker">
+          <span class="analytics-select-label">Find a story</span>
+          <input type="search" name="story_q" placeholder="Search story title" autocomplete="off"
+                 hx-get="{% url 'control:analytics_story_search' %}"
+                 hx-target="#analytics-story-results"
+                 hx-swap="innerHTML"
+                 hx-trigger="keyup changed delay:300ms, search">
+        </label>
+        <span class="analytics-story-chosen" data-story-chosen>No story chosen yet.</span>
+
+        <div class="analytics-story-results" id="analytics-story-results"></div>
+
+        <div class="analytics-filter-row">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Time frame</span>
+            <select name="bucket">
+              {% for value, label in trend_buckets %}
+              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Range</span>
+            <select name="range">
+              {% for value, label in trend_ranges %}
+              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Start from</span>
+            <input type="date" name="start">
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">End</span>
+            <input type="date" name="end">
+          </label>
+
+          <button type="submit" class="analytics-apply">Apply</button>
+        </div>
+
+        <fieldset class="analytics-series">
+          <legend class="panel-sr">Series to plot</legend>
+          {% for meta in story_performance_series %}
+          <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
+            <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_story_performance_series %} checked{% endif %}>
+            <span class="analytics-series-swatch" aria-hidden="true"></span>
+            <span>{{ meta.name }}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+      </form>
+
+      <div class="analytics-chart-body" id="analytics-story-perf-body"
+           hx-get="{% url 'control:analytics_story_performance' %}"
+           hx-include="#analytics-story-perf-form"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Pick a story to chart&hellip;</p>
+      </div>
+    </section>
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ block.super }}
+  <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+  <script src="{% static 'control/js/analytics.js' %}" defer></script>
+{% endblock %}
+
+{% block footer %}{% endblock %}

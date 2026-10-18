@@ -1,0 +1,22 @@
+{% comment %}
+  htmx fragment: the "Story performance" chart on Story lytics.
+
+  One story's views / likes / comments, bucketed over the picker's time frame.
+  With no story chosen yet it draws only the prompt, so the reader is told what
+  to do instead of being shown an empty chart. Only ever returned to an htmx
+  GET against control:analytics_story_performance.
+{% endcomment %}
+{% if chart.story %}
+<p class="analytics-chart-note">
+  <strong>{{ chart.story.heading }}</strong>
+  <span class="analytics-reading-cat">{{ chart.story.category }}</span>
+  &middot; {{ chart.story.author }}
+</p>
+<div class="analytics-chart" data-chart data-chart-kind="line">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Views, likes and comments over time for {{ chart.story.heading }}"></div>
+  {{ chart|json_script:"analytics-story-performance-data" }}
+</div>
+{% else %}
+<p class="analytics-chart-empty">Pick a story above to chart its views, likes and comments over time.</p>
+{% endif %}

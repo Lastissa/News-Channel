@@ -13,17 +13,16 @@
 
 {% block content %}
 {% comment %}
-  ANALYTICS page shell. It holds NO numbers itself: every chart below is a
-  separate htmx GET against the fragment endpoints in ADMIN.urls, fired on
-  load and re-fired when a control changes. Icons use the same inline sprite
-  pattern as the PANEL page.
+  MEMBER LYTICS page shell. It holds NO numbers itself: every chart below is a
+  separate htmx GET against the fragment endpoints in ADMIN.urls, fired on load
+  and re-fired when a control changes. Stories and reading have moved to the
+  Story lytics chamber; this page is about people. Icons use the same inline
+  sprite pattern as the PANEL page.
 {% endcomment %}
 <svg class="panel-sprite" width="0" height="0" aria-hidden="true" focusable="false">
   <symbol id="i-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
-  <symbol id="i-bar-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
-  <symbol id="i-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
 </svg>
 
 <section class="analytics-shell" data-analytics>
@@ -63,27 +62,55 @@
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-stories-title">
+    <section class="analytics-card" aria-labelledby="analytics-growth-title">
+      {% comment %}The running total of members over time: a line that steps up
+         as accounts are created. Bucket / range / custom dates mirror Trends.{% endcomment %}
       <header class="analytics-card-header">
-        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
-        <h2 id="analytics-stories-title">Stories per week</h2>
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
+        <h2 id="analytics-growth-title">Members over time</h2>
       </header>
+
       <form class="analytics-controls"
-            hx-get="{% url 'control:analytics_stories' %}"
-            hx-target="#analytics-stories-body"
+            hx-get="{% url 'control:member_growth' %}"
+            hx-target="#analytics-growth-body"
             hx-swap="innerHTML"
-            hx-trigger="change">
-        <label class="analytics-select">
-          <span class="analytics-select-label">Period</span>
-          <select name="period">
-            {% for value, label in story_periods %}
-            <option value="{{ value }}"{% if value == default_story_period %} selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+            hx-trigger="change, submit">
+        <div class="analytics-filter-row">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Time frame</span>
+            <select name="bucket">
+              {% for value, label in trend_buckets %}
+              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Range</span>
+            <select name="range">
+              {% for value, label in trend_ranges %}
+              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Start from</span>
+            <input type="date" name="start">
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">End</span>
+            <input type="date" name="end">
+          </label>
+
+          <button type="submit" class="analytics-apply">Apply</button>
+        </div>
+        <p class="analytics-date-hint">A start and end date override the Range preset.</p>
       </form>
-      <div class="analytics-chart-body" id="analytics-stories-body"
-           hx-get="{% url 'control:analytics_stories' %}"
+
+      <div class="analytics-chart-body" id="analytics-growth-body"
+           hx-get="{% url 'control:member_growth' %}"
            hx-trigger="load"
            hx-swap="innerHTML"
            aria-live="polite" aria-busy="true">
@@ -103,7 +130,7 @@
             hx-get="{% url 'control:analytics_trends' %}"
             hx-target="#analytics-trends-body"
             hx-swap="innerHTML"
-            hx-trigger="change">
+            hx-trigger="change, submit">
         {% comment %} Marks a real form submission so "every box cleared" is
            distinguishable from the first load, which shows all series. {% endcomment %}
         <input type="hidden" name="submitted" value="1">
@@ -126,7 +153,20 @@
               {% endfor %}
             </select>
           </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Start from</span>
+            <input type="date" name="start">
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">End</span>
+            <input type="date" name="end">
+          </label>
+
+          <button type="submit" class="analytics-apply">Apply</button>
         </div>
+        <p class="analytics-date-hint">A start and end date override the Range preset.</p>
 
         <fieldset class="analytics-series">
           <legend class="panel-sr">Series to plot</legend>
