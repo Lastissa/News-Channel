@@ -23,6 +23,7 @@
   <symbol id="i-bar-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
   <symbol id="i-reading" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
 </svg>
 
 <section class="analytics-shell" data-analytics>
@@ -33,11 +34,17 @@
       <span>Panel</span>
     </a>
     <h1 class="analytics-title">Story lytics</h1>
+    <button type="button" class="analytics-info" data-guide-open>
+      <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
+      {% comment %} <span>How this works</span> {% endcomment %}
+    </button>
   </div>
 
   <div class="analytics-grid">
 
-    <section class="analytics-card" aria-labelledby="analytics-stories-title">
+    <section class="analytics-card" aria-labelledby="analytics-stories-title"
+             data-guide-title="Stories per week"
+             data-guide-text="Each bar is one Sunday-to-Saturday week and counts the stories published in it. Press a bar to read the stories behind it. The tiles above count today, this week and the last 30 days.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
         <h2 id="analytics-stories-title">Stories per week</h2>
@@ -67,7 +74,9 @@
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-reading-title">
+    <section class="analytics-card" aria-labelledby="analytics-reading-title"
+             data-guide-title="Reading &amp; editorial"
+             data-guide-text="Every view here is a story-open event inside the selected range, never the all-time counter, so changing the range changes the leaderboard. It shows the top-read stories, published-versus-read by category, the never-viewed backlog, and the median wait for a story's first reader.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-reading"/></svg></span>
         <h2 id="analytics-reading-title">Reading &amp; editorial</h2>
@@ -102,7 +111,9 @@
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-perf-title">
+    <section class="analytics-card" aria-labelledby="analytics-perf-title"
+             data-guide-title="Story performance"
+             data-guide-text="Search for a story by title and pick it. Its views, likes and comments are charted over the same bucket and range controls as the other charts, and the toggles choose which signals to draw.">
       {% comment %}Pick one story, then overlay its views, likes and comments
          over the same kind of window as Trends. The picker searches as you
          type and pressing a match loads that story's chart.{% endcomment %}
@@ -187,6 +198,8 @@
     </section>
 
   </div>
+
+  {% include "ADMIN/partials/analytics_guide.html" %}
 </section>
 {% endblock %}
 

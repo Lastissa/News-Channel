@@ -525,6 +525,16 @@ class AnalyticsPageTests(TestCase):
         self.assertNotIn("analytics-stories-body", body)
         self.assertNotIn("analytics-reading-body", body)
 
+    def test_shell_carries_the_how_it_works_guide(self):
+        #   The info button and one guide step per section, in DOM order.
+        self.client.force_login(self.admin)
+        body = self.client.get(self.page_url).content.decode()
+        self.assertIn("data-guide-open", body)
+        self.assertIn("data-guide-body", body)
+        for title in ["Quick overview", "Members over time", "Trends", "Members"]:
+            with self.subTest(title=title):
+                self.assertIn('data-guide-title="%s"' % title, body)
+
     #   ------------------------------------------------------------ stories bar
     def test_stories_fragment_returns_a_week_bar_chart(self):
         self.client.force_login(self.admin)
@@ -1408,3 +1418,12 @@ class AnalyticsChamberPlaceholderTests(TestCase):
         self.assertIn("analytics-reading-body", body)
         self.assertIn("analytics-story-perf-body", body)
         self.assertNotIn("analytics-placeholder", body)
+
+    def test_the_story_shell_carries_the_how_it_works_guide(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("data-guide-open", body)
+        self.assertIn("data-guide-body", body)
+        for title in ["Stories per week", "Reading &amp; editorial", "Story performance"]:
+            with self.subTest(title=title):
+                self.assertIn('data-guide-title="%s"' % title, body)

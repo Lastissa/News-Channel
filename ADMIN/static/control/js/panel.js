@@ -391,33 +391,49 @@
 
     if (loadMoreBtn) loadMoreBtn.addEventListener("click", loadMore);
 
-    /* pointer drag */
+    /* pointer drag: the pointer is captured only once a real drag begins.
+       Capturing on pointerdown retargeted the follow-up click to the viewport
+       itself, so a plain click or tap on a card never reached the card's link
+       and the directory felt unclickable. Deferring capture until the drag
+       threshold is crossed lets both scrolling and clicking work. */
+    var DRAG_THRESHOLD = 5;
+    var pendingDrag = false;
+
     viewport.addEventListener("pointerdown", function (event) {
       if (event.target.closest && event.target.closest("[data-gallery-load-more]")) return;
-      isDragging = true;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      pendingDrag = true;
+      isDragging = false;
       didDrag = false;
       userPaused = true;
-      viewport.classList.add("is-dragging");
       dragStartX = event.clientX;
       scrollStartLeft = viewport.scrollLeft;
-      viewport.setPointerCapture(event.pointerId);
     });
 
     viewport.addEventListener("pointermove", function (event) {
-      if (!isDragging) return;
+      if (!pendingDrag) return;
       var delta = event.clientX - dragStartX;
-      if (Math.abs(delta) > 4) didDrag = true;
+      if (!isDragging) {
+        if (Math.abs(delta) < DRAG_THRESHOLD) return;
+        isDragging = true;
+        didDrag = true;
+        viewport.classList.add("is-dragging");
+        if (viewport.setPointerCapture) {
+          try { viewport.setPointerCapture(event.pointerId); } catch (err) { /* drag still works without capture */ }
+        }
+      }
       viewport.scrollLeft = scrollStartLeft - delta;
     });
 
     function endDrag() {
+      pendingDrag = false;
       isDragging = false;
       viewport.classList.remove("is-dragging");
       window.setTimeout(function () { userPaused = false; }, 1200);
     }
     viewport.addEventListener("pointerup", endDrag);
     viewport.addEventListener("pointercancel", endDrag);
-    viewport.addEventListener("pointerleave", function () { if (isDragging) endDrag(); });
+    viewport.addEventListener("pointerleave", endDrag);
 
     /* clicking a card right after a drag shouldn't navigate */
     viewport.addEventListener("click", function (event) {

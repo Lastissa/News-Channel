@@ -1,38 +1,31 @@
 {% comment %}
   htmx fragment: the "Quick overview" card.
 
-  Member figures counted over today / this week / the last 30 days. New users
-  leads the card, but its "today" figure lives in the top-bar badge, so the
-  lead shows this week's sign-ups and spells out what the week-on-week change
-  compares against (this partial week against ALL of last week) instead of a
-  bare "since last week". Stories published has moved to Story lytics.
+  One dominant figure — the current member total — sits in the hero on the
+  left; the supporting tiles (new users, active readers) are deliberately
+  smaller, so the section has a clear head. New users shows this week's
+  sign-ups against ALL of last week rather than a bare "since last week".
+  Stories published lives on Story lytics.
 
   This partial is only ever returned to an htmx GET against
   control:member_overview -- it is never rendered into the shell page.
 {% endcomment %}
 <div class="analytics-overview">
-  <div class="analytics-overview-lead">
-    <p class="analytics-overview-label">New users</p>
-    <div class="analytics-overview-figures">
-      <span class="analytics-overview-figure">
-        <strong class="analytics-overview-value">{{ stats.users.week }}</strong>
-        <span class="analytics-overview-caption">joined this week</span>
-      </span>
-      <span class="analytics-overview-figure">
-        <strong class="analytics-overview-value {{ stats.users.delta_tone }}">{{ stats.users.delta_display }}</strong>
-        <span class="analytics-overview-caption">vs last week ({{ stats.users.last_week }})</span>
-      </span>
-      <span class="analytics-overview-figure">
-        <strong class="analytics-overview-value">{{ stats.users.month }}</strong>
-        <span class="analytics-overview-caption">last 30 days</span>
-      </span>
-    </div>
+  <div class="analytics-overview-hero">
+    <p class="analytics-overview-label">Current members total</p>
+    <p class="analytics-overview-hero-value">{{ stats.members_total }}</p>
+    {% comment %} <p class="analytics-overview-hero-caption">Total Member Accounts</p> {% endcomment %}
   </div>
 
   <div class="analytics-overview-tiles">
     <div class="analytics-tile">
-      <p class="analytics-tile-label">Current members total</p>
-      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.members_total }}</span> accounts</p>
+      <p class="analytics-tile-label">New users</p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.users.week }}</span> this week</p>
+      <p class="analytics-tile-row">
+        <span class="analytics-tile-value {{ stats.users.delta_tone }}">{{ stats.users.delta_display }}</span>
+        <span class="analytics-tile-note">vs last week ({{ stats.users.last_week }})</span>
+      </p>
+      <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.users.month }}</span> last 30 days</p>
     </div>
     <div class="analytics-tile">
       <p class="analytics-tile-label">Active readers</p>

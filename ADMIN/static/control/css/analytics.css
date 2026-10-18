@@ -2,14 +2,16 @@
    Shares the PANEL look: same icons (<svg class="ic">), same theme variables
    from base.css. The charts themselves are plain SVG drawn by analytics.js. */
 
+/* The analytics column uses the full desktop width rather than a narrow
+   centred strip, so wide screens carry information instead of blank margin. */
 .analytics-shell {
-  max-width: 1180px; margin: 0 auto; padding: 0 16px 56px;
+  width: 100%; max-width: 1440px; margin: 0 auto; padding: 0 18px 40px;
 }
 
 /* ---------- Top bar ---------- */
 .analytics-topbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
-  margin: 0 -16px 20px; padding: 10px 16px;
+  margin: 0 -18px 14px; padding: 10px 18px;
   border-bottom: 1px solid var(--line);
   background: var(--paper);
   position: sticky; top: var(--header-h, 64px); z-index: 80;
@@ -22,7 +24,28 @@
   transition: color .2s var(--panel-ease, ease), border-color .2s ease, background-color .2s ease;
 }
 .analytics-back:hover { color: var(--ink); border-color: var(--paginator-hover-border); }
-.analytics-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--ink); }
+/* The page title is the loudest text on the page: bigger, heavier and ink. */
+.analytics-title {
+  margin: 0; font-size: 1.5rem; font-weight: 800;
+  letter-spacing: -0.01em; color: var(--ink);
+}
+
+/* ---------- "How this works" info button ---------- */
+.analytics-info {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px 6px 10px; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 700; font-family: inherit;
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 34%, transparent);
+  cursor: pointer;
+  transition: transform .18s cubic-bezier(.22, 1, .36, 1),
+              background-color .18s ease, border-color .18s ease;
+}
+.analytics-info .ic { width: 16px; height: 16px; }
+.analytics-info:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--brand) 22%, transparent); border-color: color-mix(in srgb, var(--brand) 55%, transparent); }
+.analytics-info:active { transform: translateY(0) scale(.96); }
+.analytics-info:focus-visible { outline: 2px solid color-mix(in srgb, var(--brand) 45%, transparent); outline-offset: 2px; }
 
 /* ---------- Top-bar badge: "N new users today" ---------- */
 /* Right-aligned in the top bar and fetched on its own, so it can refresh
@@ -48,47 +71,60 @@ html[data-theme="dark"] .analytics-new-today { background: var(--paper-dim); }
 }
 
 /* ---------- Quick overview ---------- */
-/* New users lead on the left; active readers and stories published sit as
-   tiles on the right. Stacks to a single column on a phone. */
-.analytics-overview-body { padding: 4px 0 16px; }
-.analytics-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.analytics-overview-lead {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-s);
-  background: var(--paginator-bg);
+/* One dominant figure (the current member total) carries the section; the
+   supporting tiles are deliberately smaller, so the eye lands on the headline
+   number first. This is a hierarchy, not three equal placards. */
+.analytics-overview-body { padding: 2px 0 8px; }
+.analytics-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+
+.analytics-overview-hero {
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  padding: 18px 20px; border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line));
+  border-radius: var(--radius-m);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--brand) 14%, var(--paper)), var(--paper) 70%);
+}
+html[data-theme="dark"] .analytics-overview-hero {
+  border-color: color-mix(in srgb, var(--brand-deep) 34%, var(--line));
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--brand-deep) 20%, var(--paper-dim)), var(--paper-dim) 70%);
 }
 .analytics-overview-label {
-  margin: 0; font-size: 0.72rem; font-weight: 700;
-  letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate);
+  margin: 0; font-size: 0.7rem; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--slate);
 }
-.analytics-overview-figures { display: flex; flex-wrap: wrap; gap: 10px 28px; }
-.analytics-overview-figure { display: flex; flex-direction: column; }
-.analytics-overview-value {
-  font-size: 1.9rem; font-weight: 800; line-height: 1.05;
+.analytics-overview-hero-value {
+  margin: 0; font-size: clamp(2.4rem, 5vw, 3.4rem); font-weight: 800;
+  line-height: 1; letter-spacing: -0.02em;
   color: var(--ink); font-variant-numeric: tabular-nums;
 }
-.analytics-overview-value.is-up { color: var(--success); }
-.analytics-overview-value.is-down { color: var(--danger); }
-.analytics-overview-caption { font-size: 0.78rem; color: var(--slate); }
+.analytics-overview-hero-caption { margin: 0; font-size: 0.84rem; color: var(--slate); }
 
 .analytics-overview-tiles {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
 .analytics-tile {
-  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-s);
+  padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-m);
   background: var(--paper);
 }
 html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
 .analytics-tile-label {
-  margin: 0 0 8px; font-size: 0.72rem; font-weight: 700;
-  letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate);
+  margin: 0 0 8px; font-size: 0.7rem; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--slate);
 }
 .analytics-tile-row { margin: 0; display: flex; align-items: baseline; gap: 6px; font-size: 0.82rem; color: var(--slate); }
-.analytics-tile-value { font-size: 1.05rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.analytics-tile-value {
+  font-size: 1.3rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.analytics-tile-value.is-up { color: var(--success); }
+.analytics-tile-value.is-down { color: var(--danger); }
+.analytics-tile-note { color: var(--slate); }
+html[data-theme="dark"] .analytics-tile-value.is-up { color: #4CC38A; }
+html[data-theme="dark"] .analytics-tile-value.is-down { color: #FF8876; }
 
-@media (min-width: 720px) {
-  .analytics-overview { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+@media (min-width: 820px) {
+  .analytics-overview { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.95fr); align-items: stretch; }
 }
 
 /* ---------- Placeholder pages (staff / partner lytics) ---------- */
@@ -105,13 +141,16 @@ html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
 .analytics-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 
 /* Sections are flush: no outer margin and no corner rounding (the border and
-   background stay), and each one is split from the next by a plain <hr>. */
+   background stay), and each one is split from the next by a plain <hr>.
+   Padding is deliberately tight: on a data page every spare pixel should hold
+   a number, not air. */
 .analytics-card {
   background: var(--paper); border: 1px solid var(--line);
   border-radius: 0; box-shadow: none;
-  margin: 0; padding: 16px 18px 8px;
+  margin: 0; padding: 14px 18px 6px;
+  scroll-margin-top: 92px;
 }
-.analytics-divider { border: 0; border-top: 1px solid var(--line); margin: 10px 0; }
+.analytics-divider { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
 .analytics-card-header {
   display: flex; align-items: center; gap: 12px;
   margin-bottom: 4px;
@@ -121,14 +160,18 @@ html[data-theme="dark"] .analytics-tile { background: var(--paper-dim); }
   width: 34px; height: 34px; border-radius: var(--radius-s);
   background: var(--paginator-bg); color: var(--brand-deep); flex: 0 0 auto;
 }
-.analytics-card-header h2 { margin: 0; font-size: 1.05rem; min-width: 0; }
+/* Section headings are a clear step above body text: larger, heavier, ink. */
+.analytics-card-header h2 {
+  margin: 0; min-width: 0;
+  font-size: 1.2rem; font-weight: 800; letter-spacing: -0.01em; color: var(--ink);
+}
 
 /* ---------- Controls ---------- */
 /* A full-width row under the card title. It wraps a whole control at a time
    (never mid-field), so selects and the series legend stay aligned. */
 .analytics-controls {
   display: flex; flex-wrap: wrap; align-items: flex-end;
-  gap: 12px 18px; margin: 10px 0 14px;
+  gap: 10px 18px; margin: 8px 0 10px;
 }
 
 /* The dropdowns live in their own row so that on a phone only THIS row scrolls
@@ -191,7 +234,7 @@ html[data-theme="dark"] .analytics-select select option { background: var(--pape
 .analytics-series-option:has(input:not(:checked)) { opacity: 0.5; }
 
 /* ---------- Chart body ---------- */
-.analytics-chart-body { padding: 4px 0 16px; min-height: 220px; position: relative; }
+.analytics-chart-body { padding: 2px 0 10px; min-height: 220px; position: relative; }
 /* On a slow network the moment a control changes this section is marked
    is-loading: its old contents are hidden behind a pulsing panel and a plain
    "Loading…" label shows, so the reader is never left guessing whether the
@@ -263,6 +306,8 @@ html[data-theme="dark"] .analytics-select select option { background: var(--pape
 .analytics-placard-delta.is-up { color: var(--success); }
 .analytics-placard-delta.is-down { color: var(--danger); }
 .analytics-placard-delta.is-flat { color: var(--slate); }
+html[data-theme="dark"] .analytics-placard-delta.is-up { color: #4CC38A; }
+html[data-theme="dark"] .analytics-placard-delta.is-down { color: #FF8876; }
 html[data-theme="dark"] .analytics-placard { background: var(--paper-dim); }
 @media (prefers-reduced-motion: reduce) { .analytics-placard { transition: none; } }
 
@@ -396,7 +441,7 @@ html[data-theme="dark"] .analytics-story-result-list { background: var(--paper-d
 .analytics-story-result-meta { font-size: 0.76rem; color: var(--slate); }
 .analytics-story-no-results { margin: 0; font-size: 0.86rem; color: var(--slate); }
 
-.analytics-members { padding: 2px 0 16px; }
+.analytics-members { padding: 2px 0 10px; }
 .analytics-members-summary { margin: 0 0 12px; color: var(--slate); font-size: 0.9rem; }
 .analytics-members-summary strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 .analytics-members-sep { padding: 0 3px; }
@@ -580,4 +625,98 @@ html[data-theme="dark"] .analytics-reading-block { background: var(--paper-dim);
   .analytics-members-table td { padding: 9px 9px; }
   .analytics-member-cats { max-width: 150px; }
   .analytics-member-sub { white-space: normal; }
+
+  .analytics-info { padding: 6px 9px; }
+  .analytics-info span { display: none; }
+  .analytics-guide-card { padding: 14px 14px; }
+  .analytics-guide-foot { flex-wrap: wrap; }
+}
+
+/* ---------- "How this works" guided rail ---------- */
+/* A bottom-docked coach rail, not a modal: the page stays visible and each
+   step scrolls its section into view and rings it, so the guide explains the
+   page while showing it. Motion is spring-y by design. */
+.analytics-guide {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 960;
+  display: flex; justify-content: center;
+  padding: 0 14px 16px; pointer-events: none;
+}
+.analytics-guide[hidden] { display: none; }
+.analytics-guide-card {
+  pointer-events: auto; width: min(780px, 100%);
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius-m);
+  box-shadow: 0 18px 52px rgba(2, 6, 23, 0.3);
+  padding: 16px 18px; display: grid; gap: 10px;
+  transform-origin: bottom center;
+  animation: analyticsGuideIn .44s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+html[data-theme="dark"] .analytics-guide-card {
+  background: var(--paper-dim); box-shadow: 0 18px 52px rgba(0, 0, 0, 0.6);
+}
+@keyframes analyticsGuideIn {
+  from { opacity: 0; transform: translateY(30px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.analytics-guide-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.analytics-guide-kicker {
+  margin: 0 0 2px; font-size: 0.68rem; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-deep);
+}
+.analytics-guide-heading { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--ink); }
+.analytics-guide-close {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--paginator-bg);
+  color: var(--ink); font-size: 1.1rem; line-height: 1; cursor: pointer;
+  transition: transform .2s cubic-bezier(.34, 1.56, .64, 1), border-color .2s ease;
+}
+.analytics-guide-close:hover { transform: rotate(90deg) scale(1.06); border-color: var(--paginator-hover-border); }
+.analytics-guide-body { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--slate); }
+.analytics-guide-main.is-enter { animation: analyticsGuideStep .32s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes analyticsGuideStep {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.analytics-guide-foot { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
+.analytics-guide-dots { display: flex; align-items: center; gap: 6px; margin: 0 auto; }
+.analytics-guide-dot {
+  width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--paginator-border); cursor: pointer;
+  transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), background-color .22s ease;
+}
+.analytics-guide-dot:hover { transform: scale(1.2); }
+.analytics-guide-dot.is-active { background: var(--brand-deep); transform: scale(1.4); }
+.analytics-guide-nav {
+  padding: 7px 15px; border-radius: 999px; font-family: inherit;
+  font-size: 0.84rem; font-weight: 700; cursor: pointer;
+  color: var(--ink); background: var(--paginator-bg); border: 1px solid var(--line);
+  transition: transform .16s cubic-bezier(.22, 1, .36, 1), border-color .16s ease, opacity .16s ease;
+}
+.analytics-guide-nav:hover { border-color: var(--paginator-hover-border); }
+.analytics-guide-nav:active { transform: scale(.96); }
+.analytics-guide-nav:disabled { opacity: .4; cursor: default; }
+.analytics-guide-nav--primary {
+  color: #04121a; background: var(--brand-deep); border-color: var(--brand-deep);
+}
+
+/* The section a guide step is describing, ringed and briefly pulsed so the
+   eye is pulled to it as the rail moves. */
+.analytics-card.is-guided {
+  border-color: color-mix(in srgb, var(--brand) 60%, var(--line));
+  animation: analyticsGuided 1.3s cubic-bezier(.22, 1, .36, 1) 1;
+}
+html[data-theme="dark"] .analytics-card.is-guided {
+  border-color: color-mix(in srgb, var(--brand-deep) 60%, var(--line));
+}
+@keyframes analyticsGuided {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 40%, transparent); }
+  100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--brand) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .analytics-guide-card,
+  .analytics-guide-main.is-enter,
+  .analytics-card.is-guided,
+  .analytics-guide-dot,
+  .analytics-guide-close,
+  .analytics-info { animation: none; transition: none; }
 }

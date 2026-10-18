@@ -1,0 +1,30 @@
+{% comment %}
+  "How this works" guided rail, shared by every lytics chamber.
+
+  It is a bottom-docked coach rail, not a modal: the page stays visible.
+  analytics.js collects the sections that carry data-guide-title in DOM order,
+  and each step scrolls its section into view and rings it. The rail and the
+  step content animate, so navigating the page reads as a movement rather than
+  a jump. Only rendered inside a lytics shell.
+{% endcomment %}
+<div class="analytics-guide" data-guide hidden>
+  <div class="analytics-guide-card" role="dialog" aria-modal="false" aria-labelledby="analytics-guide-heading">
+    <div class="analytics-guide-head">
+      <div>
+        <p class="analytics-guide-kicker" data-guide-step></p>
+        <h2 class="analytics-guide-heading" id="analytics-guide-heading" data-guide-heading></h2>
+      </div>
+      <button type="button" class="analytics-guide-close" data-guide-close aria-label="Close guide">&times;</button>
+    </div>
+
+    <div class="analytics-guide-main" data-guide-main>
+      <p class="analytics-guide-body" data-guide-body></p>
+    </div>
+
+    <div class="analytics-guide-foot">
+      <button type="button" class="analytics-guide-nav" data-guide-prev>Back</button>
+      <div class="analytics-guide-dots" data-guide-dots></div>
+      <button type="button" class="analytics-guide-nav analytics-guide-nav--primary" data-guide-next>Next</button>
+    </div>
+  </div>
+</div>

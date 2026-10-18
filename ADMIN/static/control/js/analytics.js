@@ -619,4 +619,110 @@
     if (form.requestSubmit) form.requestSubmit();
     else if (window.htmx) window.htmx.trigger(form, "submit");
   });
+
+  /* ---------- "How this works" guide ---------- */
+  /* A bottom-docked coach rail: the rail itself never covers the page, and each
+     step scrolls its section into view and rings it, so the guide explains the
+     chart while showing it. Steps are read from the DOM in order -- any card
+     carrying data-guide-title becomes a step -- so the wording lives next to the
+     section it describes rather than in a script. Motion is spring-y on purpose;
+     prefers-reduced-motion turns it off. */
+  (function () {
+    var guide = document.querySelector("[data-guide]");
+    if (!guide) return;
+
+    var sections = Array.prototype.slice.call(document.querySelectorAll("[data-guide-title]"));
+    if (!sections.length) return;
+
+    var openers = Array.prototype.slice.call(document.querySelectorAll("[data-guide-open]"));
+    var headingEl = guide.querySelector("[data-guide-heading]");
+    var bodyEl = guide.querySelector("[data-guide-body]");
+    var stepEl = guide.querySelector("[data-guide-step]");
+    var mainEl = guide.querySelector("[data-guide-main]");
+    var dotsEl = guide.querySelector("[data-guide-dots]");
+    var prevBtn = guide.querySelector("[data-guide-prev]");
+    var nextBtn = guide.querySelector("[data-guide-next]");
+    var closeBtn = guide.querySelector(".analytics-guide-close");
+    var index = 0;
+    var lastFocus = null;
+    var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function scrollToSection(section) {
+      var top = section.getBoundingClientRect().top + window.pageYOffset - 92;
+      window.scrollTo({ top: Math.max(top, 0), behavior: reduceMotion ? "auto" : "smooth" });
+    }
+
+    function render() {
+      var section = sections[index];
+      if (stepEl) stepEl.textContent = "Step " + (index + 1) + " of " + sections.length;
+      if (headingEl) headingEl.textContent = section.getAttribute("data-guide-title") || "";
+      if (bodyEl) bodyEl.textContent = section.getAttribute("data-guide-text") || "";
+
+      sections.forEach(function (s) { s.classList.toggle("is-guided", s === section); });
+      Array.prototype.forEach.call(dotsEl ? dotsEl.children : [], function (dot, i) {
+        dot.classList.toggle("is-active", i === index);
+        dot.setAttribute("aria-current", i === index ? "true" : "false");
+      });
+
+      if (prevBtn) prevBtn.disabled = index === 0;
+      if (nextBtn) nextBtn.textContent = index === sections.length - 1 ? "Done" : "Next";
+
+      if (mainEl) {
+        mainEl.classList.remove("is-enter");
+        void mainEl.offsetWidth; /* reflow so the step animation replays */
+        mainEl.classList.add("is-enter");
+      }
+      scrollToSection(section);
+    }
+
+    function goTo(next) {
+      index = Math.max(0, Math.min(sections.length - 1, next));
+      render();
+    }
+
+    function onKey(event) {
+      if (event.key === "Escape") { event.preventDefault(); close(); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); goTo(index + 1); }
+      else if (event.key === "ArrowLeft") { event.preventDefault(); goTo(index - 1); }
+    }
+
+    function open() {
+      lastFocus = document.activeElement;
+      guide.hidden = false;
+      index = 0;
+      render();
+      if (closeBtn) closeBtn.focus();
+      document.addEventListener("keydown", onKey);
+    }
+
+    function close() {
+      guide.hidden = true;
+      sections.forEach(function (s) { s.classList.remove("is-guided"); });
+      document.removeEventListener("keydown", onKey);
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    /* One dot per section, built once. */
+    if (dotsEl) {
+      sections.forEach(function (_, i) {
+        var dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "analytics-guide-dot";
+        dot.setAttribute("aria-label", "Go to step " + (i + 1));
+        dot.addEventListener("click", function () { goTo(i); });
+        dotsEl.appendChild(dot);
+      });
+    }
+
+    openers.forEach(function (button) { button.addEventListener("click", open); });
+    Array.prototype.forEach.call(guide.querySelectorAll("[data-guide-close]"), function (button) {
+      button.addEventListener("click", close);
+    });
+    if (prevBtn) prevBtn.addEventListener("click", function () { goTo(index - 1); });
+    if (nextBtn) nextBtn.addEventListener("click", function () {
+      if (index === sections.length - 1) close();
+      else goTo(index + 1);
+    });
+  })();
 })();
