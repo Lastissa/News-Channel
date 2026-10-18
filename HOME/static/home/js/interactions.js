@@ -339,6 +339,37 @@
     }
   });
 
+  /* ---------- share: the device's own share sheet ----------
+     The home hero share button hands the story URL to the OS share sheet
+     (navigator.share) so the reader picks their own app. Only the link is
+     attached, nothing else. Where the API is missing (older desktop
+     browsers), it falls back to copying the link like the other share
+     buttons. */
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-native-share]");
+    if (!btn) return;
+    event.preventDefault();
+
+    var url = btn.dataset.shareUrl || window.location.href;
+
+    if (navigator.share) {
+      navigator.share({ url: url }).catch(function () {
+        /* the reader dismissed the sheet, or the OS refused it: nothing to do */
+      });
+      return;
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        bottomToast("Link copied.");
+      }).catch(function () {
+        bottomtoast("Could not copy link.", "error");
+      });
+    } else {
+      window.prompt("Copy this link:", url);
+    }
+  });
+
   /* ---------- share: WhatsApp / Facebook / X, each its own text format ---------- */
   document.addEventListener("click", function (event) {
     var btn = event.target.closest("[data-share-platform]");
@@ -386,8 +417,8 @@
           field first was sending an empty "email" to the view every time. */
       var body = new FormData(newsletterForm);
 
-      statusEl.textContent = "Suscribed.";
-      statusEl.className = "newsletter-status is-ok";
+      statusEl.textContent = "Subscribing...";
+      statusEl.className = "newsletter-status";
       submitBtn.disabled = true;
       emailInput.value = "";
 
@@ -402,7 +433,12 @@
         })
         .then(function (result) {
           submitBtn.disabled = false;
-          if (!result.ok) {
+          if (result.ok) {
+            /* Show the server's own wording: "already a member", "alerts back
+               on" and a fresh signup all read differently and all arrive here. */
+            statusEl.textContent = extractDetail(result.text, "Subscribed. Check your inbox.");
+            statusEl.className = "newsletter-status is-ok";
+          } else {
             emailInput.value = previousValue;
             statusEl.textContent = extractDetail(result.text, "Something went wrong.");
             statusEl.className = "newsletter-status is-error";

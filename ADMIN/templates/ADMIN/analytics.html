@@ -53,7 +53,7 @@
 
     <section class="analytics-card" aria-labelledby="analytics-overview-title"
              data-guide-title="Quick overview"
-             data-guide-text="Counted in three windows -- today, the current week (Sunday to now) and the last 30 days. The big number is every member account on the site right now. New users compares this week against all of last week; active readers are members who opened at least one story.">
+             data-guide-text="The membership at a glance. The hero is the running size of the membership; the two tiles cover sign-ups and readers. Each step below explains one of them.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
         <h2 id="analytics-overview-title">Quick overview</h2>
@@ -131,7 +131,7 @@
 
     <section class="analytics-card" aria-labelledby="analytics-trends-title"
              data-guide-title="Trends"
-             data-guide-text="Choose a bucket (per day, per 2 days, per week or per calendar month), then a preset range or your own start and end dates. Tick the series to overlay them. Every figure is an event count inside its bucket, read from the same tables the rest of the site writes to.">
+             data-guide-text="Event counts per bucket for whichever series you tick. The next two steps cover the controls and what each series means.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-trends-title">Trends</h2>
@@ -141,7 +141,9 @@
             hx-get="{% url 'control:analytics_trends' %}"
             hx-target="#analytics-trends-body"
             hx-swap="innerHTML"
-            hx-trigger="change, submit">
+            hx-trigger="change, submit"
+            data-guide-title="Trends controls"
+            data-guide-text="Pick a bucket (per day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
         {% comment %} Marks a real form submission so "every box cleared" is
            distinguishable from the first load, which shows all series. {% endcomment %}
         <input type="hidden" name="submitted" value="1">
@@ -179,7 +181,9 @@
         </div>
         {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
 
-        <fieldset class="analytics-series">
+        <fieldset class="analytics-series"
+                  data-guide-title="Trends series"
+                  data-guide-text="Users = accounts created in the bucket. Views = story-open events. Stories = stories published. Likes = likes given. Each is a count inside its bucket, never a running total.">
           <legend class="panel-sr">Series to plot</legend>
           {% for meta in series_meta %}
           <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
@@ -204,7 +208,7 @@
 
     <section class="analytics-card" aria-labelledby="analytics-members-title"
              data-guide-title="Members"
-             data-guide-text="The directory of every account. The filters combine -- status, news alerts, category interest, recent activity and account kind -- and the email box searches as you type. Read only: nothing on this page can change an account.">
+             data-guide-text="The read-only directory of every account, with filters and paging. The next two steps cover the filters and the columns.">
       {% comment %}
         MEMBERS. Read only, members only. The shell carries the filter controls
         and an empty target; the rows come from control:analytics_members on
@@ -222,7 +226,9 @@
             hx-get="{% url 'control:analytics_members' %}"
             hx-target="#analytics-members-body"
             hx-swap="innerHTML"
-            hx-trigger="change">
+            hx-trigger="change"
+            data-guide-title="Members filters"
+            data-guide-text="Combine status, news alerts, category interest, recent activity and account kind. The email box filters as you type; the selects apply on change. The summary line counts what matched.">
         <div class="analytics-filter-row">
           <label class="analytics-select">
             <span class="analytics-select-label">Status</span>
@@ -283,6 +289,8 @@
 
       <div class="analytics-members" id="analytics-members-body"
            data-page-size="{{ member_page_size }}"
+           data-guide-title="Members table"
+           data-guide-text="One row per matching account: the email is masked, then status (Active or Suspended), the news-alert flag, the categories the account follows, the last story it read and the last time it signed in. Nothing here can change an account."
            hx-get="{% url 'control:analytics_members' %}"
            hx-trigger="load"
            hx-swap="innerHTML"

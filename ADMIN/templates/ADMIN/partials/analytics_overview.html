@@ -1,7 +1,7 @@
 {% comment %}
   htmx fragment: the "Quick overview" card.
 
-  One dominant figure — the current member total — sits in the hero on the
+  One dominant figure - the current member total - sits in the hero on the
   left; the supporting tiles (new users, active readers) are deliberately
   smaller, so the section has a clear head. New users shows this week's
   sign-ups against ALL of last week rather than a bare "since last week".
@@ -11,14 +11,18 @@
   control:member_overview -- it is never rendered into the shell page.
 {% endcomment %}
 <div class="analytics-overview">
-  <div class="analytics-overview-hero">
+  <div class="analytics-overview-hero"
+       data-guide-title="Current members total"
+       data-guide-text="Every member account on the site right now, added up. Staff and admin accounts are left out, so this matches the Members directory exactly, and the figure only grows as people join.">
     <p class="analytics-overview-label">Current members total</p>
     <p class="analytics-overview-hero-value">{{ stats.members_total }}</p>
     {% comment %} <p class="analytics-overview-hero-caption">Total Member Accounts</p> {% endcomment %}
   </div>
 
   <div class="analytics-overview-tiles">
-    <div class="analytics-tile">
+    <div class="analytics-tile"
+         data-guide-title="New users"
+         data-guide-text="Accounts created this week (Sunday to now), the same count for all of last week, and the last 30 days. The coloured figure is this week measured against last week.">
       <p class="analytics-tile-label">New users</p>
       <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.users.week }}</span> this week</p>
       <p class="analytics-tile-row">
@@ -27,7 +31,9 @@
       </p>
       <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.users.month }}</span> last 30 days</p>
     </div>
-    <div class="analytics-tile">
+    <div class="analytics-tile"
+         data-guide-title="Active readers"
+         data-guide-text="Members who opened at least one story, counted once each per window: today, this week and the last 30 days. Only signed-in members count, not anonymous opens.">
       <p class="analytics-tile-label">Active readers</p>
       <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.today }}</span> today</p>
       <p class="analytics-tile-row"><span class="analytics-tile-value">{{ stats.readers.week }}</span> this week</p>

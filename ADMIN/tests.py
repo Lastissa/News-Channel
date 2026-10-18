@@ -1084,10 +1084,10 @@ class AnalyticsOverviewTests(TestCase):
 class AnalyticsReadingTests(TestCase):
     """The ANALYTICS "Reading & editorial" card.
 
-    All four blocks are windowed to one range (the Trends ranges) and read only
-    from existing tables: StoryView events for "views", Blog.category for the
-    published-vs-read split, the stored Blog.views counter for the cold backlog,
-    and Blog.date_created -> first StoryView for time-to-first-read.
+    All three blocks are windowed to one range (the Trends ranges) and read
+    only from existing tables: StoryView events for "views", Blog.category for
+    the published-vs-read split, and the stored Blog.views counter for the cold
+    backlog.
     """
 
     def setUp(self):
@@ -1171,16 +1171,6 @@ class AnalyticsReadingTests(TestCase):
         self.assertIn("Cold story", body)
         self.assertNotIn("Warm story", body)
         self.assertNotIn("Fresh story", body)
-
-    #   ------------------------------------------------------------ speed
-    def test_time_to_first_read_reports_the_median_wait(self):
-        story = self.make_story("Slow starter", age_days=2)
-        self.add_view(story, age_days=1)   # its first reader arrived one day after publish
-
-        self.client.force_login(self.admin)
-        body = self.client.get(self.url, {"range": "30d"}).content.decode()
-        self.assertIn("1.0 days", body)
-        self.assertIn("Time to first read", body)
 
     #   ------------------------------------------------------------ range guard
     def test_an_unknown_range_falls_back_to_the_default(self):

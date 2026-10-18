@@ -12,6 +12,10 @@
      3. once the new page lands the height eases to its real size, and a pager
         click scrolls the "Members" heading back into view.
 
+   A fast reply would otherwise swap the shimmer away inside a single frame, so
+   the skeleton is held for a short minimum before it is released. The wait is
+   never longer than the network; a slow answer is shown the moment it lands.
+
    Typing in the email box only dims the rows (like the archive search); the
    selects and the pager show the skeleton, since those are the "filter
    update" the reader expects to see acknowledged. */
@@ -23,6 +27,10 @@
 
   var filtersForm = document.getElementById("analytics-members-filters");
   var searchInput = filtersForm ? filtersForm.querySelector('input[type="search"]') : null;
+
+  /* Shortest time the shimmer stays on screen, in ms, so a fast local answer
+     still reads as a load rather than an instant snap. */
+  var MIN_SKELETON_MS = 320;
 
   function pageSize() {
     var size = parseInt(membersBody.dataset.pageSize, 10);
@@ -80,6 +88,18 @@
   var pendingHTML = null;
   var activeXhr = null;
   var scrollAfterSwap = false;
+  var requestStartedAt = 0;
+  var holdTimer = null;
+  var heldHTML = null;
+
+  function releaseSkeleton() {
+    membersBody.classList.remove("is-paginating");
+    settleHeight();
+    if (scrollAfterSwap) {
+      scrollAfterSwap = false;
+      keepHeadingInView();
+    }
+  }
 
   document.body.addEventListener("htmx:beforeRequest", function (event) {
     if (!event.detail || event.detail.target !== membersBody) return;
@@ -98,6 +118,12 @@
     }
 
     scrollAfterSwap = !!(event.detail.elt && event.detail.elt.closest && event.detail.elt.closest(".analytics-members-pagination"));
+
+    /* Every filter/pager request restarts the minimum-display clock. */
+    requestStartedAt = Date.now();
+    if (holdTimer) { window.clearTimeout(holdTimer); holdTimer = null; }
+    heldHTML = null;
+
     if (!membersBody.classList.contains("is-paginating")) {
       pendingHTML = membersBody.innerHTML;
       var previousHeight = membersBody.offsetHeight;
@@ -106,6 +132,8 @@
       membersBody.style.height = Math.max(previousHeight, membersBody.scrollHeight) + "px";
       membersBody.style.overflow = "hidden";
       membersBody.classList.add("is-paginating");
+    } else {
+      membersBody.innerHTML = buildSkeleton();
     }
   });
 
@@ -114,13 +142,28 @@
     membersBody.classList.remove("is-searching");
     membersBody.setAttribute("aria-busy", "false");
     if (!membersBody.classList.contains("is-paginating")) return;
-    membersBody.classList.remove("is-paginating");
     pendingHTML = null;
-    settleHeight();
-    if (scrollAfterSwap) {
-      scrollAfterSwap = false;
-      keepHeadingInView();
+
+    var remaining = MIN_SKELETON_MS - (Date.now() - requestStartedAt);
+    if (remaining > 0) {
+      /* The answer is already in the DOM, but releasing it now would hide the
+         shimmer before it is seen. Hold it, then reveal the page. */
+      heldHTML = membersBody.innerHTML;
+      var locked = parseFloat(membersBody.style.height) || membersBody.scrollHeight;
+      membersBody.innerHTML = buildSkeleton();
+      membersBody.style.height = locked + "px";
+      holdTimer = window.setTimeout(function () {
+        holdTimer = null;
+        if (heldHTML !== null) {
+          membersBody.innerHTML = heldHTML;
+          heldHTML = null;
+        }
+        releaseSkeleton();
+      }, remaining);
+      return;
     }
+
+    releaseSkeleton();
   });
 
   function recover(event) {
@@ -128,6 +171,8 @@
     activeXhr = null;
     membersBody.classList.remove("is-searching");
     membersBody.setAttribute("aria-busy", "false");
+    if (holdTimer) { window.clearTimeout(holdTimer); holdTimer = null; }
+    heldHTML = null;
     if (membersBody.classList.contains("is-paginating")) {
       membersBody.classList.remove("is-paginating");
       if (pendingHTML !== null) membersBody.innerHTML = pendingHTML;

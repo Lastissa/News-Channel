@@ -2,8 +2,8 @@
   htmx fragment: the ANALYTICS "Reading & editorial" card.
 
   Everything here is measured over one range (the same choices as Trends):
-  the top-read stories, per-category published-vs-read, the never-viewed
-  backlog, and the median wait for a fresh story's first reader. "Views" are
+  the top-read stories, per-category published-vs-read, and the never-viewed
+  backlog. "Views" are
   StoryView events inside that window, never the all-time Blog.views counter,
   so changing the range changes the leaderboard. Only ever returned to an htmx
   GET against control:analytics_reading -- never rendered into the shell.
@@ -12,7 +12,9 @@
 
 <div class="analytics-reading-grid">
 
-  <section class="analytics-reading-block" aria-labelledby="analytics-reading-top">
+  <section class="analytics-reading-block" aria-labelledby="analytics-reading-top"
+           data-guide-title="Top-read stories"
+           data-guide-text="The stories opened most inside the selected range, ranked by story-open events. It counts views in the range, never the all-time total, so the leaderboard changes with the range. Like rate is likes per hundred views.">
     <h3 id="analytics-reading-top" class="analytics-reading-heading">Top-read stories</h3>
     {% if top_stories %}
     <div class="analytics-reading-scroll">
@@ -45,7 +47,9 @@
     {% endif %}
   </section>
 
-  <section class="analytics-reading-block" aria-labelledby="analytics-reading-cats">
+  <section class="analytics-reading-block" aria-labelledby="analytics-reading-cats"
+           data-guide-title="Published vs read"
+           data-guide-text="For each category, how many stories you published in the range beside how many views they drew, with the average views a story. It shows which subjects are landing and which are not.">
     <h3 id="analytics-reading-cats" class="analytics-reading-heading">Published vs read</h3>
     {% if top_categories %}
     <ul class="analytics-reading-cats">
@@ -65,7 +69,9 @@
     {% endif %}
   </section>
 
-  <section class="analytics-reading-block" aria-labelledby="analytics-reading-cold">
+  <section class="analytics-reading-block" aria-labelledby="analytics-reading-cold"
+           data-guide-title="Cold stories"
+           data-guide-text="Published stories, older than the cold threshold, that no one has opened yet. They are still reachable, they just have not found an audience yet.">
     <h3 id="analytics-reading-cold" class="analytics-reading-heading">Cold stories</h3>
     <p class="analytics-reading-note">Never viewed, published at least {{ cold_stories.older_than }} days ago.</p>
     {% if cold_stories.items %}
@@ -83,16 +89,6 @@
     {% endif %}
     {% else %}
     <p class="analytics-reading-empty">Nothing cold. every older story has been read.</p>
-    {% endif %}
-  </section>
-
-  <section class="analytics-reading-block" aria-labelledby="analytics-reading-speed">
-    <h3 id="analytics-reading-speed" class="analytics-reading-heading">Time to first read</h3>
-    {% if first_read.sample %}
-    <p class="analytics-reading-stat">{{ first_read.median_label }}</p>
-    <p class="analytics-reading-note">median, across {{ first_read.sample }} stor{{ first_read.sample|pluralize:"y,ies" }} published in this range.</p>
-    {% else %}
-    <p class="analytics-reading-empty">No reads recorded for stories published in this range.</p>
     {% endif %}
   </section>
 

@@ -622,17 +622,16 @@
 
   /* ---------- "How this works" guide ---------- */
   /* A bottom-docked coach rail: the rail itself never covers the page, and each
-     step scrolls its section into view and rings it, so the guide explains the
-     chart while showing it. Steps are read from the DOM in order -- any card
-     carrying data-guide-title becomes a step -- so the wording lives next to the
-     section it describes rather than in a script. Motion is spring-y on purpose;
+     step scrolls its target into view and rings it, so the guide explains each
+     figure while showing it. Steps are read from the DOM in order -- anything
+     carrying data-guide-title becomes a step, a whole card or a single figure
+     inside one -- so the wording lives next to what it describes. Much of that
+     data arrives in htmx fragments, so the list is rebuilt each time the guide
+     opens rather than frozen at first paint. Motion is spring-y on purpose;
      prefers-reduced-motion turns it off. */
   (function () {
     var guide = document.querySelector("[data-guide]");
     if (!guide) return;
-
-    var sections = Array.prototype.slice.call(document.querySelectorAll("[data-guide-title]"));
-    if (!sections.length) return;
 
     var openers = Array.prototype.slice.call(document.querySelectorAll("[data-guide-open]"));
     var headingEl = guide.querySelector("[data-guide-heading]");
@@ -643,10 +642,28 @@
     var prevBtn = guide.querySelector("[data-guide-prev]");
     var nextBtn = guide.querySelector("[data-guide-next]");
     var closeBtn = guide.querySelector(".analytics-guide-close");
+    var sections = [];
     var index = 0;
     var lastFocus = null;
     var reduceMotion = window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function collectSections() {
+      sections = Array.prototype.slice.call(document.querySelectorAll("[data-guide-title]"));
+    }
+
+    function buildDots() {
+      if (!dotsEl) return;
+      dotsEl.innerHTML = "";
+      sections.forEach(function (_, i) {
+        var dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "analytics-guide-dot";
+        dot.setAttribute("aria-label", "Go to step " + (i + 1));
+        dot.addEventListener("click", function () { goTo(i); });
+        dotsEl.appendChild(dot);
+      });
+    }
 
     function scrollToSection(section) {
       var top = section.getBoundingClientRect().top + window.pageYOffset - 92;
@@ -655,6 +672,7 @@
 
     function render() {
       var section = sections[index];
+      if (!section) return;
       if (stepEl) stepEl.textContent = "Step " + (index + 1) + " of " + sections.length;
       if (headingEl) headingEl.textContent = section.getAttribute("data-guide-title") || "";
       if (bodyEl) bodyEl.textContent = section.getAttribute("data-guide-text") || "";
@@ -677,6 +695,7 @@
     }
 
     function goTo(next) {
+      if (!sections.length) return;
       index = Math.max(0, Math.min(sections.length - 1, next));
       render();
     }
@@ -688,6 +707,9 @@
     }
 
     function open() {
+      collectSections();
+      if (!sections.length) return;
+      buildDots();
       lastFocus = document.activeElement;
       guide.hidden = false;
       index = 0;
@@ -701,18 +723,6 @@
       sections.forEach(function (s) { s.classList.remove("is-guided"); });
       document.removeEventListener("keydown", onKey);
       if (lastFocus && lastFocus.focus) lastFocus.focus();
-    }
-
-    /* One dot per section, built once. */
-    if (dotsEl) {
-      sections.forEach(function (_, i) {
-        var dot = document.createElement("button");
-        dot.type = "button";
-        dot.className = "analytics-guide-dot";
-        dot.setAttribute("aria-label", "Go to step " + (i + 1));
-        dot.addEventListener("click", function () { goTo(i); });
-        dotsEl.appendChild(dot);
-      });
     }
 
     openers.forEach(function (button) { button.addEventListener("click", open); });

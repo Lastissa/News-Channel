@@ -600,10 +600,6 @@ html[data-theme="dark"] .analytics-reading-block { background: var(--paper-dim);
 }
 .analytics-reading-note { margin: 8px 0 0; font-size: 0.78rem; color: var(--slate); }
 .analytics-reading-empty { margin: 0; font-size: 0.86rem; color: var(--slate); }
-.analytics-reading-stat {
-  margin: 0; font-size: 1.9rem; font-weight: 800; line-height: 1.05;
-  color: var(--ink); font-variant-numeric: tabular-nums;
-}
 .analytics-reading-cat {
   margin-left: 8px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em;
   text-transform: uppercase; color: var(--slate); white-space: nowrap;
@@ -754,14 +750,17 @@ html[data-theme="dark"] .analytics-guide-card {
   color: #04121a; background: var(--brand-deep); border-color: var(--brand-deep);
 }
 
-/* The section a guide step is describing, ringed and briefly pulsed so the
-   eye is pulled to it as the rail moves. */
-.analytics-card.is-guided {
-  border-color: color-mix(in srgb, var(--brand) 60%, var(--line));
+/* The target a guide step is describing, ringed and briefly pulsed so the eye
+   is pulled to it as the rail moves. Works for a whole card or a single figure
+   inside one, since a step can now point at either. */
+[data-guide-title].is-guided {
+  outline: 2px solid color-mix(in srgb, var(--brand) 65%, transparent);
+  outline-offset: 3px;
+  border-radius: var(--radius-s);
   animation: analyticsGuided 1.3s cubic-bezier(.22, 1, .36, 1) 1;
 }
-html[data-theme="dark"] .analytics-card.is-guided {
-  border-color: color-mix(in srgb, var(--brand-deep) 60%, var(--line));
+html[data-theme="dark"] [data-guide-title].is-guided {
+  outline-color: color-mix(in srgb, var(--brand-deep) 65%, transparent);
 }
 @keyframes analyticsGuided {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 40%, transparent); }
@@ -770,7 +769,7 @@ html[data-theme="dark"] .analytics-card.is-guided {
 @media (prefers-reduced-motion: reduce) {
   .analytics-guide-card,
   .analytics-guide-main.is-enter,
-  .analytics-card.is-guided,
+  [data-guide-title].is-guided,
   .analytics-guide-dot,
   .analytics-guide-close,
   .analytics-info { animation: none; transition: none; }

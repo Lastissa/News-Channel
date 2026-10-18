@@ -18,7 +18,7 @@ Design notes
 from datetime import datetime, time, timedelta
 
 from django.db import DatabaseError, transaction
-from django.db.models import Count, Max, Min
+from django.db.models import Count, Max
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -591,28 +591,6 @@ def _safe_rows(rows):
         return []
 
 
-def _median_seconds(values):
-    """Median of a list of non-negative seconds, or None for an empty list."""
-    if not values:
-        return None
-    ordered = sorted(values)
-    middle = len(ordered) // 2
-    if len(ordered) % 2:
-        return ordered[middle]
-    return (ordered[middle - 1] + ordered[middle]) / 2
-
-
-def _duration_label(seconds):
-    """A short human duration: 0 min, 45 min, 3.2 h, 2.1 days."""
-    if seconds is None:
-        return ""
-    if seconds < 3600:
-        return f"{round(seconds / 60)} min"
-    if seconds < 86400:
-        return f"{seconds / 3600:.1f} h"
-    return f"{seconds / 86400:.1f} days"
-
-
 def _range_label(selected_range):
     """The human label behind a range key, e.g. "90d" -> "Last 3 months"."""
     return dict(TREND_RANGE_CHOICES).get(selected_range, "")
@@ -726,42 +704,12 @@ def _cold_stories(now):
     }
 
 
-def _time_to_first_read(start):
-    """How long a fresh story waits for its first view, as a median.
-
-    Only stories PUBLISHED in the window are sampled, so the figure answers
-    "how fast does this range's output pick up its first reader" rather than
-    blending in stories that were already old when the window opened.
-    """
-    first_rows = _safe_rows(
-        StoryView.objects.filter(blog__date_created__gte=start)
-        .values("blog_id")
-        .annotate(first=Min("created_at"))
-    )
-    if not first_rows:
-        return {"median_label": "", "sample": 0}
-
-    published = {
-        story.pk: story.date_created
-        for story in Blog.objects.filter(pk__in=[row["blog_id"] for row in first_rows])
-    }
-    gaps = []
-    for row in first_rows:
-        created = published.get(row["blog_id"])
-        first = row["first"]
-        if created and first:
-            delta = (first - created).total_seconds()
-            if delta >= 0:
-                gaps.append(delta)
-    return {"median_label": _duration_label(_median_seconds(gaps)), "sample": len(gaps)}
-
-
 def reading_editorial(selected_range):
     """The "Reading & editorial" card: what members read over the range.
 
-    Returns the top-read stories, per-category published-vs-read, the never
-    viewed backlog, and the median wait for a fresh story's first reader. All
-    four are measured to the same window, so the card reads as one story.
+    Returns the top-read stories, per-category published-vs-read, and the
+    never-viewed backlog. All three are measured to the same window, so the
+    card reads as one story.
     """
     range_days = TREND_RANGES.get(selected_range, TREND_RANGES[DEFAULT_TREND_RANGE])
     now = timezone.localtime()
@@ -773,7 +721,6 @@ def reading_editorial(selected_range):
         "top_stories": _top_read_stories(start),
         "top_categories": _category_read_vs_published(start),
         "cold_stories": _cold_stories(now),
-        "first_read": _time_to_first_read(start),
     }
 
 

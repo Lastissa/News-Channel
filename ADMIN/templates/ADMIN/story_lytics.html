@@ -44,7 +44,7 @@
 
     <section class="analytics-card" aria-labelledby="analytics-stories-title"
              data-guide-title="Stories per week"
-             data-guide-text="Each bar is one Sunday-to-Saturday week and counts the stories published in it. Press a bar to read the stories behind it. The tiles above count today, this week and the last 30 days.">
+             data-guide-text="How much is published, and when. The next two steps cover the tiles and the bars.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
         <h2 id="analytics-stories-title">Stories per week</h2>
@@ -76,20 +76,22 @@
 
     <section class="analytics-card" aria-labelledby="analytics-reading-title"
              data-guide-title="Reading &amp; editorial"
-             data-guide-text="Every view here is a story-open event inside the selected range, never the all-time counter, so changing the range changes the leaderboard. It shows the top-read stories, published-versus-read by category, the never-viewed backlog, and the median wait for a story's first reader.">
+             data-guide-text="What members read in the selected range. Every view is a story-open event inside the range, never the all-time counter. The next steps cover each block.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-reading"/></svg></span>
         <h2 id="analytics-reading-title">Reading &amp; editorial</h2>
       </header>
 
-      {% comment %}One range control, reusing the Trends ranges, drives all four
-         blocks: top-read stories, category published-vs-read, the never-viewed
-         backlog, and the median wait for a fresh story's first reader.{% endcomment %}
+      {% comment %}One range control, reusing the Trends ranges, drives all three
+         blocks: top-read stories, category published-vs-read, and the
+         never-viewed backlog.{% endcomment %}
       <form class="analytics-controls"
             hx-get="{% url 'control:analytics_reading' %}"
             hx-target="#analytics-reading-body"
             hx-swap="innerHTML"
-            hx-trigger="change">
+            hx-trigger="change"
+            data-guide-title="Reading range"
+            data-guide-text="One range drives the three blocks below, using the same presets as Trends. Change it and the whole card is measured to the new window.">
         <label class="analytics-select">
           <span class="analytics-select-label">Range</span>
           <select name="range">
@@ -113,7 +115,7 @@
 
     <section class="analytics-card" aria-labelledby="analytics-perf-title"
              data-guide-title="Story performance"
-             data-guide-text="Search for a story by title and pick it. Its views, likes and comments are charted over the same bucket and range controls as the other charts, and the toggles choose which signals to draw.">
+             data-guide-text="One story's views, likes and comments over time. Search by title, pick a match, then choose the time frame and the signals to plot.">
       {% comment %}Pick one story, then overlay its views, likes and comments
          over the same kind of window as Trends. The picker searches as you
          type and pressing a match loads that story's chart.{% endcomment %}
@@ -131,7 +133,9 @@
         <input type="hidden" name="submitted" value="1">
         <input type="hidden" name="story" value="">
 
-        <label class="analytics-select analytics-select--search analytics-story-picker">
+        <label class="analytics-select analytics-select--search analytics-story-picker"
+               data-guide-title="Find a story"
+               data-guide-text="Search by title; matching stories appear as you type (published or not). Press a match to load its chart.">
           <span class="analytics-select-label">Find a story</span>
           <input type="search" name="story_q" placeholder="Search story title" autocomplete="off"
                  hx-get="{% url 'control:analytics_story_search' %}"
@@ -175,7 +179,9 @@
           <button type="submit" class="analytics-apply">Apply</button>
         </div>
 
-        <fieldset class="analytics-series">
+        <fieldset class="analytics-series"
+                  data-guide-title="Signals to plot"
+                  data-guide-text="Views, likes and comments for the chosen story, each counted from its own events inside the bucket. Tick the ones you want overlaid on the chart.">
           <legend class="panel-sr">Series to plot</legend>
           {% for meta in story_performance_series %}
           <label class="analytics-series-option" style="--series-color: {{ meta.color }}">

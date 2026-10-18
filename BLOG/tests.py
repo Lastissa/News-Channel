@@ -418,17 +418,17 @@ class BlogAdminDeleteReleasesImageTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Bug 1 — Exploration test (Task 1)
+# Bug 1 - Exploration test (Task 1)
 # ---------------------------------------------------------------------------
 # These tests ENCODE THE EXPECTED (FIXED) BEHAVIOUR.
-# On UNFIXED code they MUST FAIL — failure proves the bug exists.
+# On UNFIXED code they MUST FAIL - failure proves the bug exists.
 # When the fix lands (task 3), these same tests will start passing.
 #
 # Properties checked:
 #   1. cache.get("views:blog:<pk>") is not None and >= 1 after a GET
-#      (Redis counter was incremented — expected behaviour after fix)
+#      (Redis counter was incremented - expected behaviour after fix)
 #   2. No SQL UPDATE statement targeting blog_blog was executed during the GET
-#      (DB write on every request — the bug we're removing)
+#      (DB write on every request - the bug we're removing)
 # ---------------------------------------------------------------------------
 
 
@@ -700,7 +700,7 @@ class Bug1ViewCountPBTExplorationTest(HypothesisTestCase):
     """View counts remain idempotent for any generated story identifier."""
 
     # ------------------------------------------------------------------
-    # Property 1 (property-based) — holds for arbitrary blog PKs
+    # Property 1 (property-based) - holds for arbitrary blog PKs
     # ------------------------------------------------------------------
     @hyp_settings(
         max_examples=5,
@@ -734,7 +734,7 @@ class Bug1ViewCountPBTExplorationTest(HypothesisTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Bug 1 — Preservation tests (Task 2)
+# Bug 1 - Preservation tests (Task 2)
 # ---------------------------------------------------------------------------
 # These tests ENCODE THE BASELINE BEHAVIOUR that must never regress.
 # They MUST PASS on UNFIXED code (they capture what we preserve).
@@ -754,7 +754,7 @@ class Bug1ViewCountPBTExplorationTest(HypothesisTestCase):
 
 class Bug1PreservationContextTest(TestCase):
     """
-    Unit preservation test — verifies StoryDetailView returns HTTP 200 with
+    Unit preservation test - verifies StoryDetailView returns HTTP 200 with
     every mandatory context key present and non-None for a single concrete
     blog / user combination.
 
@@ -788,7 +788,7 @@ class Bug1PreservationContextTest(TestCase):
             )
             self.assertIsNotNone(
                 response.context[key],
-                msg=f"Mandatory context key '{key}' is None — must be non-None.",
+                msg=f"Mandatory context key '{key}' is None - must be non-None.",
             )
 
     @override_settings(
@@ -864,7 +864,7 @@ class Bug1PreservationContextPBTTest(HypothesisTestCase):
     """
 
     # ------------------------------------------------------------------
-    # Property 2a — context keys present for any blog PK (anonymous)
+    # Property 2a - context keys present for any blog PK (anonymous)
     # ------------------------------------------------------------------
     @hyp_settings(
         max_examples=5,
@@ -917,7 +917,7 @@ class Bug1PreservationContextPBTTest(HypothesisTestCase):
             )
 
     # ------------------------------------------------------------------
-    # Property 2b — authenticated viewer tracking preserved for any PK
+    # Property 2b - authenticated viewer tracking preserved for any PK
     # ------------------------------------------------------------------
     @hyp_settings(
         max_examples=5,

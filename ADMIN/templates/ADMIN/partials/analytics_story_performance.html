@@ -7,7 +7,9 @@
   GET against control:analytics_story_performance.
 {% endcomment %}
 {% if chart.story %}
-<p class="analytics-chart-note">
+<p class="analytics-chart-note"
+   data-guide-title="Performance chart"
+   data-guide-text="The chosen story's views, likes and comments per bucket. The toggles above choose which signals are drawn; this line names the story being charted.">
   <strong>{{ chart.story.heading }}</strong>
   <span class="analytics-reading-cat">{{ chart.story.category }}</span>
   &middot; {{ chart.story.author }}
@@ -18,5 +20,7 @@
   {{ chart|json_script:"analytics-story-performance-data" }}
 </div>
 {% else %}
-<p class="analytics-chart-empty">Pick a story above to chart its views, likes and comments over time.</p>
+<p class="analytics-chart-empty"
+   data-guide-title="Performance chart"
+   data-guide-text="Pick a story with the search box above; its views, likes and comments are then charted over the chosen time frame.">Pick a story above to chart its views, likes and comments over time.</p>
 {% endif %}

@@ -473,7 +473,7 @@ html[data-theme="dark"] .icon-moon { display: block; }
 html.auth-gate-locked { overflow: hidden; }
 
 /* ---------- Hero row: main carousel + side teaser ---------- */
-/* .hero and .hero-teaser are separate, sibling blocks — .hero-row only
+/* .hero and .hero-teaser are separate, sibling blocks - .hero-row only
    exists to lay them out. Desktop: a 70/30 flex row with a divider between
    them. Mobile: they detach completely (column, teaser gets margin-top)
    and the teaser becomes its own "peek" carousel underneath the hero. */
@@ -563,10 +563,10 @@ html.auth-gate-locked { overflow: hidden; }
 
 /* ---------- Hero teaser (side carousel) ---------- */
 /* A separate block from .hero that shares .hero-row's flex line on desktop
-   and stands completely on its own on mobile. Auto-advances only — no
+   and stands completely on its own on mobile. Auto-advances only - no
    arrows/dots on either layout. Desktop: slides are stacked full-bleed and
    crossfade. Mobile: slides sit side by side and the active one is a
-   genuinely wider box (flex-basis swap, not just a visual scale trick) —
+   genuinely wider box (flex-basis swap, not just a visual scale trick)  - 
    hero-teaser.js reads the active slide's real offsetLeft afterwards and
    slides the whole strip so focus moves right to left. */
 .hero-teaser {
@@ -606,7 +606,7 @@ a.teaser-slide { color: inherit; text-decoration: none; }
   .teaser-slide {
     /* Fixed, non-transitioning flex-basis: the size change is instant so
        hero-teaser.js can read the new offsetLeft immediately and get an
-       exact number for the strip's slide transform — no fighting between
+       exact number for the strip's slide transform - no fighting between
        an animating box size and an animating position at once. */
     position: relative; inset: auto; height: 96px;
     flex: 0 0 32%; min-width: 110px;
@@ -732,8 +732,14 @@ a.teaser-slide { color: inherit; text-decoration: none; }
   background: transparent; border: none; border-radius: 0; overflow: visible; display: flex; flex-direction: column; box-shadow: none; transition: none;
 }
 .story-card:hover { transform: none; box-shadow: none; }
-.story-card-media { aspect-ratio: 16/10; overflow: hidden; background: radial-gradient(120% 120% at 50% 0%, var(--surface) 0%, var(--paper-dim) 100%); }
-.story-card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
+.story-card-media { position: relative; aspect-ratio: 16/10; overflow: hidden; background: radial-gradient(120% 120% at 50% 0%, var(--surface) 0%, var(--paper-dim) 100%); }
+/* Branded stand-in behind a lazy photo: the box reads as a placeholder, not a
+   blank hole, until the image paints over it. Colours come from the theme
+   tokens, so paper/ink-soft follow light and dark automatically. */
+.story-card-ph { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+.story-card-ph-bg { fill: var(--paper); }
+.story-card-ph-text { fill: var(--ink-soft); opacity: .55; font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 26px; font-weight: 800; letter-spacing: 0.2em; }
+.story-card-media img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
 .story-card:hover .story-card-media img { transform: scale(1.04); }
 .story-card-body { padding: 16px 16px 18px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .story-card-meta { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--ink); }

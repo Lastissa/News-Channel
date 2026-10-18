@@ -4,8 +4,12 @@
   steps up as accounts are created. Only ever returned to an htmx GET against
   control:member_growth.
 {% endcomment %}
-<p class="analytics-chart-note"><strong>{{ chart.total }}</strong> members by the end of this window.</p>
-<div class="analytics-chart" data-chart data-chart-kind="line">
+<p class="analytics-chart-note"
+   data-guide-title="Members by the end"
+   data-guide-text="The total the line reaches at the end of the window. Accounts created before the window form the starting baseline, so the count never restarts at zero."><strong>{{ chart.total }}</strong> members by the end of this window.</p>
+<div class="analytics-chart" data-chart data-chart-kind="line"
+     data-guide-title="Members over time chart"
+     data-guide-text="Each point is how many members existed by the end of that bucket. The time frame and range come from this card's controls; a custom start and end date override the range preset.">
   <div class="analytics-chart-canvas" data-chart-canvas role="img"
        aria-label="Running total of members over the selected time frame"></div>
   {{ chart|json_script:"analytics-members-growth-data" }}

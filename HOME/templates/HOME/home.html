@@ -63,17 +63,8 @@
         <div class="hero-actions">
           <a class="glass-btn" href="{% url 'blog:story_detail' post.slug %}" target="_self">Read story</a>
           <button type="button" class="glass-btn glass-btn-outline glass-btn-icon"
-                  data-share-btn data-share-url="{{ site_domain }}{% url 'blog:story_detail' post.slug %}"
-                   data-copy-extra="
-{{post.heading}}
-
-{{post.content | filter_copy_btn_text}}
-
-Written by {{post.author.staffprofile.full_name}} | | {{project_name}} TEAM
-
-visit https://www.| {{project_name}}.com.ng for more up to date stories
-"
-                  aria-label="Copy link to this story" title="Copy link to this story">
+                  data-native-share data-share-url="{{ site_domain }}{% url 'blog:story_detail' post.slug %}"
+                  aria-label="Share this story" title="Share this story">
             <svg viewBox="0 0 24 24" class="share-icon" aria-hidden="true">
               <circle cx="18" cy="5" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
               <circle cx="6" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
@@ -125,11 +116,11 @@ visit https://www.| {{project_name}}.com.ng for more up to date stories
 </section>
 
 {% comment %}
-  Side/teaser carousel. A block of its own, not nested inside .hero — it
+  Side/teaser carousel. A block of its own, not nested inside .hero - it
   just shares .hero-row's flex line on desktop (70vw/30vw split, divider
   between them) and fades between slides on its own, no user controls.
   Mobile: it detaches from the hero entirely (own margin-top) and becomes
-  a multi-tab peek carousel — the active tab is a genuinely wider box, the
+  a multi-tab peek carousel - the active tab is a genuinely wider box, the
   rest share the remaining space evenly, sliding right to left as it
   auto-advances. Same markup drives both layouts; CSS + hero-teaser.js
   handle the rest.

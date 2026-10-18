@@ -6,7 +6,9 @@
   analytics.js reads and draws an SVG from. Only ever returned to an htmx GET
   against control:analytics_stories -- it is never rendered into the shell.
 {% endcomment %}
-<div class="analytics-overview-tiles analytics-stories-tiles">
+<div class="analytics-overview-tiles analytics-stories-tiles"
+     data-guide-title="Stories published"
+     data-guide-text="Stories published today, in the current week (Sunday to now), and in the last 30 days.">
   <div class="analytics-tile">
     <p class="analytics-tile-label">Stories published</p>
     <p class="analytics-tile-row">
@@ -20,7 +22,9 @@
 </div>
 
 <div class="analytics-chart" data-chart data-chart-kind="bar"
-     data-week-endpoint="{% url 'control:member_week_stories' %}">
+     data-week-endpoint="{% url 'control:member_week_stories' %}"
+     data-guide-title="Stories per week chart"
+     data-guide-text="Each bar is one Sunday-to-Saturday week, counting the stories published in it. Press a bar to read the stories behind it.">
   <div class="analytics-chart-canvas" data-chart-canvas role="img"
        aria-label="Stories published per week over the selected period"></div>
   {{ chart|json_script:"analytics-stories-data" }}
