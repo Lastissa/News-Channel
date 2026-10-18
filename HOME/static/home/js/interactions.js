@@ -353,7 +353,9 @@
 
     if (platform === "whatsapp") {
       /* WhatsApp keeps the current full recap: link, then heading, lead and byline. */
-      target = "https://wa.me/?text=" + encodeURIComponent(url + "\n\n" + text);
+      // i comment out this bcos now i do not want the url to be in the up part again
+      // target = "https://wa.me/?text=" + encodeURIComponent(url + "\n\n" + text);
+      target = "https://wa.me/?text=" + encodeURIComponent(text);
     } else if (platform === "facebook") {
       /* Facebook sharer only honours the link; extra copy is ignored. */
       target = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url);

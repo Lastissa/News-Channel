@@ -348,9 +348,42 @@ html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); 
 .analytics-week-close { background: transparent; border: 1px solid var(--line); border-radius: var(--radius-s); padding: 3px 7px; cursor: pointer; color: var(--ink); }
 .analytics-week-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .analytics-week-item { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; }
-.analytics-week-row { display: flex; flex-direction: column; gap: 3px; }
-.analytics-week-heading { font-weight: 600; color: var(--ink); }
-.analytics-week-meta { color: var(--slate); font-size: 0.86rem; }
+
+/* The dialog's inner data: a summary header, then one card per story. Every
+   class the fragment actually emits is styled here -- the old block targeted
+   .analytics-week-row/.analytics-week-heading, which the template no longer
+   uses, so the title read as body copy and the <ol> kept its browser indent. */
+.analytics-week-summary { margin: 0; }
+.analytics-week-range {
+  margin: 0; font-size: 0.72rem; font-weight: 800;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--slate);
+}
+.analytics-week-count { margin: 2px 0 0; font-size: 0.92rem; font-weight: 700; color: var(--ink); }
+.analytics-week-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.analytics-week-story { display: block; font-weight: 700; color: var(--ink); }
+.analytics-week-story:hover { text-decoration: underline; }
+.analytics-week-meta { margin: 3px 0 0; color: var(--slate); font-size: 0.86rem; }
+.analytics-week-by { color: var(--slate); }
+.analytics-week-dates { display: inline-flex; flex-wrap: wrap; gap: 2px 12px; margin-left: 8px; }
+.analytics-week-updated { color: var(--slate); }
+.analytics-week-empty { margin: 0; color: var(--slate); }
+
+/* The author control is a button, not body text: give it button chrome so it
+   is obviously pressable -- and legible -- in both themes. */
+.analytics-week-author {
+  margin: 0 2px; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--paginator-border); background: var(--paginator-bg);
+  color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, transform .15s ease;
+}
+.analytics-week-author:hover {
+  border-color: var(--paginator-hover-border);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.analytics-week-author:active { transform: scale(.97); }
+.analytics-week-author:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 45%, transparent); outline-offset: 2px;
+}
 .analytics-week-footer { padding: 8px 12px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
 .analytics-week-btn { padding: 6px 11px; border-radius: var(--radius-s); border: 1px solid var(--line); background: var(--paginator-bg); cursor: pointer; color: var(--ink); }
 
@@ -423,21 +456,43 @@ html[data-theme="dark"] .analytics-select input[type="date"] { background: var(-
 .analytics-story-chosen { font-size: 0.82rem; color: var(--slate); align-self: center; }
 .analytics-story-chosen strong { color: var(--ink); }
 .analytics-story-results { flex: 1 1 100%; }
+/* Each match is a real, pressable button -- bordered, filled and given a
+   trailing chevron -- so it never reads as a plain ink heading. */
 .analytics-story-result-list {
-  list-style: none; margin: 0; padding: 0; display: grid; gap: 0;
+  list-style: none; margin: 0; padding: 2px; display: grid; gap: 8px;
   max-height: 264px; overflow: auto;
-  border: 1px solid var(--line); border-radius: var(--radius-s);
-  background: var(--paper);
 }
-html[data-theme="dark"] .analytics-story-result-list { background: var(--paper-dim); }
 .analytics-story-result {
-  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
-  padding: 9px 11px; border: 0; border-bottom: 1px solid var(--line);
-  background: transparent; color: var(--ink); cursor: pointer; font-family: inherit;
+  position: relative; display: flex; flex-direction: column; gap: 2px;
+  width: 100%; text-align: left;
+  padding: 10px 32px 10px 12px;
+  border: 1px solid var(--paginator-border); border-radius: var(--radius-s);
+  background: var(--paginator-bg); color: var(--ink);
+  cursor: pointer; font-family: inherit;
+  transition: transform .15s cubic-bezier(.22, 1, .36, 1),
+              border-color .15s ease, background-color .15s ease;
 }
-.analytics-story-result-list li:last-child .analytics-story-result { border-bottom: 0; }
-.analytics-story-result:hover, .analytics-story-result:focus-visible { background: var(--paginator-bg); }
-.analytics-story-result-title { font-weight: 600; font-size: 0.9rem; }
+html[data-theme="dark"] .analytics-story-result { background: var(--paper-dim); }
+.analytics-story-result:hover {
+  border-color: var(--paginator-hover-border);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.analytics-story-result:active { transform: scale(.99); }
+.analytics-story-result:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 45%, transparent);
+  outline-offset: 2px;
+  border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+}
+/* trailing chevron: a wordless "press me" affordance */
+.analytics-story-result::after {
+  content: ""; position: absolute; right: 14px; top: 50%;
+  width: 8px; height: 8px; margin-top: -5px;
+  border-right: 2px solid var(--slate); border-bottom: 2px solid var(--slate);
+  transform: rotate(-45deg);
+  transition: border-color .15s ease, right .15s ease;
+}
+.analytics-story-result:hover::after { border-color: var(--brand-deep); right: 11px; }
+.analytics-story-result-title { font-weight: 700; font-size: 0.92rem; }
 .analytics-story-result-meta { font-size: 0.76rem; color: var(--slate); }
 .analytics-story-no-results { margin: 0; font-size: 0.86rem; color: var(--slate); }
 

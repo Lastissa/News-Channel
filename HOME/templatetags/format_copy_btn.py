@@ -6,6 +6,8 @@ register = template.Library()
 
 @register.filter
 def filter_copy_btn_text(value):
+    # Because i want the whatsapp share to not contain the first paragraph -  i am stoppin this from returning anythign for now
+    return ""
     if not value:
         return ""
 

@@ -178,7 +178,7 @@ def _try_send_password_reset_email(user: object, reset_link: str):
         "<p>Hi,</p>"
         f"<p>We received a request to reset the password on your account ({user.email}).</p>"
         f'<p><a href="{reset_link}">Click here to reset your password</a></p>'
-        "<p>If you didn't request this, you can safely ignore this email -- your password won't change.</p>"
+        "<p>If you didn't request this, you can safely ignore this email.</p>"
     )
     html_message = _build_email_html(
         title="Password Reset Requested",
@@ -336,7 +336,7 @@ def _try_send_newsletter_subscribe_email(email: str):
     main_content = (
         "<p>Hi,</p>"
         f"<p>You're now subscribed to news updates from {About.project_name}.</p>"
-        "<p>We'll only email you when there's something worth reading. Please Follow Authors so we can further tailor the kind of stories you get</p>"
+        f"<p>We'll only email you when new stories are publisehd. Please Follow Authors so we can further tailor the kind of stories you get or click <a href='{About.domain}/profile/'>here</a> to personalize the kind of category of stories you want to be receiving</p>"
     )
     html_message = _build_email_html(
         title="Subscription Confirmed",

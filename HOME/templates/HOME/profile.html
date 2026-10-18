@@ -50,8 +50,8 @@
                 hx-get="{% url 'home:profile_sessions_placard' %}"
                 hx-target="[data-sessions-overlay]"
                 hx-swap="innerHTML"
-                aria-label="View active sessions">
-          <span>Active sessions</span>
+                aria-label="View active login">
+          <span>Active Logins</span>
           <strong>{{ user_sessions|length }}</strong>
         </button>
       </div>

@@ -1242,11 +1242,20 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   background: var(--ink); color: var(--paper);
   font-weight: 800; font-size: 0.95rem; letter-spacing: 0.01em;
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  /* A resting shadow and a pressed state make it read as a real button on a
+     touch screen, where there is no hover to reveal the lift below. */
+  box-shadow: 0 2px 6px rgba(14, 27, 44, 0.22);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+              transform 0.15s ease, box-shadow 0.15s ease;
 }
 .story-body a.story-inline-btn:hover, .story-body a.story-inline-btn:focus-visible,
 .story-inline-btn:hover, .story-inline-btn:focus-visible {
-  background: var(--brand-deep); color: var(--paper); border-color: var(--brand-deep); transform: translateY(-1px);
+  background: var(--brand-deep); color: var(--paper); border-color: var(--brand-deep);
+  transform: translateY(-1px); box-shadow: 0 5px 14px rgba(14, 27, 44, 0.28);
+}
+.story-body a.story-inline-btn:active,
+.story-inline-btn:active {
+  transform: translateY(1px); box-shadow: 0 1px 2px rgba(14, 27, 44, 0.28);
 }
 .story-body > p,
 .story-body > ul,

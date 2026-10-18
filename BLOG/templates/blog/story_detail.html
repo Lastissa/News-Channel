@@ -162,7 +162,7 @@
             <button type="button" class="share-btn share-btn-whatsapp" data-share-platform="whatsapp"
                     data-share-url="{{ site_domain }}{{ request.path }}"
                     data-share-title="{{ blog.heading }}"
-                    data-share-text="
+                    data-share-text="🔥 PLACEHOLDER 🔥
 {{ blog.heading }}
 
 {{ blog_content_html|filter_copy_btn_text }}
@@ -170,7 +170,7 @@
 full details 👇
 {{ site_domain }}{{ request.path }}
 
-ABUREPORT"
+{{ blog.author_name }} | ABUREPORT"
                     aria-label="Share on WhatsApp">
               <img class="share-icon" src="{% static 'blog/file/WhatsApp-icon.svg' %}" alt="" width="16" height="16" loading="lazy">
               {% comment %} <span>WhatsApp</span> {% endcomment %}

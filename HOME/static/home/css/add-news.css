@@ -69,7 +69,7 @@ html.editor-modal-open { overflow: hidden; }
 .fg-copy,
 .fg-toggle,
 .editor-modal-btn {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.12s ease;
 }
 
 .editor-btn:hover,
@@ -217,22 +217,30 @@ html.editor-modal-open { overflow: hidden; }
 .editor-insert-group { display: inline-flex; gap: 4px; flex: 0 0 auto; }
 .editor-insert-group + .editor-insert-group { padding-left: 10px; border-left: 1px solid var(--line); }
 
+/* Resting state is a visible chip in BOTH themes. `--surface` used to match
+   the bar behind it, so in light mode a white button sat on a white strip with
+   only a hairline border -- it read as plain text until you hovered. On mobile
+   this strip is a swipeable row of those chips (see the max-width rule near the
+   bottom), which is exactly where a hover-only affordance disappears. The fill,
+   border and shadow give real button shape with no hover at all. */
 .editor-insert-btn {
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
   border-radius: var(--radius-s);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--ink) 9%, var(--paper));
   color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
+  font-weight: 700;
   line-height: 1;
   padding: 7px 10px;
   cursor: pointer;
   white-space: nowrap;
   touch-action: manipulation;
+  box-shadow: 0 1px 2px rgba(14, 27, 44, 0.14);
 }
 
 .editor-insert-btn:hover { background: var(--input-fill); border-color: var(--ink); }
-.editor-insert-btn:active { background: var(--ink); color: var(--surface); }
+.editor-insert-btn:active { background: var(--ink); color: var(--paper); border-color: var(--ink); transform: translateY(1px); box-shadow: none; }
 .editor-insert-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 
 /* ---------- formatting guide ---------- */
