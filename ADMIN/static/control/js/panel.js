@@ -111,18 +111,37 @@
       cards.forEach(function (card) { card.classList.add("is-in"); });
     }
 
-    shell.addEventListener("click", function (event) {
-      var btn = event.target.closest("[data-collapse]");
+    /*  Collapsible cards. Every card ships collapsed so the panel opens as a
+        tidy list of section headers; a nav tap jumps to a section and opens
+        it. One helper keeps the card class and the button's aria state in
+        step, and syncs the labels for the cards that start folded. */
+    function setCollapsed(card, collapsed) {
+      card.classList.toggle("is-collapsed", collapsed);
+      var btn = card.querySelector("[data-collapse]");
       if (!btn) return;
-      var card = btn.closest(".panel-card");
-      if (!card) return;
-      var collapsed = card.classList.toggle("is-collapsed");
       btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
       var heading = card.querySelector("h2");
       var name = heading ? heading.textContent.trim() : "section";
-      var label = (collapsed ? "Expand " : "Collapse ") + name;
-      btn.setAttribute("aria-label", label);
+      btn.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + name);
       btn.title = collapsed ? "Expand" : "Collapse";
+    }
+    cards.forEach(function (card) {
+      if (card.classList.contains("is-collapsed")) setCollapsed(card, true);
+    });
+
+    shell.addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-collapse]");
+      if (btn) {
+        var card = btn.closest(".panel-card");
+        if (card) setCollapsed(card, !card.classList.contains("is-collapsed"));
+        return;
+      }
+      /*  A section link in the nav opens the section it points at, so a tap
+          reveals content instead of landing on a folded header. */
+      var link = event.target.closest(".panel-nav-link");
+      if (!link) return;
+      var target = document.getElementById((link.getAttribute("href") || "").slice(1));
+      if (target && target.classList.contains("panel-card")) setCollapsed(target, false);
     });
 
     /* highlight the nav icon of the card nearest the top of the viewport */

@@ -18,6 +18,7 @@
 }
 .analytics-back {
   display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px;
   padding: 7px 12px; border-radius: var(--radius-s);
   color: var(--slate); text-decoration: none; font-size: 0.92rem; font-weight: 600;
   border: 1px solid var(--line); background: var(--paginator-bg);
@@ -33,7 +34,8 @@
 /* ---------- "How this works" info button ---------- */
 .analytics-info {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 6px 12px 6px 10px; border-radius: 999px;
+  min-height: 44px; min-width: 44px;
+  padding: 6px 12px 6px 10px; border-radius: var(--radius-s);
   font-size: 0.82rem; font-weight: 700; font-family: inherit;
   color: var(--brand-deep);
   background: color-mix(in srgb, var(--brand) 12%, transparent);
@@ -189,6 +191,7 @@ html[data-theme="dark"] .analytics-tile-value.is-down { color: #FF8876; }
 }
 .analytics-select select {
   appearance: none;
+  min-height: 44px;
   padding: 8px 30px 8px 10px; font-size: 0.9rem; font-family: inherit;
   color: var(--ink); background: var(--paper);
   border: 1px solid var(--line); border-radius: var(--radius-s);
@@ -221,7 +224,10 @@ html[data-theme="dark"] .analytics-select select option { background: var(--pape
 .analytics-series-option {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 0.88rem; color: var(--ink); cursor: pointer;
-  padding: 5px 10px; border-radius: 999px;
+  /* A legend control, not a badge: squared with a small radius, and tall
+     enough to hit comfortably on a phone. */
+  min-height: 44px;
+  padding: 5px 12px; border-radius: var(--radius-s);
   border: 1px solid var(--line); background: var(--paginator-bg);
   transition: border-color .2s ease, opacity .2s ease;
 }
@@ -371,7 +377,7 @@ html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); 
 /* The author control is a button, not body text: give it button chrome so it
    is obviously pressable -- and legible -- in both themes. */
 .analytics-week-author {
-  margin: 0 2px; padding: 1px 8px; border-radius: 999px;
+  margin: 0 2px; padding: 1px 8px; border-radius: var(--radius-s);
   border: 1px solid var(--paginator-border); background: var(--paginator-bg);
   color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
   transition: border-color .15s ease, background-color .15s ease, transform .15s ease;
@@ -409,7 +415,7 @@ html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); 
 .analytics-week-retry:hover { border-color: var(--paginator-hover-border); }
 .analytics-toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-  padding: 8px 14px; border-radius: 999px; background: rgba(15,23,42,0.9); color: #fff;
+  padding: 8px 14px; border-radius: var(--radius-s); background: rgba(15,23,42,0.9); color: #fff;
   font-size: 0.9rem; z-index: 1001; box-shadow: 0 10px 30px rgba(2,6,23,0.25);
 }
 .analytics-toast[hidden] { display: none; }
@@ -419,6 +425,7 @@ html[data-theme="dark"] .analytics-week-content { background: var(--paper-dim); 
    select, and follow the theme the same way. */
 .analytics-select input[type="search"],
 .analytics-select input[type="date"] {
+  min-height: 44px;
   padding: 8px 10px; font-size: 0.9rem; font-family: inherit;
   color: var(--ink); background: var(--paper);
   border: 1px solid var(--line); border-radius: var(--radius-s);
@@ -440,6 +447,7 @@ html[data-theme="dark"] .analytics-select input[type="date"] { background: var(-
 
 /* The "Apply" button beside a pair of date boxes; a plain themed button. */
 .analytics-apply {
+  min-height: 44px;
   padding: 8px 14px; font-size: 0.88rem; font-weight: 600; font-family: inherit;
   color: var(--ink); background: var(--paginator-bg);
   border: 1px solid var(--line); border-radius: var(--radius-s); cursor: pointer;
@@ -529,7 +537,7 @@ html[data-theme="dark"] .analytics-story-result { background: var(--paper-dim); 
 
 .analytics-badge {
   display: inline-flex; align-items: center; white-space: nowrap;
-  padding: 3px 10px; border-radius: 999px;
+  padding: 3px 10px; border-radius: var(--radius-s);
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
   border: 1px solid var(--line); color: var(--slate);
 }
@@ -542,7 +550,10 @@ html[data-theme="dark"] .analytics-story-result { background: var(--paper-dim); 
 
 .analytics-member-cats { max-width: 230px; }
 .analytics-chip {
-  display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px; border-radius: 999px;
+  /* The chamber's label shape: clipped corners rather than a pill, matching
+     .an-tag. Horizontal padding covers the 7px slant so no text is clipped. */
+  display: inline-block; margin: 2px 4px 2px 0; padding: 2px 12px;
+  border-radius: 0; clip-path: var(--an-clip-tag);
   font-size: 0.72rem; color: var(--ink);
   background: var(--paginator-bg);
 }
@@ -574,7 +585,7 @@ html[data-theme="dark"] .analytics-story-result { background: var(--paper-dim); 
 .analytics-member-skeleton-lines { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; }
 .analytics-member-skeleton-bar { height: 10px; border-radius: 5px; width: min(46%, 260px); }
 .analytics-member-skeleton-bar.is-short { width: min(28%, 160px); height: 8px; }
-.analytics-member-skeleton-chip { width: 68px; height: 22px; border-radius: 999px; flex: 0 0 auto; }
+.analytics-member-skeleton-chip { width: 68px; height: 22px; border-radius: 0; clip-path: var(--an-clip-tag); flex: 0 0 auto; }
 .analytics-member-skeleton-lines + .analytics-member-skeleton-chip { margin-left: auto; }
 /* Typing in the email box only dims the rows; it never flashes a skeleton. */
 .analytics-members.is-searching { opacity: .55; transition: opacity .18s ease; }
@@ -616,7 +627,10 @@ html[data-theme="dark"] .analytics-reading-block { background: var(--paper-dim);
 .analytics-reading-table tbody tr:last-child td { border-bottom: 0; }
 .analytics-reading-table th:not(:first-child),
 .analytics-reading-table td.analytics-reading-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.analytics-reading-story { color: var(--ink); font-weight: 600; text-decoration: none; }
+.analytics-reading-story {
+  display: flex; align-items: center; min-height: 44px;
+  color: var(--ink); font-weight: 600; text-decoration: none;
+}
 .analytics-reading-story:hover { text-decoration: underline; }
 
 .analytics-reading-cats { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
@@ -716,9 +730,9 @@ html[data-theme="dark"] .analytics-guide-card {
 }
 .analytics-guide-heading { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--ink); }
 .analytics-guide-close {
-  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  flex: 0 0 auto; width: 44px; height: 44px; border-radius: var(--radius-s);
   border: 1px solid var(--line); background: var(--paginator-bg);
-  color: var(--ink); font-size: 1.1rem; line-height: 1; cursor: pointer;
+  color: var(--ink); font-size: 1.2rem; line-height: 1; cursor: pointer;
   transition: transform .2s cubic-bezier(.34, 1.56, .64, 1), border-color .2s ease;
 }
 .analytics-guide-close:hover { transform: rotate(90deg) scale(1.06); border-color: var(--paginator-hover-border); }
@@ -729,16 +743,21 @@ html[data-theme="dark"] .analytics-guide-card {
   to { opacity: 1; transform: translateY(0); }
 }
 .analytics-guide-foot { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
-.analytics-guide-dots { display: flex; align-items: center; gap: 6px; margin: 0 auto; }
+.analytics-guide-dots { display: flex; align-items: center; gap: 0; margin: 0 auto; }
 .analytics-guide-dot {
-  width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%;
-  background: var(--paginator-border); cursor: pointer;
+  /* The dot stays 8px and the button around it is a full 44px target: the
+     padding is clipped out of the paint, so only the dot shows. Boxes touch
+     rather than overlap, so a tap lands on the step it points at. */
+  width: 8px; height: 8px; padding: 18px; border: 0; border-radius: 50%;
+  background: var(--paginator-border); background-clip: content-box; cursor: pointer;
   transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), background-color .22s ease;
 }
 .analytics-guide-dot:hover { transform: scale(1.2); }
 .analytics-guide-dot.is-active { background: var(--brand-deep); transform: scale(1.4); }
 .analytics-guide-nav {
-  padding: 7px 15px; border-radius: 999px; font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px;
+  padding: 7px 15px; border-radius: var(--radius-s); font-family: inherit;
   font-size: 0.84rem; font-weight: 700; cursor: pointer;
   color: var(--ink); background: var(--paginator-bg); border: 1px solid var(--line);
   transition: transform .16s cubic-bezier(.22, 1, .36, 1), border-color .16s ease, opacity .16s ease;
@@ -773,4 +792,98 @@ html[data-theme="dark"] [data-guide-title].is-guided {
   .analytics-guide-dot,
   .analytics-guide-close,
   .analytics-info { animation: none; transition: none; }
+}
+
+/* ---------- Story KPI strip (fragment from analytics_story_kpis.html) ---------- */
+/* Reserves room for the four tiles so the card never jumps while the totals
+   arrive over htmx. */
+.analytics-kpis-body { min-height: 172px; }
+.analytics-kpis { padding: 2px 0 10px; }
+
+.analytics-kpi-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: 10px 14px; margin: 0 0 12px;
+}
+.analytics-kpi-dates {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px;
+}
+
+/* A squared segmented control: one outline, flush cells, no pill. */
+.analytics-segmented {
+  display: inline-flex; margin: 0; padding: 0;
+  border: 1px solid var(--an-line); border-radius: var(--an-radius-sq);
+  overflow: hidden; background: var(--an-surface);
+}
+.analytics-seg {
+  appearance: none; border: 0; border-right: 1px solid var(--an-line);
+  background: transparent; color: var(--an-muted);
+  font-family: inherit; font-size: var(--an-text-s); font-weight: 700;
+  padding: 9px 15px; min-height: 44px; cursor: pointer;
+  transition: background-color var(--an-dur-micro) var(--an-ease-out),
+              color var(--an-dur-micro) var(--an-ease-out);
+}
+.analytics-seg:last-child { border-right: 0; }
+.analytics-seg:hover { color: var(--an-ink); background: var(--an-surface-sunken); }
+.analytics-seg.is-active { color: var(--an-on-accent); background: var(--an-accent-fill); }
+.analytics-seg:focus-visible { outline: 2px solid var(--an-focus); outline-offset: -2px; }
+
+.analytics-kpis-range {
+  margin: 0 0 10px; font-size: var(--an-text-xs); font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--an-muted);
+}
+
+.analytics-kpis-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px;
+}
+.analytics-kpi {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 16px; border: 1px solid var(--an-line);
+  border-radius: var(--an-radius-m); background: var(--an-surface);
+}
+.analytics-kpi-label {
+  margin: 0; font-size: 0.7rem; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--an-muted);
+}
+.analytics-kpi-value {
+  margin: 0; font-size: var(--an-num); font-weight: 800;
+  line-height: 1; letter-spacing: -0.02em; color: var(--an-ink);
+  font-variant-numeric: tabular-nums;
+}
+.analytics-kpi-foot {
+  margin: 0; display: flex; align-items: center; flex-wrap: wrap;
+  gap: 6px 8px; font-size: var(--an-text-xs); color: var(--an-muted);
+}
+
+/* Delta chip: a signed number plus a direction triangle, so the meaning is
+   never carried by colour alone. */
+.analytics-delta {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 8px; border-radius: var(--an-radius-sq);
+  font-size: var(--an-text-xs); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.analytics-delta::before {
+  content: ""; width: 0; height: 0;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+}
+.analytics-delta.is-up { color: var(--an-positive); background: var(--an-positive-wash); }
+.analytics-delta.is-up::before { border-bottom: 5px solid currentColor; }
+.analytics-delta.is-down { color: var(--an-negative); background: var(--an-negative-wash); }
+.analytics-delta.is-down::before { border-top: 5px solid currentColor; }
+.analytics-delta.is-flat { color: var(--an-muted); background: var(--an-surface-sunken); }
+.analytics-delta.is-flat::before { width: 8px; height: 2px; border: 0; background: currentColor; }
+
+.analytics-kpis-empty { margin: 12px 0 0; font-size: 0.86rem; color: var(--an-muted); }
+
+@media (max-width: 640px) {
+  .analytics-kpi-controls { gap: 10px; }
+  .analytics-segmented { width: 100%; }
+  .analytics-seg { flex: 1 1 0; padding: 9px 8px; }
+  .analytics-kpi-dates { width: 100%; }
+  .analytics-kpis-list { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .analytics-seg { transition: none; }
 }

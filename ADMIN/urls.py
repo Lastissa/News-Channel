@@ -29,6 +29,7 @@ urlpatterns = [
     path("panel/analytics/story-search/", views.AnalyticsStorySearchView.as_view(), name="analytics_story_search"),
     path("panel/analytics/members/", views.AnalyticsMembersView.as_view(), name="analytics_members"),
     path("panel/analytics/reading/", views.AnalyticsReadingView.as_view(), name="analytics_reading"),
+    path("panel/analytics/story-kpis/", views.AnalyticsStoryKpisView.as_view(), name="analytics_story_kpis"),
     path("panel/analytics/week/", views.AnalyticsWeekStoriesView.as_view(), name="member_week_stories"),
     path("panel/analytics/staff/", views.StaffLyticsView.as_view(), name="staff_lytics"),
     path("panel/analytics/author/", views.AuthorLyticsView.as_view(), name="author_lytics"),

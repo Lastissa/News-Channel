@@ -11,6 +11,36 @@ html[data-theme="dark"] {
   --panel-staff-bg: #17283F;      /* dark theme gets its own, the light one would glare */
 }
 
+/* ---------- Light-mode contrast ----------
+   In light mode the shared theme tokens resolve to a 12% hairline, near-white
+   fills and a light slate, so the panel washed out on white paper. Inside the
+   panel only (the site header and footer keep the originals) re-point those
+   faint tokens to solid, visible colours and give the controls a real surface. */
+html[data-theme="light"] .panel-shell {
+  --line: #D2D8E1;              /* solid rule, was rgba(14, 27, 44, 0.12) */
+  --paper-dim: #EDF1F6;         /* real hover fill, was #fefbff */
+  --paginator-bg: #E6EAF1;      /* solid chip / avatar fill, was rgba(15, 23, 42, 0.06) */
+  --slate: #45566B;             /* readable muted text, was #5B6B7C */
+  --input-fill: #FFFFFF;
+}
+html[data-theme="light"] .panel-card { background: var(--surface); }
+html[data-theme="light"] .panel-icon-btn,
+html[data-theme="light"] .panel-pager button,
+html[data-theme="light"] .panel-recipient-result-row button,
+html[data-theme="light"] .panel-gallery-load-more {
+  background: #F3F6FB;
+  border-color: #C6CEDB;
+}
+html[data-theme="light"] .panel-toggle-chip:not(.is-active) {
+  background: #F3F6FB;
+  border-color: #C6CEDB;
+}
+html[data-theme="light"] .panel-icon-danger {
+  background: #FBEDE9;
+  border-color: #E7C3B9;
+}
+html[data-theme="light"] .panel-badge-danger { background: #F7E4DF; }
+
 html { scroll-behavior: smooth; }
 
 /* ---------- Icons ---------- */
@@ -157,6 +187,15 @@ html { scroll-behavior: smooth; }
   clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
 }
 .panel-eyebrow:empty { display: none; }
+
+/* Staff total, sitting next to the add-staff icon in the directory header */
+.panel-staff-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 26px; padding: 0 8px;
+  font-size: 0.76rem; font-weight: 700; line-height: 1;
+  color: var(--ink); background: var(--paginator-bg);
+  border: 1px solid var(--line); border-radius: 999px;
+}
 
 /* Collapse: animates height without measuring it (grid rows 1fr -> 0fr) */
 .panel-collapse {
@@ -430,6 +469,8 @@ html { scroll-behavior: smooth; }
      instead of pushing the Save button past the clip edge. */
   .panel-shell { padding: 0 0 48px; }
   .panel-nav { margin: 0 0 16px; padding: 6px 12px; }
+  /* Keep the lytics buttons off the screen edge. */
+  .panel-analytics-group { margin: 0 5px 16px; }
   .panel-grid { gap: 14px; }
   .panel-card { padding: 12px; }
   .ta-layout { gap: 18px; }

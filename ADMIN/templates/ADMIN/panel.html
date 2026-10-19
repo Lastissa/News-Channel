@@ -83,13 +83,14 @@
 
   <div class="panel-grid">
 
-    <section class="panel-card panel-card-wide" id="panel-staff-gallery" aria-label="Staff directory">
+    <section class="panel-card panel-card-wide is-collapsed" id="panel-staff-gallery" aria-label="Staff directory">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
         <h2>Staff</h2>
         <div class="panel-card-header-actions">
           <a href="{% url 'control:staff_create' %}" class="panel-icon-btn" aria-label="Add staff" title="Add staff"><svg class="ic" aria-hidden="true"><use href="#i-user-plus"/></svg></a>
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Staff" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <span class="panel-staff-count" title="{{ gallery_total }} staff accounts">{{ gallery_total }}</span>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Staff" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
@@ -120,13 +121,13 @@
       </div></div>
     </section>
 
-    <section class="panel-card panel-card-wide" id="panel-announcements" aria-label="Announcements">
+    <section class="panel-card panel-card-wide is-collapsed" id="panel-announcements" aria-label="Announcements">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></span>
         <h2>Announcements</h2>
         <span class="panel-eyebrow" data-ann-total></span>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Announcements" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Announcements" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
@@ -166,13 +167,13 @@
       </div></div>
     </section>
 
-    <section class="panel-card panel-card-wide" id="panel-image-adverts" aria-label="Image adverts">
+    <section class="panel-card panel-card-wide is-collapsed" id="panel-image-adverts" aria-label="Image adverts">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg></span>
         <h2>Image adverts</h2>
         <span class="panel-eyebrow" data-ad-total></span>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Image adverts" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Image adverts" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
@@ -221,12 +222,12 @@
       </div></div>
     </section>
 
-    <section class="panel-card" id="panel-mass-email" aria-label="Send mass email">
+    <section class="panel-card is-collapsed" id="panel-mass-email" aria-label="Send mass email">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg></span>
         <h2>Mass email</h2>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Mass email" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Mass email" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
@@ -267,13 +268,13 @@
       </div></div>
     </section>
 
-    <section class="panel-card" id="panel-sessions" aria-label="Active sessions">
+    <section class="panel-card is-collapsed" id="panel-sessions" aria-label="Active sessions">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg></span>
         <h2>Active Logins</h2>
         <span class="panel-eyebrow">{{ sessions_total_people }}</span>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Sessions" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Sessions" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
@@ -314,12 +315,12 @@
       </div></div>
     </section>
 
-    <section class="panel-card" id="panel-socials" aria-label="Site socials">
+    <section class="panel-card is-collapsed" id="panel-socials" aria-label="Site socials">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg></span>
         <h2>Socials and contacts</h2>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Socials and contacts" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Socials and contacts" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
@@ -362,13 +363,13 @@
       </div></div>
     </section>
 
-    <section class="panel-card" id="panel-categories" aria-label="News categories">
+    <section class="panel-card is-collapsed" id="panel-categories" aria-label="News categories">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg></span>
         <h2>Categories</h2>
         <span class="panel-eyebrow" data-category-total>{{ category_rows|length }}</span>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Categories" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Categories" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">
@@ -395,12 +396,12 @@
       </div></div>
     </section>
 
-    <section class="panel-card panel-card-wide" id="panel-speciality" aria-label="Search staff by speciality">
+    <section class="panel-card panel-card-wide is-collapsed" id="panel-speciality" aria-label="Search staff by speciality">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span>
         <h2>Speciality</h2>
         <div class="panel-card-header-actions">
-          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="true" aria-label="Collapse Speciality" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Speciality" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
       </header>
       <div class="panel-collapse"><div class="panel-collapse-inner">

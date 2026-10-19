@@ -309,10 +309,13 @@
     var path = btn.querySelector("path");
     if (path) path.setAttribute("fill", saved ? "currentColor" : "none");
     var label = btn.querySelector(".bookmark-label");
-    if (label) {
-      label.textContent = saved ? "Bookmarked" : "Read later";
-      btn.setAttribute("aria-label", saved ? "Remove from bookmarks" : "Save story");
-    }
+    if (label) label.textContent = saved ? "Bookmarked" : "Read later";
+    /* A hint on hover for every chip, and a spoken label for screen readers,
+       both flipped with the saved state. The card chips also carry a visible
+       text label; the hero and story-page chips are icon-only, so this tooltip
+       is the only nudge they show. The profile toggle keeps its own wording. */
+    btn.setAttribute("aria-label", saved ? "Remove from bookmarks" : "Save story");
+    btn.setAttribute("title", saved ? "Click me to remove from history" : "Click me to read later");
     if (btn.classList.contains("profile-bookmark-toggle")) {
       btn.setAttribute("aria-label", saved ? "Remove bookmark" : "Save bookmark");
       btn.setAttribute("title", saved ? "Remove bookmark" : "Save bookmark");

@@ -8,6 +8,7 @@
 {% block extra_head %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
+  <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}">
 {% endblock %}
 
@@ -41,6 +42,24 @@
   </div>
 
   <div class="analytics-grid">
+
+    <section class="analytics-card" aria-labelledby="analytics-kpis-title"
+             data-guide-title="Story totals"
+             data-guide-text="Published and reads are counted inside the window you pick; the small chip compares it with the window just before, and appears only when there is something to compare against. Reads per story divides one by the other.">
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
+        <h2 id="analytics-kpis-title">Story totals</h2>
+      </header>
+      <div class="analytics-kpis-body" id="analytics-kpis-body"
+           hx-get="{% url 'control:analytics_story_kpis' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading totals&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
 
     <section class="analytics-card" aria-labelledby="analytics-stories-title"
              data-guide-title="Stories per week"
@@ -108,6 +127,84 @@
            hx-swap="innerHTML"
            aria-live="polite" aria-busy="true">
         <p class="analytics-loading">Loading reading&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
+
+    <section class="analytics-card" aria-labelledby="analytics-story-trends-title"
+             data-guide-title="Publishing vs reading"
+             data-guide-text="How much is published against how often stories are opened, per bucket. Only the story series appear here. Tick a series to show or hide it; a custom start and end date override the range preset.">
+      {% comment %}The same Trends chart the Member lytics page uses, but the
+         legend offers only the two series that belong to stories. The chart
+         body includes this form on load so the first paint plots exactly the
+         ticked series instead of every series the endpoint knows.{% endcomment %}
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
+        <h2 id="analytics-story-trends-title">Publishing vs reading</h2>
+      </header>
+
+      <form class="analytics-controls"
+            id="analytics-story-trends-form"
+            hx-get="{% url 'control:analytics_trends' %}"
+            hx-target="#analytics-story-trends-body"
+            hx-swap="innerHTML"
+            hx-trigger="change, submit"
+            data-guide-title="Trend controls"
+            data-guide-text="Pick a bucket (per day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
+        <input type="hidden" name="submitted" value="1">
+
+        <div class="analytics-filter-row">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Time frame</span>
+            <select name="bucket">
+              {% for value, label in trend_buckets %}
+              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Range</span>
+            <select name="range">
+              {% for value, label in trend_ranges %}
+              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Start from</span>
+            <input type="date" name="start">
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">End</span>
+            <input type="date" name="end">
+          </label>
+
+          <button type="submit" class="analytics-apply">Apply</button>
+        </div>
+
+        <fieldset class="analytics-series">
+          <legend class="panel-sr">Series to plot</legend>
+          {% for meta in series_meta %}
+          <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
+            <input type="checkbox" name="series" value="{{ meta.key }}" checked>
+            <span class="analytics-series-swatch" aria-hidden="true"></span>
+            <span>{{ meta.name }}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+      </form>
+
+      <div class="analytics-chart-body" id="analytics-story-trends-body"
+           hx-get="{% url 'control:analytics_trends' %}"
+           hx-include="#analytics-story-trends-form"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading chart&hellip;</p>
       </div>
     </section>
 

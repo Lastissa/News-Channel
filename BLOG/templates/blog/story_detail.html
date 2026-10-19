@@ -81,7 +81,8 @@
                 data-endpoint="{% url 'home:bookmark' blog.id %}"
                 data-saved="{% if is_bookmarked %}true{% else %}false{% endif %}"
                 aria-pressed="{% if is_bookmarked %}true{% else %}false{% endif %}"
-                aria-label="Save story">
+                aria-label="{% if is_bookmarked %}Remove from bookmarks{% else %}Save story{% endif %}"
+                title="{% if is_bookmarked %}Click me to remove from history{% else %}Click me to read later{% endif %}">
           <svg viewBox="0 0 20 20" class="bookmark-icon" aria-hidden="true">
             <path d="M5 3.5h10a1 1 0 011 1V18l-6-3.6L4 18V4.5a1 1 0 011-1z" fill="{% if is_bookmarked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
           </svg>

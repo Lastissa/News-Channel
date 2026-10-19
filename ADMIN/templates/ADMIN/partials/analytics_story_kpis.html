@@ -1,0 +1,89 @@
+{% comment %}
+  htmx fragment: the Story lytics KPI strip.
+
+  Real totals over one window: what was published, how often those stories
+  were opened, the reads per story, and the current never-viewed backlog.
+  Each window figure can carry a delta against the previous window of the
+  same length, shown only when that earlier window had data. Returned by
+  control:analytics_story_kpis and never rendered into the shell.
+{% endcomment %}
+<div class="analytics-kpis"
+     data-guide-title="Story totals"
+     data-guide-text="Published and reads are counted inside the chosen window; the delta compares it with the window just before, so it appears only when there is something to compare against. Reads per story divides one by the other. Cold stories are older than a week and still unread.">
+  <div class="analytics-kpi-controls">
+    <form class="analytics-segmented"
+          role="group" aria-label="Date range"
+          hx-get="{% url 'control:analytics_story_kpis' %}"
+          hx-target="#analytics-kpis-body"
+          hx-swap="innerHTML"
+          hx-trigger="submit">
+      {% for value, label in kpi_ranges %}
+      <button type="submit" name="range" value="{{ value }}"
+              class="analytics-seg an-press{% if value == range and not start_value %} is-active{% endif %}"
+              aria-pressed="{% if value == range and not start_value %}true{% else %}false{% endif %}">{{ label }}</button>
+      {% endfor %}
+    </form>
+
+    <form class="analytics-kpi-dates"
+          hx-get="{% url 'control:analytics_story_kpis' %}"
+          hx-target="#analytics-kpis-body"
+          hx-swap="innerHTML"
+          hx-trigger="change, submit">
+      <label class="analytics-select">
+        <span class="analytics-select-label">Start from</span>
+        <input type="date" name="start" value="{{ start_value }}">
+      </label>
+      <label class="analytics-select">
+        <span class="analytics-select-label">End</span>
+        <input type="date" name="end" value="{{ end_value }}">
+      </label>
+      <button type="submit" class="analytics-apply an-press">Apply</button>
+    </form>
+  </div>
+
+  <p class="analytics-kpis-range">{{ range_label }} &middot; {{ display_range }}</p>
+
+  <ul class="analytics-kpis-list">
+    <li class="analytics-kpi">
+      <p class="analytics-kpi-label">Published</p>
+      <p class="analytics-kpi-value">{{ published}}</p>
+      <p class="analytics-kpi-foot">
+        {% if published_delta %}
+        <span class="analytics-delta {{ published_delta.tone }}" aria-label="{{ published_delta.label }}">{{ published_delta.display }}</span>
+        <span>against the previous period</span>
+        {% else %}
+        <span>No earlier period to compare.</span>
+        {% endif %}
+      </p>
+    </li>
+
+    <li class="analytics-kpi">
+      <p class="analytics-kpi-label">Reads</p>
+      <p class="analytics-kpi-value">{{ reads}}</p>
+      <p class="analytics-kpi-foot">
+        {% if reads_delta %}
+        <span class="analytics-delta {{ reads_delta.tone }}" aria-label="{{ reads_delta.label }}">{{ reads_delta.display }}</span>
+        <span>against the previous period</span>
+        {% else %}
+        <span>No earlier period to compare.</span>
+        {% endif %}
+      </p>
+    </li>
+
+    <li class="analytics-kpi">
+      <p class="analytics-kpi-label">Reads per story</p>
+      <p class="analytics-kpi-value">{{ reads_per_story}}</p>
+      <p class="analytics-kpi-foot"><span>Reads divided by stories published.</span></p>
+    </li>
+
+    <li class="analytics-kpi">
+      <p class="analytics-kpi-label">Cold stories</p>
+      <p class="analytics-kpi-value">{{ cold_total}}</p>
+      <p class="analytics-kpi-foot"><span>Older than a week, never read.</span></p>
+    </li>
+  </ul>
+
+  {% if not published and not reads %}
+  <p class="analytics-kpis-empty">Nothing was published or read in this window.</p>
+  {% endif %}
+</div>

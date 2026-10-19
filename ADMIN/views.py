@@ -53,6 +53,8 @@ from ADMIN.analytics import (
     MEMBER_NEWSLETTER_CHOICES,
     MEMBER_STATE_CHOICES,
     SERIES_META,
+    STORY_KPI_RANGE_CHOICES,
+    STORY_KPI_RANGES,
     STORY_PERFORMANCE_SERIES,
     STORY_PERIODS,
     STORY_PERIOD_CHOICES,
@@ -68,6 +70,7 @@ from ADMIN.analytics import (
     reading_editorial,
     stories_overview,
     stories_per_week,
+    story_kpis,
     story_performance,
     story_search,
     trends,
@@ -767,6 +770,7 @@ class PanelView(View):
                 "announcement_items": _announcement_items(),
                 "image_advert_items": _image_advert_items(),
                 "gallery_items": staff_directory_rows(list(gallery_page.object_list)),
+                "gallery_total": gallery_paginator.count,
                 "gallery_has_next": gallery_page.has_next(),
                 "gallery_next_page": gallery_page.next_page_number() if gallery_page.has_next() else None,
                 "sessions_rows": sessions_rows,
@@ -1074,6 +1078,30 @@ class AnalyticsReadingView(View):
         )
 
 
+class AnalyticsStoryKpisView(View):
+    """htmx fragment: the Story lytics KPI strip.
+
+    Read only and admin only, like every other figure endpoint. The range is
+    validated against the preset list and an unknown value falls back, exactly
+    like the Reading card, so a hand typed querystring cannot widen the window.
+    A custom start/end pair overrides the preset inside story_kpis().
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        if selected_range not in STORY_KPI_RANGES:
+            selected_range = DEFAULT_TREND_RANGE
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+
+        context = story_kpis(selected_range, start_iso, end_iso)
+        context["kpi_ranges"] = STORY_KPI_RANGE_CHOICES
+        return render(request, "ADMIN/partials/analytics_story_kpis.html", context)
+
+
 class StaffLyticsView(View):
     """Placeholder for the staff chamber of analytics (not built yet)."""
 
@@ -1139,6 +1167,11 @@ class StoryLyticsView(View):
                 "default_trend_bucket": DEFAULT_TREND_BUCKET,
                 "trend_ranges": TREND_RANGE_CHOICES,
                 "default_trend_range": DEFAULT_TREND_RANGE,
+                #   Only the two series that belong to stories: how much is
+                #   published and how often stories are opened. The Trends
+                #   endpoint draws exactly what the legend has ticked.
+                "series_meta": [meta for meta in SERIES_META if meta["key"] in {"stories", "views"}],
+                "story_kpi_ranges": STORY_KPI_RANGE_CHOICES,
                 "story_performance_series": STORY_PERFORMANCE_SERIES,
                 "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
             },

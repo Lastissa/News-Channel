@@ -1191,6 +1191,128 @@ class AnalyticsReadingTests(TestCase):
         self.assertIn("Published vs read", body)
 
 
+class AnalyticsStoryKpisTests(TestCase):
+    """The Story lytics KPI strip (control:analytics_story_kpis).
+
+    Four real totals over one window: published, reads, reads per story and the
+    current cold backlog. The two windowed figures can only carry a delta when
+    the period before them had data, so an empty history shows no chip at all
+    rather than a fall invented out of nothing.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="story-kpis-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="story-kpis-writer@example.com")
+        self.member = Auth.objects.create_user(email="story-kpis-member@example.com")
+
+        self.url = reverse("control:analytics_story_kpis")
+
+    def make_story(self, heading, category="NEWS", age_days=0, views=0):
+        story = Blog.objects.create(
+            author=self.writer, heading=heading, category=category,
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        #   Pinned by hand: auto_now_add would file every fixture under "now".
+        Blog.objects.filter(pk=story.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days), views=views
+        )
+        return story
+
+    def add_view(self, story, age_days=0):
+        view = StoryView.objects.create(blog=story)
+        StoryView.objects.filter(pk=view.pk).update(created_at=timezone.now() - timedelta(days=age_days))
+        return view
+
+    #   ------------------------------------------------------------ access
+    def test_the_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    #   ------------------------------------------------------------ shell
+    def test_the_shell_ships_the_target_but_never_the_figures(self):
+        self.client.force_login(self.admin)
+        shell = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("analytics-kpis-body", shell)
+        self.assertNotIn("analytics-kpi-value", shell)
+        self.assertNotIn("analytics-kpis-range", shell)
+
+    def test_the_strip_ships_the_four_real_tiles(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "7d"}).content.decode()
+        for label in ["Published", "Reads", "Reads per story", "Cold stories"]:
+            with self.subTest(label=label):
+                self.assertIn(label, body)
+        #   the segmented control is squared markup, and copy stays free of em
+        #   dashes project wide
+        self.assertIn("analytics-segmented", body)
+        self.assertNotIn("\u2014", body)
+
+    #   ------------------------------------------------------------ deltas
+    def test_a_delta_only_appears_when_the_previous_window_had_data(self):
+        #   One story and one read a fortnight ago (the previous 7 day window),
+        #   two stories inside the current one: published up, reads down.
+        earlier = self.make_story("KPI earlier story", age_days=10)
+        self.add_view(earlier, age_days=10)
+        self.make_story("KPI current one", age_days=0)
+        self.make_story("KPI current two", age_days=1)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "7d"}).content.decode()
+        self.assertIn('class="analytics-delta is-up"', body)
+        self.assertIn('class="analytics-delta is-down"', body)
+        self.assertIn("against the previous period", body)
+
+        #   A window whose earlier half is empty carries no chip at all.
+        wide = self.client.get(self.url, {"range": "90d"}).content.decode()
+        self.assertNotIn("analytics-delta", wide)
+        self.assertIn("No earlier period to compare.", wide)
+
+    #   ------------------------------------------------------------ windows
+    def test_an_unknown_range_falls_back_to_the_default(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "banana"}).content.decode()
+        self.assertIn("Last 30 days", body)
+
+    def test_a_custom_pair_overrides_the_preset_and_activates_no_segment(self):
+        today = timezone.localdate()
+        start = (today - timedelta(days=3)).isoformat()
+        end = today.isoformat()
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "7d", "start": start, "end": end}).content.decode()
+        self.assertIn("Custom range", body)
+        self.assertNotIn("is-active", body)
+        #   the typed dates come back, so the boxes keep what was entered
+        self.assertIn('value="%s"' % start, body)
+        self.assertIn('value="%s"' % end, body)
+
+    def test_published_and_reads_are_windowed_not_all_time(self):
+        #   The stale story sits outside seven days but inside ninety, so the
+        #   published tile has to move with the range instead of holding an
+        #   all-time figure.
+        self.make_story("KPI stale story", age_days=40)
+        recent = self.make_story("KPI fresh story", age_days=0)
+        self.add_view(recent)
+
+        self.client.force_login(self.admin)
+        seven = self.client.get(self.url, {"range": "7d"}).content.decode()
+        wide = self.client.get(self.url, {"range": "90d"}).content.decode()
+
+        #   published / reads / reads-per-story / cold all read one in the short
+        #   window, then published becomes two while reads stays at one
+        self.assertEqual(seven.count('analytics-kpi-value">1<'), 4)
+        self.assertIn('analytics-kpi-value">2<', wide)
+        self.assertNotIn('analytics-kpi-value">2<', seven)
+
+
 class AnalyticsMembersGrowthTests(TestCase):
     """The "Members over time" running-total line chart (control:member_growth).
 

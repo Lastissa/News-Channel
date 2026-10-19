@@ -725,6 +725,98 @@ def reading_editorial(selected_range):
 
 
 #   -------------------------------------------------------------------------
+#   STORY KPI STRIP -- the totals above the Story lytics cards
+#   -------------------------------------------------------------------------
+#   Published and reads are counted over one window (a preset range or a custom
+#   start/end pair), and each carries a delta against the window immediately
+#   before it. The delta is only produced when that earlier window had data, so
+#   a fresh install never shows a fall invented out of nothing.
+
+STORY_KPI_RANGE_CHOICES = [
+    ("7d", "7 days"),
+    ("30d", "30 days"),
+    ("90d", "90 days"),
+]
+STORY_KPI_RANGES = tuple(value for value, _ in STORY_KPI_RANGE_CHOICES)
+
+
+def _safe_count(queryset):
+    """Count a queryset, or 0 while its table is still unmigrated.
+
+    StoryView is the only table this guards, matching _safe_values and
+    _safe_rows: ANALYTICS must show a zero, not a 500, before its migration.
+    """
+    try:
+        with transaction.atomic():
+            return queryset.count()
+    except DatabaseError:
+        return 0
+
+
+def _story_reads(start, end=None):
+    """Story-open events in [start, end), the same source the charts count."""
+    queryset = StoryView.objects.filter(created_at__gte=start)
+    if end is not None:
+        queryset = queryset.filter(created_at__lt=end)
+    return _safe_count(queryset)
+
+
+def _delta_chip(current, previous):
+    """A signed delta against the previous window, or None when it was empty."""
+    if not previous:
+        return None
+    diff = current - previous
+    tone = "is-up" if diff > 0 else ("is-down" if diff < 0 else "is-flat")
+    display = f"+{diff}" if diff > 0 else (f"-{abs(diff)}" if diff < 0 else "0")
+    return {
+        "display": display,
+        "tone": tone,
+        "label": f"Change against the previous period: {display}",
+    }
+
+
+def story_kpis(selected_range, start_iso=None, end_iso=None):
+    """The Story lytics KPI strip: published, reads, reads per story, cold.
+
+    Published and reads share the chosen window, so the ratio between them is
+    honest. "Cold" is the current never-viewed backlog: a running figure, not a
+    windowed one, so it is never set against a previous period.
+    """
+    now = timezone.localtime()
+    custom = _custom_window(start_iso, end_iso)
+    if custom is not None:
+        start, end_exclusive = custom
+        span = end_exclusive - start
+    else:
+        range_days = TREND_RANGES.get(selected_range, TREND_RANGES[DEFAULT_TREND_RANGE])
+        start = _local_midnight(now - timedelta(days=range_days - 1))
+        end_exclusive = None
+        span = now - start
+
+    published = _stories_published(start, end_exclusive)
+    reads = _story_reads(start, end_exclusive)
+
+    previous_start = start - span
+    previous_published = _stories_published(previous_start, start)
+    previous_reads = _story_reads(previous_start, start)
+
+    last_day = (end_exclusive - timedelta(days=1)) if end_exclusive is not None else now
+    return {
+        "range": selected_range,
+        "range_label": "Custom range" if custom is not None else _range_label(selected_range),
+        "display_range": _fmt_range(start, last_day),
+        "start_value": (start_iso or "").strip(),
+        "end_value": (end_iso or "").strip(),
+        "published": published,
+        "reads": reads,
+        "reads_per_story": round(reads / published) if published else 0,
+        "cold_total": _cold_stories(now)["total"],
+        "published_delta": _delta_chip(published, previous_published),
+        "reads_delta": _delta_chip(reads, previous_reads),
+    }
+
+
+#   -------------------------------------------------------------------------
 #   STORY PERFORMANCE -- one story's views / likes / comments over a window
 #   -------------------------------------------------------------------------
 #   The reader picks a single story and overlays the three signals on one line

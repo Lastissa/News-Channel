@@ -401,6 +401,25 @@
   document.addEventListener("htmx:afterSwap", renderAll);
   document.addEventListener("htmx:afterSettle", renderAll);
 
+  /* An aria-live fragment body starts out aria-busy while its first load is in
+     flight, but nothing ever cleared it: the region stayed busy forever, so a
+     screen reader skipped the very figures it was waiting for. Busy is raised
+     again on the real swap target whenever a refresh goes out, and dropped as
+     soon as the new markup lands. Charts also clear their own body once drawn,
+     which this makes redundant rather than conflicting. */
+  document.addEventListener("htmx:configRequest", function (event) {
+    var target = event.detail && event.detail.target;
+    if (target && target.hasAttribute && target.hasAttribute("aria-busy")) {
+      target.setAttribute("aria-busy", "true");
+    }
+  });
+  document.addEventListener("htmx:afterSettle", function (event) {
+    var target = event.detail && event.detail.elt;
+    if (target && target.hasAttribute && target.hasAttribute("aria-busy")) {
+      target.setAttribute("aria-busy", "false");
+    }
+  });
+
   window.addEventListener("resize", onViewportChange);
   window.addEventListener("orientationchange", onViewportChange);
 

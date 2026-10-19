@@ -1,0 +1,233 @@
+/* ==========================================================================
+   analytics-tokens.css - shared design tokens for the two analytics chambers
+   (Member lytics and Story lytics).
+
+   Stage 1 of the analytics redesign. This file owns the token layer only:
+   colour roles, radii, elevation, motion durations and easings, the fluid
+   spacing and type scales, and the shared motion utilities. It is read-only
+   to the per-page stylesheets, which consume the tokens but never redefine
+   them.
+
+   Everything derives from HOME/static/home/css/base.css so the newsroom's
+   paper-and-ink identity carries into the instruments. Light is the default;
+   dark re-points the same roles under html[data-theme="dark"]. No raw colour
+   is invented beyond the status roles the reference asks for, and every
+   status role pairs a text colour with a wash so a chip never signals by
+   colour alone.
+   ========================================================================== */
+
+.analytics-shell {
+  /* --- Surface and ink -------------------------------------------------- */
+  --an-surface: var(--surface);
+  --an-surface-2: var(--paper-dim);
+  --an-surface-sunken: var(--input-fill);
+  --an-ink: var(--ink);
+  --an-ink-soft: var(--ink-soft);
+  --an-muted: var(--slate);
+  --an-line: var(--line);
+  --an-line-strong: rgba(14, 27, 44, 0.24);
+
+  /* --- Accent: the site teal, kept as each chamber's single accent ------ */
+  --an-accent: #0B6E8A;
+  --an-accent-fill: #22D3EE;
+  --an-accent-wash: rgba(34, 211, 238, 0.16);
+  --an-on-accent: #04202A;
+  --an-focus: #0B6E8A;
+
+  /* --- Status roles: sign and shape carry meaning, not colour alone ----- */
+  --an-positive: #1F7A4D;
+  --an-positive-wash: rgba(31, 122, 77, 0.12);
+  --an-negative: #B3402A;
+  --an-negative-wash: rgba(179, 64, 42, 0.11);
+  --an-warning: #8A5300;
+  --an-warning-wash: rgba(232, 163, 36, 0.18);
+
+  /* --- Radius: squared controls, small clipped corners for labels ------- */
+  --an-radius-sq: 4px;
+  --an-radius: var(--radius-s);
+  --an-radius-m: var(--radius-m);
+  --an-radius-l: var(--radius-l);
+  --an-clip-tag: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+
+  /* --- Elevation -------------------------------------------------------- */
+  --an-shadow-1: var(--shadow-card);
+  --an-shadow-2: var(--shadow-raised);
+
+  /* --- Motion: 160 micro / 240 component / 340 panel, ease-out ---------- */
+  --an-dur-micro: 160ms;
+  --an-dur-comp: 240ms;
+  --an-dur-panel: 340ms;
+  --an-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --an-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --an-stagger: 40ms;
+
+  /* --- Fluid spacing and type ------------------------------------------ */
+  --an-gap-xs: clamp(6px, 0.6vw, 8px);
+  --an-gap-s: clamp(10px, 1vw, 14px);
+  --an-gap-m: clamp(14px, 1.6vw, 20px);
+  --an-gap-l: clamp(20px, 2.4vw, 32px);
+  --an-pad-card: clamp(14px, 1.6vw, 22px);
+  --an-text-xs: clamp(0.72rem, 0.68rem + 0.2vw, 0.8rem);
+  --an-text-s: clamp(0.82rem, 0.78rem + 0.2vw, 0.9rem);
+  --an-text-m: clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem);
+  --an-text-l: clamp(1.15rem, 1rem + 1vw, 1.5rem);
+  --an-text-xl: clamp(1.5rem, 1.2rem + 2vw, 2.25rem);
+  --an-num: clamp(1.6rem, 1.2rem + 2.4vw, 2.6rem);
+
+  /* --- Loading skeleton ------------------------------------------------- */
+  --an-sk-base: rgba(14, 27, 44, 0.08);
+  --an-sk-shine: rgba(14, 27, 44, 0.16);
+
+  color: var(--an-ink);
+  min-width: 0;
+}
+
+html[data-theme="dark"] .analytics-shell {
+  --an-line-strong: rgba(243, 239, 230, 0.28);
+  --an-accent: #22D3EE;
+  --an-accent-fill: #0B6E8A;
+  /* On the light theme the fill is a bright cyan, so the label sits dark on
+     it. The dark fill is a mid teal, which a near-black label only reaches
+     2.9:1 against, so the label flips to white here: 5.8:1. */
+  --an-on-accent: #FFFFFF;
+  --an-accent-wash: rgba(34, 211, 238, 0.22);
+  --an-focus: #22D3EE;
+  --an-positive: #4CC38A;
+  --an-positive-wash: rgba(76, 195, 138, 0.14);
+  --an-negative: #FF8876;
+  --an-negative-wash: rgba(255, 136, 118, 0.14);
+  --an-warning: #EDB35A;
+  --an-warning-wash: rgba(237, 179, 90, 0.16);
+  --an-sk-base: rgba(243, 239, 230, 0.08);
+  --an-sk-shine: rgba(243, 239, 230, 0.16);
+}
+
+/* Visible focus ring across the chambers. */
+.analytics-shell :focus-visible {
+  outline: 2px solid var(--an-focus);
+  outline-offset: 2px;
+}
+
+/* Shared helpers ----------------------------------------------------------- */
+
+/* A clipped-corner label, matching AGENT.MD's parallelogram rule. */
+.analytics-shell .an-tag {
+  display: inline-block;
+  padding: 2px 12px;
+  clip-path: var(--an-clip-tag);
+  background: var(--an-accent-wash);
+  color: var(--an-accent);
+  font-size: var(--an-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Skeleton block: reserve space so a loading swap never jumps. */
+.analytics-shell .an-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--an-sk-base) 25%,
+    var(--an-sk-shine) 37%,
+    var(--an-sk-base) 63%
+  );
+  background-size: 400% 100%;
+  border-radius: var(--an-radius-sq);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Staggered entrance, used on first paint only. Each element sets --an-i. */
+  .analytics-shell .an-reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: an-reveal var(--an-dur-comp) var(--an-ease-out) both;
+    animation-delay: calc(var(--an-i, 0) * var(--an-stagger));
+  }
+  @keyframes an-reveal {
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Row entrance for list and table rows as a page of results lands. */
+  .analytics-shell .an-row-in {
+    animation: an-row-in var(--an-dur-comp) var(--an-ease-out) both;
+    animation-delay: calc(var(--an-i, 0) * var(--an-stagger));
+  }
+  @keyframes an-row-in {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Panel and drawer slide plus scrim handled by the per-page stylesheets;
+     these are the shared keyframes they build on. */
+  .analytics-shell .an-slide-in {
+    animation: an-slide-in var(--an-dur-panel) var(--an-ease-out) both;
+  }
+  @keyframes an-slide-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+
+  .analytics-shell .an-sheet-up {
+    animation: an-sheet-up var(--an-dur-panel) var(--an-ease-out) both;
+  }
+  @keyframes an-sheet-up {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+
+  .analytics-shell .an-skeleton {
+    animation: an-shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes an-shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: 0 0;
+    }
+  }
+
+  /* Subtle press feedback for square controls. */
+  .analytics-shell .an-press {
+    transition: transform var(--an-dur-micro) var(--an-ease-out);
+  }
+  .analytics-shell .an-press:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Reduced motion: instant state changes, no shimmer, no slide. */
+@media (prefers-reduced-motion: reduce) {
+  .analytics-shell .an-reveal,
+  .analytics-shell .an-row-in,
+  .analytics-shell .an-slide-in,
+  .analytics-shell .an-sheet-up {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+  .analytics-shell .an-skeleton {
+    animation: none;
+  }
+}
