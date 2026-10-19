@@ -312,15 +312,126 @@
     if (label) label.textContent = saved ? "Bookmarked" : "Read later";
     /* A hint on hover for every chip, and a spoken label for screen readers,
        both flipped with the saved state. The card chips also carry a visible
-       text label; the hero and story-page chips are icon-only, so this tooltip
-       is the only nudge they show. The profile toggle keeps its own wording. */
+       text label; the hero and story-page chips are icon-only, so this hover
+       title (plus the one-time tip below on the story page) is the only nudge
+       they show. The profile toggle keeps its own wording. */
     btn.setAttribute("aria-label", saved ? "Remove from bookmarks" : "Save story");
-    btn.setAttribute("title", saved ? "Click me to remove from history" : "Click me to read later");
+    btn.setAttribute("title", saved
+      ? "Saved for later - click to remove"
+      : "Click me to save this story and read it later");
     if (btn.classList.contains("profile-bookmark-toggle")) {
       btn.setAttribute("aria-label", saved ? "Remove bookmark" : "Save bookmark");
       btn.setAttribute("title", saved ? "Remove bookmark" : "Save bookmark");
     }
   }
+
+  /* ---------- bookmark awareness tip (story pages only) ----------
+     On a story page the bookmark chip sits at the top left of the header and,
+     being icon-only, never says what it is for. On every load of a story page
+     (a refresh included) a short tip appears under it, reads for a moment,
+     then takes itself away after 3 seconds so it is never sitting over the
+     article while somebody is reading. Anything the reader does on purpose
+     retires it at once: tapping anywhere, scrolling the story, hovering or
+     focusing the chip, pressing Escape, or switching tabs. Never shown to a
+     reader who already saved this story, and marked aria-hidden because the
+     chip already carries "Save story" as its accessible name. */
+  (function () {
+    var TIP_DELAY_MS = 900;
+    var TIP_LIFETIME_MS = 3000;
+
+    var chip = document.querySelector(".story-article [data-bookmark-tip-anchor]");
+    if (!chip || chip.dataset.saved === "true") return;
+
+    var tip = null;
+    var showTimer = null;
+    var hideTimer = null;
+    var finished = false;
+
+    function listen(on) {
+      var method = on ? "addEventListener" : "removeEventListener";
+      window[method]("scroll", onScroll, { passive: true });
+      window[method]("resize", onResize);
+      window[method]("keydown", onKeydown);
+      document[method]("visibilitychange", onVisibility);
+      document[method]("click", onPointerActivity, true);
+      chip[method]("pointerenter", onPointerActivity);
+      chip[method]("focus", onPointerActivity);
+    }
+
+    /* Only a scroll made while the tip is on screen retires it; the scroll a
+       browser restores on a refresh must never count against it. */
+    function onScroll() {
+      if (tip) dismiss();
+    }
+
+    function onResize() {
+      if (tip) dismiss();
+    }
+
+    function onKeydown(event) {
+      if (event.key === "Escape") dismiss();
+    }
+
+    function onVisibility() {
+      if (document.hidden) dismiss();
+    }
+
+    /* Any deliberate pointer or focus move on the chip: it is being looked at
+       (and hover already reveals the chip's own title), so stop. */
+    function onPointerActivity() {
+      dismiss();
+    }
+
+    /* One exit for every case: before the tip is built this only cancels the
+       timer, afterwards it fades the node out and drops it. */
+    function dismiss() {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+      listen(false);
+      if (!tip) return;
+      var node = tip;
+      tip = null;
+      node.classList.remove("is-on");
+      window.setTimeout(function () { node.remove(); }, 240);
+    }
+
+    function place() {
+      var header = document.getElementById("site-header");
+      /* The site header is sticky, so never pin the tip underneath it. */
+      var ceiling = (header ? Math.max(0, header.getBoundingClientRect().bottom) : 0) + 12;
+      var rect = chip.getBoundingClientRect();
+      var room = window.innerWidth - tip.offsetWidth - 12;
+      var left = Math.min(Math.max(12, rect.left), Math.max(12, room));
+      /* A refresh restores the reader's scroll position, which can leave the
+         chip off screen: keep the reminder on screen rather than pointing at a
+         chip nobody can see. */
+      var top = Math.max(rect.bottom + 10, ceiling);
+      top = Math.min(top, Math.max(ceiling, window.innerHeight - tip.offsetHeight - 12));
+      tip.style.left = left + "px";
+      tip.style.top = top + "px";
+    }
+
+    function show() {
+      if (finished || !document.body.contains(chip)) return;
+      tip = document.createElement("span");
+      tip.className = "bookmark-tip";
+      tip.setAttribute("role", "presentation");
+      tip.setAttribute("aria-hidden", "true");
+      tip.textContent = "Tap the bookmark to save this story and read it later.";
+      document.body.appendChild(tip);
+      place();
+      /* Read a layout value back so the browser commits the starting state
+         before the class lands, otherwise the fade-in is coalesced away. */
+      void tip.offsetWidth;
+      tip.classList.add("is-on");
+      hideTimer = window.setTimeout(dismiss, TIP_LIFETIME_MS);
+    }
+
+    listen(true);
+    showTimer = window.setTimeout(show, TIP_DELAY_MS);
+  })();
 
   /* ---------- share: copy link, instant feedback ---------- */
   document.addEventListener("click", function (event) {

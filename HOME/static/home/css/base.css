@@ -1060,7 +1060,7 @@ body.dark .fab-btn, */
 a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 .story-separator { color: var(--slate); }
 .story-bookmark-chip {
-  width: auto; height: 30px; gap: 5px; padding: 0 9px; border-radius: 999px;
+  width: auto; height: 30px; gap: 5px; padding: 0 9px; border-radius: var(--radius-s);
   border-color: var(--line); background: var(--paper-dim); color: var(--ink-soft);
   font: inherit; letter-spacing: 0.06em; cursor: pointer;
 }
@@ -1068,6 +1068,29 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .story-bookmark-chip.is-saved { color: var(--amber-deep); border-color: var(--amber-deep); background: transparent; }
 .story-bookmark-chip.is-pending { opacity: 0.55; pointer-events: none; }
 .story-bookmark-chip .bookmark-icon { width: 14px; height: 14px; }
+
+/*  The "save it for later" nudge that introduces the bookmark chip on a story
+    page. interactions.js creates it, points it at the chip and takes it away
+    after a few seconds, so it must never sit in the way of a tap or a line of
+    text: no pointer events, no layout box of its own, and it only fades. */
+.bookmark-tip {
+  position: fixed; left: 12px; top: 0; z-index: 60;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--toast-fg); color: var(--toast-bg);
+  box-shadow: var(--shadow-raised);
+  font-size: 0.78rem; font-weight: 600; line-height: 1.35; letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.bookmark-tip.is-on { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .bookmark-tip { transition: none; transform: none; }
+}
 .story-header h1 {
   /* Article headlines use the same restrained newsroom sans as the interface. */
   font-family: var(--font-body); font-weight: 700;
@@ -2540,7 +2563,7 @@ html.nav-locked { overflow: hidden; }
   .tag { padding: 6px 14px; }
   .story-card-footer .bookmark-chip:not(.has-label) { width: 44px; height: 44px; }
   .story-card-footer .bookmark-chip.has-label { min-height: 44px; padding: 0 16px; }
-  .story-bookmark-chip { height: 40px; padding: 0 12px; }
+  .story-bookmark-chip { height: 44px; padding: 0 12px; }
   .comment-submit-btn { width: 100%; justify-content: center; }
   .comment-toolbar .comment-like-btn,
   .comment-toolbar .comment-delete-btn { height: 44px; min-width: 44px; }

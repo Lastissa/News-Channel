@@ -18,6 +18,7 @@ from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Comment
 from BLOG.views import parse_story_content, StoryDetailView, enhance_story_body
+from HOME.models import Bookmark
 from SERVICE_INTERNAL.abstract import is_bot_request
 from STAFF.models import StaffProfile
 
@@ -638,6 +639,47 @@ class StoryDetailRecommendationsMarkupTests(TestCase):
         self.assertNotIn(story.heading, content[content.index("author-latest-list"):])
         self.assertIn("story-rail-read-also", content)
         self.assertIn("story-rail-author", content)
+
+
+class StoryBookmarkHintTests(TestCase):
+    """The story page marks its bookmark chip as the anchor for the read-later
+    tip that interactions.js shows by itself, and must never invite a reader to
+    save a story they have already saved."""
+
+    def setUp(self):
+        self.author = Auth.objects.create_user(email="bookmark-hint@example.com", is_staff=True)
+        StaffProfile.objects.create(
+            auth=self.author,
+            gender="M",
+            full_name="Bookmark Hint Author",
+            get_blog_notification=False,
+        )
+        self.story = Blog.objects.create(
+            author=self.author,
+            category="GENERAL",
+            heading="Bookmark hint story",
+            content="First paragraph.\n\nSecond paragraph.",
+        )
+
+    def test_story_page_marks_the_chip_for_the_read_later_tip(self):
+        response = self.client.get(reverse("blog:story_detail", args=[self.story.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-bookmark-tip-anchor")
+        self.assertContains(response, "Click me to save this story and read it later")
+        self.assertContains(response, 'data-saved="false"')
+
+    def test_a_saved_story_offers_removal_instead(self):
+        reader = Auth.objects.create_user(email="bookmark-hint-reader@example.com")
+        Bookmark.objects.create(user=reader, blog=self.story)
+        self.client.force_login(reader)
+
+        response = self.client.get(reverse("blog:story_detail", args=[self.story.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-saved="true"')
+        self.assertContains(response, "Saved for later - click to remove")
+        self.assertNotContains(response, "Click me to save this story and read it later")
 
 
 class StoryHeroImageFallbackTests(TestCase):
