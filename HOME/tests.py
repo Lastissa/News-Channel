@@ -4,6 +4,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest import mock
 from urllib.parse import parse_qs, urlsplit
+from xml.etree import ElementTree
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
@@ -1967,6 +1968,56 @@ class LlmsTxtTests(QuietTestCase):
         self.assertContains(response, reverse("home:author_handbook"))
         self.assertContains(response, reverse("home:privacy_policy"))
         self.assertContains(response, "Story URLs look like")
+
+
+class StoryFeedTests(QuietTestCase):
+    """The RSS 2.0 and Atom 1.0 story feeds (HOME/views.RssFeedView and
+    AtomFeedView) plus the <link rel="alternate"> discovery tags in base.html."""
+
+    def setUp(self):
+        super().setUp()
+        self.author = make_staff()
+        self.story = make_story(self.author, heading="Feed story one")
+
+    def test_rss_feed_lists_the_newest_story(self):
+        response = self.client.get("/rss.xml")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("application/rss+xml"))
+        self.assertContains(response, "<rss")
+        self.assertContains(response, "<title>Feed story one</title>")
+        self.assertContains(response, reverse("blog:story_detail", args=[self.story.slug]))
+        self.assertContains(response, "<pubDate>")
+        #   Well-formed, not just shaped like XML: a real parser must accept it.
+        ElementTree.fromstring(response.content)
+
+    def test_atom_feed_lists_the_newest_story(self):
+        response = self.client.get("/atom.xml")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("application/atom+xml"))
+        self.assertContains(response, "<feed")
+        self.assertContains(response, "<entry>")
+        self.assertContains(response, "<title>Feed story one</title>")
+        ElementTree.fromstring(response.content)
+
+    def test_feed_puts_the_newest_story_first(self):
+        older = make_story(self.author, heading="Older feed story")
+        Blog.objects.filter(pk=older.pk).update(
+            date_created=timezone.now() - timedelta(days=3)
+        )
+
+        body = self.client.get("/rss.xml").content.decode()
+
+        self.assertLess(body.index("Feed story one"), body.index("Older feed story"))
+
+    def test_pages_advertise_both_feeds(self):
+        response = self.client.get(reverse("home:about"))
+
+        self.assertContains(response, 'type="application/rss+xml"')
+        self.assertContains(response, 'type="application/atom+xml"')
+        self.assertContains(response, "/rss.xml")
+        self.assertContains(response, "/atom.xml")
 
 
 class ArchiveUploadAlertToggleTests(QuietTestCase):

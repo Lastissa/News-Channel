@@ -3,6 +3,7 @@ import logging
 import random
 from datetime import timedelta
 from urllib.parse import urlencode
+from xml.sax.saxutils import quoteattr
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, logout as auth_logout
@@ -14,6 +15,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Prefetch
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import Truncator, slugify
@@ -365,6 +367,7 @@ class LlmsTxtView(View):
             f"- [Advertise and partner with us]({domain}{reverse('home:promote')})",
             f"- [Author handbook]({domain}{reverse('home:author_handbook')}): the writing and formatting guide for our reporters.",
             f"- [Sitemap]({domain}/sitemap.xml): a machine-readable list of every story, category and portfolio.",
+            f"- [RSS feed]({domain}/rss.xml): the newest stories, newest first, in a standard feed.",
             f"- [Robots]({domain}/robots.txt)",
             "",
             f"Story URLs look like {domain}/story/<slug>-<id>/ and author portfolios look like "
@@ -401,6 +404,107 @@ class LlmsTxtView(View):
         ]
 
         return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
+
+
+class _FeedView(View):
+    """Shared builder for the story feeds at /rss.xml and /atom.xml.
+
+    RSS 2.0 and Atom 1.0 describe exactly the same thing -- the newest
+    published stories -- so the item list, the domain and the channel text are
+    built here once and only the XML wrapper differs (see
+    HOME/templates/HOME/rss.xml and atom.xml). Domain and catchphrase come
+    from the same editable config as robots.txt/sitemap.xml/llms.txt, so a
+    config change flows into the feeds too.
+
+    The author's StaffProfile is pulled in the same query as the story (no
+    N+1 for a page of items), and each story's summary is the same
+    _build_meta_description the story page uses for its own meta description,
+    so a feed reader sees the identical excerpt a search engine would."""
+
+    item_limit = 50
+    template_name = ""
+    feed_path = ""
+    content_type = "application/xml; charset=utf-8"
+
+    def _items(self, domain):
+        from ARCHIVE.templatetags.archive_extras import cloudinary_proxy
+        from BLOG.views import _build_meta_description
+
+        stories = (
+            Blog.objects.exclude(slug__isnull=True)
+            .exclude(slug="")
+            .select_related("author", "author__staffprofile")
+            .order_by("-date_created", "-pk")[: self.item_limit]
+        )
+
+        items = []
+        for story in stories:
+            url = f"{domain}{reverse('blog:story_detail', args=[story.slug])}"
+            title = story.heading or ""
+            summary = _build_meta_description(story.content, max_len=400) or title
+            #   A feed description may hold HTML, so the lead image is embedded
+            #   as a real <img>. quoteattr escapes the URL/alt for the attribute
+            #   and the "]]>" guard keeps a stray marker out of the RSS CDATA,
+            #   which is what actually breaks a feed file.
+            description_html = summary.replace("]]>", "]] >")
+            if story.image_1:
+                proxied = cloudinary_proxy(story.image_1)
+                image = f"{domain}{proxied}" if str(proxied).startswith("/") else str(proxied)
+                description_html = (
+                    f"<img src={quoteattr(image)} alt={quoteattr(title)}> {description_html}"
+                )
+
+            profile = getattr(story.author, "staffprofile", None)
+            author = (
+                profile.full_name
+                if profile and profile.full_name
+                else story.author.email.split("@")[0].title()
+            )
+
+            items.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "summary": summary,
+                    "description_html": description_html,
+                    "author": author,
+                    "category": story.get_category_display(),
+                    "published": story.date_created,
+                    "updated": story.last_updated or story.date_created,
+                }
+            )
+        return items
+
+    def get(self, request):
+        context_processors = custom_context_processors(request)
+        domain = (context_processors.get("site_domain") or About.domain).rstrip("/")
+        context = {
+            "project_name": context_processors.get("project_name") or About.project_name,
+            "catchphrase": context_processors.get("project_cachphrase") or About.project_cachphrase,
+            "domain": domain,
+            "feed_url": f"{domain}{self.feed_path}",
+            "logo": f"{domain}{static('logo.jpg')}",
+            "items": self._items(domain),
+        }
+        return render(request, self.template_name, context, content_type=self.content_type)
+
+
+class RssFeedView(_FeedView):
+    """RSS 2.0 feed of the newest stories, advertised at /rss.xml and linked
+    from every page's <head> via <link rel="alternate">."""
+
+    template_name = "HOME/rss.xml"
+    feed_path = "/rss.xml"
+    content_type = "application/rss+xml; charset=utf-8"
+
+
+class AtomFeedView(_FeedView):
+    """Atom 1.0 feed of the newest stories at /atom.xml. Same items as RSS,
+    kept because some readers and aggregators only speak Atom."""
+
+    template_name = "HOME/atom.xml"
+    feed_path = "/atom.xml"
+    content_type = "application/atom+xml; charset=utf-8"
 
 
 class FavicoView(View):

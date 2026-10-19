@@ -27,6 +27,9 @@
     <meta name="twitter:description" content="{% block twitter_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
     {% comment %} ONCE WE HAVE AN OFFICAL X HANDLE, I WILL ATTACH twitter:site HERE {% endcomment %}
     <link rel="icon" type="image/jpeg" href="{% static "logo.jpg" %}">
+    {% comment %} FEED DISCOVERY: the newest stories are syndicated as RSS 2.0 and Atom 1.0 (HOME.views.RssFeedView / AtomFeedView). Every page advertises both so readers and aggregators can auto-detect them. {% endcomment %}
+    <link rel="alternate" type="application/rss+xml" title="{{ project_name }} | Newest stories" href="{{ site_domain }}/rss.xml">
+    <link rel="alternate" type="application/atom+xml" title="{{ project_name }} | Newest stories" href="{{ site_domain }}/atom.xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <script>

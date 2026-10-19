@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+{% comment %}
+  RSS 2.0 feed of the newest stories (HOME.views.RssFeedView). Items are
+  ordered newest first and the same list feeds the Atom template, so the two
+  never drift. The lead image is embedded in <description> as HTML inside
+  CDATA (autoescape off) because RSS descriptions are HTML, not plain text.
+{% endcomment %}
+<rss version="2.0"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>{{ project_name }}</title>
+    <link>{{ domain }}/</link>
+    <description>{{ project_name }} | {{ catchphrase }} Latest verified news and reports across many genres, with a strong focus on Nigeria and Africa.</description>
+    <language>en-ng</language>
+    <lastBuildDate>{% now "r" %}</lastBuildDate>
+    <generator>{{ project_name }}</generator>
+    <atom:link href="{{ feed_url }}" rel="self" type="application/rss+xml"/>
+    <image>
+      <url>{{ logo }}</url>
+      <title>{{ project_name }}</title>
+      <link>{{ domain }}/</link>
+    </image>
+    {% for item in items %}
+    <item>
+      <title>{{ item.title }}</title>
+      <link>{{ item.url }}</link>
+      <guid isPermaLink="true">{{ item.url }}</guid>
+      <pubDate>{{ item.published|date:"r" }}</pubDate>
+      <dc:creator>{{ item.author }}</dc:creator>
+      <category>{{ item.category }}</category>
+      <description><![CDATA[{{ item.description_html|safe }}]]></description>
+    </item>
+    {% endfor %}
+  </channel>
+</rss>

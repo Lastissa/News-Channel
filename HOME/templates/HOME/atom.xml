@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+{% comment %}
+  Atom 1.0 feed of the newest stories (HOME.views.AtomFeedView). Built from
+  the same item list as rss.xml. Atom dates are RFC 3339 (the "c" format) and
+  the summary is escaped HTML, which is what type="html" expects.
+{% endcomment %}
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>{{ project_name }}</title>
+  <subtitle>{{ catchphrase }}</subtitle>
+  <link href="{{ domain }}/" rel="alternate" type="text/html"/>
+  <link href="{{ feed_url }}" rel="self" type="application/atom+xml"/>
+  <id>{{ domain }}/</id>
+  <updated>{% now "c" %}</updated>
+  <rights>{% now "Y" %} {{ project_name }}</rights>
+  <icon>{{ logo }}</icon>
+  <logo>{{ logo }}</logo>
+  <author>
+    <name>{{ project_name }}</name>
+    <uri>{{ domain }}/</uri>
+  </author>
+  {% for item in items %}
+  <entry>
+    <title>{{ item.title }}</title>
+    <link href="{{ item.url }}" rel="alternate" type="text/html"/>
+    <id>{{ item.url }}</id>
+    <published>{{ item.published|date:"c" }}</published>
+    <updated>{{ item.updated|date:"c" }}</updated>
+    <author><name>{{ item.author }}</name></author>
+    <category term="{{ item.category }}"/>
+    <summary type="html">{{ item.description_html }}</summary>
+  </entry>
+  {% endfor %}
+</feed>
