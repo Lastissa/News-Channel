@@ -13,6 +13,8 @@
   <style>
     /* Skeleton only: the polish lives in add-news.css (loaded by the light script below). Kept identical to add_news.html so both editors wear the same UI. */
     .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; font-weight:700;}
+    .editor-grace-note { margin: 0 0 14px; padding: 9px 13px; border: 1px solid var(--line); border-left: 4px solid var(--amber-alt); background: var(--input-fill); color: var(--ink-soft); font-size: 0.82rem; line-height: 1.45; }
+    .editor-grace-note strong { color: var(--ink); }
     .editor-shell { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; }
     .editor-toolbar { margin-bottom: 14px; }
     .editor-toolbar-main { display: flex; align-items: center; gap: 12px; }
@@ -64,7 +66,7 @@
          id="editor-shell"
          data-view="write"
          data-published="{{ blog.date_created|date:'j M Y' }}"
-         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261018-2"
+         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261019-1"
          data-heavy-js="{% static 'home/js/edit-news-editor.js' %}?v=20261012-4">
   <div class="editor-toolbar" data-editor-toolbar>
     <div class="editor-toolbar-main">
@@ -87,6 +89,8 @@
   </div>
 
   <p class="prompt">Clcik <a href="{% url "home:author_handbook" %}" target="_blank" rel="noopener noreferrer">HERE</a> for detailed guide.</p>
+
+  <p class="editor-grace-note" role="note"><strong>5 minute rule:</strong> an edit made within 5 minutes of publishing is saved, but it does not change the story's last modified time. After 5 minutes, any content or category change refreshes it.</p>
 
   <div class="editor-workspace">
     <div class="editor-pane editor-preview-pane">

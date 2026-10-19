@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -78,6 +79,15 @@ CONTINUE_COOLDOWN_STORY_MS = 60 * 60 * 1000  #   1 HOUR       # INSIDE THE STORY
 
 
 NOTFOUND_SUGGESTION_COUNT = 3  #   HOW MANY LATEST STORIES THE 404 PAGES SUGGEST
+
+#   FIVE MINUTE GRACE AFTER PUBLISHING (HOME.views.EditNewsView). Fixing a typo
+#   seconds after a story goes live is not a real update, so inside this window
+#   a category/body edit is still saved but it does NOT set `last_edited` (nor
+#   move `last_updated`). The reader facing "last updated" notice and the dates
+#   search engines are told about stay put, exactly like a banner only change.
+#   Both editors tell the author about this window (see add_news.html /
+#   edit_news.html) and the author handbook documents it.
+EDIT_GRACE_MINUTES = 5
 
 
 def latest_stories_for_404(limit=NOTFOUND_SUGGESTION_COUNT):
@@ -1208,7 +1218,9 @@ class EditNewsView(View):
 
     An edit that changes nothing is not saved, so `last_edited` (and with it
     the "this post was last updated ..." notice readers see on the story page)
-    only moves when something really changed.
+    only moves when something really changed. A real change made within
+    EDIT_GRACE_MINUTES of publishing (a typo fix) is saved too, but it keeps the
+    clock put: the story is still being finished, not updated.
     """
 
     def dispatch(self, request, *args, **kwargs):
@@ -1365,10 +1377,17 @@ class EditNewsView(View):
         #   dropdown works the same way: picking a new level (or turning the list
         #   off) is saved (the story page must render it) but it is a display
         #   choice, never an edit, so the last-published clock stays put.
+        #
+        #   A category or body change made within EDIT_GRACE_MINUTES of publishing
+        #   is the same story being finished, not updated, so it keeps both clocks
+        #   put as well: the save happens, only the public dates do not move.
         update_fields = ["image_1", "image_public_id", "image_info", "category", "content", "toc_mode"]
         if changed_content:
-            blog.last_edited = timezone.now()
-            update_fields += ["last_edited", "last_updated"]
+            now = timezone.now()
+            inside_grace = bool(blog.date_created) and (now - blog.date_created) < timedelta(minutes=EDIT_GRACE_MINUTES)
+            if not inside_grace:
+                blog.last_edited = now
+                update_fields += ["last_edited", "last_updated"]
         try:
             blog.save(update_fields=update_fields)
         except IntegrityError:

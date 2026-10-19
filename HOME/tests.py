@@ -246,6 +246,10 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "Do not begin the content with a")
         self.assertContains(response, "position: sticky")
         self.assertContains(response, "top: var(--header-h, 64px)")
+        #   The 5 minute grace window (HOME.views.EDIT_GRACE_MINUTES) is explained
+        #   to the author right above the workspace.
+        self.assertContains(response, "editor-grace-note")
+        self.assertContains(response, "5 minute rule")
 
     def test_formatting_guide_tells_authors_to_check_todays_news_first(self, _ping):
         response = self.client.get(self.url)
@@ -893,6 +897,11 @@ class EditNewsViewTests(QuietTestCase):
         super().setUp()
         self.author = make_staff()
         self.blog = make_story(self.author)
+        #   A normal edit happens well after publishing, so move `date_created`
+        #   back past the 5 minute grace window (HOME.views.EDIT_GRACE_MINUTES).
+        #   The tests about the window set their own date_created.
+        Blog.objects.filter(pk=self.blog.pk).update(date_created=timezone.now() - timedelta(minutes=30))
+        self.blog.refresh_from_db()
         self.url = reverse("home:edit_news", args=[self.blog.id])
         self.client.force_login(self.author)
 
@@ -941,6 +950,10 @@ class EditNewsViewTests(QuietTestCase):
         self.assertContains(response, 'value="Original caption."')
         self.assertContains(response, ">Original content.</textarea>")
         self.assertContains(response, '<option value="GENERAL" selected>')
+        #   The 5 minute grace window (HOME.views.EDIT_GRACE_MINUTES) is explained
+        #   to the author right above the workspace.
+        self.assertContains(response, "editor-grace-note")
+        self.assertContains(response, "5 minute rule")
         self.assertContains(response, static("home/js/edit-news-editor.js"))
         self.assertContains(response, static("home/css/add-news.css"))
         #   the heading input is disabled and has no name, so it can never be submitted
@@ -984,6 +997,32 @@ class EditNewsViewTests(QuietTestCase):
         self.assertEqual(self.blog.image_info, "New caption.")
         self.assertEqual(self.blog.category, "SCHOLARSHIP")
         self.assertEqual(self.blog.content, "Brand new content.")
+        self.assertIsNotNone(self.blog.last_edited)
+        self.assertGreater(self.blog.last_updated, before)
+
+    def test_a_content_edit_within_five_minutes_is_saved_without_moving_the_clocks(self, _ping):
+        #   A typo fixed right after publishing is the story being finished, not
+        #   updated: the body is saved, but `last_edited` and `last_updated` stay
+        #   put so readers and search engines still see the original time.
+        Blog.objects.filter(pk=self.blog.pk).update(date_created=timezone.now() - timedelta(minutes=4))
+        self.blog.refresh_from_db()
+        before = self.blog.last_updated
+
+        response = self.post(content="Fixed a typo.")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["changed"])
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.content, "Fixed a typo.")
+        self.assertIsNone(self.blog.last_edited)
+        self.assertEqual(self.blog.last_updated, before)
+
+    def test_a_content_edit_after_the_grace_window_moves_the_clocks(self, _ping):
+        #   setUp already aged the story past the window, so this is a real edit.
+        before = self.blog.last_updated
+        response = self.post(content="A real update.")
+        self.assertEqual(response.status_code, 200)
+        self.blog.refresh_from_db()
         self.assertIsNotNone(self.blog.last_edited)
         self.assertGreater(self.blog.last_updated, before)
 
@@ -1474,6 +1513,10 @@ class StoryUpdatedNoticeTests(QuietTestCase):
         self.assertNotContains(self.client.get(reverse("home:home")), "last updated")
 
     def test_editing_through_the_view_then_reading_shows_the_notice(self, _ping):
+        #   Age the story past the 5 minute grace window so this edit is a real
+        #   update (HOME.views.EDIT_GRACE_MINUTES). A fix made inside the window
+        #   is covered by test_a_quick_fix_after_publishing_shows_no_notice.
+        Blog.objects.filter(pk=self.blog.pk).update(date_created=timezone.now() - timedelta(hours=1))
         self.client.force_login(self.author)
         response = self.client.post(
             reverse("home:edit_news", args=[self.blog.id]),
@@ -1483,7 +1526,22 @@ class StoryUpdatedNoticeTests(QuietTestCase):
         self.client.logout()
 
         notices = list(self.story().context["messages"])
-        self.assertEqual(str(notices[0]), "This post was last updated less than a minute after its initial publication.")
+        self.assertEqual(str(notices[0]), "Last updated 1 hour after its initial publication.")
+
+    def test_a_quick_fix_after_publishing_shows_no_notice(self, _ping):
+        #   The story is brand new, so this edit lands inside the 5 minute window
+        #   and must not paint an "updated" notice on the reader's page.
+        self.client.force_login(self.author)
+        response = self.client.post(
+            reverse("home:edit_news", args=[self.blog.id]),
+            {"image_1": self.blog.image_1, "image_info": self.blog.image_info, "category": "GENERAL", "content": "Fixed a typo."},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.client.logout()
+
+        response = self.story()
+        self.assertEqual(list(response.context["messages"]), [])
+        self.assertNotContains(response, "story-edited")
 
 
 @mock.patch("HOME.views.ping_indexnow")

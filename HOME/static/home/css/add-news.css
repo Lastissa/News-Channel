@@ -113,6 +113,23 @@ html.editor-modal-open { overflow: hidden; }
 
 .editor-toc-note strong { color: var(--ink); }
 
+/* Five minute grace note. Both editors show it above the workspace so the
+   author knows up front that a fix made within 5 minutes of publishing is
+   saved but does not move the story's last modified time. The skeleton copy in
+   add_news.html / edit_news.html matches this rule for the pre-load paint. */
+.editor-grace-note {
+  margin: 0 0 14px;
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--amber-alt);
+  background: var(--input-fill);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.editor-grace-note strong { color: var(--ink); }
+
 .editor-field label {
   font-size: 0.74rem;
   font-weight: 700;
