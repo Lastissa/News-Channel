@@ -2488,8 +2488,10 @@
         entries.forEach(function (entry) {
           var video = entry.target;
           var figure = video.closest(".story-inline-video");
-          if (!figure || figure.dataset.videoSound !== "on") return;
-          video.muted = !entry.isIntersecting;
+          if (!figure) return;
+          if (figure.dataset.videoSound === "on") {
+            video.muted = !entry.isIntersecting;
+          }
           sync(video);
         });
       }, { threshold: IN_VIEW_RATIO });

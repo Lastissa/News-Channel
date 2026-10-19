@@ -106,6 +106,54 @@ __Please note:__ deadlines are strict.
         #   the trailing text becomes the caption
         self.assertIn("<figcaption>Crowd at the rally</figcaption>", html)
 
+    def test_a_video_token_with_a_youtube_link_renders_an_embed_iframe(self):
+        html = parse_story_content("vidc https://www.youtube.com/watch?v=dQw4w9WgXcQ Rally clip")
+
+        #   A YouTube address is a PAGE, not a video file: a <video> can never
+        #   play it (the browser fires an error and the old fallback clip
+        #   played), so it must be an <iframe> embed instead.
+        self.assertNotIn("<video", html)
+        self.assertIn('<iframe class="story-inline-video-embed"', html)
+        self.assertIn("https://www.youtube.com/embed/dQw4w9WgXcQ?", html)
+        self.assertIn("autoplay=1", html)
+        self.assertIn("mute=1", html)
+        self.assertIn("loop=1", html)
+        self.assertIn("playlist=dQw4w9WgXcQ", html)
+        self.assertIn("is-embed", html)
+        #   the provider draws its own controls, so the custom overlay is gone
+        self.assertNotIn("data-video-toggle", html)
+        self.assertNotIn("data-video-sound", html)
+        #   the trailing text still becomes the caption
+        self.assertIn("<figcaption>Rally clip</figcaption>", html)
+
+    def test_a_video_token_accepts_every_youtube_address_shape(self):
+        cases = {
+            "https://youtu.be/dQw4w9WgXcQ": "dQw4w9WgXcQ",
+            "https://m.youtube.com/watch?v=dQw4w9WgXcQ&t=30": "dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ": "dQw4w9WgXcQ",
+            "https://www.youtube.com/shorts/dQw4w9WgXcQ": "dQw4w9WgXcQ",
+            "https://www.youtube.com/embed/dQw4w9WgXcQ": "dQw4w9WgXcQ",
+        }
+        for url, video_id in cases.items():
+            with self.subTest(url=url):
+                html = parse_story_content(f"vidc {url}")
+                self.assertIn(f"https://www.youtube.com/embed/{video_id}?", html)
+
+        #   a start time is carried into the embed
+        html = parse_story_content("vidc https://youtu.be/dQw4w9WgXcQ?t=45")
+        self.assertIn("start=45", html)
+
+    def test_a_video_token_with_a_vimeo_link_renders_an_embed_iframe(self):
+        html = parse_story_content("vidl https://vimeo.com/123456789 The damaged bridge")
+
+        self.assertNotIn("<video", html)
+        self.assertIn('<iframe class="story-inline-video-embed"', html)
+        self.assertIn("https://player.vimeo.com/video/123456789?", html)
+        self.assertIn("autoplay=1", html)
+        self.assertIn("muted=1", html)
+        self.assertIn("story-inline-fig-left", html)
+        self.assertNotIn("data-video-toggle", html)
+
     def test_a_video_token_alone_does_not_count_as_body_text(self):
         from SERVICE_INTERNAL.story_validation import validate_story
 

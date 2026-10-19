@@ -297,12 +297,46 @@
     return '<p class="story-inline-btn-row"><a class="story-inline-btn" href="' + escapeAttr(url) + '" rel="noopener noreferrer" target="_blank">' + escapeHtml(label) + "</a></p>";
   }
 
+  /* EXTERNAL VIDEO PROVIDERS - mirrors _video_embed_url in BLOG/views.py. A
+     YouTube or Vimeo address is a page, not a file, so a <video> can never
+     play it; it is shown in an <iframe> with the provider's own player. Any
+     other URL stays on the plain <video> path below. */
+  var YOUTUBE_ID_RE = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?[^\s#]*?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+  var VIMEO_ID_RE = /vimeo\.com\/(?:video\/)?(\d+)/;
+
+  function videoEmbedUrl(url) {
+    var value = url || "";
+    var youtube = value.match(YOUTUBE_ID_RE);
+    if (youtube) {
+      var params = ["rel=0", "playsinline=1", "modestbranding=1", "autoplay=1", "mute=1", "loop=1", "playlist=" + youtube[1]];
+      var start = value.match(/[?&](?:t|start)=(\d+)/);
+      if (start) params.push("start=" + start[1]);
+      return "https://www.youtube.com/embed/" + youtube[1] + "?" + params.join("&");
+    }
+    var vimeo = value.match(VIMEO_ID_RE);
+    if (vimeo) {
+      return "https://player.vimeo.com/video/" + vimeo[1] + "?autoplay=1&muted=1&loop=1&playsinline=1&dnt=1";
+    }
+    return "";
+  }
+
   /* Mirrors _render_inline_video in BLOG/views.py: the same autoplay/muted/
-     loop <video> with no native controls, plus the single play/pause button. */
+     loop <video> with no native controls, plus the play/pause and sound
+     buttons - except a YouTube/Vimeo URL, which becomes an <iframe> embed
+     with the provider's own controls (is-embed, no overlay buttons). */
   function renderInlineVideo(direction, url, captionText) {
     var caption = (captionText || "").trim();
     var figClass = VID_SIDE_CLASSES[direction] || "story-inline-fig-left";
     var aria = caption || "Story video";
+    var captionHtml = caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "";
+    var embedUrl = videoEmbedUrl(url);
+    if (embedUrl) {
+      return '<figure class="story-inline-fig story-inline-video is-embed ' + figClass + '">' +
+        '<div class="story-inline-video-frame">' +
+        '<iframe class="story-inline-video-embed" src="' + escapeAttr(embedUrl) + '" title="' + escapeAttr(aria) + '" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>' +
+        '</div>' + captionHtml +
+        "</figure>";
+    }
     return '<figure class="story-inline-fig story-inline-video ' + figClass + '">' +
       '<div class="story-inline-video-frame">' +
       '<video onerror="this.onerror=null;this.src=\'/static/404_video.mp4\';" class="story-inline-video-el" src="' + escapeAttr(url) + '" muted loop playsinline autoplay preload="metadata" aria-label="' + escapeAttr(aria) + '"></video>' +

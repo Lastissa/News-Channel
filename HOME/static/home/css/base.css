@@ -1233,6 +1233,14 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .story-inline-video-icon-sound-on { display: none; }
 .story-inline-video:not(.is-muted) .story-inline-video-icon-sound-on { display: block; }
 .story-inline-video:not(.is-muted) .story-inline-video-icon-sound-off { display: none; }
+/*  A video token pointing at a provider PAGE (YouTube / Vimeo) is an <iframe>
+    embed: the provider draws its own controls, so the custom overlay buttons
+    are not used, and the frame is given a fixed 16:9 box instead of sizing
+    itself to the clip. See _video_embed_url in BLOG/views.py. */
+.story-inline-video.is-embed { width: min(50%, 300px); }
+.story-inline-video.is-embed.story-inline-fig-center { width: min(65%, 460px); }
+.story-inline-video.is-embed .story-inline-video-frame { width: 100%; aspect-ratio: 16 / 9; }
+.story-inline-video-embed { display: block; width: 100%; height: 100%; border: 0; background: #000; }
 @media (max-width: 599.98px) {
   .story-inline-fig { max-width: min(55%, 200px); }
   .story-inline-fig > .story-inline-img { max-height: 190px; }

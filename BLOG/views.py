@@ -84,6 +84,55 @@ VID_FIG_CLASSES = {
     "vidc": "story-inline-fig-center",
 }
 
+#   EXTERNAL VIDEO PROVIDERS. A vidl/vidr/vidc line normally points at a
+#   direct video FILE (an /archive/ upload, or any .mp4/.webm/.ogg/.mov/.m4v
+#   address), which a plain <video> plays. A YouTube or Vimeo address is a
+#   PAGE, not a file: "https://www.youtube.com/watch?v=..." is an HTML
+#   document, so a <video> can never load it -- the browser fires `error` and
+#   the old 404 fallback clip played in its place. Those addresses are
+#   recognised here and rendered as an <iframe> embed with the provider's own
+#   player instead. Anything unrecognised keeps the plain <video> path.
+YOUTUBE_ID_RE = re.compile(
+    r"(?:youtube(?:-nocookie)?\.com/(?:watch\?[^\s#]*?v=|embed/|shorts/|live/|v/)|youtu\.be/)"
+    r"([A-Za-z0-9_-]{11})"
+)
+VIMEO_ID_RE = re.compile(r"vimeo\.com/(?:video/)?(\d+)")
+
+
+def _video_embed_url(url):
+    """The <iframe> src for a recognised provider page (YouTube or Vimeo), or
+    None when `url` is not one -- e.g. a direct video file, which the caller
+    plays in a plain <video>.
+
+    The embed autoplays muted and loops, matching the direct-file <video>
+    (browsers only allow autoplay while muted). The provider draws its own
+    controls for an embed, so the custom play/pause and sound overlay is not
+    used here (see _render_inline_video)."""
+    value = url or ""
+    youtube = YOUTUBE_ID_RE.search(value)
+    if youtube:
+        video_id = youtube.group(1)
+        params = [
+            "rel=0",
+            "playsinline=1",
+            "modestbranding=1",
+            "autoplay=1",
+            "mute=1",
+            "loop=1",                      #   loop=1 needs playlist=<id> too
+            f"playlist={video_id}",
+        ]
+        start = re.search(r"[?&](?:t|start)=(\d+)", value)
+        if start:
+            params.append(f"start={start.group(1)}")
+        return f"https://www.youtube.com/embed/{video_id}?" + "&".join(params)
+    vimeo = VIMEO_ID_RE.search(value)
+    if vimeo:
+        return (
+            f"https://player.vimeo.com/video/{vimeo.group(1)}"
+            "?autoplay=1&muted=1&loop=1&playsinline=1&dnt=1"
+        )
+    return None
+
 #   INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
 #   the image token above (keyword, URL, optional trailing text) but
 #   renders as a downloadable link in the normal flow of the paragraph
@@ -252,12 +301,32 @@ def _render_inline_video(direction, url, caption_text):
 
     Caption: the trailing text is shown beneath the video in a <figcaption>,
     exactly like the image token. With no trailing text no caption is drawn
-    (the accessible name falls back to a plain "Story video" label)."""
+    (the accessible name falls back to a plain "Story video" label).
+
+    A YouTube or Vimeo address (see _video_embed_url) is a page, not a file,
+    so it is rendered in an <iframe> with the provider's own player instead:
+    the figure carries `is-embed` and no overlay buttons are drawn. Every
+    other URL keeps the self-playing <video> below."""
     caption = (caption_text or "").strip()
     fig_class = VID_FIG_CLASSES.get(direction, "story-inline-fig-left")
-    safe_url = html.escape(url, quote=True)
     safe_aria = html.escape(caption or "Story video", quote=True)
     caption_html = f"<figcaption>{html.escape(caption)}</figcaption>" if caption else ""
+
+    embed_url = _video_embed_url(url)
+    if embed_url:
+        safe_embed = html.escape(embed_url, quote=True)
+        return (
+            f'<figure class="story-inline-fig story-inline-video is-embed {fig_class}">'
+            f'<div class="story-inline-video-frame">'
+            f'<iframe class="story-inline-video-embed" src="{safe_embed}" '
+            f'title="{safe_aria}" loading="lazy" '
+            f'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" '
+            f'allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+            f'</div>'
+            f"{caption_html}</figure>"
+        )
+
+    safe_url = html.escape(url, quote=True)
     return (
         f'<figure class="story-inline-fig story-inline-video {fig_class}">'
         f'<div class="story-inline-video-frame">'
