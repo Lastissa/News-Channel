@@ -754,9 +754,31 @@ class StoryHeroImageFallbackTests(TestCase):
         content = response.content.decode()
         self.assertNotIn('src="None"', content)
         self.assertIn(
-            f'<img src="{static("404.jpg")}" alt="{story.heading}" loading="eager">',
+            f'<img src="{static("404.jpg")}" alt="{story.heading}" '
+            'loading="eager" decoding="async" '
+            'onload="if(!this.getAttribute(\'width\')){this.width=this.naturalWidth;this.height=this.naturalHeight;}">',
             content,
         )
+
+
+class StoryWithoutStaffProfileTests(TestCase):
+    """A story whose author has no staff profile still renders its page, but
+    with a real 404 status so search engines never index it."""
+
+    def test_story_from_an_unverified_author_renders_with_a_404_status(self):
+        author = Auth.objects.create_user(email="no-profile@example.com", is_staff=True)
+        story = Blog.objects.create(
+            author=author,
+            category="GENERAL",
+            heading="Story from an author with no profile",
+            content="Body copy for the missing-profile test.",
+        )
+
+        response = self.client.get(reverse("blog:story_detail", args=[story.slug]))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "Unverified Author", status_code=404)
+        self.assertContains(response, "noindex", status_code=404)
 
 
 class Bug1ViewCountUnitExplorationTest(TestCase):

@@ -2,10 +2,10 @@
 {% load static archive_extras seo_tags %}
 
 {% block adsense %}{% endblock %}
-{% block title %}About {{ project_name }} · {{ project_cachphrase }}{% endblock %}
+{% block title %}About {{ project_name }} | {{ project_cachphrase }}{% endblock %}
 {% block meta_description %}About {{ project_name }}: news across all genres with a strong focus on Nigeria and Africa, and how to reach us.{% endblock %}
 {% block og_type %}website{% endblock %}
-{% block og_title %}About {{ project_name }} · {{ project_cachphrase }}{% endblock %}
+{% block og_title %}About {{ project_name }} | {{ project_cachphrase }}{% endblock %}
 {% block og_description %}News across all genres with a strong focus on Nigeria and Africa.{% endblock %}
 {% block twitter_title %}About {{ project_name }}{% endblock %}
 {% block twitter_description %}News across all genres with a strong focus on Nigeria and Africa.{% endblock %}
@@ -60,7 +60,7 @@
         {% for post in latest_posts %}
         <li class="about-news-item">
           <a class="about-news-thumb" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true">
-            <img src="{{ post.image_1|cloudinary_proxy|default:story_placeholder }}" alt="" loading="lazy" decoding="async">
+            <img src="{{ post.image_1|cloudinary_proxy|default:story_placeholder }}" alt="{{ post.heading }}" loading="lazy" decoding="async">
           </a>
           <div class="about-news-body">
             <a class="about-news-link" href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a>

@@ -30,6 +30,11 @@ SIMILARITY_WARN = 0.75
 #   posts that hurt search visibility and ad eligibility.
 HARD_MIN_BODY_WORDS = 100
 MIN_BODY_WORDS = 300
+#   The opening paragraph is what becomes the story's search/AI summary, so a
+#   very short one is flagged (advisory only) even when the whole body is long
+#   enough. BLOG.views' meta-description builder still falls back to later
+#   blocks so the tag is never empty -- this is about readability.
+MIN_OPENING_WORDS = 15
 #   A story built on another report, post or page must say so: a line that starts
 #   with "Source" (e.g. "Source: https://..."), or a link anywhere in the body.
 SOURCE_RE = re.compile(r"(?im)^\s*source\b")
@@ -400,6 +405,18 @@ def validate_story(heading, content):
             add(_warn(
                 "first_paragraph_formatted",
                 "Your first paragraph starts with bold or italic formatting. The guide recommends keeping the opening paragraph plain text.",
+            ))
+
+        #   RULE 12: THE OPENING PARAGRAPH SHOULD BE A FULL PARAGRAPH. A
+        #   one-line opener gives search and AI answer engines almost nothing
+        #   to summarise the story with.
+        opening_words = _word_count(first_paragraph["text"])
+        if first_paragraph["type"] == "paragraph" and opening_words < MIN_OPENING_WORDS:
+            add(_warn(
+                "opening_paragraph_too_short",
+                f"Your first paragraph is only {opening_words} word{'s' if opening_words != 1 else ''}. "
+                f"Aim for a fuller opening (about {MIN_OPENING_WORDS} words or more) that states the key facts, "
+                "so the story reads clearly and search engines can lift a useful summary from it.",
             ))
 
     return {"errors": errors, "warnings": warnings}

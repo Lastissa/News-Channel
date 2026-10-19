@@ -678,6 +678,34 @@ def _clean_content_block(block):
     return " ".join(lines).strip()
 
 
+def _build_meta_description(content, max_len=160):
+    """A non-empty description for the story page's meta/OG/Twitter tags and
+    its JSON-LD `description` (see StoryDetailView.get).
+
+    The opening paragraph is preferred, but a one-line opener ("The match
+    ended 2-0.") makes a poor snippet, so the following plain-text blocks are
+    appended until there is enough to read. Blocks that clean down to nothing
+    (a lone imgl/btn token, a bare heading marker) are skipped, so the tag is
+    never empty when the story has any prose at all. Trimmed on a word
+    boundary so it never ends mid-word."""
+    if not content:
+        return ""
+    blocks = [block for block in re.split(r"\n\s*\n", content.strip()) if block.strip()]
+    parts, length = [], 0
+    for block in blocks:
+        text = _clean_content_block(block)
+        if not text:
+            continue
+        parts.append(text)
+        length += len(text) + 1
+        if length >= max_len:
+            break
+    description = " ".join(parts).strip()
+    if len(description) > max_len:
+        description = description[:max_len].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return description
+
+
 def build_ticker_text(content):
     """Plain-text feed for the reading marquee at the top of the story page.
     Cleans every paragraph/block with _clean_content_block above and joins
@@ -751,7 +779,9 @@ class StoryDetailView(View):
         except StaffProfile.DoesNotExist as e:
             info_logger(msg=f"MISSING STAFFPROFILE: story for {blog.author.email} was found with no staff profile")
             author_profile = StaffProfile()
-            return render(request, 'blog/staffprofile_404.html', {'blog': blog})
+            #   The page renders normally, but with a real 404 status so search
+            #   engines never index a story whose author has no profile.
+            return render(request, 'blog/staffprofile_404.html', {'blog': blog}, status=404)
             
         author_tags = []
         if author_profile and isinstance(author_profile.speciality, list):
@@ -848,13 +878,14 @@ class StoryDetailView(View):
         author_follower_count = (
             AuthorFollow.objects.filter(author=blog.author).count() if author_has_portfolio else 0
         )
-        #   FOR OG DESCRIPTION TO BE CLEAN AND CLEAR carrying the first paragrah 
-        #   -- _clean_content_block also drops any imgl/imgr/imgc/filel token
-        #   down to just its alt/link text, so one never leaks into the
-        #   <head> meta/JSON-LD tags this feeds (see StoryDetailView.get context).
-        og_descr_block = re.split(r'\n\s*\n', blog.content.strip(), maxsplit=1)[0]
-        og_descr = _clean_content_block(og_descr_block)
-        if len(og_descr) > 400: og_descr = og_descr[:400]
+        #   DESCRIPTION for the <head> meta/OG/Twitter tags and the story's
+        #   JSON-LD node. Built from the opening paragraph and, when that is
+        #   too thin to read (or cleans down to nothing, e.g. a lone image
+        #   token), the blocks that follow -- so the tag is never an empty
+        #   string or a one-word snippet. _clean_content_block also drops any
+        #   imgl/imgr/imgc/filel token down to just its alt/link text, so one
+        #   never leaks into the <head> (see StoryDetailView.get context).
+        og_descr = _build_meta_description(blog.content) or (blog.heading or "")
         context = {
             "blog": blog,
             'excerp': og_descr,

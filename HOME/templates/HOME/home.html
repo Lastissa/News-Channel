@@ -6,7 +6,7 @@
 {% spaceless %}
 {% if is_filtered %}
   {% if query %}Results for "{{ query|truncatechars:50 }}" | {{project_name}}
-  {% elif active_category %}Latest On {{ active_category|title }} |  | {{project_name}}
+  {% elif active_category %}Latest On {{ active_category|title }} | {{project_name}}
   {% else %} {{ block.super }}
   {% endif %}
   {% if page_obj.number > 1 %} | Page {{ page_obj.number }}{% endif %}
@@ -18,7 +18,7 @@
 
 {% block meta_description %}
 {% spaceless %}
-{% if is_filtered %}{% if query %}Results for {{ query|truncatechars:50 }} | | {{project_name}}{% elif active_category %}Latest On {{ active_category|title }} | | {{project_name}}{% endif %}{% else %}{{project_name}} is a Nigerian digital news platform providing reliable, timely and relevant news, updates, educational related services and stories for readers in Nigeria and beyond.{% endif %}
+{% if is_filtered %}{% if query %}Results for {{ query|truncatechars:50 }} | {{project_name}}{% elif active_category %}Latest On {{ active_category|title }} | {{project_name}}{% endif %}{% else %}{{project_name}} is a Nigerian digital news platform providing reliable, timely and relevant news, updates, educational related services and stories for readers in Nigeria and beyond.{% endif %}
 {% endspaceless %}
 {% endblock meta_description %}
 
@@ -48,6 +48,10 @@
   <div class="hero-track">
     {% for post in featured_posts %}
         <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|cloudinary_proxy|default:placeholder|safe }}');" data-index="{{ forloop.counter0 }}">
+      {% comment %}Real, crawlable <img> with alt text (the slide's CSS background stays as the fallback layer if it fails to load); removes it on error so the background shows through.{% endcomment %}
+      {% if post.image_1 %}
+      <img class="hero-slide-img" src="{{ post.image_1|cloudinary_proxy }}" alt="{{ post.heading }}" loading="{% if forloop.first %}eager{% else %}lazy{% endif %}" decoding="async" onload="if(!this.getAttribute('width')){this.width=this.naturalWidth;this.height=this.naturalHeight;}" onerror="this.remove();">
+      {% endif %}
       <div class="hero-scrim"></div>
       {# whole slide (image included) opens the story; headline link below stays the accessible one #}
       <a class="hero-slide-link" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true"></a>

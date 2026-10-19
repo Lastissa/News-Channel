@@ -165,7 +165,8 @@ class SitemapXmlView(View):
         domain = About.domain.rstrip("/")
         #   The archive gallery entry gets a real lastmod from the newest item
         #   (deferred import: HOME does not otherwise depend on ARCHIVE).
-        from ARCHIVE.models import ArchiveImage
+        from ARCHIVE.models import ArchiveImage, ArchiveKind
+        from ARCHIVE.templatetags.archive_extras import cloudinary_proxy
 
         newest_item = ArchiveImage.objects.order_by("-date_created").only("date_created").first()
         archive_lastmod = (
@@ -173,6 +174,29 @@ class SitemapXmlView(View):
             if newest_item and newest_item.date_created
             else ""
         )
+        #   IMAGE SITEMAP: every archive picture is listed as its own
+        #   <image:image> entry on the gallery URL, using the same-origin
+        #   /archive/cdn/ URL the page itself renders, so Google Images can
+        #   index the individual assets and not just the gallery page. Any URL
+        #   we do not host (an external link pasted in) is skipped, and the
+        #   list is capped like the stories below to keep one file small.
+        archive_images = []
+        for item in (
+            ArchiveImage.objects.filter(kind=ArchiveKind.IMAGE)
+            .only("url", "alt", "date_created")
+            .order_by("-date_created")[:2000]
+        ):
+            proxied = cloudinary_proxy(item.url)
+            if not proxied or not str(proxied).startswith("/"):
+                continue
+            archive_images.append(
+                {
+                    "loc": f"{domain}{proxied}",
+                    "title": item.alt,
+                    "caption": item.alt,
+                    "lastmod": item.date_created.date().isoformat() if item.date_created else "",
+                }
+            )
         urls = [
             {"loc": f"{domain}/", "lastmod": "", "changefreq": "hourly", "priority": "1.0"},
             {"loc": f"{domain}{reverse('home:about')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
@@ -185,7 +209,7 @@ class SitemapXmlView(View):
             #   /archive/ now also carries every image/file's own real,
             #   same-domain cdn/ URL (see ARCHIVE.views.CloudinaryProxyView),
             #   so the gallery page itself is worth indexing for SEO too.
-            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod, "changefreq": "daily", "priority": "0.6"},
+            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod, "changefreq": "daily", "priority": "0.6", "images": archive_images},
         ]
 
         #   PERMANENT CATEGORY PAGES: /category/<slog>/ is a stable landing page

@@ -1679,6 +1679,37 @@ class SearchAndCategoryPageTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("editorial_team"))
 
+    def test_sitemap_offers_each_archive_picture_to_image_search(self):
+        """Every archive picture is listed through the image sitemap extension
+        using our own same-domain /archive/cdn/ URL, so Google Images can index
+        the individual assets and not just the gallery page."""
+        from django.conf import settings
+
+        author = Auth.objects.create_user(email="archive-uploader@example.com")
+        ArchiveImage.objects.create(
+            kind="image",
+            url=(
+                f"https://res.cloudinary.com/{settings.CLOUDINARY_CLOUD_NAME}"
+                "/image/upload/v1/abureport/archive/sample.jpg"
+            ),
+            alt="A sample archive photograph",
+            width=1200,
+            height=800,
+            author=author,
+        )
+
+        response = self.client.get("/sitemap.xml")
+        content = response.content.decode()
+        expected_loc = About.domain.rstrip("/") + reverse(
+            "archive:cdn_proxy",
+            kwargs={"cloud_path": "image/upload/v1/abureport/archive/sample.jpg"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"', content)
+        self.assertIn(f"<image:loc>{expected_loc}</image:loc>", content)
+        self.assertIn("<image:title>A sample archive photograph</image:title>", content)
+
 
 class ContinueReadingPopupTests(QuietTestCase):
     """The home-page "Continue reading" popup and the signed-in feed behind it
