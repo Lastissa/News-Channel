@@ -519,9 +519,19 @@ html.auth-gate-locked { overflow: hidden; }
   border-top: none;
   border-right: 1px solid white;
   border-bottom: 1px solid white;
-   transition: background 0.18s ease, transform 0.18s ease;
+   transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
 }
-.glass-btn:hover { background: transparent; color: var(--ink); border-color: var(--amber); transform: translateY(-2px); }
+/*  Hero buttons sit on a dark story photo, so their hover state must never
+    lean on whatever is behind them. A transparent fill with --ink text left
+    the "Read story" label and the share icon as near-black on near-black:
+    the button looked like it had vanished. On touch the hover state also
+    sticks after a tap, so it stayed blank until something else was tapped.
+    Now the hover gets a solid paper surface of its own, and only devices with
+    a real pointer get a hover state at all. */
+@media (hover: hover) {
+  .glass-btn:hover { background: var(--paper); color: var(--ink); border-color: var(--amber); transform: translateY(-2px); }
+}
+.glass-btn:active { background: var(--paper); color: var(--ink); transform: translateY(0); }
 .glass-btn-outline { background: #0B6E8A; border: none; }
 .glass-btn-icon {
   width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
