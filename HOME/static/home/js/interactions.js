@@ -1,6 +1,4 @@
 (function () {
-  // "use strict";
-
   /* ---------- helpers ---------- */
   function getCookie(name) {
     var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
@@ -19,6 +17,38 @@
     } catch (e) {
       return genericMessage;
     }
+  }
+
+  /* Shared by the staff-record and profile blocks further down: write one line
+     of inline feedback, and post a url-encoded form with the CSRF token. */
+  function say(node, message, isError) {
+    if (!node) return;
+    node.textContent = message;
+    node.classList.toggle("is-error", !!isError);
+  }
+
+  function post(endpoint, payload) {
+    var body = new URLSearchParams();
+    Object.keys(payload || {}).forEach(function (key) {
+      body.append(key, payload[key]);
+    });
+
+    return fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+        "X-Requested-With": "XMLHttpRequest",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      credentials: "same-origin",
+      body: body.toString(),
+    }).then(function (response) {
+      return response.json().catch(function () {
+        return {};
+      }).then(function (data) {
+        return { ok: response.ok, data: data };
+      });
+    });
   }
 
   var toastHost = null;         /* up toasts: top-right stack with icon/close */
@@ -111,8 +141,8 @@
      meant for notices that don't need to scream (success / info). It takes
      exactly the same (message, tone, placement) arguments as the up toast,
      so any call site can switch flavours just by swapping the function name:
-       uptoast("Copied.")        -> top-right, icon/close/progress
-       bottomtoast("Copied.")    -> bottom pill, small padding, fades out  */
+       toast("Copied.")          -> top-right, icon/close/progress
+       bottomToast("Copied.")    -> bottom pill, small padding, fades out  */
   function bottomToast(message, tone, placement) {
     if (!bottomToastHost) {
       bottomToastHost = document.createElement("div");
@@ -144,10 +174,8 @@
   }
 
   window.AbuToast = toast;
-  window.AbuUpToast = toast;
-  window.AbuBottomToast = bottomToast;
-  /* Plain names too, so swapping the function name is a one-word change. */
-  window.uptoast = toast;
+  /* Plain name too, so swapping the function name on a call site stays a
+     one-word change (login.html and auth-gate.js use this one). */
   window.bottomtoast = bottomToast;
 
   /* A 401 means the visitor is signed out. Instead of an error toast, open the
@@ -438,15 +466,15 @@
     var btn = event.target.closest("[data-share-btn]");
     if (!btn) return;
     event.preventDefault();
- var extra = btn.dataset.copyExtra || "";
-  var url = btn.dataset.shareUrl || "";
-  var text = extra ? url + "\n\n" + extra : url;
-  
-  if (navigator.clipboard && navigator.clipboard.writeText) {
+    var extra = btn.dataset.copyExtra || "";
+    var url = btn.dataset.shareUrl || "";
+    var text = extra ? url + "\n\n" + extra : url;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
         bottomToast("copied.");
       }).catch(function () {
-        bottomtoast("Could not copy link.", "error");
+        bottomToast("Could not copy link.", "error");
       });
     } else {
       window.prompt("Copy this link:", url);
@@ -497,9 +525,8 @@
     var target = "";
 
     if (platform === "whatsapp") {
-      /* WhatsApp keeps the current full recap: link, then heading, lead and byline. */
-      // i comment out this bcos now i do not want the url to be in the up part again
-      // target = "https://wa.me/?text=" + encodeURIComponent(url + "\n\n" + text);
+      /* WhatsApp gets the recap text only; the link was deliberately dropped
+         from the top so it no longer shows twice. */
       target = "https://wa.me/?text=" + encodeURIComponent(text);
     } else if (platform === "facebook") {
       /* Facebook sharer only honours the link; extra copy is ignored. */
@@ -1832,7 +1859,6 @@
   }
 
   updateLoadMorePager();
-})();
 
 /*  ADMIN AUTHORITY: STAFF RECORD WRITE CONTROLS
     Drives the tribute, role and account status controls on the staff detail
@@ -1841,41 +1867,6 @@
 (function () {
   var shell = document.querySelector(".staff-record-shell");
   if (!shell) return;
-
-  function getCookie(name) {
-    var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
-    return match ? decodeURIComponent(match.pop()) : "";
-  }
-
-  function say(node, message, isError) {
-    if (!node) return;
-    node.textContent = message;
-    node.classList.toggle("is-error", !!isError);
-  }
-
-  function post(endpoint, payload) {
-    var body = new URLSearchParams();
-    Object.keys(payload).forEach(function (key) {
-      body.append(key, payload[key]);
-    });
-
-    return fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "X-CSRFToken": getCookie("csrftoken"),
-        "X-Requested-With": "XMLHttpRequest",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      credentials: "same-origin",
-      body: body.toString(),
-    }).then(function (response) {
-      return response.json().catch(function () {
-        return {};
-      }).then(function (data) {
-        return { ok: response.ok, data: data };
-      });
-    });
-  }
 
   /*  TRIBUTE  */
   var tributeSave = shell.querySelector("[data-tribute-save]");
@@ -2063,46 +2054,6 @@
     also enforced server side, in ADMIN.views and HOME.views. */
 (function () {
   "use strict";
-
-  function getCookie(name) {
-    var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
-    return match ? decodeURIComponent(match.pop()) : "";
-  }
-
-  function say(node, message, isError) {
-    if (!node) return;
-    node.textContent = message;
-    node.classList.toggle("is-error", !!isError);
-  }
-
-  function post(endpoint, payload, formData) {
-    var options = {
-      method: "POST",
-      headers: {
-        "X-CSRFToken": getCookie("csrftoken"),
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      credentials: "same-origin",
-    };
-    if (formData) {
-      options.body = formData;
-    } else {
-      options.headers["Content-Type"] = "application/x-www-form-urlencoded";
-      var body = new URLSearchParams();
-      Object.keys(payload || {}).forEach(function (key) {
-        body.append(key, payload[key]);
-      });
-      options.body = body.toString();
-    }
-
-    return fetch(endpoint, options).then(function (response) {
-      return response.json().catch(function () {
-        return {};
-      }).then(function (data) {
-        return { ok: response.ok, data: data };
-      });
-    });
-  }
 
   /*  OWN ROLE: an admin sets their own role from their own profile. */
   var ownRoleSave = document.querySelector("[data-own-role-save]");
@@ -2583,7 +2534,6 @@
     var stageFrame = null;
     var speedButtons = [];
     var sourceVideo = null;
-    var sourceFrame = null;
     var sourceWasPlaying = false;
     var lastFocus = null;
 
@@ -2639,11 +2589,8 @@
       if (!source) return;
       build();
       sourceVideo = null;
-      sourceFrame = null;
       var isFrame = source.tagName === "IFRAME";
-      if (isFrame) {
-        sourceFrame = source;
-      } else {
+      if (!isFrame) {
         sourceVideo = source;
         sourceWasPlaying = !source.paused;
         try { source.pause(); } catch (err) { /* already stopped */ }
@@ -2722,7 +2669,6 @@
         } catch (err) { /* ignore */ }
       }
       sourceVideo = null;
-      sourceFrame = null;
       var focusBack = lastFocus;
       lastFocus = null;
       if (focusBack && document.contains(focusBack) && focusBack.focus) {
@@ -2747,4 +2693,5 @@
       close();
     });
   })();
+})();
 })();
