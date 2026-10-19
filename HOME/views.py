@@ -37,6 +37,7 @@ from SERVICE_INTERNAL.email_batch import (
     _try_send_account_deleted_batch_email,
     _try_send_new_story_batch_email,
     _try_send_partnership_inquiry_batch_email,
+    new_story_alert_counts_for,
 )
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.images import (
@@ -1050,7 +1051,16 @@ class AddNewsView(View):
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
-        return render(request, "HOME/add_news.html")
+        #   The "send the newsletter?" placard in the editor asks the author
+        #   about a real number: how many readers a new-story alert in each
+        #   category would actually reach right now. Computed from the same
+        #   query the sender uses (SERVICE_INTERNAL.email_batch), so the
+        #   question and the send can never disagree.
+        return render(
+            request,
+            "HOME/add_news.html",
+            {"news_alert_counts": new_story_alert_counts_for(request.user)},
+        )
 
     def post(self, request):
         heading = (request.POST.get("heading") or "").strip()
@@ -1161,14 +1171,23 @@ class AddNewsView(View):
         #   (BLOG.signals already clears the same key on every Blog save; this
         #   is the explicit belt-and-braces for the publish path.)
         invalidate_cache(HOME_BLOGS_CACHE_KEY)
-        #   NEW NEWS ALERT: email every user who has news alerts on and follows
+        #   NEW NEWS ALERT, NOW OPT IN: the author is asked twice in the editor
+        #   (see add-news-editor.js) and only an explicit `newsletter=1` on the
+        #   POST sends it. Email every user who has news alerts on and follows
         #   this author, plus users who follow nobody at all. Dispatched on the
         #   background email pool so the publish never waits on Resend, and a
         #   pure info_logger print in DEBUG mode (nothing is ever sent) -- see
         #   SERVICE_INTERNAL.email_batch._try_send_new_story_batch_email.
-        _try_send_new_story_batch_email(blog)
+        newsletter = (request.POST.get("newsletter") or "").strip().lower() in {"1", "true", "yes"}
+        if newsletter:
+            _try_send_new_story_batch_email(blog)
         return _response(
-            {"detail": "Story published.", "story_url": reverse("blog:story_detail", args=[blog.slug]), "id": blog.pk},
+            {
+                "detail": "Story published.",
+                "story_url": reverse("blog:story_detail", args=[blog.slug]),
+                "id": blog.pk,
+                "newsletter_sent": newsletter,
+            },
             status=201,
         )
 

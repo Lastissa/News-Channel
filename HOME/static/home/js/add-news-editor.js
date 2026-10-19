@@ -46,6 +46,21 @@
   var archiveStage = archiveModal ? archiveModal.querySelector(".archive-picker-stage") : null;
   var modalEditTarget = null;
   var modalConfirmWarnings = true;
+  var modalConfirmAction = null;
+  var modalEditAction = null;
+
+  /* The newsletter choice for the publish in progress:
+       null  = not asked yet for this attempt
+       false = publish without the newsletter
+       true  = the author asked for it (and confirmed it)  */
+  var newsletterChoice = null;
+  var newsletterGateWarnings = false;
+  var newsletterCounts = {};
+  (function readNewsletterCounts() {
+    var el = document.getElementById("news-alert-counts");
+    if (!el) return;
+    try { newsletterCounts = JSON.parse(el.textContent || "{}") || {}; } catch (e) { newsletterCounts = {}; }
+  })();
 
   var PREVIEW_KEY = "abu-editor-preview";
   var DRAFT_KEY = shell.dataset.draftKey;
@@ -702,10 +717,12 @@
   }
 
   /* ---------- validation dialog ----------
-     Two modes, both fed by the server's answer (the server is the single
-     source of truth for the writing rules, see SERVICE_INTERNAL/story_validation.py):
+     Modes, all fed by the server's answer where rules are involved (the
+     server is the single source of truth for the writing rules, see
+     SERVICE_INTERNAL/story_validation.py):
        blocked  (HTTP 400 + errors)             -> explains what to fix, one button
        warnings (HTTP 409 + needs_confirmation) -> explains, then asks YES / NO
+       newsletter (asked here, before the POST) -> asks, then asks again
      "Go back and edit" simply keeps the story unposted. */
   var modalReturnFocus = null;
 
@@ -728,6 +745,8 @@
     modalReturnFocus = document.activeElement;
     modalEditTarget = options.editTarget || contentInput;
     modalConfirmWarnings = options.confirmWarnings !== false;
+    modalConfirmAction = options.onConfirm || null;
+    modalEditAction = options.onEdit || null;
     modalTitle.textContent = options.title;
     modalIntro.textContent = options.intro;
     modalList.innerHTML = "";
@@ -736,9 +755,10 @@
       li.textContent = item.message;
       modalList.appendChild(li);
     });
-    modalQuestion.textContent = options.askToPost ? "Do you still want to post this story now?" : "";
+    modalQuestion.textContent = options.question || (options.askToPost ? "Do you still want to post this story now?" : "");
     modalConfirmBtn.hidden = !options.askToPost;
-    modalEditBtn.textContent = options.askToPost ? "No, let me edit" : "Back to editing";
+    modalConfirmBtn.textContent = options.confirmLabel || "Yes, post anyway";
+    modalEditBtn.textContent = options.editLabel || (options.askToPost ? "No, let me edit" : "Back to editing");
     showDialog(modal);
     modalEditBtn.focus({ preventScroll: true });
   }
@@ -748,16 +768,99 @@
       el.addEventListener("click", closeModal);
     });
     modalEditBtn.addEventListener("click", function () {
+      var action = modalEditAction;
       closeModal();
+      if (action) action();
     });
     modalConfirmBtn.addEventListener("click", function () {
+      var action = modalConfirmAction;
       var confirmWarnings = modalConfirmWarnings;
       closeModal();
-      submitStory(confirmWarnings);
+      if (action) { action(); return; }
+      startPublish(confirmWarnings);
     });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !modal.hidden) closeModal();
     });
+  }
+
+  /* ---------- the newsletter ask ----------
+     The newsletter is optional. Every fresh publish attempt stops here
+     first: one placard asks whether it should go out, and (only when the
+     author says yes) a second placard asks them to confirm, so a stray click
+     cannot mail every reader by accident. The answer travels as
+     `newsletter=1` on the POST and the server only sends on that flag.
+     Both "exits" of the first placard publish the story: sending is what the
+     author has to choose deliberately, not publishing. */
+  function newsletterAudience() {
+    var category = categorySelect ? categorySelect.value : "";
+    var known = Object.prototype.hasOwnProperty.call(newsletterCounts, category);
+    var count = known ? newsletterCounts[category] : null;
+    if (count === 0) {
+      return "No reader has news alerts on for this category right now, so a newsletter would reach nobody.";
+    }
+    if (count === 1) {
+      return "1 reader has news alerts on and would get this story by email.";
+    }
+    if (typeof count === "number") {
+      return count + " readers have news alerts on and would get this story by email.";
+    }
+    return "Readers who turned news alerts on would get this story by email.";
+  }
+
+  function openNewsletterConfirm() {
+    openModal({
+      title: "Confirm the newsletter",
+      intro: "One more check before it goes out. The newsletter is sent the moment the story is published and cannot be recalled.",
+      items: [{ message: newsletterAudience() }],
+      question: "Send the newsletter now?",
+      askToPost: true,
+      confirmLabel: "Yes, send the newsletter",
+      editLabel: "Go back",
+      onConfirm: function () {
+        submitStory(newsletterGateWarnings);
+      },
+      onEdit: function () {
+        newsletterChoice = null;
+        openNewsletterAsk();
+      }
+    });
+  }
+
+  function openNewsletterAsk() {
+    openModal({
+      title: "Send Newsletter with this story?",
+      intro: "The newsletter is optional. Decide whether readers are emailed about this story, then confirm before it goes out.",
+      items: [{ message: newsletterAudience() }],
+      question: "Should the newsletter go out when this story is published?",
+      askToPost: true,
+      confirmLabel: "Send Newsletter",
+      editLabel: "Publish without Sending newsletter",
+      onConfirm: function () {
+        newsletterChoice = true;
+        openNewsletterConfirm();
+      },
+      onEdit: function () {
+        newsletterChoice = false;
+        submitStory(newsletterGateWarnings);
+      }
+    });
+  }
+
+  function startPublish(confirmWarnings) {
+    if (!modal) {
+      /* No placard markup: never hold the story hostage over the optional
+         newsletter. Publish without it. */
+      newsletterChoice = false;
+      submitStory(confirmWarnings);
+      return;
+    }
+    if (newsletterChoice !== null) {
+      submitStory(confirmWarnings);
+      return;
+    }
+    newsletterGateWarnings = confirmWarnings;
+    openNewsletterAsk();
   }
 
   function submitStory(confirmWarnings) {
@@ -766,6 +869,7 @@
     setPublishPending(true);
     var data = new FormData(form);
     if (confirmWarnings) data.set("confirm_warnings", "1");
+    if (newsletterChoice) data.set("newsletter", "1");
 
     fetch(form.dataset.endpoint, {
       method: "POST",
@@ -808,6 +912,8 @@
 
         /* blocked by a writing rule: say exactly what to correct */
         if (!result.ok && payload.errors && payload.errors.length) {
+          /* a fresh attempt after this gets a fresh newsletter decision */
+          newsletterChoice = null;
           openModal({
             title: "This story cannot be submitted yet",
             intro: payload.errors.length > 1
@@ -820,6 +926,7 @@
         }
 
         if (!result.ok) {
+          newsletterChoice = null;
           var detail = extractDetail(result.text, "Could not publish the story.");
           toast(detail, "error");
           if (/already/i.test(detail)) {
@@ -832,7 +939,10 @@
 
         clearDraft();
         if (selectedImageObjectUrl) { URL.revokeObjectURL(selectedImageObjectUrl); selectedImageObjectUrl = null; }
-        toast(payload.detail || "Story published.");
+        var publishedMessage = payload.detail || "Story published.";
+        if (payload.newsletter_sent) publishedMessage += " The newsletter is on its way to readers who have news alerts on.";
+        newsletterChoice = null;
+        toast(publishedMessage);
         if (payload.story_url) {
           window.setTimeout(function () { window.location.href = payload.story_url; }, 700);
         }
@@ -882,7 +992,7 @@
       return;
     }
 
-    submitStory(false);
+    startPublish(false);
   });
 
   /* ---------- insert bar: drop a command at the cursor ----------

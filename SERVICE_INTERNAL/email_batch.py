@@ -69,6 +69,82 @@ def _dispatch_batch_email(recipients, subject, build_html_for):
     info_logger(msg=f"BATCH EMAIL: dispatched {sent_total}/{len(recipients)} total, subject={subject}")
 
 
+def _new_story_alert_base(author: object):
+    """Eligible accounts for a new-story alert before the category narrowing:
+
+      (a) everyone who follows this author (STAFF.AuthorFollow), plus
+      (b) everyone who follows no author at all,
+
+    limited to active accounts with `send_newsletter` on, author excluded.
+    """
+    following_author_ids = AuthorFollow.objects.filter(author=author).values_list("follower_id", flat=True)
+    follows_somebody_ids = AuthorFollow.objects.values_list("follower_id", flat=True)
+    return (
+        Auth.objects.filter(
+            Q(pk__in=following_author_ids) | ~Q(pk__in=follows_somebody_ids),
+            send_newsletter=True,
+            is_active=True,
+        )
+        .exclude(pk=author.pk)
+    )
+
+
+def new_story_alert_recipients(author: object, category: str) -> list:
+    """The exact address list a new-story newsletter would go to, shared by
+    the sender (_try_send_new_story_batch_email) and the "send the newsletter?"
+    placard in the add-news editor, so the number the author is asked about is
+    the number that would actually be mailed.
+
+    Narrowed by the per-category opt-in (HOME.models.CategorySubscription): a
+    reader who has touched the profile control only hears about the categories
+    they left on, and no rows at all keeps everything.
+    """
+    #   Per-category opt-in from the profile control (HOME.views.
+    #   ProfileCategoryPreferenceToggleView). A reader who has touched it only
+    #   gets stories in the categories they left on; a reader with no rows at
+    #   all keeps getting everything, which is the documented default. Rows for
+    #   categories that have since been removed are filtered out here, so a
+    #   stale preference can never silence a reader by accident.
+    current_category_names = [name for name, _ in get_category_choices()]
+    preferences = CategorySubscription.objects.filter(category__in=current_category_names)
+    opted_in_ids = preferences.filter(category=category).values_list("user_id", flat=True)
+    has_preference_ids = preferences.values_list("user_id", flat=True)
+
+    return list(
+        _new_story_alert_base(author)
+        .filter(Q(pk__in=opted_in_ids) | ~Q(pk__in=has_preference_ids))
+        .values_list("email", flat=True)
+        .distinct()
+    )
+
+
+def new_story_alert_counts_for(author: object) -> dict:
+    """{category: how many readers a new-story alert in that category would
+    reach right now} for the add-news placard. Same rules as
+    new_story_alert_recipients, counted in one pass so no category can drift.
+    """
+    names = [name for name, _ in get_category_choices()]
+    base_ids = list(_new_story_alert_base(author).values_list("pk", flat=True))
+
+    preferred = {}
+    for user_id, category in CategorySubscription.objects.filter(
+        user_id__in=base_ids, category__in=names
+    ).values_list("user_id", "category"):
+        preferred.setdefault(user_id, set()).add(category)
+
+    counts = {name: 0 for name in names}
+    for user_id in base_ids:
+        categories = preferred.get(user_id)
+        if not categories:
+            #   no preference rows: keeps the everything-on default
+            for name in names:
+                counts[name] += 1
+            continue
+        for name in categories:
+            counts[name] += 1
+    return counts
+
+
 def _try_send_new_story_batch_email(blog: object):
     """
     Fired right after a story is published (HOME.views.AddNewsView). Recipients:
@@ -90,32 +166,7 @@ def _try_send_new_story_batch_email(blog: object):
     out.
     """
     author = blog.author
-
-    following_author_ids = AuthorFollow.objects.filter(author=author).values_list("follower_id", flat=True)
-    follows_somebody_ids = AuthorFollow.objects.values_list("follower_id", flat=True)
-
-    #   Per-category opt-in from the profile control (HOME.views.
-    #   ProfileCategoryPreferenceToggleView). A reader who has touched it only
-    #   gets stories in the categories they left on; a reader with no rows at
-    #   all keeps getting everything, which is the documented default. Rows for
-    #   categories that have since been removed are filtered out here, so a
-    #   stale preference can never silence a reader by accident.
-    current_category_names = [name for name, _ in get_category_choices()]
-    preferences = CategorySubscription.objects.filter(category__in=current_category_names)
-    opted_in_ids = preferences.filter(category=blog.category).values_list("user_id", flat=True)
-    has_preference_ids = preferences.values_list("user_id", flat=True)
-
-    recipients = list(
-        Auth.objects.filter(
-            Q(pk__in=following_author_ids) | ~Q(pk__in=follows_somebody_ids),
-            send_newsletter=True,
-            is_active=True,
-        )
-        .filter(Q(pk__in=opted_in_ids) | ~Q(pk__in=has_preference_ids))
-        .exclude(pk=author.pk)
-        .values_list("email", flat=True)
-        .distinct()
-    )
+    recipients = new_story_alert_recipients(blog.author, blog.category)
 
     #   DEBUG = DEV MODE: never touch Resend here, just print what would have
     #   gone out. info_logger prints to the console while DEBUG is on.

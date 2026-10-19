@@ -64,7 +64,7 @@
          id="editor-shell"
          data-view="write"
          data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261018-2"
-         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261012-4"
+         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261019-1"
          data-draft-key="abureport-add-news-draft-{{ request.user.pk }}">
   <div class="editor-toolbar" data-editor-toolbar>
     <div class="editor-toolbar-main">
@@ -125,7 +125,7 @@
                   <h3>Review before you publish</h3>
                   <ol class="fg-rules fg-rules-key">
                     <li data-guide-item="Re-review your content and make sure it aligns with {{ project_name }} guidelines before publishing.">Re-review your content and make sure it aligns with {{ project_name }} guidelines before publishing.</li>
-                    <li data-guide-item="The first paragraph can have at most 70% similarity with the heading. Open with new information, not a copy of the headline.">The first paragraph can have at most 70% similarity with the heading. Open with new information, not a copy of the headline.</li>
+                    <li data-guide-item="The first paragraph can have at most 70% similarity with the heading. Open with new information, not a copy of the headline.">The first paragraph can have at most 70% similarity with the heading. Open with new information, not a copy of the headline. Also its our og description meaning it should be a clear , concise attention grabber for our readers.</li>
                     <li data-guide-item="Provide an image description for the headline image. It is shown beneath the image.">Provide an image description for the headline image. It is shown beneath the image.</li>
                     <li data-guide-item="Keep the content SEO friendly for Nigerians as primary audience: a clear headline, an opening paragraph that states what happened, with facts ,who, where and/or when and if necessary sections with headings.">Keep the content SEO friendly for Nigerians as primary audience: a clear headline, an opening paragraph that states what happened, with facts ,who, where and/or when and if necessary sections with headings.</li>
                     <li data-guide-item="Avoid frequent repetition of content in the article. Say each fact once.">Avoid frequent repetition of content in the article. Say each fact once.</li>
@@ -288,6 +288,8 @@
       <div class="editor-preview-scroll" data-editor-preview-output aria-live="polite"></div>
     </div> {% endcomment %}
   </div>
+
+  {{ news_alert_counts|json_script:"news-alert-counts" }}
 
   <div class="editor-modal" data-editor-modal hidden>
     <div class="editor-modal-backdrop" data-editor-modal-close></div>

@@ -241,7 +241,7 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "data-archive-refresh")
         self.assertContains(response, "data-editor-modal-confirm")
         self.assertContains(response, static("home/js/add-news-editor.js"))
-        self.assertContains(response, "20261013-1")
+        self.assertContains(response, "20261019-1")
         self.assertContains(response, "Image and file archive")
         self.assertContains(response, "Do not begin the content with a")
         self.assertContains(response, "position: sticky")
@@ -400,22 +400,24 @@ class NewStoryAlertTests(QuietTestCase):
     """Publishing a story (HOME.views.AddNewsView) must queue the new-story
     alert batch: everyone who has news alerts on AND follows this author, plus
     everyone who has news alerts on and follows no author at all. DEBUG mode
-    must never send anything, only report via info_logger."""
+    must never send anything, only report via info_logger. The newsletter is
+    opt-in: nothing goes out unless the editor posted `newsletter=1` (the
+    two-step placard in HOME/add_news.html asks the author twice)."""
 
     def setUp(self):
         super().setUp()
         self.author = make_staff("publisher@example.com")
         self.client.force_login(self.author)
 
-    def _publish(self, heading="New alert test story"):
-        return self.client.post(
-            reverse("home:add_news"),
-            {
-                "heading": heading,
-                "category": "GENERAL",
-                "content": PUBLISHABLE_BODY,
-            },
-        )
+    def _publish(self, heading="New alert test story", newsletter=True):
+        data = {
+            "heading": heading,
+            "category": "GENERAL",
+            "content": PUBLISHABLE_BODY,
+        }
+        if newsletter:
+            data["newsletter"] = "1"
+        return self.client.post(reverse("home:add_news"), data)
 
     def test_publish_queues_alert_for_followers_and_unfollowed_users_only(self):
         follower = Auth.objects.create_user(email="follower@example.com", send_newsletter=True)
@@ -508,6 +510,41 @@ class NewStoryAlertTests(QuietTestCase):
         html = build_html_for("reader@example.com")
         self.assertIn("choose the kind of email you receive", html)
         self.assertIn(f'href="{About.domain}/profile/"', html)
+
+    def test_publishing_without_choosing_the_newsletter_sends_nothing(self):
+        Auth.objects.create_user(email="follower@example.com", send_newsletter=True)
+
+        with mock.patch("HOME.views.ping_indexnow"), mock.patch(
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR"
+        ) as executor:
+            response = self._publish(newsletter=False)
+
+        self.assertEqual(response.status_code, 201)
+        executor.submit.assert_not_called()
+        self.assertFalse(response.json()["newsletter_sent"])
+
+    def test_choosing_the_newsletter_is_reported_back_to_the_editor(self):
+        with mock.patch("HOME.views.ping_indexnow"), mock.patch(
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR"
+        ):
+            response = self._publish()
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.json()["newsletter_sent"])
+
+    def test_editor_placard_is_given_the_real_audience_size(self):
+        follower = Auth.objects.create_user(email="follower@example.com", send_newsletter=True)
+        Auth.objects.create_user(email="quiet@example.com", send_newsletter=False)
+        AuthorFollow.objects.create(follower=follower, author=self.author)
+
+        response = self.client.get(reverse("home:add_news"))
+
+        self.assertEqual(response.status_code, 200)
+        #   The placard reads this JSON to say how many readers would actually
+        #   be emailed, so a quiet account must not be counted.
+        self.assertContains(response, 'id="news-alert-counts"')
+        counts = response.context["news_alert_counts"]
+        self.assertEqual(counts["GENERAL"], 1)
 
 
 class ProfileSignInRedirectTests(QuietTestCase):
