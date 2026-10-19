@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static seo_tags %}
 
 {% block adsense %}{% endblock %}
 {% block title %}Promote your business · {{ project_name }}{% endblock %}
@@ -11,6 +11,8 @@
 
 {% block extra_head %}
   {{ block.super }}
+  {% url 'home:home' as breadcrumb_home_url %}
+  {% breadcrumb_schema "Home" breadcrumb_home_url "Promote your business" %}
   <link rel="stylesheet" href="{% static 'home/css/promote.css' %}">
 {% endblock %}
 

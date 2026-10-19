@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static l10n archive_extras %}
+{% load static l10n archive_extras seo_tags %}
 
 {% block adsense %}{% endblock %}
 {% block title %}{{ display_name }} · {{ role_label }} · Portfolio · {{ project_name }}{% endblock %}
@@ -25,6 +25,9 @@
   <meta name="author" content="{{ display_name }} ({{ author.email }})">
   <meta property="profile:username" content="{{ display_name }}">
   <script type="application/ld+json">{{ person_schema_json | safe }}</script>
+  {% url 'home:home' as breadcrumb_home_url %}
+  {% url 'editorial_team' as breadcrumb_editorial_url %}
+  {% breadcrumb_schema "Home" breadcrumb_home_url "Editorial team" breadcrumb_editorial_url display_name %}
   <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}?v=20261013-1">
 {% endblock %}
 

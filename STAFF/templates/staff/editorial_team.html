@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static seo_tags %}
 
 {% block adsense %}{% endblock %}
 {% block title %}Editorial Team | Editors· {{ project_name }}{% endblock %}
@@ -22,6 +22,8 @@
 {% block extra_head %}
   {{ block.super }}
   <script type="application/ld+json">{{ team_schema_json|safe }}</script>
+  {% url 'home:home' as breadcrumb_home_url %}
+  {% breadcrumb_schema "Home" breadcrumb_home_url "Editorial Team" %}
   <link rel="stylesheet" href="{% static 'staff/css/editorial_team.css' %}?v=20261013-1">
 {% endblock %}
 

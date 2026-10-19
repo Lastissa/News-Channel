@@ -378,15 +378,20 @@ class PortfolioView(View):
         """JSON-LD Person so search engines capture the username, the email
         and every reach out link on the page."""
         from SERVICE_INTERNAL.config import About
+        from SERVICE_INTERNAL.schema import organization_id
 
         schema = {
             "@context": "https://schema.org",
             "@type": "Person",
+            "@id": f"{About.domain}{request.path}#person",
             "name": display_name,
             "email": f"mailto:{author.email}",
             "description": description[:300],
             "jobTitle": role_label,
-            "worksFor": {"@type": "Organization", "name": PortfolioView._project_name()},
+            #   Point at the shared publisher entity instead of repeating it,
+            #   so the author attaches to the same Organization node the
+            #   sitewide graph and every story's publisher use.
+            "worksFor": {"@id": organization_id()},
             #   REAL DOMAIN, NOT request.build_absolute_uri(): that reflects whatever
             #   host/IP/tunnel served the request, which hurts SEO ranking signals.
             "url": f"{About.domain}{request.path}",
@@ -409,6 +414,7 @@ class EditorialTeamView(View):
 
     def get(self, request):
         from SERVICE_INTERNAL.config import About
+        from SERVICE_INTERNAL.schema import organization_id
 
         today = timezone.localdate()
         #   The week runs Sunday to Saturday, so the "author of the week" is
@@ -493,6 +499,7 @@ class EditorialTeamView(View):
             {
                 "@type": "Person",
                 "name": member["display_name"],
+                "worksFor": {"@id": organization_id()},
                 **(
                     {
                         "url": (
@@ -509,8 +516,10 @@ class EditorialTeamView(View):
         team_schema = {
             "@context": "https://schema.org",
             "@type": "Organization",
+            "@id": f"{About.domain.rstrip('/')}{reverse('editorial_team')}#organization",
             "name": f"{About.project_name} Editorial Team",
             "url": f"{About.domain.rstrip('/')}{reverse('editorial_team')}",
+            "parentOrganization": {"@id": organization_id()},
             "member": person_schema,
         }
         team_schema_json = json.dumps(team_schema, ensure_ascii=False).replace("<", "\\u003c")

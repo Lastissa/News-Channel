@@ -77,18 +77,17 @@
     {% endblock og_image %}
     
     {% endblock %}
-    {% if social_links %}
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "NewsMediaOrganization",
-      "name": "{{ project_name|escapejs }}",
-      "url": "{{ site_domain }}/",
-      "logo": "{{ site_domain }}{% static 'logo.jpg' %}"
-
-    }
-    </script>
-    {% endif %}
+    {% comment %}
+      SITEWIDE JSON-LD ENTITY GRAPH: a NewsMediaOrganization (publisher) and a
+      WebSite with a SearchAction, built once in SERVICE_INTERNAL.schema and
+      shared by every page so the two @id values stay consistent. A page that
+      needs a DIFFERENT graph overrides this block outright; a page that only
+      needs to ADD a node (NewsArticle, Person, BreadcrumbList) leaves it
+      alone and points at `schema_organization_id` / `schema_website_id`.
+    {% endcomment %}
+    {% block structured_data %}
+    {% if site_schema_json %}<script type="application/ld+json">{{ site_schema_json|safe }}</script>{% endif %}
+    {% endblock structured_data %}
 </head>
 
 

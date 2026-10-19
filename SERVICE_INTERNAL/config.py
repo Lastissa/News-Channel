@@ -4,6 +4,7 @@ PROJECT CUSTOM CONFIGURATION FILE
 from django.conf import settings
 
 from SERVICE_INTERNAL.abstract import cache_or_run
+from SERVICE_INTERNAL.schema import organization_id, site_graph_json, website_id
 
 class About:
     project_name = "AbuReport"
@@ -103,7 +104,7 @@ def custom_context_processors(request):
     social_links = [url for url in (facebook, tweeter, whatsapp, About.instagram, About.linkedin) if url]
     twitter_username = tweeter.rstrip("/").split("/")[-1] if tweeter else default_social
 
-    return {
+    context = {
         "project_name": About.project_name,
         "version": About.version,
         'project_cachphrase': About.project_cachphrase,
@@ -128,3 +129,14 @@ def custom_context_processors(request):
         #   (e.g. Google AdSense in base.html) off localhost/dev entirely.
         'debug': settings.DEBUG,
     }
+
+    #   SITEWIDE JSON-LD ENTITY GRAPH (NewsMediaOrganization + WebSite with a
+    #   SearchAction), built once from the values above and rendered in
+    #   base.html. The two @id values are exposed too so a page's own nodes
+    #   (NewsArticle, Person, ...) can point at the shared entity instead of
+    #   repeating it. A page that needs a different graph overrides the
+    #   `structured_data` block in base.html.
+    context['site_schema_json'] = site_graph_json(context)
+    context['schema_organization_id'] = organization_id()
+    context['schema_website_id'] = website_id()
+    return context

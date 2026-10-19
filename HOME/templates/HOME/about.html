@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static archive_extras %}
+{% load static archive_extras seo_tags %}
 
 {% block adsense %}{% endblock %}
 {% block title %}About {{ project_name }} · {{ project_cachphrase }}{% endblock %}
@@ -18,14 +18,12 @@
     "@type": "AboutPage",
     "name": "About {{ project_name|escapejs }}",
     "url": "{{ site_domain }}{% url 'home:about' %}",
-    "mainEntity": {
-      "@type": "NewsMediaOrganization",
-      "name": "{{ project_name|escapejs }}",
-      "url": "{{ site_domain }}/",
-      "logo": "{{ site_domain }}{% static 'logo.jpg' %}"
-    }
+    "isPartOf": {"@id": "{{ schema_website_id }}"},
+    "mainEntity": {"@id": "{{ schema_organization_id }}"}
   }
   </script>
+  {% url 'home:home' as breadcrumb_home_url %}
+  {% breadcrumb_schema "Home" breadcrumb_home_url "About us" %}
   <link rel="stylesheet" href="{% static 'home/css/about.css' %}?v=20261013-6">
 {% endblock %}
 

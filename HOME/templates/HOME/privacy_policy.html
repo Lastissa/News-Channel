@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static seo_tags %}
 
 {% block adsense %}{% endblock %}
 {% block title %}Privacy Policy · {{ project_name }}{% endblock %}
@@ -7,6 +7,8 @@
 
 {% block extra_head %}
   {{ block.super }}
+  {% url 'home:home' as breadcrumb_home_url %}
+  {% breadcrumb_schema "Home" breadcrumb_home_url "Privacy Policy" %}
   <link rel="stylesheet" href="{% static 'home/css/privacy-policy.css' %}?v=20261013-4">
 {% endblock %}
 
