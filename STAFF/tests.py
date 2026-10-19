@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog
+from SERVICE_INTERNAL.config import About
 from STAFF.models import StaffProfile
 
 
@@ -81,6 +82,14 @@ class PortfolioFeedTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'id="portfolio-bio"')
+
+    def test_portfolio_schema_is_a_profile_page_for_the_author(self):
+        response = self.client.get(reverse("staff:portfolio", args=[self.profile.slug]))
+
+        self.assertContains(response, '"@type": "ProfilePage"')
+        self.assertContains(response, f"/portfolio/{self.profile.slug}/#person")
+        self.assertContains(response, '"@type": "Person"')
+        self.assertContains(response, '"worksFor": {"@id"')
 
     def test_feed_endpoint_returns_next_slice_and_pagination_headers(self):
         final_story = self.stories[0]
@@ -242,6 +251,16 @@ class EditorialTeamPageTests(TestCase):
 
         portfolio_url = reverse("staff:portfolio", args=[self.profile.slug])
         self.assertContains(response, f'<a class="ef-ph" href="{portfolio_url}"')
+
+    def test_editorial_members_carry_the_same_person_id_as_the_portfolio(self):
+        response = self.client.get(reverse("editorial_team"))
+
+        self.assertContains(
+            response,
+            f'"@id": "{About.domain}/portfolio/{self.profile.slug}/#person"',
+        )
+        self.assertContains(response, '"@type": "Person"')
+        self.assertContains(response, '"knowsAbout": ["Education"]')
 
     def test_editorial_page_shows_yet_to_decide_when_nobody_published_this_week(self):
         Blog.objects.filter(author=self.author).update(

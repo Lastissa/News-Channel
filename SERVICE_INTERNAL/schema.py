@@ -202,6 +202,128 @@ def breadcrumb_list(items, context=None):
     return node
 
 
+def person_id(slug):
+    """The stable ``@id`` of one author entity, keyed on the portfolio URL.
+
+    Both the author's portfolio page and every story they wrote point at this
+    exact value, so search engines and answer engines resolve the byline on a
+    story and the portfolio page to a SINGLE Person instead of two unrelated
+    nodes. An author with no portfolio slug has no stable id and is left
+    anonymous rather than given an invented one."""
+    return f"{domain()}/portfolio/{slug}/#person"
+
+
+def person_node(
+    *,
+    name,
+    slug="",
+    url="",
+    image="",
+    description="",
+    job_title="",
+    same_as=(),
+    knows_about=(),
+    email="",
+    hire_date="",
+):
+    """The author as a schema.org ``Person`` -- the one definition every page
+    that mentions them reuses.
+
+    ``slug`` (the portfolio slug) makes the entity stable: when it is set the
+    node carries ``person_id(slug)`` and a URL, so a story's ``author`` and the
+    portfolio's ``mainEntity`` are literally the same node. Without a slug the
+    node is still valid but anonymous. ``worksFor`` ties the person to the
+    shared publisher entity (E-E-A-T). Only real, non-placeholder profile links
+    survive as ``sameAs``.
+    """
+    node = {"@type": "Person", "name": name}
+    if slug:
+        node["@id"] = person_id(slug)
+        node["url"] = url or f"{domain()}/portfolio/{slug}/"
+    elif url:
+        node["url"] = url
+
+    if image:
+        node["image"] = image
+    if description:
+        node["description"] = description
+    if job_title:
+        node["jobTitle"] = job_title
+
+    profiles = []
+    for value in same_as or ():
+        clean = _clean_external_url(value)
+        if clean and clean not in profiles:
+            profiles.append(clean)
+    if profiles:
+        node["sameAs"] = profiles
+
+    beats = [str(beat).strip() for beat in (knows_about or ()) if str(beat).strip()]
+    if beats:
+        node["knowsAbout"] = beats
+
+    if email:
+        node["email"] = email
+    if hire_date:
+        node["hireDate"] = hire_date
+
+    node["worksFor"] = {"@id": organization_id()}
+    return node
+
+
+def profile_page_node(*, url, name, person, description=""):
+    """A ``ProfilePage`` whose ``mainEntity`` is the author's ``person`` node,
+    the shape Google expects for an author/portfolio page."""
+    node = {
+        "@type": "ProfilePage",
+        "@id": f"{url}#profilepage",
+        "url": url,
+        "name": name,
+        "mainEntity": person,
+    }
+    if description:
+        node["description"] = description
+    return node
+
+
+def news_article_node(
+    *,
+    headline,
+    url,
+    description,
+    author,
+    image="",
+    date_published="",
+    date_modified="",
+    section="",
+    word_count=0,
+):
+    """A ``NewsArticle`` for one story, with the shared publisher/WebSite
+    entities referenced by ``@id`` and ``author`` given as a full ``person_node``
+    so the byline resolves to the author's stable entity."""
+    node = {
+        "@type": "NewsArticle",
+        "@id": f"{url}#article",
+        "headline": headline,
+        "description": description,
+        "url": url,
+        "datePublished": date_published,
+        "dateModified": date_modified or date_published,
+        "inLanguage": "en-NG",
+        "author": author,
+        "publisher": {"@id": organization_id()},
+        "isPartOf": {"@id": website_id()},
+        "mainEntityOfPage": {"@type": "WebPage", "@id": url},
+    }
+    if section:
+        node["articleSection"] = section
+    if image:
+        node["image"] = {"@type": "ImageObject", "url": image}
+    if word_count:
+        node["wordCount"] = word_count
+    return node
+
+
 def dumps(node):
     """Encode a node for a <script type="application/ld+json"> block. ``<`` is
     escaped so user text (a headline, a bio) can never close the script tag

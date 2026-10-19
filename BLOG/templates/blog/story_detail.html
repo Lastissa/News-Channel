@@ -28,30 +28,12 @@
   <meta property="article:published_time" content="{{ blog.date_created|date:'c' }}">
   <meta property="article:author" content="{{ blog.author_name }}">
   <meta property="article:section" content="{{ blog.get_category_display|title }}">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    "@id": "{{ site_domain }}{{ request.path }}#article",
-    "headline": "{{ blog.heading|escapejs }}",
-    "description": "{% if excerp %}{{ excerp|escapejs }}{% else %}{{ blog.heading|escapejs }} - read the full report on {{ project_name|escapejs }}.{% endif %}",
-    {% if blog.image_1 %}"image": {"@type": "ImageObject", "url": "{{ blog.image_1|cloudinary_proxy|archive_absolute_url:request|escapejs }}"},{% endif %}
-    "datePublished": "{{ blog.date_created|date:'c' }}",
-    "dateModified": "{{ blog.last_updated|date:'c' }}",
-    "inLanguage": "en-NG",
-    "url": "{{ site_domain }}{{ request.path }}",
-    "author": {
-      "@type": "Person",
-      "name": "{{ blog.author_name|escapejs }}"{% if author_portfolio_url %},
-      "url": "{{ site_domain }}{{ author_portfolio_url }}"{% endif %}
-    },
-    "publisher": {"@id": "{{ schema_organization_id }}"},
-    "isPartOf": {"@id": "{{ schema_website_id }}"},
-    "mainEntityOfPage": {"@type": "WebPage", "@id": "{{ site_domain }}{{ request.path }}"},
-    "articleSection": "{{ blog.get_category_display|escapejs }}",
-    "wordCount": {{ blog.word_count }}
-  }
-  </script>
+  {% comment %}
+    The NewsArticle (and its author Person) is built in the view via
+    SERVICE_INTERNAL.schema so the byline shares the exact same @id as the
+    author's portfolio page.
+  {% endcomment %}
+  <script type="application/ld+json">{{ article_schema_json|safe }}</script>
   {% url 'home:home' as breadcrumb_home_url %}
   {% url 'home:category' blog.category|slugify as breadcrumb_category_url %}
   {% breadcrumb_schema "Home" breadcrumb_home_url blog.get_category_display|title breadcrumb_category_url blog.heading %}

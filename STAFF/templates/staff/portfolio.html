@@ -162,12 +162,11 @@
   </header>
 
   {% comment %}
-    Author bio, shown for transparency. It was retired by accident with the
-    old analytics dashboard (the if-False block lower down), but the view still
-    feeds bio and uses it for the meta description and the Person schema. The
-    card styles already exist.
+    Author bio, shown for transparency and E-E-A-T: it is the on-page version of
+    the Person node's `description` in the JSON-LD above, and the view already
+    feeds `bio` for the meta description.
   {% endcomment %}
-  {% comment %} {% if bio %}
+  {% if bio %}
   <div class="portfolio-grid portfolio-about">
     <article class="portfolio-card" id="portfolio-bio">
       <header class="portfolio-card-head">
@@ -177,7 +176,7 @@
       <p class="portfolio-prose">{{ bio|linebreaksbr }}</p>
     </article>
   </div>
-  {% endif %} {% endcomment %}
+  {% endif %}
 
   <div class="portfolio-content-layout">
     <section class="portfolio-feed" id="portfolio-feed"

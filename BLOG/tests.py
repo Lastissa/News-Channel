@@ -20,6 +20,7 @@ from BLOG.models import Blog, BlogLike, Comment
 from BLOG.views import parse_story_content, StoryDetailView, enhance_story_body
 from HOME.models import Bookmark
 from SERVICE_INTERNAL.abstract import is_bot_request
+from SERVICE_INTERNAL.config import About
 from STAFF.models import StaffProfile
 
 
@@ -779,6 +780,80 @@ class StoryWithoutStaffProfileTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertContains(response, "Unverified Author", status_code=404)
         self.assertContains(response, "noindex", status_code=404)
+
+
+class StoryAuthorEntityTests(TestCase):
+    """The /story/<slug>/ NewsArticle names the same Person @id as the author's
+    /portfolio/<slug>/ ProfilePage, so a byline and a portfolio are ONE entity
+    (E-E-A-T) instead of two unrelated nodes."""
+
+    def setUp(self):
+        self.author = Auth.objects.create_user(
+            email="entity-author@example.com",
+            is_staff=True,
+            profile_img="https://example.com/avatar.jpg",
+        )
+        self.profile = StaffProfile.objects.create(
+            auth=self.author,
+            gender="F",
+            full_name="Entity Author",
+            role="JOURNALIST",
+            bio="Covers education and policy.",
+            speciality=["Education", "Policy"],
+            twitter_handle="https://x.com/entityauthor",
+        )
+        self.story = Blog.objects.create(
+            author=self.author,
+            category="GENERAL",
+            heading="Entity graph story",
+            content="Opening paragraph for the entity story.",
+        )
+
+    @staticmethod
+    def _nodes(response):
+        import re
+
+        blocks = re.findall(
+            r'<script type="application/ld\+json">(.*?)</script>',
+            response.content.decode(),
+            re.S,
+        )
+        return [json.loads(block) for block in blocks]
+
+    def _article(self, response):
+        for node in self._nodes(response):
+            if node.get("@type") == "NewsArticle":
+                return node
+        return None
+
+    def test_story_author_is_the_same_entity_as_the_portfolio(self):
+        expected_id = f"{About.domain}/portfolio/{self.profile.slug}/#person"
+
+        article = self._article(self.client.get(reverse("blog:story_detail", args=[self.story.slug])))
+        self.assertIsNotNone(article)
+        self.assertEqual(article["author"]["@type"], "Person")
+        self.assertEqual(article["author"]["@id"], expected_id)
+        self.assertEqual(article["author"]["knowsAbout"], ["Education", "Policy"])
+        self.assertEqual(article["author"]["worksFor"]["@id"], f"{About.domain}/#organization")
+
+        profile_nodes = self._nodes(
+            self.client.get(reverse("staff:portfolio", args=[self.profile.slug]))
+        )
+        profile_pages = [node for node in profile_nodes if node.get("@type") == "ProfilePage"]
+        self.assertTrue(profile_pages)
+        self.assertEqual(profile_pages[0]["mainEntity"]["@id"], expected_id)
+
+    def test_story_article_carries_headline_dates_and_word_count(self):
+        article = self._article(
+            self.client.get(reverse("blog:story_detail", args=[self.story.slug]))
+        )
+
+        self.assertEqual(article["@type"], "NewsArticle")
+        self.assertEqual(article["headline"], "Entity graph story")
+        self.assertTrue(article["datePublished"])
+        self.assertTrue(article["dateModified"])
+        self.assertGreater(article["wordCount"], 0)
+        self.assertEqual(article["mainEntityOfPage"]["@id"], article["url"])
 
 
 class Bug1ViewCountUnitExplorationTest(TestCase):

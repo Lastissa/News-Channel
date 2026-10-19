@@ -886,9 +886,56 @@ class StoryDetailView(View):
         #   imgl/imgr/imgc/filel token down to just its alt/link text, so one
         #   never leaks into the <head> (see StoryDetailView.get context).
         og_descr = _build_meta_description(blog.content) or (blog.heading or "")
+
+        #   STRUCTURED DATA: the story's NewsArticle, with its `author` built as
+        #   a full Person node from the shared schema builder. The Person's @id
+        #   is keyed on the author's portfolio slug, so this byline and the
+        #   author's portfolio page resolve to ONE entity (E-E-A-T) instead of
+        #   two unrelated nodes, and `worksFor` attaches it to the publisher.
+        #   The image is the same same-origin cdn URL the page renders, resolved
+        #   against the canonical domain (never the request host).
+        from ARCHIVE.templatetags.archive_extras import cloudinary_proxy
+        from SERVICE_INTERNAL.config import About, StaffConfig
+        from SERVICE_INTERNAL.schema import dumps, news_article_node, person_node
+        from STAFF.views import _portfolio_socials
+
+        author_schema = person_node(
+            name=blog.author_name,
+            slug=author_profile.slug or "",
+            url=f"{About.domain}{author_portfolio_url}" if author_portfolio_url else "",
+            image=blog.author.profile_img or "",
+            description=(author_profile.bio or "").strip()[:300],
+            job_title=StaffConfig.role_label(author_profile.role) if author_profile.role else "",
+            same_as=[social["url"] for social in _portfolio_socials(author_profile, blog.author_name)],
+            knows_about=author_tags,
+        )
+        article_image = ""
+        if blog.image_1:
+            proxied = cloudinary_proxy(blog.image_1)
+            article_image = f"{About.domain}{proxied}" if str(proxied).startswith("/") else str(proxied)
+        article_schema_json = dumps(
+            {
+                "@context": "https://schema.org",
+                **news_article_node(
+                    headline=blog.heading,
+                    url=f"{About.domain}{request.path}",
+                    description=og_descr,
+                    author=author_schema,
+                    image=article_image,
+                    date_published=blog.date_created.isoformat() if blog.date_created else "",
+                    date_modified=(
+                        (blog.last_updated or blog.date_created).isoformat() if blog.date_created else ""
+                    ),
+                    section=blog.get_category_display(),
+                    word_count=blog.word_count,
+                ),
+            }
+        )
+
         context = {
             "blog": blog,
             'excerp': og_descr,
+            "article_schema_json": article_schema_json,
             "blog_content_html": blog_content,
             "ticker_text": ticker_text,
             "comments": comments,

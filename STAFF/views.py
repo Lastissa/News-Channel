@@ -1,6 +1,5 @@
 """Public author portfolio and reader-facing author follow."""
 
-import json
 import logging
 import re
 from datetime import date, datetime, time, timedelta
@@ -362,7 +361,8 @@ class PortfolioView(View):
             "meta_description": description_source[:300],
             "page_og_image": author.profile_img or None,
             "person_schema_json": self._person_schema(
-                request, author, display_name, bio or description_source, role_label, socials, speciality
+                request, author, display_name, bio or description_source, role_label, socials, speciality,
+                slug=profile.slug if profile else "",
             ),
         }
         return render(request, "staff/portfolio.html", context)
@@ -374,47 +374,45 @@ class PortfolioView(View):
         return About.project_name
 
     @staticmethod
-    def _person_schema(request, author, display_name, description, role_label, socials, speciality):
-        """JSON-LD Person so search engines capture the username, the email
-        and every reach out link on the page."""
-        from SERVICE_INTERNAL.config import About
-        from SERVICE_INTERNAL.schema import organization_id
+    def _person_schema(request, author, display_name, description, role_label, socials, speciality, slug=""):
+        """JSON-LD for the portfolio: a ProfilePage whose mainEntity is the
+        author's Person node.
 
-        schema = {
-            "@context": "https://schema.org",
-            "@type": "Person",
-            "@id": f"{About.domain}{request.path}#person",
-            "name": display_name,
-            "email": f"mailto:{author.email}",
-            "description": description[:300],
-            "jobTitle": role_label,
-            #   Point at the shared publisher entity instead of repeating it,
-            #   so the author attaches to the same Organization node the
-            #   sitewide graph and every story's publisher use.
-            "worksFor": {"@id": organization_id()},
-            #   REAL DOMAIN, NOT request.build_absolute_uri(): that reflects whatever
-            #   host/IP/tunnel served the request, which hurts SEO ranking signals.
-            "url": f"{About.domain}{request.path}",
-        }
-        if author.profile_img:
-            schema["image"] = author.profile_img
-        if author.date_joined:
-            schema["hireDate"] = author.date_joined.date().isoformat()
-        if speciality:
-            schema["knowsAbout"] = speciality
-        same_as = [social["url"] for social in socials]
-        if same_as:
-            schema["sameAs"] = same_as
-        #   Encode < so a bio can never close the script tag early.
-        return json.dumps(schema, ensure_ascii=False).replace("<", "\\u003c")
+        The Person is built by SERVICE_INTERNAL.schema.person_node -- the same
+        builder every one of the author's stories uses for its ``author`` -- so
+        the byline on a story and this portfolio resolve to ONE entity with one
+        ``@id`` (E-E-A-T), and ``worksFor`` attaches that entity to the shared
+        Organization node instead of repeating it.
+        """
+        from SERVICE_INTERNAL.config import About
+        from SERVICE_INTERNAL.schema import dumps, person_node, profile_page_node
+
+        #   REAL DOMAIN, NOT request.build_absolute_uri(): that reflects whatever
+        #   host/IP/tunnel served the request, which hurts SEO ranking signals.
+        url = f"{About.domain}{request.path}"
+        person = person_node(
+            name=display_name,
+            slug=slug,
+            url=url,
+            image=author.profile_img or "",
+            description=description[:300],
+            job_title=role_label,
+            same_as=[social["url"] for social in socials],
+            knows_about=speciality,
+            email=author.email,
+            hire_date=author.date_joined.date().isoformat() if author.date_joined else "",
+        )
+        page = profile_page_node(url=url, name=display_name, person=person, description=description[:300])
+        #   dumps() escapes < so a bio can never close the script tag early.
+        return dumps({"@context": "https://schema.org", **page})
 
 
 class EditorialTeamView(View):
     """Public directory of active editorial accounts and their published work."""
 
     def get(self, request):
-        from SERVICE_INTERNAL.config import About
-        from SERVICE_INTERNAL.schema import organization_id
+        from SERVICE_INTERNAL.config import About, StaffConfig
+        from SERVICE_INTERNAL.schema import dumps, organization_id, person_node
 
         today = timezone.localdate()
         #   The week runs Sunday to Saturday, so the "author of the week" is
@@ -495,22 +493,27 @@ class EditorialTeamView(View):
         team_story_total = sum(member["story_count"] for member in members)
         writer_word = "writer" if len(members) == 1 else "writers"
 
+        #   Each member is built by the shared person_node builder, so the
+        #   directory points at the SAME Person @id their portfolio and their
+        #   stories use -- one author entity sitewide, not a fourth copy.
         person_schema = [
-            {
-                "@type": "Person",
-                "name": member["display_name"],
-                "worksFor": {"@id": organization_id()},
-                **(
-                    {
-                        "url": (
-                            f"{About.domain.rstrip('/')}"
-                            f"{reverse('staff:portfolio', args=[member['slug']])}"
-                        )
-                    }
+            person_node(
+                name=member["display_name"],
+                slug=member["slug"],
+                url=(
+                    f"{About.domain.rstrip('/')}"
+                    f"{reverse('staff:portfolio', args=[member['slug']])}"
                     if member["slug"]
-                    else {}
+                    else ""
                 ),
-            }
+                image=member["portrait"],
+                job_title=(
+                    StaffConfig.role_label(member["profile"].role)
+                    if member["profile"] and member["profile"].role
+                    else ""
+                ),
+                knows_about=member["speciality"],
+            )
             for member in members
         ]
         team_schema = {
@@ -522,7 +525,7 @@ class EditorialTeamView(View):
             "parentOrganization": {"@id": organization_id()},
             "member": person_schema,
         }
-        team_schema_json = json.dumps(team_schema, ensure_ascii=False).replace("<", "\\u003c")
+        team_schema_json = dumps(team_schema)
         return render(
             request,
             "staff/editorial_team.html",
