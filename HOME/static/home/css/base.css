@@ -2730,6 +2730,27 @@ a:focus:not(:focus-visible) {
   border-radius: 8px;
 }
 
+/*  Provider embeds in the theatre: a fixed 16:9 box, same backdrop blur /
+    feel as the inline embed but fills the stage. The inline .is-embed uses
+    the same styling in spirit, the theatre replaces its inner HTML so this
+    targets that container. */
+.video-theatre-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.video-theatre-embed {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
 .video-theatre-close {
   position: absolute;
   top: 8px;

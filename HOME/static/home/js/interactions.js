@@ -2576,12 +2576,14 @@
      the archive (which extends base.html) already defer this same file. */
   (function initVideoTheatre() {
     var SPEEDS = [0.5, 1, 2, 10];
-    var SOURCE_SELECTOR = ".story-inline-video video, .archive-videotile video";
+    var SOURCE_SELECTOR = ".story-inline-video video, .story-inline-video iframe.story-inline-video-embed, .archive-videotile video";
 
     var overlay = null;
     var stageVideo = null;
+    var stageFrame = null;
     var speedButtons = [];
     var sourceVideo = null;
+    var sourceFrame = null;
     var sourceWasPlaying = false;
     var lastFocus = null;
 
@@ -2604,12 +2606,13 @@
           '<button type="button" class="video-theatre-close" data-theatre-close aria-label="Close video">' +
             '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
           '</button>' +
-          '<video class="video-theatre-el" controls playsinline preload="metadata"></video>' +
+          '<div class="video-theatre-media" data-theatre-media></div>' +
           '<div class="video-theatre-tools" data-theatre-tools role="group" aria-label="Playback speed"></div>' +
         '</div>';
       document.body.appendChild(overlay);
 
-      stageVideo = overlay.querySelector(".video-theatre-el");
+      stageVideo = null;
+      stageFrame = null;
       var tools = overlay.querySelector("[data-theatre-tools]");
       SPEEDS.forEach(function (rate) {
         var btn = document.createElement("button");
@@ -2635,48 +2638,91 @@
     function open(source) {
       if (!source) return;
       build();
-      sourceVideo = source;
-      sourceWasPlaying = !source.paused;
-      try { source.pause(); } catch (err) { /* already stopped */ }
-
-      var src = source.getAttribute("src") || source.getAttribute("data-src") || "";
-      if (!src) {
-        var sourceTag = source.querySelector("source");
-        if (sourceTag) src = sourceTag.getAttribute("src") || "";
+      sourceVideo = null;
+      sourceFrame = null;
+      var isFrame = source.tagName === "IFRAME";
+      if (isFrame) {
+        sourceFrame = source;
+      } else {
+        sourceVideo = source;
+        sourceWasPlaying = !source.paused;
+        try { source.pause(); } catch (err) { /* already stopped */ }
       }
-      if (!src) return;
+
+      var media = overlay.querySelector("[data-theatre-media]");
+      if (!media) return;
+      media.innerHTML = "";
+
+      if (isFrame) {
+        var srcFrame = source.getAttribute("src") || "";
+        if (!srcFrame) return;
+        var iframe = document.createElement("iframe");
+        iframe.className = "video-theatre-embed";
+        iframe.setAttribute("src", srcFrame);
+        iframe.setAttribute("allowfullscreen", "");
+        iframe.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture; fullscreen");
+        iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+        iframe.setAttribute("title", source.getAttribute("title") || "Video");
+        media.appendChild(iframe);
+        stageFrame = iframe;
+        stageVideo = null;
+        overlay.classList.add("video-theatre--embed");
+      } else {
+        var src = source.getAttribute("src") || source.getAttribute("data-src") || "";
+        if (!src) {
+          var sourceTag = source.querySelector("source");
+          if (sourceTag) src = sourceTag.getAttribute("src") || "";
+        }
+        if (!src) return;
+        var videoEl = document.createElement("video");
+        videoEl.className = "video-theatre-el";
+        videoEl.setAttribute("controls", "");
+        videoEl.setAttribute("playsinline", "");
+        videoEl.setAttribute("preload", "metadata");
+        videoEl.setAttribute("src", src);
+        media.appendChild(videoEl);
+        stageVideo = videoEl;
+        stageFrame = null;
+        overlay.classList.remove("video-theatre--embed");
+        stageVideo.muted = false;
+        stageVideo.volume = 1;
+        if (stageVideo.currentSrc === src) {
+          try { stageVideo.currentTime = source.currentTime || 0; } catch (err) {}
+        } else {
+          stageVideo.load();
+        }
+        setSpeed(1);
+        var played = stageVideo.play();
+        if (played && played.catch) played.catch(function () { /* gesture blocked */ });
+      }
 
       lastFocus = document.activeElement;
       overlay.hidden = false;
       document.body.classList.add("video-theatre-open");
-      stageVideo.muted = false;
-      stageVideo.volume = 1;
-      stageVideo.setAttribute("src", src);
-      if (stageVideo.currentSrc === src) {
-        try { stageVideo.currentTime = source.currentTime || 0; } catch (err) {}
-      } else {
-        stageVideo.load();
-      }
-      setSpeed(1);
-      var played = stageVideo.play();
-      if (played && played.catch) played.catch(function () { /* gesture blocked */ });
       var closeBtn = overlay.querySelector("[data-theatre-close]");
       if (closeBtn) closeBtn.focus({ preventScroll: true });
     }
 
     function close() {
       if (!overlay || overlay.hidden) return;
-      try { stageVideo.pause(); } catch (err) {}
-      stageVideo.removeAttribute("src");
-      try { stageVideo.load(); } catch (err) {}
+      if (stageVideo) {
+        try { stageVideo.pause(); } catch (err) {}
+        try { stageVideo.removeAttribute("src"); stageVideo.load(); } catch (err) {}
+      }
+      if (stageFrame) {
+        try { stageFrame.removeAttribute("src"); stageFrame.setAttribute("src", "about:blank"); } catch (err) {}
+      }
       setSpeed(1);
       overlay.hidden = true;
       document.body.classList.remove("video-theatre-open");
       if (sourceVideo && sourceWasPlaying) {
-        var resumed = sourceVideo.play();
-        if (resumed && resumed.catch) resumed.catch(function () { /* autoplay blocked */ });
+        try {
+          var resumed = sourceVideo.play();
+          if (resumed && resumed.catch) resumed.catch(function () { /* autoplay blocked */ });
+        } catch (err) { /* ignore */ }
       }
       sourceVideo = null;
+      sourceFrame = null;
       var focusBack = lastFocus;
       lastFocus = null;
       if (focusBack && document.contains(focusBack) && focusBack.focus) {

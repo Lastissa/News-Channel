@@ -64,7 +64,7 @@ TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE 
 #   "CONTINUE READING" POPUP (HOME/partials/continue_popup.html). How many
 #   last-read stories get pinned at the top, and how many recommendation
 #   stories load per slice in the feed below them.
-CONTINUE_RECENT_COUNT = 3
+CONTINUE_RECENT_COUNT = 5
 CONTINUE_PAGE_SIZE = 6
 CONTINUE_GUEST_COUNT = 6  #   STORIES IN THE RANDOM-CATEGORY GUEST GRID
 CONTINUE_GUEST_MIN = 3  #   PREFER A RANDOM CATEGORY WITH AT LEAST THIS MANY STORIES
