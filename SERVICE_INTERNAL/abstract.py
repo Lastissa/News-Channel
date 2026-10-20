@@ -133,8 +133,12 @@ BOT_USER_AGENT_MARKERS = (
     #   ---- ADDED: crawlers/clients seen in production logs (Oct 2026) whose
     #   UA does not necessarily contain one of the generic tokens above ----
     #   AI / LLM and answer-engine fetchers
-    "chatgpt-user", "cohere-ai", "anthropic-ai", "claude-web", "perplexity",
-    "meta-externalagent", "apis-google",
+    "chatgpt-user", "cohere-ai", "anthropic-ai", "claude-web", "claudebot", "perplexity",
+    "meta-externalagent", "apis-google", "google-extended", "gptbot", "oai-searchbot",
+    "openai", "gemini", "googlebot-news", "bingbot", "duckduckbot", "ccbot", "amazonbot",
+    "petalbot", "yandexbot", "seznambot", "dotbot", "ahrefsbot", "semrushbot",
+    "mj12bot", "blexbot", "bytespider", "imagesiftbot", "tiktokspider", "kagibot",
+    "diffbot", "exabot", "turnitinbot", "sogou web spider", "coccocbot", "uptimebot",
     #   search engines and SEO crawlers the generic tokens miss
     "seznam", "megaindex", "qwantify", "screaming frog", "baidu", "sogou",
     "yisou", "yeti/", "google-read-aloud",
@@ -142,7 +146,7 @@ BOT_USER_AGENT_MARKERS = (
     "feedfetcher", "feedly", "feedspot", "inoreader", "newsblur", "feedbin",
     "superfeedr",
     #   social / chat link-preview fetchers not caught above
-    "slack-imgproxy",
+    "slack-imgproxy", "twitterbot", "telegrambot", "whatsapp", "skypeuripreview",
     #   HTTP clients and scripted libraries a real browser never sends
     "httpx", "aiohttp", "node-fetch", "undici", "got (", "guzzle", "http.rb",
     "ruby/", "php/", "dart/", "deno/", "bun/", "powershell", "winhttp",

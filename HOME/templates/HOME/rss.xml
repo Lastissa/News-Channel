@@ -12,7 +12,7 @@
     <title>{{ project_name }}</title>
     <link>{{ domain }}/</link>
     <description>{{ project_name }} | {{ catchphrase }} Latest verified news and reports across many genres, with a strong focus on Nigeria and Africa.</description>
-    <language>en-ng</language>
+    <language>en-NG</language>
     <lastBuildDate>{% now "r" %}</lastBuildDate>
     <generator>{{ project_name }}</generator>
     <atom:link href="{{ feed_url }}" rel="self" type="application/rss+xml"/>

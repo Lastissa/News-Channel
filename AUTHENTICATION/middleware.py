@@ -80,11 +80,14 @@ class AdminMaxPeriod:
         # ADMIN HAVE TO BE LOGGED OUT FAST TO PREVENT HAKCER USING THEIR CREDS.
         if request.user.is_authenticated and request.user.is_admin:
             tracker = request.session.get('last_activity')
-            if not tracker:
-                request.session['last_activity'] = time.time()
-            if tracker and time.time() - tracker > getattr(settings, "ADMIN_MAX_AGE_TOO", 1*60*60):  # 1 day
+            now = time.time()
+            timeout = getattr(settings, "ADMIN_MAX_AGE_TOO", 1 * 60 * 60)
+            if tracker and now - tracker > timeout:
                 logout(request)
                 from django.contrib import messages
+
                 messages.error(request, "ADMIN (logged out)!")
-            
+                return redirect("auth:login")
+            request.session['last_activity'] = now
+
         return self.get_response(request)

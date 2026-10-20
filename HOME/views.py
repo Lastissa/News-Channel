@@ -145,7 +145,7 @@ class RobotsTxtView(View):
                 "Disallow: /_admin/",
                 "Disallow: /control/",
                 "Disallow: /sy/",
-                # "Disallow: /auth/", i will use noindex follow in the meta so it wont get index but itcan be crawled cos of othr pages linkage
+                "Disallow: /auth/",
                 "Disallow: /profile/",
                 "Disallow: /load-more/",
                 #   Fragment/AJAX endpoints, not standalone pages -- keep them
@@ -203,19 +203,20 @@ class SitemapXmlView(View):
                     "lastmod": item.date_created.date().isoformat() if item.date_created else "",
                 }
             )
+        today = timezone.localdate()
         urls = [
-            {"loc": f"{domain}/", "lastmod": "", "changefreq": "hourly", "priority": "1.0"},
-            {"loc": f"{domain}{reverse('home:about')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
+            {"loc": f"{domain}/", "lastmod": today.isoformat(), "changefreq": "hourly", "priority": "1.0"},
+            {"loc": f"{domain}{reverse('home:about')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
             #   /editorial/ is the public "who reports this and how" trust page;
             #   it carries the same E-E-A-T weight as /about/ and is indexable,
             #   so it belongs in the sitemap beside it.
-            {"loc": f"{domain}{reverse('editorial_team')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
-            {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": "", "changefreq": "yearly", "priority": "0.3"},
-            {"loc": f"{domain}{reverse('home:promote')}", "lastmod": "", "changefreq": "monthly", "priority": "0.5"},
+            {"loc": f"{domain}{reverse('editorial_team')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
+            {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": today.isoformat(), "changefreq": "yearly", "priority": "0.3"},
+            {"loc": f"{domain}{reverse('home:promote')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
             #   /archive/ now also carries every image/file's own real,
             #   same-domain cdn/ URL (see ARCHIVE.views.CloudinaryProxyView),
             #   so the gallery page itself is worth indexing for SEO too.
-            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod, "changefreq": "daily", "priority": "0.6", "images": archive_images},
+            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod.date().isoformat() if archive_lastmod else today.isoformat(), "changefreq": "daily", "priority": "0.6", "images": archive_images},
         ]
 
         #   PERMANENT CATEGORY PAGES: /category/<slog>/ is a stable landing page
@@ -235,7 +236,7 @@ class SitemapXmlView(View):
             urls.append(
                 {
                     "loc": f"{domain}{reverse('home:category', args=[slugify(name)])}",
-                    "lastmod": "",
+                    "lastmod": today.isoformat(),
                     "changefreq": "daily",
                     "priority": "0.7",
                 }
@@ -269,7 +270,7 @@ class SitemapXmlView(View):
             urls.append(
                 {
                     "loc": f"{domain}{reverse('staff:portfolio', args=[profile.slug])}",
-                    "lastmod": "",
+                    "lastmod": today.isoformat(),
                     "changefreq": "weekly",
                     "priority": "0.6",
                 }
