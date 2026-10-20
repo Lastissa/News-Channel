@@ -2019,6 +2019,17 @@ class StoryFeedTests(QuietTestCase):
         self.assertContains(response, "/rss.xml")
         self.assertContains(response, "/atom.xml")
 
+    def test_robots_and_llms_txt_point_at_both_feeds(self):
+        robots = self.client.get("/robots.txt")
+
+        self.assertContains(robots, "/rss.xml")
+        self.assertContains(robots, "/atom.xml")
+
+        llms = self.client.get("/llms.txt")
+
+        self.assertContains(llms, "/rss.xml")
+        self.assertContains(llms, "/atom.xml")
+
 
 class ArchiveUploadAlertToggleTests(QuietTestCase):
     """The archive upload alert switch is a superuser-only setting on the single

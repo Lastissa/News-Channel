@@ -153,6 +153,10 @@ class RobotsTxtView(View):
                 "Disallow: /promote-ads/",
                 "",
                 f"Sitemap: {domain}/sitemap.xml",
+                #   Syndication discovery: aggregators and feed readers read the
+                #   same two feeds every page <head> advertises.
+                f"# RSS: {domain}/rss.xml",
+                f"# Atom: {domain}/atom.xml",
             ]
         )
         return HttpResponse(body, content_type="text/plain; charset=utf-8")
@@ -367,7 +371,8 @@ class LlmsTxtView(View):
             f"- [Advertise and partner with us]({domain}{reverse('home:promote')})",
             f"- [Author handbook]({domain}{reverse('home:author_handbook')}): the writing and formatting guide for our reporters.",
             f"- [Sitemap]({domain}/sitemap.xml): a machine-readable list of every story, category and portfolio.",
-            f"- [RSS feed]({domain}/rss.xml): the newest stories, newest first, in a standard feed.",
+            f"- [RSS feed]({domain}/rss.xml): the newest stories, newest first, in a standard RSS 2.0 feed.",
+            f"- [Atom feed]({domain}/atom.xml): the same newest stories as Atom 1.0, for readers and aggregators that only speak Atom.",
             f"- [Robots]({domain}/robots.txt)",
             "",
             f"Story URLs look like {domain}/story/<slug>-<id>/ and author portfolios look like "
