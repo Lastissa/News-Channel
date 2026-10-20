@@ -812,6 +812,7 @@ class AnalyticsView(View):
                 "member_activity_choices": MEMBER_ACTIVITY_CHOICES,
                 "member_kind_choices": MEMBER_KIND_CHOICES,
                 "member_page_size": MEMBER_PAGE_SIZE,
+                "active_chamber": "member",
             },
         )
 
@@ -1112,7 +1113,7 @@ class StaffLyticsView(View):
         return render(
             request,
             "ADMIN/analytics_placeholder.html",
-            {"heading": "Staff lytics", "message": "Staff analytics is not built yet. It will cover story production and authors."},
+            {"heading": "Staff lytics", "message": "Staff analytics is not built yet. It will cover story production and authors.", "active_chamber": "staff"},
         )
 
 
@@ -1126,7 +1127,7 @@ class PartnerLyticsView(View):
         return render(
             request,
             "ADMIN/analytics_placeholder.html",
-            {"heading": "Partner lytics", "message": "Partner analytics is not built yet. It will cover adverts and announcements."},
+            {"heading": "Partner lytics", "message": "Partner analytics is not built yet. It will cover adverts and announcements.", "active_chamber": "partner"},
         )
 
 
@@ -1140,7 +1141,7 @@ class AuthorLyticsView(View):
         return render(
             request,
             "ADMIN/analytics_placeholder.html",
-            {"heading": "Author lytics", "message": "Author analytics is not built yet. It will cover authors and their production."},
+            {"heading": "Author lytics", "message": "Author analytics is not built yet. It will cover authors and their production.", "active_chamber": "author"},
         )
 
 
@@ -1174,6 +1175,7 @@ class StoryLyticsView(View):
                 "story_kpi_ranges": STORY_KPI_RANGE_CHOICES,
                 "story_performance_series": STORY_PERFORMANCE_SERIES,
                 "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
+                "active_chamber": "story",
             },
         )
 

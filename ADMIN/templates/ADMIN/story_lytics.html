@@ -25,6 +25,10 @@
   <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
   <symbol id="i-reading" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
 </svg>
 
 <section class="analytics-shell" data-analytics>
@@ -40,6 +44,8 @@
       {% comment %} <span>How this works</span> {% endcomment %}
     </button>
   </div>
+
+  {% include "ADMIN/partials/analytics_chambers.html" %}
 
   <div class="analytics-grid">
 
@@ -67,6 +73,7 @@
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
         <h2 id="analytics-stories-title">Stories per week</h2>
+        {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-stories" height_default=400 %}
       </header>
       <form class="analytics-controls"
             hx-get="{% url 'control:analytics_stories' %}"
@@ -142,6 +149,7 @@
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-story-trends-title">Publishing vs reading</h2>
+        {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-trends" height_default=400 %}
       </header>
 
       <form class="analytics-controls"
@@ -219,6 +227,7 @@
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-perf-title">Story performance</h2>
+        {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-performance" height_default=400 %}
       </header>
 
       <form class="analytics-controls"
