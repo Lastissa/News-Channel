@@ -61,8 +61,8 @@ html[data-theme="dark"] .analytics-chamber.is-current {
 }
 
 /* ---------- Per-chart height control ---------- */
-/* A compact number + unit pair, pinned to the right of the card header. It
-   sizes THAT chart (see analytics.js), not every chart. */
+/* A compact percent field, pinned to the right of the card header. It sizes
+   THAT chart (see analytics.js), not every chart. */
 .analytics-card-header .analytics-height { margin-left: auto; }
 .analytics-height {
   display: inline-flex; align-items: center; gap: 6px;
@@ -76,22 +76,18 @@ html[data-theme="dark"] .analytics-height { background: var(--paper-dim); }
   text-transform: uppercase; color: var(--slate);
 }
 .analytics-height-number {
-  width: 62px; padding: 5px 6px; font: inherit; font-size: 0.84rem;
+  width: 52px; padding: 5px 6px; font: inherit; font-size: 0.84rem;
   color: var(--ink); background: var(--paper);
   border: 1px solid var(--line); border-radius: var(--radius-s);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; text-align: right;
 }
-.analytics-height-unit {
-  appearance: none; padding: 5px 22px 5px 8px; font: inherit; font-size: 0.8rem;
-  color: var(--ink); background: var(--paper); cursor: pointer;
-  border: 1px solid var(--line); border-radius: var(--radius-s);
-  background-image: linear-gradient(45deg, transparent 50%, var(--slate) 50%), linear-gradient(135deg, var(--slate) 50%, transparent 50%);
-  background-position: calc(100% - 12px) 52%, calc(100% - 8px) 52%;
-  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+.analytics-height-suffix { font-size: 0.8rem; color: var(--slate); }
+html[data-theme="dark"] .analytics-height-number { background-color: var(--paper-dim); }
+.analytics-height-number:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  outline-offset: 2px;
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
 }
-.analytics-height-unit option { background: var(--paper); color: var(--ink); }
-html[data-theme="dark"] .analytics-height-number,
-html[data-theme="dark"] .analytics-height-unit { background-color: var(--paper-dim); }
 .analytics-height-reset {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; padding: 0; cursor: pointer;
@@ -100,10 +96,9 @@ html[data-theme="dark"] .analytics-height-unit { background-color: var(--paper-d
 }
 .analytics-height-reset:hover { color: var(--ink); border-color: var(--slate); }
 
-/* A chart the admin has resized draws at exactly that height: the canvas is
-   pinned so the SVG's own aspect ratio cannot stretch it back. */
-.analytics-chart[data-height-set] .analytics-chart-canvas { height: var(--chart-h); }
-.analytics-chart[data-height-set] .analytics-svg { height: 100%; }
+/* A chart the admin has scaled draws at that share of its natural height: the
+   SVG's own viewBox (set by analytics.js) carries the size, so nothing here
+   needs a fixed pixel box. */
 
 /* ---------- "How this works" info button ---------- */
 .analytics-info {

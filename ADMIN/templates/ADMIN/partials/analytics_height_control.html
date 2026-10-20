@@ -1,35 +1,31 @@
 {% comment %}
   Per-chart height control, shared by every chart card.
 
-  Each chart gets its own height and its own unit (px / rem / vh), so a wide
-  bar chart and a tall trend line no longer share one fixed plot height. The
-  value is remembered per admin in localStorage (keyed by `data-chart-height-id`,
-  which each card sets uniquely), so it survives navigation and reloads with no
-  migration and no SiteSettings change.
+  The height is expressed as a SHARE OF THE CHART'S OWN HEIGHT, as a percent:
+  100 is the chart at its full natural height, 50 is half of it, 150 is half
+  again taller. Because it is relative to the chart itself, the same value
+  reads as the same shape on a phone and on a wide desktop, and a chart never
+  has to be told about pixels, rem or viewport units.
 
-  analytics.js reads the control, stores the choice, and applies it to the
-  card's [data-chart] as a CSS variable; with JS off the control simply does
-  nothing and the chart keeps its default adaptive height.
+  The value is remembered per admin in localStorage (keyed by
+  `data-chart-height-id`, which each card sets uniquely), so it survives
+  navigation and reloads with no migration and no SiteSettings change.
 
-  `height_id` must be unique per chart, and `height_default` is the initial
-  value written into the input.
+  analytics.js reads the control and scales the chart's natural height by the
+  percentage; with JS off the control simply does nothing and the chart keeps
+  its default height.
+
+  `height_id` must be unique per chart.
 {% endcomment %}
 <div class="analytics-height" data-chart-height data-chart-height-id="{{ height_id }}">
   <label class="analytics-height-field">
     <span class="analytics-height-label">Height</span>
     <input type="number" class="analytics-height-number" data-chart-height-number
-           min="140" max="1200" step="10" inputmode="numeric"
-           value="{{ height_default|default:400 }}"
-           data-chart-height-default="{{ height_default|default:400 }}"
-           aria-label="Chart height">
-  </label>
-  <label class="analytics-height-field">
-    <span class="panel-sr">Unit</span>
-    <select class="analytics-height-unit" data-chart-height-unit aria-label="Chart height unit">
-      <option value="px" selected>px</option>
-      <option value="rem">rem</option>
-      <option value="vh">vh</option>
-    </select>
+           min="25" max="400" step="5" inputmode="numeric"
+           value="100" data-chart-height-default="100"
+           aria-label="Chart height, as a percent of its full height"
+           title="A percent of the chart's full height: 100 is full size, 50 is half.">
+    <span class="analytics-height-suffix" aria-hidden="true">%</span>
   </label>
   <button type="button" class="analytics-height-reset" data-chart-height-reset
           aria-label="Reset this chart's height" title="Reset height">&times;</button>

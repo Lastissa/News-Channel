@@ -63,33 +63,33 @@
      margin. Small screens get a tighter margin (fewer wasted pixels) and a
      relatively taller plot so the lines are not squashed into a sliver.
 
-     When the admin has set a height for this chart (the per-chart height
-     control), that height wins: the plot is drawn at exactly the chosen
-     pixels, so the drawn SVG and the pinned CSS box agree. */
+     When the admin has scaled this chart (the per-chart height control), the
+     NATURAL height for this width is multiplied by that percentage: 100 leaves
+     it alone, 50 halves it, 150 makes it half again taller. So the same value
+     means the same shape at every screen size. */
   function frameFor(host) {
     var w = host ? Math.round(host.clientWidth) : 0;
     if (!w || w < MIN_W) w = FALLBACK_W;
     var compact = w < COMPACT_W;
+    var natural = compact ? COMPACT_H : DESKTOP_H;
     var frame = {
       w: w,
-      h: compact ? COMPACT_H : DESKTOP_H,
+      h: Math.round(natural * heightScale(host)),
       margin: compact ? COMPACT_MARGIN : DESKTOP_MARGIN,
       compact: compact
     };
-    var forced = forcedHeight(host);
-    if (forced) frame.h = Math.round(forced);
     return frame;
   }
 
-  /* The height the admin pinned on this chart, in CSS pixels, or 0 when none
-     is set. The value is read off the [data-chart] root (set by
-     applyHeightToChart) rather than measured, so an unrendered fragment is
-     drawn at the right size on its very first paint. */
-  function forcedHeight(host) {
+  /* The height share the admin set on this chart, as a multiplier of the
+     chart's natural height (1 = full size). Read off the [data-chart] root
+     (set by applyHeightToChart) rather than measured, so an unrendered
+     fragment is drawn at the right size on its very first paint. */
+  function heightScale(host) {
     var root = host && host.closest ? host.closest("[data-chart]") : null;
-    if (!root) return 0;
-    var forced = parseInt(root.getAttribute("data-chart-h"), 10);
-    return forced > 0 ? forced : 0;
+    if (!root) return 1;
+    var pct = parseFloat(root.getAttribute("data-chart-h"));
+    return pct > 0 ? pct / 100 : 1;
   }
 
   function plotBox(frame) {
@@ -406,7 +406,6 @@
   var resizeTimer = null;
   function redrawAll() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-chart]"), function (root) {
-      reapplyHeight(root);
       renderChart(root, true);
     });
   }
@@ -609,13 +608,17 @@
   }
 
   /* ---------- Per-chart height control ----------
-     Each chart card ships a small number + unit control. Its choice is saved
-     per admin in localStorage under the chart's data-chart-height-id, applied
-     to the card's [data-chart] as both data-chart-h (read by the renderer for
-     the drawn frame) and a --chart-h CSS variable (which pins the canvas), then
-     the chart is redrawn. With localStorage unavailable every call degrades to
-     a no-op and charts keep their default adaptive height. */
-  var HEIGHT_STORE_KEY = "abureport:analytics-chart-heights";
+     Each chart card ships a small percent control. Its choice is saved per
+     admin in localStorage under the chart's data-chart-height-id, applied to
+     the card's [data-chart] as data-chart-h (the percentage the renderer
+     multiplies the natural height by), then the chart is redrawn. 100 is the
+     chart's full natural height; the renderer owns the pixel maths, so the
+     same value means the same shape on any screen. With localStorage
+     unavailable every call degrades to a no-op and charts keep their default
+     height. */
+  var HEIGHT_STORE_KEY = "abureport:analytics-chart-heights:v2";
+  var HEIGHT_MIN_PCT = 25;      /* never shrink a chart below a readable plot */
+  var HEIGHT_MAX_PCT = 400;     /* nor grow it past four times its natural size */
 
   function readHeightStore() {
     try {
@@ -629,17 +632,12 @@
     try { window.localStorage.setItem(HEIGHT_STORE_KEY, JSON.stringify(store)); } catch (e) { /* quota/private mode: choice is simply not kept */ }
   }
 
-  /* turn "420" + "rem" into CSS pixels, using the live root font size / viewport
-     so the stored unit means the same thing it did when it was chosen */
-  function toPixels(value, unit) {
+  /* Clamp a typed percentage into the allowed band, or 0 when it is not a
+     usable number at all (so the caller can clear the scaling). */
+  function clampPercent(value) {
     var n = parseFloat(value);
     if (!isFinite(n) || n <= 0) return 0;
-    if (unit === "rem") {
-      var fs = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-      return n * fs;
-    }
-    if (unit === "vh") return (n / 100) * window.innerHeight;
-    return n;
+    return Math.max(HEIGHT_MIN_PCT, Math.min(HEIGHT_MAX_PCT, Math.round(n)));
   }
 
   function cardOf(control) {
@@ -651,13 +649,12 @@
     return card ? card.querySelector("[data-chart]") : null;
   }
 
-  function applyHeight(root, value, unit) {
+  function applyHeight(root, pct) {
     if (!root) return;
-    var px = toPixels(value, unit);
-    if (!px) { clearHeight(root); return; }
-    root.setAttribute("data-chart-h", String(Math.round(px)));
+    var value = clampPercent(pct);
+    if (!value) { clearHeight(root); return; }
+    root.setAttribute("data-chart-h", String(value));
     root.setAttribute("data-height-set", "1");
-    root.style.setProperty("--chart-h", Math.round(px) + "px");
     renderChart(root, true);
   }
 
@@ -665,25 +662,12 @@
     if (!root) return;
     root.removeAttribute("data-chart-h");
     root.removeAttribute("data-height-set");
-    root.style.removeProperty("--chart-h");
     renderChart(root, true);
   }
 
-  /* On a resize, a rem/vh height means a different number of pixels. Recompute
-     the pinned pixels from the control's current value so a rotation keeps the
-     chart at the size the admin asked for. */
-  function reapplyHeight(root) {
-    var card = root && root.closest ? root.closest(".analytics-card") : null;
-    var control = card ? card.querySelector("[data-chart-height]") : null;
-    if (!control || root.getAttribute("data-height-set") !== "1") return;
-    var number = control.querySelector("[data-chart-height-number]");
-    var unitSel = control.querySelector("[data-chart-height-unit]");
-    var px = toPixels(number ? number.value : "", unitSel ? unitSel.value : "px");
-    if (px) {
-      root.setAttribute("data-chart-h", String(Math.round(px)));
-      root.style.setProperty("--chart-h", Math.round(px) + "px");
-    }
-  }
+  /* A percentage needs no recompute on resize: the renderer derives the pixels
+     from the measured width (and the compact/desktop frame) every time, so a
+     rotation naturally keeps the same share. */
 
   /* Repaint a chart from the stored choice on first paint and after a swap. */
   function applyStoredHeight(root) {
@@ -696,10 +680,8 @@
     var saved = id ? store[id] : null;
     if (saved && saved.value) {
       var number = control.querySelector("[data-chart-height-number]");
-      var unitSel = control.querySelector("[data-chart-height-unit]");
       if (number) number.value = saved.value;
-      if (unitSel) unitSel.value = saved.unit || "px";
-      applyHeight(root, saved.value, saved.unit || "px");
+      applyHeight(root, saved.value);
     }
   }
 
@@ -707,17 +689,18 @@
     var id = control ? control.getAttribute("data-chart-height-id") : "";
     if (!id || !root) return;
     var number = control.querySelector("[data-chart-height-number]");
-    var unitSel = control.querySelector("[data-chart-height-unit]");
     var store = readHeightStore();
-    store[id] = { value: number ? number.value : "", unit: unitSel ? unitSel.value : "px" };
+    var value = number ? number.value : "";
+    /* 100 is the default: storing it would only pin a value that already
+       matches the natural height, so the entry is dropped instead. */
+    if (clampPercent(value) === 100) { delete store[id]; }
+    else { store[id] = { value: value }; }
     writeHeightStore(store);
   }
 
   function resetControl(control, root) {
     var number = control.querySelector("[data-chart-height-number]");
-    var unitSel = control.querySelector("[data-chart-height-unit]");
-    if (number) number.value = number.getAttribute("data-chart-height-default") || "400";
-    if (unitSel) unitSel.value = "px";
+    if (number) number.value = number.getAttribute("data-chart-height-default") || "100";
     var id = control.getAttribute("data-chart-height-id");
     if (id) {
       var store = readHeightStore();
@@ -732,22 +715,17 @@
     var number = event.target.closest && event.target.closest("[data-chart-height-number]");
     if (!number) return;
     var control = number.closest("[data-chart-height]");
-    applyHeight(chartOf(control), number.value, (control.querySelector("[data-chart-height-unit]") || {}).value || "px");
+    applyHeight(chartOf(control), number.value);
     rememberHeight(control, chartOf(control));
   });
   document.addEventListener("change", function (event) {
-    var unitSel = event.target.closest && event.target.closest("[data-chart-height-unit]");
-    if (unitSel) {
-      var control = unitSel.closest("[data-chart-height]");
-      var number = control.querySelector("[data-chart-height-number]");
-      applyHeight(chartOf(control), number ? number.value : "", unitSel.value);
-      rememberHeight(control, chartOf(control));
-      return;
-    }
-    if (event.target.closest && event.target.closest("[data-chart-height-number]")) {
-      var num = event.target.closest("[data-chart-height-number]");
-      rememberHeight(num.closest("[data-chart-height]"), chartOf(num.closest("[data-chart-height]")));
-    }
+    var number = event.target.closest && event.target.closest("[data-chart-height-number]");
+    if (!number) return;
+    var control = number.closest("[data-chart-height]");
+    var clamped = clampPercent(number.value);
+    if (clamped) number.value = String(clamped);
+    applyHeight(chartOf(control), clamped);
+    rememberHeight(control, chartOf(control));
   });
   document.addEventListener("click", function (event) {
     var reset = event.target.closest && event.target.closest("[data-chart-height-reset]");
