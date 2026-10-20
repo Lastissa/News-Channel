@@ -14,6 +14,7 @@
 {% block extra_head %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
+  <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}">
 {% endblock %}
 
@@ -28,16 +29,25 @@
 <section class="analytics-shell">
 
   <div class="analytics-topbar">
-    <a class="analytics-back" href="{% url 'control:panel' %}">
-      <span aria-hidden="true">&larr;</span>
-      <span>Panel</span>
-    </a>
-    <h1 class="analytics-title">{{ heading }}</h1>
+    <div class="analytics-topbar-main">
+      <a class="analytics-back" href="{% url 'control:panel' %}">
+        <span aria-hidden="true">&larr;</span>
+        <span>Panel</span>
+      </a>
+      <div class="analytics-heading">
+        <p class="analytics-eyebrow">Analytics</p>
+        <h1 class="analytics-title">{{ heading }}</h1>
+      </div>
+    </div>
+
+    {% include "ADMIN/partials/analytics_chambers.html" %}
   </div>
 
-  {% include "ADMIN/partials/analytics_chambers.html" %}
-
-  <p class="analytics-placeholder">{{ message }}</p>
+  <div class="analytics-grid">
+    <section class="analytics-card analytics-placeholder-card">
+      <p class="analytics-placeholder">{{ message }}</p>
+    </section>
+  </div>
 
 </section>
 {% endblock %}

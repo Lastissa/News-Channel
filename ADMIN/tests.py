@@ -1161,16 +1161,42 @@ class AnalyticsReadingTests(TestCase):
         self.assertIn("Reading older win", body)
 
     #   ------------------------------------------------------------ cold backlog
-    def test_cold_stories_lists_only_old_never_viewed_stories(self):
+    def test_cold_stories_caps_views_and_gates_by_age(self):
+        #   Five views or fewer is cold; six is not. The gate is two days, so a
+        #   story published this morning is never cold however few views it has.
         self.make_story("Cold story", age_days=10)
-        self.make_story("Warm story", age_days=10, views=4)
-        self.make_story("Fresh story", age_days=2)
+        self.make_story("Almost cold", age_days=10, views=5)
+        self.make_story("Warm story", age_days=10, views=6)
+        self.make_story("Fresh story", age_days=1)
 
         self.client.force_login(self.admin)
         body = self.client.get(self.url, {"range": "30d"}).content.decode()
         self.assertIn("Cold story", body)
+        self.assertIn("Almost cold", body)
         self.assertNotIn("Warm story", body)
         self.assertNotIn("Fresh story", body)
+
+    def test_a_cooled_since_date_moves_the_age_gate(self):
+        #   One day old is inside the default two-day gate, so it is NOT cold by
+        #   default. Moving "cooled since" forward to today means "published on
+        #   or before today", which the story now is, so it joins the list.
+        self.make_story("One day story", age_days=1)
+
+        self.client.force_login(self.admin)
+        default = self.client.get(self.url, {"range": "30d"}).content.decode()
+        self.assertNotIn("One day story", default)
+
+        cooled = timezone.localdate().isoformat()
+        wide = self.client.get(self.url, {"range": "30d", "cooled": cooled}).content.decode()
+        self.assertIn("One day story", wide)
+        self.assertIn('value="%s"' % cooled, wide)
+
+    def test_a_bad_cooled_date_falls_back_to_the_default_gate(self):
+        self.make_story("Default gate story", age_days=3)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "30d", "cooled": "banana"}).content.decode()
+        self.assertIn("Default gate story", body)
 
     #   ------------------------------------------------------------ range guard
     def test_an_unknown_range_falls_back_to_the_default(self):

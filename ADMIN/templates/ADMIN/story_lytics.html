@@ -34,18 +34,23 @@
 <section class="analytics-shell" data-analytics>
 
   <div class="analytics-topbar">
-    <a class="analytics-back" href="{% url 'control:panel' %}">
-      <svg class="ic" aria-hidden="true"><use href="#i-left"/></svg>
-      <span>Panel</span>
-    </a>
-    <h1 class="analytics-title">Story lytics</h1>
-    <button type="button" class="analytics-info" data-guide-open>
-      <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
-      {% comment %} <span>How this works</span> {% endcomment %}
-    </button>
-  </div>
+    <div class="analytics-topbar-main">
+      <a class="analytics-back" href="{% url 'control:panel' %}">
+        <svg class="ic" aria-hidden="true"><use href="#i-left"/></svg>
+        <span>Panel</span>
+      </a>
+      <div class="analytics-heading">
+        <p class="analytics-eyebrow">Analytics</p>
+        <h1 class="analytics-title">Story lytics</h1>
+      </div>
+      <button type="button" class="analytics-info" data-guide-open>
+        <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
+        {% comment %} <span>How this works</span> {% endcomment %}
+      </button>
+    </div>
 
-  {% include "ADMIN/partials/analytics_chambers.html" %}
+    {% include "ADMIN/partials/analytics_chambers.html" %}
+  </div>
 
   <div class="analytics-grid">
 
@@ -112,6 +117,7 @@
          blocks: top-read stories, category published-vs-read, and the
          never-viewed backlog.{% endcomment %}
       <form class="analytics-controls"
+            id="analytics-reading-form"
             hx-get="{% url 'control:analytics_reading' %}"
             hx-target="#analytics-reading-body"
             hx-swap="innerHTML"
@@ -130,6 +136,7 @@
 
       <div class="analytics-chart-body" id="analytics-reading-body"
            hx-get="{% url 'control:analytics_reading' %}"
+           hx-include="closest .analytics-card"
            hx-trigger="load"
            hx-swap="innerHTML"
            aria-live="polite" aria-busy="true">
@@ -318,6 +325,8 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+  <script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
+  <script src="{% static 'control/js/analytics_apex.js' %}" defer></script>
   <script src="{% static 'control/js/analytics.js' %}" defer></script>
 {% endblock %}
 

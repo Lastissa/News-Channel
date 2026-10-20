@@ -383,11 +383,24 @@
     try { data = JSON.parse(script.textContent); } catch (e) { return; }
 
     root.setAttribute("data-rendered", "1");
+    bindWeekPress(root);
+    /* The chart may have been an ApexCharts instance on the last pass; tear it
+       down before either renderer repaints, so a swap never stacks two charts
+       in the same mount. */
+    if (window.AnalyticsApex) window.AnalyticsApex.destroy(canvas);
     canvas.innerHTML = "";
     var stalePlacard = root.querySelector(".analytics-placard");
     if (stalePlacard) stalePlacard.remove();
-    if (data.type === "line") renderLine(canvas, data, root);
-    else renderBar(canvas, data, root);
+
+    /* ApexCharts is the real renderer. The hand-drawn SVG stays as the safety
+       net for a page whose bundle did not load, and for the data shapes Apex
+       refuses (an empty selection), which it declines by returning false. */
+    var drawn = false;
+    if (window.AnalyticsApex) drawn = window.AnalyticsApex.render(canvas, data, root);
+    if (!drawn) {
+      if (data.type === "line") renderLine(canvas, data, root);
+      else renderBar(canvas, data, root);
+    }
 
     var body = root.parentElement;
     while (body && !body.classList.contains("analytics-chart-body")) { body = body.parentElement; }
@@ -605,6 +618,19 @@
       if (!btn) return;
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); btn.click(); }
     });
+  }
+
+  /* The ApexCharts renderer cannot attach a DOM listener to a bar it draws, so
+     the bar fragment reaches the same week dialog through this shared hook.
+     Bound once per chart root, beside the SVG listener above. */
+  function bindWeekPress(root) {
+    if (!root || root.__weekPress) return;
+    root.__weekPress = function (week, hint) {
+      if (!week) return;
+      fetchWeekStories(root, week, hint || "Week stories").catch(function (err) {
+        showWeekToast(err && err.name === "AbortError" ? "Week stories took too long. Retry." : "Couldn't load week stories. Retry.");
+      });
+    };
   }
 
   /* ---------- Per-chart height control ----------

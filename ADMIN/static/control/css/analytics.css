@@ -8,57 +8,72 @@
   width: 100%; max-width: 1440px; margin: 0 auto; padding: 0 18px 40px;
 }
 
-/* ---------- Top bar ---------- */
+/* ---------- Sticky command bar ---------- */
+/* One premium header: the page identity, the live "new today" figure, and the
+   chamber rail, all inside the same sticky plate. The rail used to float below
+   the bar, which read as a second, competing header. */
 .analytics-topbar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
-  margin: 0 -18px 14px; padding: 10px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  margin: 0 -18px 16px; padding: 12px 18px 0;
   border-bottom: 1px solid var(--line);
   background: var(--paper);
   position: sticky; top: var(--header-h, 64px); z-index: 80;
 }
+.analytics-topbar-main {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+}
+.analytics-heading { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+/* A quiet eyebrow above the loud title. It names the supersection, not the
+   page, so it is deliberately small and muted rather than a second heading. */
+.analytics-eyebrow {
+  margin: 0; font-size: 0.66rem; font-weight: 800;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate);
+}
 .analytics-back {
   display: inline-flex; align-items: center; gap: 6px;
   min-height: 44px;
-  padding: 7px 12px; border-radius: var(--radius-s);
-  color: var(--slate); text-decoration: none; font-size: 0.92rem; font-weight: 600;
+  padding: 7px 13px; border-radius: var(--an-radius-sq);
+  color: var(--slate); text-decoration: none; font-size: 0.9rem; font-weight: 600;
   border: 1px solid var(--line); background: var(--paginator-bg);
   transition: color .2s var(--panel-ease, ease), border-color .2s ease, background-color .2s ease;
 }
 .analytics-back:hover { color: var(--ink); border-color: var(--paginator-hover-border); }
 /* The page title is the loudest text on the page: bigger, heavier and ink. */
 .analytics-title {
-  margin: 0; font-size: 1.5rem; font-weight: 800;
-  letter-spacing: -0.01em; color: var(--ink);
+  margin: 0; font-size: 1.35rem; font-weight: 800;
+  letter-spacing: -0.015em; color: var(--ink);
 }
 
-/* ---------- Chamber strip ---------- */
-/* All five lytics chambers on every lytics page, so switching between them is
-   one tap instead of a detour through the PANEL. The current chamber is marked
-   with aria-current and reads as a filled pill; the rest are quiet outlines. */
+/* ---------- Chamber rail ---------- */
+/* All five lytics chambers sit on every lytics page as one segmented rail,
+   flush inside the command bar. The current chamber is the filled cell and
+   carries aria-current; the rest are quiet and lift on hover. A squared
+   segmented control, matching the KPI range picker, not a pill. */
 .analytics-chambers {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  margin: 0 0 12px;
+  display: flex; align-items: stretch; gap: 0;
+  margin: 0 -18px; padding: 0 18px;
+  border-top: 1px solid var(--line);
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: thin;
 }
+.analytics-chambers::-webkit-scrollbar { height: 4px; }
+.analytics-chambers::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
 .analytics-chamber {
-  display: inline-flex; align-items: center; gap: 6px;
-  min-height: 40px;
-  padding: 6px 12px; border-radius: var(--radius-s);
-  font-size: 0.84rem; font-weight: 700; text-decoration: none;
-  color: var(--slate); background: var(--paper);
-  border: 1px solid var(--line);
+  position: relative;
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 46px; flex: 0 0 auto;
+  padding: 8px 16px;
+  font-size: 0.86rem; font-weight: 700; text-decoration: none;
+  color: var(--slate); background: transparent;
+  border: 0; border-bottom: 2px solid transparent;
   transition: color .18s ease, border-color .18s ease, background-color .18s ease;
 }
 .analytics-chamber .ic { width: 16px; height: 16px; }
-.analytics-chamber:hover { color: var(--ink); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-.analytics-chamber.is-current {
-  color: var(--brand-deep);
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
-  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
-}
-html[data-theme="dark"] .analytics-chamber { background: var(--paper-dim); }
-html[data-theme="dark"] .analytics-chamber.is-current {
-  color: var(--ink); background: color-mix(in srgb, var(--brand) 26%, transparent);
-}
+.analytics-chamber:hover { color: var(--ink); background: var(--paginator-bg); }
+/* The current chamber reads as a solid accent underline plus ink text: the
+   label is the signal in both themes, never colour alone. */
+.analytics-chamber.is-current { color: var(--an-accent); border-bottom-color: var(--an-accent); }
+html[data-theme="dark"] .analytics-chamber.is-current { color: var(--ink); border-bottom-color: var(--brand); }
 
 /* ---------- Per-chart height control ---------- */
 /* A compact percent field, pinned to the right of the card header. It sizes
@@ -66,7 +81,7 @@ html[data-theme="dark"] .analytics-chamber.is-current {
 .analytics-card-header .analytics-height { margin-left: auto; }
 .analytics-height {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 6px; border-radius: var(--radius-s);
+  padding: 3px 6px; border-radius: var(--an-radius-sq);
   border: 1px solid var(--line); background: var(--paginator-bg);
 }
 html[data-theme="dark"] .analytics-height { background: var(--paper-dim); }
@@ -723,6 +738,38 @@ html[data-theme="dark"] .analytics-reading-block { background: var(--paper-dim);
 .analytics-reading-cold { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .analytics-reading-cold-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 0; font-size: 0.84rem; }
 .analytics-reading-cold-date { margin-left: auto; font-size: 0.72rem; color: var(--slate); white-space: nowrap; }
+/* The view count is the whole point of the new cold rule, so it reads as a
+   small squared counter between the category tag and the date. */
+.analytics-reading-cold-views {
+  margin-left: 8px; padding: 1px 7px; font-size: 0.7rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: var(--an-accent);
+  background: var(--an-accent-wash); border-radius: var(--an-radius-sq);
+  white-space: nowrap;
+}
+
+/* The cold block carries its own control (the age gate), so it gets a header
+   row: the heading on the left, the "cooled since" date on the right. */
+.analytics-reading-cold-head {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px;
+}
+.analytics-reading-cooled {
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.analytics-reading-cooled-label {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--slate); white-space: nowrap;
+}
+.analytics-reading-cooled input[type="date"] {
+  min-height: 36px; padding: 4px 8px; font: inherit; font-size: 0.82rem;
+  color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); border-radius: var(--an-radius-sq);
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme="dark"] .analytics-reading-cooled input[type="date"] { background-color: var(--paper-dim); }
+.analytics-reading-cooled input[type="date"]:focus-visible {
+  outline: 2px solid var(--an-focus); outline-offset: 2px;
+}
 
 @media (max-width: 640px) {
   .analytics-shell { padding: 0 12px 44px; }
@@ -955,4 +1002,43 @@ html[data-theme="dark"] [data-guide-title].is-guided {
 }
 @media (prefers-reduced-motion: reduce) {
   .analytics-seg { transition: none; }
+}
+
+/* ---------- ApexCharts chrome (renderer: analytics_apex.js) ---------- */
+/* Apex ships its own stylesheet. These rules re-point it at the newsroom ink
+   and line tokens and strip the bits of its default skin we do not want (the
+   drop-shadowed tooltip, the legend box). Nothing here sets layout: the chart
+   height still comes from the per-chart control, never from CSS. */
+.analytics-chart-canvas .apexcharts-canvas { font-family: inherit !important; }
+.analytics-chart-canvas .apexcharts-tooltip {
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-s) !important;
+  box-shadow: var(--shadow-card) !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+}
+html[data-theme="dark"] .analytics-chart-canvas .apexcharts-tooltip {
+  background: var(--paper-dim) !important;
+}
+.analytics-chart-canvas .apexcharts-xaxistooltip,
+.analytics-chart-canvas .apexcharts-yaxistooltip { display: none !important; }
+.analytics-chart-canvas .apexcharts-gridline { stroke: var(--line); }
+
+/* Our own tooltip body, built by analytics_apex.js so it carries the same
+   swatch/name/value/step rows the hand-drawn placard used. */
+.analytics-apex-tip { display: flex; flex-direction: column; gap: 3px; padding: 2px; }
+.analytics-apex-tip .analytics-placard-row { font-size: 0.75rem; }
+
+/* ---------- Placeholder chambers (staff / author / partner) ---------- */
+/* The unbuilt chambers now use the same card chrome as a real lytics section,
+   so a placeholder reads as "this panel exists, it is just empty" rather than
+   as an unstyled paragraph stranded on the page. */
+.analytics-placeholder-card {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 260px; padding: 40px 24px;
+}
+.analytics-placeholder-card .analytics-placeholder {
+  margin: 0; padding: 0; border: 0;
+  max-width: 460px; text-align: center;
+  color: var(--slate); font-size: var(--an-text-m);
 }

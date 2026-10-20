@@ -1061,7 +1061,8 @@ class AnalyticsReadingView(View):
     Read only and admin only, like every other figure endpoint. The single
     Range dropdown reuses the Trends ranges; an unknown value falls back to the
     30 day default here, so a hand typed querystring can never widen the window
-    past a choice the menu offers.
+    past a choice the menu offers. The optional "cooled since" date only moves
+    the age gate on the barely-read list.
     """
 
     def get(self, request):
@@ -1072,10 +1073,12 @@ class AnalyticsReadingView(View):
         if selected_range not in TREND_RANGES:
             selected_range = DEFAULT_TREND_RANGE
 
+        cooled_since = (request.GET.get("cooled") or "").strip()
+
         return render(
             request,
             "ADMIN/partials/analytics_reading.html",
-            reading_editorial(selected_range),
+            reading_editorial(selected_range, cooled_since),
         )
 
 

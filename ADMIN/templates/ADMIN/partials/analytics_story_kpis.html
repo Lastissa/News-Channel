@@ -79,7 +79,7 @@
     <li class="analytics-kpi">
       <p class="analytics-kpi-label">Cold stories</p>
       <p class="analytics-kpi-value">{{ cold_total}}</p>
-      <p class="analytics-kpi-foot"><span>Older than a week, never read.</span></p>
+      <p class="analytics-kpi-foot"><span>{{ cold_max_views }} views or fewer, older than {{ cold_older_than }} day{{ cold_older_than|pluralize }}.</span></p>
     </li>
   </ul>
 

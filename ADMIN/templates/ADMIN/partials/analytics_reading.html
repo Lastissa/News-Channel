@@ -2,15 +2,20 @@
   htmx fragment: the ANALYTICS "Reading & editorial" card.
 
   Everything here is measured over one range (the same choices as Trends):
-  the top-read stories, per-category published-vs-read, and the never-viewed
-  backlog. "Views" are
-  StoryView events inside that window, never the all-time Blog.views counter,
-  so changing the range changes the leaderboard. Only ever returned to an htmx
-  GET against control:analytics_reading -- never rendered into the shell.
-{% endcomment %}
-<p class="analytics-reading-range">{{ range_label }}</p>
+  the top-read stories, per-category published-vs-read, and the barely-read
+  backlog. "Views" are StoryView events inside that window, never the all-time
+  Blog.views counter, so changing the range changes the leaderboard. Only ever
+  returned to an htmx GET against control:analytics_reading -- never rendered
+  into the shell.
 
-<div class="analytics-reading-grid">
+  The "cooled since" date on the cold block overrides the age gate. It posts
+  itself back to the same endpoint, carrying the range box with it, so the two
+  controls never disagree about which window is on screen.
+{% endcomment %}
+<div class="analytics-reading" data-reading-root>
+  <p class="analytics-reading-range">{{ range_label }}</p>
+
+  <div class="analytics-reading-grid">
 
   <section class="analytics-reading-block" aria-labelledby="analytics-reading-top"
            data-guide-title="Top-read stories"
@@ -71,15 +76,27 @@
 
   <section class="analytics-reading-block" aria-labelledby="analytics-reading-cold"
            data-guide-title="Cold stories"
-           data-guide-text="Published stories, older than the cold threshold, that no one has opened yet. They are still reachable, they just have not found an audience yet.">
-    <h3 id="analytics-reading-cold" class="analytics-reading-heading">Cold stories</h3>
-    <p class="analytics-reading-note">Never viewed, published at least {{ cold_stories.older_than }} days ago.</p>
+           data-guide-text="Published stories, older than the cooled-since date, that have drawn five views or fewer. They are still reachable, they just have not found an audience yet. Move the date to widen or narrow the gate.">
+    <div class="analytics-reading-cold-head">
+      <h3 id="analytics-reading-cold" class="analytics-reading-heading">Cold stories</h3>
+      <label class="analytics-reading-cooled">
+        <span class="analytics-reading-cooled-label">Cooled since</span>
+        <input type="date" name="cooled" value="{{ cooled_since_value }}"
+               data-cold-default="{{ cooled_since_default }}"
+               hx-get="{% url 'control:analytics_reading' %}"
+               hx-target="#analytics-reading-body"
+               hx-include="closest [data-reading-root], #analytics-reading-form [name='range']"
+               hx-trigger="change">
+      </label>
+    </div>
+    <p class="analytics-reading-note">{{ cold_stories.max_views }} views or fewer, published on or before {{ cooled_since_label|date:"M j, Y" }}.</p>
     {% if cold_stories.items %}
     <ul class="analytics-reading-cold">
       {% for story in cold_stories.items %}
       <li class="analytics-reading-cold-row">
         <a class="analytics-reading-story" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
         <span class="analytics-reading-cat">{{ story.category }}</span>
+        <span class="analytics-reading-cold-views">{{ story.views }} view{{ story.views|pluralize }}</span>
         <span class="analytics-reading-cold-date">{{ story.posted|date:"M j, Y" }}</span>
       </li>
       {% endfor %}
@@ -88,8 +105,9 @@
     <p class="analytics-reading-note">and {{ cold_stories.remaining }} more.</p>
     {% endif %}
     {% else %}
-    <p class="analytics-reading-empty">Nothing cold. Every older story has been read.</p>
+    <p class="analytics-reading-empty">No story has drawn {{ cold_stories.max_views }} views or fewer by this date.</p>
     {% endif %}
   </section>
 
+  </div>
 </div>

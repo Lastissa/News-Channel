@@ -289,6 +289,24 @@ def _custom_window(start_iso, end_iso):
     return start, end_exclusive
 
 
+def _cold_window(cooled_since):
+    """The age gate for the cold list, as a whole number of days.
+
+    The admin may hand the Reading card a "cooled since" date: a story is cold
+    when it was published on or before that date. The gate is how long ago that
+    was, so a *later* date admits more stories and today admits everything
+    published today or earlier. A missing, malformed or future date falls back
+    to the default, so the list can never be emptied by a bad querystring.
+    """
+    day = parse_date((cooled_since or "").strip())
+    if day is None:
+        return READING_COLD_MIN_AGE_DAYS
+    days = (timezone.localdate() - day).days
+    if days < 0:
+        return READING_COLD_MIN_AGE_DAYS
+    return days
+
+
 def _month_starts(start, last):
     """First-of-month edges from `start`'s month through `last`'s month."""
     first = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -572,8 +590,12 @@ def stories_overview():
 READING_TOP_STORIES = 10        #   rows in the top-read table
 READING_TOP_CATEGORIES = 8      #   categories in the published-vs-read list
 READING_COLD_LIMIT = 10         #   cold-story entries shown before the "and N more" line
-#   A story is only "cold" once it has had a fair week to be discovered.
-READING_COLD_MIN_AGE_DAYS = 7
+#   Cold means "barely read at all", not "never read": a story with a handful of
+#   views is still unpublished in practice. The threshold is a cap, inclusive.
+READING_COLD_MAX_VIEWS = 5      #   views at or below this reads as cold
+#   A story is only "cold" once it has had a fair couple of days to be
+#   discovered, so a story published this morning is never counted.
+READING_COLD_MIN_AGE_DAYS = 2   #   default age gate; the admin can override it
 
 
 def _safe_rows(rows):
@@ -677,50 +699,84 @@ def _category_read_vs_published(start):
     return rows
 
 
-def _cold_stories(now):
-    """The never-viewed backlog: stories older than the cold window with 0 views.
+def _cold_stories(now, min_age_days=None):
+    """The barely-read backlog: stories at or below 5 views, published before today.
+
+    "Cold" used to mean exactly zero views, which hid the far larger pile of
+    stories that drew one or two reads and were never really published. The cap
+    is inclusive (5 views or fewer) and the age gate keeps a story published
+    this morning out of the list, because it has not had a chance yet.
+
+    `min_age_days` is the age gate; the Reading card passes the admin's own
+    "cooled since" date, and any value falls back to the default when it is
+    missing or nonsensical.
 
     Uses the stored Blog.views counter (written in the same branch as StoryView)
     so this stays one indexed query rather than an appetite for the whole view
     history.
     """
-    cutoff = now - timedelta(days=READING_COLD_MIN_AGE_DAYS)
-    cold = Blog.objects.filter(views=0, date_created__lt=cutoff).order_by("-date_created")
+    age_days = READING_COLD_MIN_AGE_DAYS
+    if min_age_days is not None:
+        try:
+            age_days = max(int(min_age_days), 0)
+        except (TypeError, ValueError):
+            age_days = READING_COLD_MIN_AGE_DAYS
+
+    cutoff = now - timedelta(days=age_days)
+    cold = (
+        Blog.objects.filter(views__lte=READING_COLD_MAX_VIEWS, date_created__lt=cutoff)
+        .order_by("-date_created")
+    )
     total = cold.count()
     items = [
         {
             "heading": story.heading,
             "slug": story.slug,
             "category": story.category,
+            "views": story.views,
             "posted": timezone.localtime(story.date_created),
         }
         for story in cold[:READING_COLD_LIMIT]
     ]
     return {
-        "older_than": READING_COLD_MIN_AGE_DAYS,
+        "older_than": age_days,
+        "max_views": READING_COLD_MAX_VIEWS,
         "total": total,
         "remaining": max(total - len(items), 0),
         "items": items,
     }
 
 
-def reading_editorial(selected_range):
+def reading_editorial(selected_range, cooled_since=None):
     """The "Reading & editorial" card: what members read over the range.
 
     Returns the top-read stories, per-category published-vs-read, and the
-    never-viewed backlog. All three are measured to the same window, so the
-    card reads as one story.
+    barely-read backlog. The first two are measured to the same window, so the
+    card reads as one story; the backlog has its own age gate, which the admin
+    can move with the "cooled since" date.
     """
     range_days = TREND_RANGES.get(selected_range, TREND_RANGES[DEFAULT_TREND_RANGE])
     now = timezone.localtime()
     start = _local_midnight(now - timedelta(days=range_days - 1))
+    age_days = _cold_window(cooled_since)
+
+    #   The gate rounds to whole days, so the date box can show back exactly what
+    #   that became: "cooled since <date>" is unambiguous when a typed date sits
+    #   mid-day.
+    today = timezone.localdate(now)
+    cooled_day = today - timedelta(days=age_days)
 
     return {
         "range": selected_range,
         "range_label": _range_label(selected_range),
         "top_stories": _top_read_stories(start),
         "top_categories": _category_read_vs_published(start),
-        "cold_stories": _cold_stories(now),
+        "cold_stories": _cold_stories(now, age_days),
+        "cooled_since_value": cooled_day.isoformat(),
+        "cooled_since_label": cooled_day,
+        "cooled_since_default": (
+            today - timedelta(days=READING_COLD_MIN_AGE_DAYS)
+        ).isoformat(),
     }
 
 
@@ -801,6 +857,7 @@ def story_kpis(selected_range, start_iso=None, end_iso=None):
     previous_reads = _story_reads(previous_start, start)
 
     last_day = (end_exclusive - timedelta(days=1)) if end_exclusive is not None else now
+    cold = _cold_stories(now)
     return {
         "range": selected_range,
         "range_label": "Custom range" if custom is not None else _range_label(selected_range),
@@ -810,7 +867,9 @@ def story_kpis(selected_range, start_iso=None, end_iso=None):
         "published": published,
         "reads": reads,
         "reads_per_story": round(reads / published) if published else 0,
-        "cold_total": _cold_stories(now)["total"],
+        "cold_total": cold["total"],
+        "cold_max_views": cold["max_views"],
+        "cold_older_than": cold["older_than"],
         "published_delta": _delta_chip(published, previous_published),
         "reads_delta": _delta_chip(reads, previous_reads),
     }
