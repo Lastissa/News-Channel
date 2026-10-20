@@ -72,7 +72,16 @@ def _absolute(path):
 
 
 def _logo_url():
-    logo = static("logo.jpg")
+    try:
+        logo = static("logo.jpg")
+    except Exception:
+        try:
+            logo = static("images/logo.png")
+        except Exception:
+            try:
+                logo = static("img/logo.png")
+            except Exception:
+                logo = "/static/logo.jpg"
     return logo if logo.startswith("http") else f"{domain()}{logo}"
 
 
@@ -105,12 +114,29 @@ def organization_node(context):
     point at through ``organization_id()``."""
     about = _about()
     base = domain()
+    logo_url = _logo_url()
+    logo = {"@type": "ImageObject", "url": logo_url}
+    try:
+        from django.contrib.staticfiles import finders
+        for name in ("logo.jpg", "images/logo.png", "img/logo.png", "logo.png"):
+            path = finders.find(name)
+            if path:
+                try:
+                    from PIL import Image
+                    with Image.open(path) as im:
+                        logo["width"] = im.width
+                        logo["height"] = im.height
+                except Exception:
+                    pass
+                break
+    except Exception:
+        pass
     node = {
         "@type": "NewsMediaOrganization",
         "@id": organization_id(),
         "name": about.project_name,
         "url": f"{base}/",
-        "logo": {"@type": "ImageObject", "url": _logo_url()},
+        "logo": logo,
         "description": (
             f"{about.project_name} is a Nigerian news platform reporting verified, "
             "up-to-date news across many genres, with a strong focus on Nigeria and Africa."
