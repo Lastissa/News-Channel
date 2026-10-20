@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import logging
 import re
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from django.conf import settings
 from django.contrib import messages
@@ -36,6 +36,64 @@ from .models import Blog, BlogLike, Comment, StoryView
 logger = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://[^\s<>'\"]+")
+
+#   OUTBOUND REFERRAL TAGGING
+#   An author only ever has to paste a plain link. Before that link is drawn
+#   as an anchor it is stamped with our referral parameters so every site we
+#   send a reader to can see the traffic came from us: utm_source is our
+#   domain (the "primary tag" -- abureport.com.ng), utm_medium is "referral"
+#   and utm_campaign names the story that sent the click. This is done at
+#   RENDER time (never on save), so it is always current, needs no data
+#   migration, and every already-published story gets it too -- the stored
+#   content is never rewritten.
+#
+#   Only links that leave the site are tagged. Our own domain, mailto:/tel:
+#   and #anchors are left exactly as written. A link the author already
+#   tagged by hand (it carries a utm_source) is respected and left alone, so
+#   a deliberately chosen campaign is never overwritten.
+REFERRAL_SOURCE = "abureport.com.ng"
+REFERRAL_MEDIUM = "referral"
+
+
+def _is_internal_host(host):
+    """True when `host` is our own site (abureport.com.ng or any subdomain,
+    plus localhost while developing), so a link that stays on the site is
+    never handed our own referral parameters."""
+    host = (host or "").split(":", 1)[0].lower()
+    if not host:
+        return True
+    if host in ("localhost", "127.0.0.1"):
+        return True
+    bare = REFERRAL_SOURCE.lower()
+    return host == bare or host.endswith(f".{bare}")
+
+
+def tag_outbound_url(url, campaign=""):
+    """Return `url` with our referral parameters appended, or `url` unchanged
+    when it should not be tagged (not http/https, our own domain, already
+    carries a utm_source). Existing query parameters and the #fragment are
+    preserved; a fragment keeps its place at the very end."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return url
+    if parsed.scheme not in ("http", "https") or _is_internal_host(parsed.netloc):
+        return url
+
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    if "utm_source" in query:
+        return url
+
+    query["utm_source"] = [REFERRAL_SOURCE]
+    query["utm_medium"] = [REFERRAL_MEDIUM]
+    if campaign:
+        query["utm_campaign"] = [campaign]
+    new_query = urlencode(query, doseq=True)
+
+    return urlunparse(
+        (parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment)
+    )
+
 
 #   MARKDOWN-STYLE LINK: "[label](https://url)". Lets the author show a short
 #   word while the anchor still points at a long address, so a raw link never
@@ -153,12 +211,17 @@ STORY_404_CONTENT = (
 )
 
 
-def _linkify_text(value):
+def _linkify_text(value, campaign=""):
     """Turn markdown links ([words](url)) and bare URLs into anchor tags
     while preserving normal text. A markdown link lets the writer show a
     short word instead of a long raw URL; the bare-URL form stays for links
     simply pasted into the text. Both are matched in one pass so a URL that
-    already sits inside "[words](...)" is never linkified a second time."""
+    already sits inside "[words](...)" is never linkified a second time.
+
+    Every link that leaves the site is stamped with our referral parameters
+    (see tag_outbound_url); `campaign` is the story slug that sent the
+    click. A link back to our own site, or one already tagged by hand, is
+    left as written."""
     safe_text = html.escape(value, quote=False)
     safe_text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", safe_text)
     safe_text = re.sub(r"__(.+?)__", r"<em>\1</em>", safe_text)
@@ -167,7 +230,13 @@ def _linkify_text(value):
         label, url = match.group(1), match.group(2)
         if url is None:                       #   bare-URL branch (group 3)
             url = label = match.group(3)
-        return f'<a href="{url}" rel="noopener noreferrer" target="_blank">{label}</a>'
+        #   `safe_text` is already HTML-escaped, so a "&" in the author's URL
+        #   is sitting here as "&amp;". Undo that before parsing so the
+        #   tagging step sees the real query string, then escape the result
+        #   for the attribute. Without this a second "&" would come back out
+        #   as "&amp%3B" and break the link.
+        tagged = html.escape(tag_outbound_url(html.unescape(url), campaign), quote=True)
+        return f'<a href="{tagged}" rel="noopener noreferrer" target="_blank">{label}</a>'
 
     return _LINK_OR_URL_RE.sub(_anchor, safe_text)
 
@@ -247,7 +316,7 @@ def _render_inline_image(direction, url, alt_text):
     )
 
 
-def _render_inline_file(url, display_text):
+def _render_inline_file(url, display_text, campaign=""):
     """Build the inline downloadable link for a "filel URL text" token. This
     sits in the normal flow of the paragraph (unlike imgl/imgr, it is never
     floated -- a file has no picture to wrap text around), but clicking it
@@ -257,9 +326,10 @@ def _render_inline_file(url, display_text):
     `cloudinary_proxy` template filter is for (see
     ARCHIVE.templatetags.archive_extras) -- any file uploaded through this
     project and served back through /archive/cdn/... downloads correctly;
-    an arbitrary external URL still gets a normal link."""
+    an arbitrary external URL still gets a normal link, and (like every
+    other outbound link) is stamped with our referral parameters."""
     label = (display_text or "").strip() or _image_filename_from_url(url)
-    safe_url = html.escape(url, quote=True)
+    safe_url = html.escape(tag_outbound_url(url, campaign), quote=True)
     safe_label = html.escape(label, quote=True)
     return (
         f'<a class="story-inline-file" href="{safe_url}" download rel="noopener noreferrer">'
@@ -267,7 +337,7 @@ def _render_inline_file(url, display_text):
     )
 
 
-def _render_inline_button(url, label_text):
+def _render_inline_button(url, label_text, campaign=""):
     """Build the block-level button for a "btn URL label" token.
 
     Unlike `filel`, this is not a download: it is a normal link the reader
@@ -275,9 +345,10 @@ def _render_inline_button(url, label_text):
     destination and the trailing text is the label printed on the button.
     When no label was typed the URL itself is printed so the button is never
     blank. It sits on its own line (a <p> wrapper), so it never floats and
-    surrounding text never wraps around it."""
+    surrounding text never wraps around it. As with every other outbound
+    link it carries our referral parameters."""
     label = (label_text or "").strip() or url
-    safe_url = html.escape(url, quote=True)
+    safe_url = html.escape(tag_outbound_url(url, campaign), quote=True)
     safe_label = html.escape(label, quote=False)
     return (
         f'<p class="story-inline-btn-row">'
@@ -360,8 +431,13 @@ def _render_inline_video(direction, url, caption_text):
     )
 
 
-def parse_story_content(content):
-    """Render story text into a readable article structure with SEO-friendly blocks."""
+def parse_story_content(content, campaign=""):
+    """Render story text into a readable article structure with SEO-friendly blocks.
+
+    `campaign` is the story slug; every outbound link the parser draws is
+    stamped with our referral parameters naming that story (see
+    tag_outbound_url). It defaults to "" so the news editor's JavaScript
+    preview -- and every test -- can call the parser without a story."""
     if not content:
         return ""
 
@@ -385,7 +461,7 @@ def parse_story_content(content):
         file_match = FILE_TOKEN_RE.match(line)
         if file_match:
             url, display_text = file_match.groups()
-            blocks.append(_render_inline_file(url, display_text))
+            blocks.append(_render_inline_file(url, display_text, campaign))
             i += 1
             continue
 
@@ -399,7 +475,7 @@ def parse_story_content(content):
         btn_match = BTN_TOKEN_RE.match(line)
         if btn_match:
             url, label_text = btn_match.groups()
-            blocks.append(_render_inline_button(url, label_text))
+            blocks.append(_render_inline_button(url, label_text, campaign))
             i += 1
             continue
 
@@ -409,7 +485,7 @@ def parse_story_content(content):
             heading_text = heading_match.group(2).strip()
             if heading_text:
                 tag_level = min(heading_level + 1, 4)
-                blocks.append(f'<h{tag_level}>{_linkify_text(heading_text)}</h{tag_level}>')
+                blocks.append(f'<h{tag_level}>{_linkify_text(heading_text, campaign)}</h{tag_level}>')
             i += 1
             continue
 
@@ -421,7 +497,7 @@ def parse_story_content(content):
                     break
                 items.append(current[2:].strip())
                 i += 1
-            blocks.append('<ul>' + ''.join(f'<li>{_linkify_text(item)}</li>' for item in items if item) + '</ul>')
+            blocks.append('<ul>' + ''.join(f'<li>{_linkify_text(item, campaign)}</li>' for item in items if item) + '</ul>')
             continue
 
         if re.match(r"^\d+\.\s+", line):
@@ -434,7 +510,7 @@ def parse_story_content(content):
                 if match:
                     items.append(match.group(1).strip())
                 i += 1
-            blocks.append('<ol>' + ''.join(f'<li>{_linkify_text(item)}</li>' for item in items if item) + '</ol>')
+            blocks.append('<ol>' + ''.join(f'<li>{_linkify_text(item, campaign)}</li>' for item in items if item) + '</ol>')
             continue
 
         paragraph_lines = []
@@ -451,7 +527,7 @@ def parse_story_content(content):
 
         paragraph = ' '.join(paragraph_lines).strip()
         if paragraph:
-            blocks.append(f'<p>{_linkify_text(paragraph)}</p>')
+            blocks.append(f'<p>{_linkify_text(paragraph, campaign)}</p>')
 
     return '\n'.join(blocks)
 
@@ -768,7 +844,7 @@ class StoryDetailView(View):
         #   `blog` can arrive from a 100s Redis cache, so a row pickled just
         #   before this field shipped would not carry `toc_mode`. getattr keeps
         #   that first request from 500-ing; the cache self-heals in 100s.
-        blog_content = enhance_story_body(parse_story_content(blog.content), getattr(blog, "toc_mode", 0))
+        blog_content = enhance_story_body(parse_story_content(blog.content, blog.slug), getattr(blog, "toc_mode", 0))
         ticker_text = build_ticker_text(blog.content)
 
         comments = blog.comments.select_related("author__staffprofile").order_by("id")

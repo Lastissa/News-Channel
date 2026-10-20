@@ -219,6 +219,44 @@
     return escapeHtml(value).replace(/"/g, "&quot;");
   }
 
+  /* Undo the escaping above. A URL is escaped before it is parsed for
+     tagging, so "&" in the author's query string is sitting here as "&amp;";
+     the real query string has to be read back before tagOutboundUrl runs, or
+     a second "&" would come out as "&amp%3B" and break the link. Mirrors the
+     html.unescape in _linkify_text (BLOG/views.py). */
+  function unescapeHtml(value) {
+    return String(value)
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&");
+  }
+
+  /* OUTBOUND REFERRAL TAGGING -- mirrors tag_outbound_url in BLOG/views.py.
+     A pasted link is stamped with our referral parameters before it becomes
+     an anchor, so sites we send readers to see the traffic came from us.
+     Only links that leave the site are tagged; our own domain, mailto:/tel:
+     and #anchors are left alone, and a link the author already tagged (it
+     carries a utm_source) is respected. The campaign story slug is added by
+     the server on the published page; the preview omits it since the editor
+     has no slug. */
+  var REFERRAL_SOURCE = "abureport.com.ng";
+  var REFERRAL_MEDIUM = "referral";
+
+  function tagOutboundUrl(url) {
+    var parsed;
+    try { parsed = new URL(url); } catch (error) { return url; }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return url;
+    var host = parsed.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") return url;
+    var bare = REFERRAL_SOURCE.toLowerCase();
+    if (host === bare || host.slice(-(bare.length + 1)) === "." + bare) return url;
+    if (parsed.searchParams.has("utm_source")) return url;
+    parsed.searchParams.set("utm_source", REFERRAL_SOURCE);
+    parsed.searchParams.set("utm_medium", REFERRAL_MEDIUM);
+    return parsed.toString();
+  }
+
   function linkifyText(value) {
     var safe = escapeHtml(value);
     safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -228,7 +266,7 @@
        _linkify_text / _LINK_OR_URL_RE in BLOG/views.py. */
     safe = safe.replace(/\[([^\[\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>'"]+)/g, function (match, label, url, bare) {
       if (url === undefined) { url = bare; label = bare; }
-      return '<a href="' + url + '" rel="noopener noreferrer" target="_blank">' + label + "</a>";
+      return '<a href="' + escapeAttr(tagOutboundUrl(unescapeHtml(url))) + '" rel="noopener noreferrer" target="_blank">' + label + "</a>";
     });
     return safe;
   }
@@ -285,7 +323,7 @@
 
   function renderInlineFile(url, displayText) {
     var label = (displayText || "").trim() || imageFilenameFromUrl(url);
-    return '<a class="story-inline-file" href="' + escapeAttr(url) + '" download rel="noopener noreferrer">' +
+    return '<a class="story-inline-file" href="' + escapeAttr(tagOutboundUrl(url)) + '" download rel="noopener noreferrer">' +
       '<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>' + escapeHtml(label) + "</a>";
   }
 
@@ -294,7 +332,7 @@
      blank. */
   function renderInlineButton(url, labelText) {
     var label = (labelText || "").trim() || url;
-    return '<p class="story-inline-btn-row"><a class="story-inline-btn" href="' + escapeAttr(url) + '" rel="noopener noreferrer" target="_blank">' + escapeHtml(label) + "</a></p>";
+    return '<p class="story-inline-btn-row"><a class="story-inline-btn" href="' + escapeAttr(tagOutboundUrl(url)) + '" rel="noopener noreferrer" target="_blank">' + escapeHtml(label) + "</a></p>";
   }
 
   /* EXTERNAL VIDEO PROVIDERS - mirrors _video_embed_url in BLOG/views.py. A

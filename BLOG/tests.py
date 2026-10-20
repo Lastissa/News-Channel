@@ -47,7 +47,7 @@ __Please note:__
         html = parse_story_content(content)
 
         self.assertIn('<h2>Admissions</h2>', html)
-        self.assertIn('<a href="https://example.com/path"', html)
+        self.assertIn('<a href="https://example.com/path', html)
         self.assertIn('<ul>', html)
         self.assertIn('<li>First bullet item</li>', html)
         self.assertIn('<ol>', html)
@@ -74,7 +74,7 @@ __Please note:__ deadlines are strict.
         html = parse_story_content(content)
 
         self.assertIn('<h2>Admission Process</h2>', html)
-        self.assertIn('<a href="https://example.edu/admission"', html)
+        self.assertIn('<a href="https://example.edu/admission', html)
         self.assertIn('<strong>Late applications will not be accepted.</strong>', html)
         self.assertIn('<em>Please note:</em>', html)
         self.assertIn('<ul>', html)
@@ -170,19 +170,23 @@ __Please note:__ deadlines are strict.
             "The portal is https://example.edu/portal\n"
         )
 
-        html = parse_story_content(content)
+        html = parse_story_content(content, "admissions-update")
 
-        #   [words](url): the words carry the link, the address is not shown
+        #   [words](url): the words carry the link, the address is not shown.
+        #   The address does carry our referral parameters (see
+        #   OutboundLinkTaggingTests) and names the story that sent the click.
         self.assertIn(
-            '<a href="https://example.edu/admission/guide" rel="noopener noreferrer" target="_blank">admission guide</a>',
+            '<a href="https://example.edu/admission/guide'
+            '?utm_source=abureport.com.ng&amp;utm_medium=referral'
+            '&amp;utm_campaign=admissions-update" rel="noopener noreferrer" target="_blank">admission guide</a>',
             html,
         )
         #   a btn line becomes one block-level button carrying the trailing text
         self.assertIn('<p class="story-inline-btn-row">', html)
-        self.assertIn('<a class="story-inline-btn" href="https://example.edu/apply"', html)
+        self.assertIn('<a class="story-inline-btn" href="https://example.edu/apply', html)
         self.assertIn(">Start your application</a>", html)
         #   a bare URL still linkifies
-        self.assertIn('<a href="https://example.edu/portal"', html)
+        self.assertIn('<a href="https://example.edu/portal', html)
 
     def test_a_markdown_link_url_is_only_linked_once(self):
         html = parse_story_content("[Guide](https://example.edu/guide)")
@@ -193,7 +197,7 @@ __Please note:__ deadlines are strict.
     def test_a_button_without_a_label_falls_back_to_the_url(self):
         html = parse_story_content("btn https://example.edu/apply")
 
-        self.assertIn('<a class="story-inline-btn" href="https://example.edu/apply"', html)
+        self.assertIn('<a class="story-inline-btn" href="https://example.edu/apply', html)
         self.assertIn(">https://example.edu/apply</a>", html)
 
     def test_ticker_text_strips_markdown_links_and_button_markers(self):
@@ -209,6 +213,65 @@ __Please note:__ deadlines are strict.
         self.assertNotIn("[", text)
         self.assertNotIn("btn ", text)
         self.assertNotIn("https://example.edu/apply", text)
+
+    def test_outbound_links_are_stamped_with_our_referral_parameters(self):
+        from BLOG.views import tag_outbound_url
+
+        tagged = tag_outbound_url("https://example.com/news", "the-story-slug")
+
+        self.assertIn("utm_source=abureport.com.ng", tagged)
+        self.assertIn("utm_medium=referral", tagged)
+        self.assertIn("utm_campaign=the-story-slug", tagged)
+        self.assertTrue(tagged.startswith("https://example.com/news?"))
+
+    def test_referral_tagging_preserves_existing_query_and_fragment(self):
+        from BLOG.views import tag_outbound_url
+
+        tagged = tag_outbound_url("https://example.com/page?a=1#top", "slug")
+
+        self.assertIn("a=1", tagged)
+        self.assertIn("utm_source=abureport.com.ng", tagged)
+        self.assertTrue(tagged.endswith("#top"))
+
+    def test_a_link_already_carrying_a_query_is_not_mangled_when_rendered(self):
+        #   A "&" in the author's URL is escaped to "&amp;" before the anchor
+        #   is built; the tagging step must see the real query string, so
+        #   both parameters survive and nothing turns into "&amp%3B".
+        html = parse_story_content("See https://example.com/page?a=1&b=2 now.", "slug")
+
+        self.assertIn("https://example.com/page?a=1&amp;b=2&amp;utm_source=abureport.com.ng", html)
+        self.assertNotIn("amp%3B", html)
+
+    def test_referral_tagging_never_touches_our_own_site_or_non_links(self):
+        from BLOG.views import tag_outbound_url
+
+        #   Our own domain and its subdomains stay untouched.
+        self.assertEqual(
+            tag_outbound_url("https://abureport.com.ng/story/x", "slug"),
+            "https://abureport.com.ng/story/x",
+        )
+        self.assertEqual(
+            tag_outbound_url("https://www.abureport.com.ng/story/x", "slug"),
+            "https://www.abureport.com.ng/story/x",
+        )
+        #   Non-http schemes are not links we can tag.
+        self.assertEqual(tag_outbound_url("mailto:tips@example.com", "slug"), "mailto:tips@example.com")
+        self.assertEqual(tag_outbound_url("#section-one", "slug"), "#section-one")
+
+    def test_referral_tagging_respects_a_link_the_author_already_tagged(self):
+        from BLOG.views import tag_outbound_url
+
+        already = "https://example.com/news?utm_source=partner&utm_campaign=spring"
+
+        self.assertEqual(tag_outbound_url(already, "slug"), already)
+
+    def test_story_content_stamps_outbound_links_with_the_story_slug(self):
+        html = parse_story_content(
+            "Read the [guide](https://example.edu/guide) now.", "admissions-update"
+        )
+
+        self.assertIn("utm_source=abureport.com.ng", html)
+        self.assertIn("utm_campaign=admissions-update", html)
 
     def test_a_markdown_link_counts_its_words_but_not_the_address(self):
         from SERVICE_INTERNAL.story_validation import _word_count, split_blocks
@@ -1270,7 +1333,7 @@ class StoryTableOfContentsTests(TestCase):
 
         #   The visible label is plain text; the id is slugified from it too.
         self.assertIn('<h2 id="section-read-the-guide-first">'
-                      'Read <a href="https://example.edu/guide"', body)
+                      'Read <a href="https://example.edu/guide', body)
         self.assertIn('href="#section-read-the-guide-first"', body)
         self.assertIn('href="#section-bold-sub"', body)
         #   The TOC link itself holds the words, not the anchor markup.
