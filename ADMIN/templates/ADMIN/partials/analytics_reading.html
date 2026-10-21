@@ -19,7 +19,7 @@
 
   <section class="analytics-reading-block" aria-labelledby="analytics-reading-top"
            data-guide-title="Top-read stories"
-           data-guide-text="The stories opened most inside the selected range, ranked by story-open events. It counts views in the range, never the all-time total, so the leaderboard changes with the range. Like rate is likes per hundred views.">
+           data-guide-text="The stories opened most inside the selected range, ranked by story-open events. It counts views in the range, never the all-time total, so the leaderboard changes with the range.">
     <h3 id="analytics-reading-top" class="analytics-reading-heading">Top-read stories</h3>
     {% if top_stories %}
     <div class="analytics-reading-scroll">
@@ -29,7 +29,6 @@
             <th scope="col">Story</th>
             <th scope="col">Views</th>
             <th scope="col">Likes</th>
-            <th scope="col">Like rate</th>
           </tr>
         </thead>
         <tbody>
@@ -41,7 +40,6 @@
             </td>
             <td class="analytics-reading-num">{{ story.views }}</td>
             <td class="analytics-reading-num">{{ story.likes }}</td>
-            <td class="analytics-reading-num">{{ story.engagement }}%</td>
           </tr>
           {% endfor %}
         </tbody>

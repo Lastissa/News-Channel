@@ -1,0 +1,32 @@
+{% comment %}
+  htmx fragment: the "Category, head to head" chart on Story lytics.
+
+  Two subjects, three numbers each: stories published, likes and comments,
+  all counted inside the same window. The line above the chart states the
+  difference between the two in figures, so the numbers can be read without
+  measuring the bars. Only ever returned to an htmx GET against
+  control:analytics_category_compare.
+{% endcomment %}
+{% if chart %}
+<p class="analytics-chart-note"
+   data-guide-title="The difference"
+   data-guide-text="What separates the two subjects over this window, stated in figures. A positive number means subject A is ahead; the leader is named beside it.">
+  <strong>{{ chart.categories.0 }}</strong> against <strong>{{ chart.categories.1 }}</strong>
+  over the {{ chart.range_label|lower }}:
+  {% for row in chart.differences %}
+  <span class="analytics-compare-gap">
+    {{ row.metric }} {{ row.display }}{% if row.leader %} ({{ row.leader }} ahead){% elif row.tie %} (level){% endif %}
+  </span>{% if not forloop.last %},{% endif %}
+  {% endfor %}.
+</p>
+<div class="analytics-chart" data-chart data-chart-kind="bar"
+     data-guide-title="Head to head chart"
+     data-guide-text="Three groups -- stories, likes and comments -- with one bar per subject. The taller bar is the subject that leads on that number.">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Stories, likes and comments for two categories over the selected window"></div>
+  {{ chart|json_script:"analytics-category-compare-data" }}
+</div>
+{% else %}
+<p class="analytics-chart-empty"
+   data-guide-text="Two categories are needed for a comparison.">There are not two categories to compare yet.</p>
+{% endif %}

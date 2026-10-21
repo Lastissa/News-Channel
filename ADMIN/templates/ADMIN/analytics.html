@@ -96,37 +96,7 @@
             hx-target="#analytics-growth-body"
             hx-swap="innerHTML"
             hx-trigger="change, submit">
-        <div class="analytics-filter-row">
-          <label class="analytics-select">
-            <span class="analytics-select-label">Time frame</span>
-            <select name="bucket">
-              {% for value, label in trend_buckets %}
-              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">Range</span>
-            <select name="range">
-              {% for value, label in trend_ranges %}
-              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">Start from</span>
-            <input type="date" name="start">
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">End</span>
-            <input type="date" name="end">
-          </label>
-
-          <button type="submit" class="analytics-apply">Apply</button>
-        </div>
+        {% include "ADMIN/partials/analytics_bucket_range.html" %}
         {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
       </form>
 
@@ -156,47 +126,17 @@
             hx-swap="innerHTML"
             hx-trigger="change, submit"
             data-guide-title="Trends controls"
-            data-guide-text="Pick a bucket (per day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
+            data-guide-text="Pick a time frame (per hour, 12 hours, day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
         {% comment %} Marks a real form submission so "every box cleared" is
            distinguishable from the first load, which shows all series. {% endcomment %}
         <input type="hidden" name="submitted" value="1">
 
-        <div class="analytics-filter-row">
-          <label class="analytics-select">
-            <span class="analytics-select-label">Time frame</span>
-            <select name="bucket">
-              {% for value, label in trend_buckets %}
-              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">Range</span>
-            <select name="range">
-              {% for value, label in trend_ranges %}
-              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">Start from</span>
-            <input type="date" name="start">
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">End</span>
-            <input type="date" name="end">
-          </label>
-
-          <button type="submit" class="analytics-apply">Apply</button>
-        </div>
+        {% include "ADMIN/partials/analytics_bucket_range.html" %}
         {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
 
         <fieldset class="analytics-series"
                   data-guide-title="Trends series"
-                  data-guide-text="Users = accounts created in the bucket. Views = story-open events. Stories = stories published. Likes = likes given. Each is a count inside its bucket, never a running total.">
+                  data-guide-text="Users = accounts created in the bucket. Stories = stories published. Likes = likes given. Each is a count inside its bucket, never a running total. Story views live on the Story lytics page.">
           <legend class="panel-sr">Series to plot</legend>
           {% for meta in series_meta %}
           <label class="analytics-series-option" style="--series-color: {{ meta.color }}">

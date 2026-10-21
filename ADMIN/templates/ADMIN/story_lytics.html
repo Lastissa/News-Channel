@@ -146,35 +146,88 @@
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-story-trends-title"
-             data-guide-title="Publishing vs reading"
-             data-guide-text="How much is published against how often stories are opened, per bucket. Only the story series appear here. Tick a series to show or hide it; a custom start and end date override the range preset.">
-      {% comment %}The same Trends chart the Member lytics page uses, but the
-         legend offers only the two series that belong to stories. The chart
-         body includes this form on load so the first paint plots exactly the
-         ticked series instead of every series the endpoint knows.{% endcomment %}
+    <section class="analytics-card" aria-labelledby="analytics-category-daily-title"
+             data-guide-title="Stories per day, by category"
+             data-guide-text="How much is published in each subject, bucket by bucket. One line per category; tick the subjects you want to compare. The window is a preset, or your own start and end dates when you want exactly two days or exactly a week.">
+      {% comment %}The publishing rate of each subject. A line per category, so
+         a subject that has gone quiet reads as a flat line against one that
+         is still being written.{% endcomment %}
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
-        <h2 id="analytics-story-trends-title">Publishing vs reading</h2>
-        {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-trends" height_default=400 %}
+        <h2 id="analytics-category-daily-title">Stories per day, by category</h2>
+        {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-category-daily" height_default=400 %}
       </header>
 
       <form class="analytics-controls"
-            id="analytics-story-trends-form"
-            hx-get="{% url 'control:analytics_trends' %}"
-            hx-target="#analytics-story-trends-body"
+            id="analytics-category-daily-form"
+            hx-get="{% url 'control:analytics_story_category_daily' %}"
+            hx-target="#analytics-category-daily-body"
             hx-swap="innerHTML"
             hx-trigger="change, submit"
-            data-guide-title="Trend controls"
-            data-guide-text="Pick a bucket (per day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
-        <input type="hidden" name="submitted" value="1">
+            data-guide-title="Category controls"
+            data-guide-text="Pick a time frame, a window and the subjects to draw. A custom start and end date override the window preset.">
+        {% include "ADMIN/partials/analytics_bucket_range.html" %}
 
+        <fieldset class="analytics-series"
+                  data-guide-title="Subjects to draw"
+                  data-guide-text="One line per subject. The subjects that have published most are ticked to begin with; untick one to take it off the chart.">
+          <legend class="panel-sr">Categories to plot</legend>
+          {% for category in categories %}
+          <label class="analytics-series-option" style="--series-color: {{ category.color }}">
+            <input type="checkbox" name="category" value="{{ category.name }}"{% if category.name in default_categories %} checked{% endif %}>
+            <span class="analytics-series-swatch" aria-hidden="true"></span>
+            <span>{{ category.name }}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+      </form>
+
+      <div class="analytics-chart-body" id="analytics-category-daily-body"
+           hx-get="{% url 'control:analytics_story_category_daily' %}"
+           hx-include="#analytics-category-daily-form"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading chart&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
+
+    <section class="analytics-card" aria-labelledby="analytics-category-compare-title"
+             data-guide-title="Category, head to head"
+             data-guide-text="Two subjects against each other over one window: how many stories each published, how many likes and how many comments those stories drew, and the difference between them.">
+      {% comment %}The head-to-head: two subjects, three numbers each, and the
+         gap between them stated in figures.{% endcomment %}
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
+        <h2 id="analytics-category-compare-title">Category, head to head</h2>
+        {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-category-compare" height_default=400 %}
+      </header>
+
+      <form class="analytics-controls"
+            id="analytics-category-compare-form"
+            hx-get="{% url 'control:analytics_category_compare' %}"
+            hx-target="#analytics-category-compare-body"
+            hx-swap="innerHTML"
+            hx-trigger="change, submit"
+            data-guide-title="Comparison controls"
+            data-guide-text="Pick the two subjects and the window they are measured over.">
         <div class="analytics-filter-row">
           <label class="analytics-select">
-            <span class="analytics-select-label">Time frame</span>
-            <select name="bucket">
-              {% for value, label in trend_buckets %}
-              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
+            <span class="analytics-select-label">Subject A</span>
+            <select name="a">
+              {% for category in categories %}
+              <option value="{{ category.name }}"{% if category.name == default_categories.0 %} selected{% endif %}>{{ category.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="analytics-select">
+            <span class="analytics-select-label">Subject B</span>
+            <select name="b">
+              {% for category in categories %}
+              <option value="{{ category.name }}"{% if category.name == default_categories.1 %} selected{% endif %}>{{ category.name }}</option>
               {% endfor %}
             </select>
           </label>
@@ -200,6 +253,44 @@
 
           <button type="submit" class="analytics-apply">Apply</button>
         </div>
+      </form>
+
+      <div class="analytics-chart-body" id="analytics-category-compare-body"
+           hx-get="{% url 'control:analytics_category_compare' %}"
+           hx-include="#analytics-category-compare-form"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading comparison&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
+
+    <section class="analytics-card" aria-labelledby="analytics-story-trends-title"
+             data-guide-title="Publishing vs reading"
+             data-guide-text="How much is published against how often stories are opened, per bucket. Only the story series appear here. Tick a series to show or hide it; a custom start and end date override the range preset.">
+      {% comment %}The same Trends chart the Member lytics page uses, but the
+         legend offers only the two series that belong to stories. The chart
+         body includes this form on load so the first paint plots exactly the
+         ticked series instead of every series the endpoint knows.{% endcomment %}
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
+        <h2 id="analytics-story-trends-title">Publishing vs reading</h2>
+        {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-trends" height_default=400 %}
+      </header>
+
+      <form class="analytics-controls"
+            id="analytics-story-trends-form"
+            hx-get="{% url 'control:analytics_trends' %}"
+            hx-target="#analytics-story-trends-body"
+            hx-swap="innerHTML"
+            hx-trigger="change, submit"
+            data-guide-title="Trend controls"
+            data-guide-text="Pick a time frame (per hour, 12 hours, day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
+        <input type="hidden" name="submitted" value="1">
+
+        {% include "ADMIN/partials/analytics_bucket_range.html" %}
 
         <fieldset class="analytics-series">
           <legend class="panel-sr">Series to plot</legend>
@@ -260,37 +351,7 @@
 
         <div class="analytics-story-results" id="analytics-story-results"></div>
 
-        <div class="analytics-filter-row">
-          <label class="analytics-select">
-            <span class="analytics-select-label">Time frame</span>
-            <select name="bucket">
-              {% for value, label in trend_buckets %}
-              <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">Range</span>
-            <select name="range">
-              {% for value, label in trend_ranges %}
-              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">Start from</span>
-            <input type="date" name="start">
-          </label>
-
-          <label class="analytics-select">
-            <span class="analytics-select-label">End</span>
-            <input type="date" name="end">
-          </label>
-
-          <button type="submit" class="analytics-apply">Apply</button>
-        </div>
+        {% include "ADMIN/partials/analytics_bucket_range.html" with default_range="1y" %}
 
         <fieldset class="analytics-series"
                   data-guide-title="Signals to plot"

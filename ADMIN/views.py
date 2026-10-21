@@ -54,19 +54,26 @@ from ADMIN.analytics import (
     MEMBER_KIND_CHOICES,
     MEMBER_NEWSLETTER_CHOICES,
     MEMBER_STATE_CHOICES,
+    MEMBER_TREND_SERIES,
     SERIES_META,
     STORY_KPI_RANGE_CHOICES,
     STORY_KPI_RANGES,
     STORY_PERFORMANCE_SERIES,
     STORY_PERIODS,
     STORY_PERIOD_CHOICES,
+    STORY_TREND_SERIES,
     TREND_BUCKET_CHOICES,
     TREND_RANGE_CHOICES,
     TREND_RANGES,
+    TREND_SUB_RANGE_CHOICES,
     author_detail,
     author_directory_rows,
     author_kpis,
     author_likes,
+    category_comparison,
+    category_names,
+    category_palette,
+    category_story_counts,
     member_category_filter_choices,
     member_directory_queryset,
     member_new_today,
@@ -75,6 +82,7 @@ from ADMIN.analytics import (
     members_growth,
     reading_editorial,
     stories_overview,
+    stories_per_day_by_category,
     stories_per_week,
     story_kpis,
     story_performance,
@@ -808,8 +816,11 @@ class AnalyticsView(View):
                 "trend_buckets": TREND_BUCKET_CHOICES,
                 "default_trend_bucket": DEFAULT_TREND_BUCKET,
                 "trend_ranges": TREND_RANGE_CHOICES,
+                "trend_sub_ranges": TREND_SUB_RANGE_CHOICES,
                 "default_trend_range": DEFAULT_TREND_RANGE,
-                "series_meta": SERIES_META,
+                #   Member lytics is about people: the story-open series lives
+                #   on the Story lytics page, so it is not offered here.
+                "series_meta": MEMBER_TREND_SERIES,
                 "story_performance_series": STORY_PERFORMANCE_SERIES,
                 "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
                 "member_state_choices": MEMBER_STATE_CHOICES,
@@ -850,11 +861,13 @@ class AnalyticsStoriesChartView(View):
 class AnalyticsTrendsChartView(View):
     """htmx fragment: the multi-series trend line chart.
 
-    The four checkboxes in the shell decide which series are drawn. On the
-    very first (load) request the browser sends no `submitted` marker, so all
-    four series are shown by default; once the form has fired, the ticked set
-    is honoured exactly -- including the case where every box is cleared,
-    which draws an empty chart rather than silently re-adding them all.
+    The checkboxes in the shell decide which series are drawn. On the very
+    first (load) request the browser sends no `submitted` marker, so the
+    Member lytics set is shown by default -- the story-open series belongs to
+    the Story lytics page, which always sends the boxes it has ticked. Once
+    the form has fired, the ticked set is honoured exactly -- including the
+    case where every box is cleared, which draws an empty chart rather than
+    silently re-adding them all.
     """
 
     def get(self, request):
@@ -868,12 +881,92 @@ class AnalyticsTrendsChartView(View):
         if "submitted" in request.GET:
             series_keys = set(request.GET.getlist("series"))
         else:
-            series_keys = {meta["key"] for meta in SERIES_META}
+            series_keys = {meta["key"] for meta in MEMBER_TREND_SERIES}
 
         return render(
             request,
             "ADMIN/partials/analytics_trends.html",
             {"chart": trends(bucket, selected_range, series_keys, start_iso, end_iso)},
+        )
+
+
+class AnalyticsStoryCategoryDailyView(View):
+    """htmx fragment: stories published per bucket, one line per category.
+
+    Read only and admin only, like every other figure endpoint. The category
+    names are checked against the live category list, so a hand typed
+    querystring can only ever name a category that exists.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        bucket = (request.GET.get("bucket") or DEFAULT_TREND_BUCKET).strip()
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+
+        palette = category_palette(category_names())
+        ticked = [name for name in request.GET.getlist("category") if name in palette]
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_story_category_daily.html",
+            {
+                "chart": stories_per_day_by_category(
+                    bucket, selected_range, ticked, palette, start_iso, end_iso
+                )
+            },
+        )
+
+
+class AnalyticsCategoryCompareView(View):
+    """htmx fragment: two categories side by side over one window.
+
+    Read only and admin only. The two names are snapped to real categories
+    and must differ, so the chart always compares two subjects rather than a
+    category with itself.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        names = category_names()
+        palette = category_palette(names)
+        defaults = _default_chart_categories(limit=2)
+
+        first = (request.GET.get("a") or "").strip()
+        second = (request.GET.get("b") or "").strip()
+        if first not in palette:
+            #   The busiest subject, so the first paint compares two subjects
+            #   that have actually published.
+            first = defaults[0] if defaults else (names[0] if names else "")
+        if second not in palette or second == first:
+            second = next((name for name in defaults if name != first), "")
+            if not second:
+                second = next((name for name in names if name != first), "")
+
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+
+        if not first or not second:
+            return render(
+                request,
+                "ADMIN/partials/analytics_category_compare.html",
+                {"chart": None},
+            )
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_category_compare.html",
+            {
+                "chart": category_comparison(
+                    first, second, selected_range, palette, start_iso, end_iso
+                )
+            },
         )
 
 
@@ -1286,17 +1379,46 @@ class StoryLyticsView(View):
                 "trend_buckets": TREND_BUCKET_CHOICES,
                 "default_trend_bucket": DEFAULT_TREND_BUCKET,
                 "trend_ranges": TREND_RANGE_CHOICES,
+                "trend_sub_ranges": TREND_SUB_RANGE_CHOICES,
                 "default_trend_range": DEFAULT_TREND_RANGE,
                 #   Only the two series that belong to stories: how much is
                 #   published and how often stories are opened. The Trends
                 #   endpoint draws exactly what the legend has ticked.
-                "series_meta": [meta for meta in SERIES_META if meta["key"] in {"stories", "views"}],
+                "series_meta": STORY_TREND_SERIES,
                 "story_kpi_ranges": STORY_KPI_RANGE_CHOICES,
                 "story_performance_series": STORY_PERFORMANCE_SERIES,
                 "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
+                #   The per-category charts work from the live category list.
+                "categories": [
+                    {"name": name, "color": color}
+                    for name, color in category_palette(category_names()).items()
+                ],
+                #   The per-category card opens on the subjects that have
+                #   actually published, not on the first few in the menu: a
+                #   card that starts on silent subjects reads as an empty
+                #   chart, which is not what "nothing published" means.
+                "default_categories": _default_chart_categories(),
                 "active_chamber": "story",
             },
         )
+
+
+def _default_chart_categories(limit=4):
+    """The categories the per-category charts open on.
+
+    The subjects that have actually published, busiest first. When nothing
+    has been published at all the first few in the menu are used instead, so
+    the card is never an empty box: an empty chart and a project with no
+    stories are not the same thing.
+    """
+    counts = category_story_counts()
+    known = category_names()
+    ranked = sorted(
+        (name for name in counts if name in known),
+        key=lambda name: (-counts[name], name),
+    )
+    chosen = ranked[:limit]
+    return chosen or known[:limit]
 
 
 class PanelStaffGalleryView(View):

@@ -36,13 +36,32 @@
      height follows analytics.js's compact/desktop frame so a percentage means
      the same shape at every width; a missing value is simply the natural one. */
   function chartHeight(mount) {
-    var root = mount && mount.closest ? mount.closest("[data-chart]") : null;
     var width = mount ? mount.clientWidth : 0;
-    var compact = width > 0 && width < 560;
-    var natural = compact ? 250 : FALLBACK_H;
+    var natural = (width > 0 && width < 560) ? 250 : FALLBACK_H;
+    var root = mount && mount.closest ? mount.closest("[data-chart]") : null;
     var pct = root ? parseFloat(root.getAttribute("data-chart-h")) : NaN;
     if (pct > 0) natural = Math.round(natural * pct / 100);
     return Math.max(160, natural);
+  }
+
+  /* How many gridline steps the vertical axis carries. It follows the height
+     of the plot, so a chart that has been made taller reads as finer detail
+     rather than as the same five lines stretched apart. analytics.js owns
+     the rule; this copy is only used if that file has not loaded. */
+  function gridIntervals(plotHeight) {
+    if (!plotHeight || plotHeight <= 0) return 5;
+    var steps = Math.round(plotHeight / 64);
+    return Math.max(3, Math.min(16, steps));
+  }
+
+  function tickAmount(mount, height) {
+    var width = mount ? mount.clientWidth : 0;
+    var compact = width > 0 && width < 560;
+    var plot = height - (compact ? 56 : 76);
+    if (window.AnalyticsFrame && window.AnalyticsFrame.intervalsFor) {
+      return window.AnalyticsFrame.intervalsFor(plot);
+    }
+    return gridIntervals(plot);
   }
 
   function apexSeries(data) {
@@ -119,6 +138,9 @@
           formatter: function (value) { return Math.round(value); },
         },
         forceNiceScale: true,
+        /* The step count follows the height of the plot, so a taller chart
+           carries more steps instead of the same few spread further apart. */
+        tickAmount: tickAmount(mount, height),
         min: 0,
       },
       tooltip: {

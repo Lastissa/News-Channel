@@ -1,0 +1,23 @@
+{% comment %}
+  htmx fragment: the "Stories per day, by category" chart on Story lytics.
+
+  One line per category, each counting the stories published in it inside the
+  bucket. Only ever returned to an htmx GET against
+  control:analytics_story_category_daily -- never rendered into the shell.
+{% endcomment %}
+{% if chart.series %}
+<p class="analytics-chart-note"
+   data-guide-title="Publishing rate"
+   data-guide-text="Each point is how many stories that subject published in that bucket. A flat line is a subject that has gone quiet; a spike is a subject that was worked on hard for a while.">
+  <strong>{{ chart.total }}</strong>
+  stor{{ chart.total|pluralize:"y,ies" }} published across
+  {{ chart.series|length }} subject{{ chart.series|length|pluralize }}.
+</p>
+{% endif %}
+<div class="analytics-chart" data-chart data-chart-kind="line"
+     data-guide-title="Stories per day chart"
+     data-guide-text="One line per subject, one point per bucket. The window and the time frame come from this card's controls; a custom start and end date override the range preset.">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Stories published per bucket, one line per category"></div>
+  {{ chart|json_script:"analytics-story-category-daily-data" }}
+</div>

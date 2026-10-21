@@ -535,6 +535,51 @@ class AnalyticsPageTests(TestCase):
             with self.subTest(title=title):
                 self.assertIn('data-guide-title="%s"' % title, body)
 
+    #   ------------------------------------------------------------ which series
+    def test_member_lytics_no_longer_offers_the_story_open_series(self):
+        #   Story views live on the Story lytics page now, so Member lytics
+        #   does not offer them at all.
+        self.client.force_login(self.admin)
+        body = self.client.get(self.page_url).content.decode()
+        self.assertNotIn('name="series" value="views"', body)
+
+    def test_story_lytics_still_offers_the_story_open_series(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn('name="series" value="views"', body)
+
+    #   ------------------------------------------------------------ buckets
+    def test_the_finest_buckets_are_offered_on_every_lytics_page(self):
+        self.client.force_login(self.admin)
+        for url in [self.page_url, reverse("control:story_lytics")]:
+            with self.subTest(url=url):
+                body = self.client.get(url).content.decode()
+                self.assertIn('value="hour"', body)
+                self.assertIn('value="12hour"', body)
+
+    def test_an_hourly_bucket_is_drawn(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.trends_url, {"bucket": "hour", "range": "24h"}),
+            "analytics-trends-data",
+        )
+        self.assertEqual(chart["bucket"], "hour")
+        #   A day of hours, not a month of them.
+        self.assertLessEqual(len(chart["labels"]), 26)
+        self.assertTrue(all(":" in label for label in chart["labels"]))
+
+    def test_a_twelve_hour_bucket_is_drawn(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.trends_url, {"bucket": "12hour", "range": "72h"}),
+            "analytics-trends-data",
+        )
+        self.assertEqual(chart["bucket"], "12hour")
+        self.assertLessEqual(len(chart["labels"]), 8)
+        self.assertTrue(all("am" in label or "pm" in label for label in chart["labels"]))
+
     #   ------------------------------------------------------------ stories bar
     def test_stories_fragment_returns_a_week_bar_chart(self):
         self.client.force_login(self.admin)
@@ -557,11 +602,22 @@ class AnalyticsPageTests(TestCase):
         self.assertEqual(len(chart["labels"]), 4)
 
     #   ------------------------------------------------------------ trends line
-    def test_first_load_shows_every_series(self):
+    def test_first_load_shows_every_member_series(self):
+        #   Member lytics is about people, so the story-open series is not
+        #   drawn here: it lives on the Story lytics page instead.
         self.client.force_login(self.admin)
         chart = _chart_data(self, self.client.get(self.trends_url), "analytics-trends-data")
         self.assertEqual(chart["type"], "line")
-        self.assertEqual([s["key"] for s in chart["series"]], ["users", "views", "stories", "likes"])
+        self.assertEqual([s["key"] for s in chart["series"]], ["users", "stories", "likes"])
+
+    def test_the_story_open_series_is_still_available_when_asked_for(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.trends_url, {"submitted": "1", "series": ["views"]}),
+            "analytics-trends-data",
+        )
+        self.assertEqual([s["key"] for s in chart["series"]], ["views"])
 
     def test_only_the_ticked_boxes_are_plotted(self):
         self.client.force_login(self.admin)
@@ -1217,6 +1273,336 @@ class AnalyticsReadingTests(TestCase):
         self.assertIn("SPORT", body)
         self.assertIn("Published vs read", body)
 
+    #   ------------------------------------------------------------ like rate
+    def test_the_top_read_table_no_longer_carries_a_like_rate(self):
+        story = self.make_story("Rate story")
+        self.add_view(story)
+        self.add_view(story)
+        BlogLike.objects.create(blog=story, user=self.member)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"range": "30d"}).content.decode()
+        self.assertIn("Rate story", body)
+        self.assertNotIn("Like rate", body)
+
+
+class AnalyticsCategoryDailyTests(TestCase):
+    """The "Stories per day, by category" chart
+    (control:analytics_story_category_daily).
+
+    One line per category, each counting the stories published in that
+    category inside the bucket. The window is a preset or a custom start and
+    end date, so the admin can ask for exactly two days or exactly a week.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="catdaily-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="catdaily-writer@example.com")
+
+        self.url = reverse("control:analytics_story_category_daily")
+
+    def make_story(self, heading, category="NEWS", age_days=0):
+        story = Blog.objects.create(
+            author=self.writer, heading=heading, category=category,
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        Blog.objects.filter(pk=story.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days)
+        )
+        return story
+
+    #   ------------------------------------------------------------ access
+    def test_the_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    #   ------------------------------------------------------------ shell
+    def test_the_shell_ships_the_card_but_no_numbers(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("analytics-category-daily-body", body)
+        self.assertIn("analytics/story-category-daily/", body)
+        self.assertNotIn("analytics-story-category-daily-data", body)
+
+    #   ------------------------------------------------------------ the chart
+    def test_each_ticked_category_gets_its_own_line(self):
+        self.make_story("Daily news one", category="NEWS")
+        self.make_story("Daily news two", category="NEWS")
+        self.make_story("Daily sport one", category="SPORT")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"bucket": "day", "range": "30d", "category": ["NEWS", "SPORT"]},
+            ),
+            "analytics-story-category-daily-data",
+        )
+        self.assertEqual(chart["type"], "line")
+        self.assertEqual([s["key"] for s in chart["series"]], ["NEWS", "SPORT"])
+        totals = {s["key"]: sum(s["values"]) for s in chart["series"]}
+        self.assertEqual(totals, {"NEWS": 2, "SPORT": 1})
+        self.assertEqual(chart["total"], 3)
+
+    def test_an_unticked_category_is_not_drawn(self):
+        self.make_story("Only news", category="NEWS")
+        self.make_story("Unticked sport", category="SPORT")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"bucket": "day", "range": "30d", "category": ["NEWS"]}),
+            "analytics-story-category-daily-data",
+        )
+        self.assertEqual([s["key"] for s in chart["series"]], ["NEWS"])
+
+    def test_an_unknown_category_name_is_ignored(self):
+        self.make_story("Real news", category="NEWS")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"bucket": "day", "range": "30d", "category": ["BANANA"]},
+            ),
+            "analytics-story-category-daily-data",
+        )
+        self.assertEqual(chart["series"], [])
+        self.assertEqual(chart["total"], 0)
+
+    def test_a_custom_period_narrows_the_window_to_exactly_two_days(self):
+        self.make_story("Inside the two days", category="NEWS", age_days=1)
+        self.make_story("Outside the two days", category="NEWS", age_days=5)
+
+        start = (timezone.localdate() - timedelta(days=1)).isoformat()
+        end = timezone.localdate().isoformat()
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {
+                    "bucket": "day",
+                    "category": ["NEWS"],
+                    "start": start,
+                    "end": end,
+                },
+            ),
+            "analytics-story-category-daily-data",
+        )
+        totals = {s["key"]: sum(s["values"]) for s in chart["series"]}
+        self.assertEqual(totals, {"NEWS": 1})
+
+    def test_a_custom_period_can_cover_exactly_a_week(self):
+        self.make_story("Inside the week", category="NEWS", age_days=6)
+        self.make_story("Outside the week", category="NEWS", age_days=9)
+
+        start = (timezone.localdate() - timedelta(days=6)).isoformat()
+        end = timezone.localdate().isoformat()
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {
+                    "bucket": "day",
+                    "category": ["NEWS"],
+                    "start": start,
+                    "end": end,
+                },
+            ),
+            "analytics-story-category-daily-data",
+        )
+        totals = {s["key"]: sum(s["values"]) for s in chart["series"]}
+        self.assertEqual(totals, {"NEWS": 1})
+
+    def test_the_stories_are_bucketed_by_day(self):
+        self.make_story("Two days ago", category="NEWS", age_days=2)
+        self.make_story("Also two days ago", category="NEWS", age_days=2)
+        self.make_story("Yesterday", category="NEWS", age_days=1)
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"bucket": "day", "range": "7d", "category": ["NEWS"]},
+            ),
+            "analytics-story-category-daily-data",
+        )
+        values = chart["series"][0]["values"]
+        self.assertEqual(sum(values), 3)
+        #   The last three buckets are two days ago, yesterday and today: the
+        #   two stories share one bucket, yesterday carries one, today none.
+        self.assertEqual(values[-3:], [2, 1, 0])
+
+    def test_an_hourly_bucket_finer_than_a_day(self):
+        self.make_story("Just now", category="NEWS")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"bucket": "hour", "range": "24h", "category": ["NEWS"]},
+            ),
+            "analytics-story-category-daily-data",
+        )
+        values = chart["series"][0]["values"]
+        self.assertEqual(sum(values), 1)
+        #   An hourly window is a handful of points, not a month of them.
+        self.assertLessEqual(len(values), 26)
+
+
+class AnalyticsCategoryCompareTests(TestCase):
+    """The "Category, head to head" chart (control:analytics_category_compare).
+
+    Two subjects, three numbers each -- stories published, likes and comments
+    -- all counted inside the same window, with the gap between the two stated
+    in figures.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="compare-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="compare-writer@example.com")
+        self.member = Auth.objects.create_user(email="compare-member@example.com")
+
+        self.url = reverse("control:analytics_category_compare")
+
+    def make_story(self, heading, category="NEWS", age_days=0):
+        story = Blog.objects.create(
+            author=self.writer, heading=heading, category=category,
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        Blog.objects.filter(pk=story.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days)
+        )
+        return story
+
+    #   ------------------------------------------------------------ access
+    def test_the_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    #   ------------------------------------------------------------ shell
+    def test_the_shell_ships_the_card_but_no_numbers(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("analytics-category-compare-body", body)
+        self.assertIn("analytics/category-compare/", body)
+        self.assertNotIn("analytics-category-compare-data", body)
+
+    #   ------------------------------------------------------------ the chart
+    def test_the_two_subjects_are_counted_side_by_side(self):
+        news = self.make_story("Compare news one", category="NEWS")
+        self.make_story("Compare news two", category="NEWS")
+        sport = self.make_story("Compare sport one", category="SPORT")
+        BlogLike.objects.create(blog=news, user=self.member)
+        Comment.objects.create(blog=sport, author=self.member, content="Nice one.")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"a": "NEWS", "b": "SPORT", "range": "30d"}),
+            "analytics-category-compare-data",
+        )
+        self.assertEqual(chart["type"], "bar")
+        self.assertEqual(chart["labels"], ["Stories", "Likes", "Comments"])
+        self.assertEqual([s["key"] for s in chart["series"]], ["NEWS", "SPORT"])
+        self.assertEqual(chart["series"][0]["values"], [2, 1, 0])
+        self.assertEqual(chart["series"][1]["values"], [1, 0, 1])
+
+    def test_the_difference_between_the_two_is_stated_in_figures(self):
+        self.make_story("Gap news one", category="NEWS")
+        self.make_story("Gap news two", category="NEWS")
+        self.make_story("Gap sport one", category="SPORT")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"a": "NEWS", "b": "SPORT", "range": "30d"}),
+            "analytics-category-compare-data",
+        )
+        rows = {row["metric"]: row for row in chart["differences"]}
+        self.assertEqual(rows["Stories"]["difference"], 1)
+        self.assertEqual(rows["Stories"]["display"], "+1")
+        self.assertEqual(rows["Stories"]["leader"], "NEWS")
+        self.assertEqual(rows["Likes"]["difference"], 0)
+        self.assertEqual(rows["Likes"]["display"], "0")
+        self.assertTrue(rows["Likes"]["tie"])
+
+    def test_the_note_line_states_the_difference(self):
+        self.make_story("Note news one", category="NEWS")
+        self.make_story("Note news two", category="NEWS")
+        self.make_story("Note sport", category="SPORT")
+
+        self.client.force_login(self.admin)
+        body = self.client.get(
+            self.url, {"a": "NEWS", "b": "SPORT", "range": "30d"}
+        ).content.decode()
+        self.assertIn("Stories +1", body)
+
+    def test_the_two_subjects_must_differ(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"a": "NEWS", "b": "NEWS", "range": "30d"}),
+            "analytics-category-compare-data",
+        )
+        self.assertEqual(len(chart["series"]), 2)
+        self.assertNotEqual(chart["series"][0]["key"], chart["series"][1]["key"])
+
+    def test_an_unknown_subject_snaps_to_a_real_category(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"a": "BANANA", "b": "ALSO BANANA", "range": "30d"}),
+            "analytics-category-compare-data",
+        )
+        self.assertNotIn("BANANA", [s["key"] for s in chart["series"]])
+
+    def test_the_window_applies_to_every_metric(self):
+        old = self.make_story("Old news", category="NEWS", age_days=200)
+        self.make_story("Old sport", category="SPORT", age_days=200)
+        like = BlogLike.objects.create(blog=old, user=self.member)
+        #   The like is as old as the story it belongs to.
+        BlogLike.objects.filter(pk=like.pk).update(
+            created_at=timezone.now() - timedelta(days=200)
+        )
+
+        self.client.force_login(self.admin)
+        wide = _chart_data(
+            self,
+            self.client.get(self.url, {"a": "NEWS", "b": "SPORT", "range": "1y"}),
+            "analytics-category-compare-data",
+        )
+        narrow = _chart_data(
+            self,
+            self.client.get(self.url, {"a": "NEWS", "b": "SPORT", "range": "30d"}),
+            "analytics-category-compare-data",
+        )
+        self.assertEqual(wide["series"][0]["values"], [1, 1, 0])
+        #   The like is 200 days old, so a 30 day window leaves it out.
+        self.assertEqual(narrow["series"][0]["values"], [0, 0, 0])
+
 
 class AnalyticsStoryKpisTests(TestCase):
     """The Story lytics KPI strip (control:analytics_story_kpis).
@@ -1443,12 +1829,14 @@ class AnalyticsStoryPerformanceTests(TestCase):
         self.search_url = reverse("control:analytics_story_search")
         self.story = self.make_story("Performance story")
 
-    def make_story(self, heading):
+    def make_story(self, heading, age_days=0):
         story = Blog.objects.create(
             author=self.writer, heading=heading, category="NEWS",
             content="Body.", image_1="https://example.com/a.jpg",
         )
-        Blog.objects.filter(pk=story.pk).update(date_created=timezone.now())
+        Blog.objects.filter(pk=story.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days)
+        )
         return story
 
     def add_view(self, story, age_days=0):
@@ -1500,6 +1888,47 @@ class AnalyticsStoryPerformanceTests(TestCase):
         self.client.force_login(self.admin)
         body = self.client.get(self.url, {"story": "999999"}).content.decode()
         self.assertIn("Pick a story", body)
+
+    #   ------------------------------------------------------------ the window
+    def test_the_chart_opens_on_the_day_the_story_was_published(self):
+        #   A story published three days ago must not be drawn against a
+        #   thirty day window: the chart starts on its own publish day, so the
+        #   story's life fills the chart instead of hiding on one side of it.
+        story = self.make_story("Published three days ago", age_days=3)
+        self.add_view(story)
+        story.refresh_from_db()   #   date_created was pinned in the database
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"story": story.pk, "bucket": "day", "range": "30d"}),
+            "analytics-story-performance-data",
+        )
+        published = timezone.localtime(story.date_created)
+        self.assertEqual(chart["labels"][0], "%s %d" % (published.strftime("%b"), published.day))
+        #   The publish day and the three days since it.
+        self.assertEqual(len(chart["labels"]), 4)
+
+    def test_the_range_still_bounds_an_old_story(self):
+        story = self.make_story("Published long ago", age_days=200)
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(self.url, {"story": story.pk, "bucket": "day", "range": "30d"}),
+            "analytics-story-performance-data",
+        )
+        #   Thirty days of buckets, even though the story is much older.
+        self.assertEqual(len(chart["labels"]), 30)
+
+    def test_the_publish_day_is_named_above_the_chart(self):
+        story = self.make_story("Published today", age_days=0)
+        story.refresh_from_db()
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url, {"story": story.pk, "bucket": "day", "range": "30d"}).content.decode()
+        published = timezone.localtime(story.date_created)
+        self.assertIn("%s %d" % (published.strftime("%b"), published.day), body)
 
     #   ------------------------------------------------------------ picker search
     def test_search_matches_by_heading(self):

@@ -1,0 +1,55 @@
+{% comment %}
+  The shared bucket / range / custom-date controls, used by every chart that
+  measures something over time.
+
+  One partial so the charts that own these controls cannot drift apart: the
+  Trends card, the Members-over-time card, the Story lytics publishing chart,
+  the per-story performance chart and the per-category charts all measure to
+  the same window, and they must offer the same windows.
+
+  The range menu carries two scales. A day scale window ("Last 30 days")
+  asked of an hourly bucket would ask for 720 points, which reads as a smear,
+  so the menu swaps to the hour scale when the bucket is 12 hours or 1 hour.
+  Both sets live in the one <select>: each option says which scale it belongs
+  to (data-scale) and analytics.js shows only the set that fits the chosen
+  bucket. With JS off every option simply stays visible and the server falls
+  back to the matching scale on its own.
+
+  `default_range` overrides the shell's default for the one card that wants a
+  different starting point (the story performance chart opens on the year, so
+  a story published inside it still opens on its own publish day).
+{% endcomment %}
+<div class="analytics-filter-row" data-bucket-range>
+  <label class="analytics-select">
+    <span class="analytics-select-label">Time frame</span>
+    <select name="bucket" data-bucket-select>
+      {% for value, label in trend_buckets %}
+      <option value="{{ value }}"{% if value == default_trend_bucket %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="analytics-select">
+    <span class="analytics-select-label">Range</span>
+    <select name="range" data-range-select>
+      {% for value, label in trend_ranges %}
+      <option value="{{ value }}" data-scale="day"{% if value == default_range|default:default_trend_range %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+      {% for value, label in trend_sub_ranges %}
+      <option value="{{ value }}" data-scale="hour">{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="analytics-select">
+    <span class="analytics-select-label">Start from</span>
+    <input type="date" name="start">
+  </label>
+
+  <label class="analytics-select">
+    <span class="analytics-select-label">End</span>
+    <input type="date" name="end">
+  </label>
+
+  <button type="submit" class="analytics-apply">Apply</button>
+</div>

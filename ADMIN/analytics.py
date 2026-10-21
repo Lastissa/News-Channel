@@ -41,13 +41,17 @@ STORY_PERIODS = {
 }
 DEFAULT_STORY_PERIOD = "1m"
 
-#   Line chart: bucket size (day / 2 days / week) and the window it covers.
-#   "Per month" is a calendar bucket rather than a fixed number of days, so it
-#   is handled apart from this map (see MONTH_BUCKET / _trend_frame).
+#   Line chart: bucket size and the window it covers. The two finest buckets
+#   are sub-day (12 hours, 1 hour) so a chart can zoom into a single day's
+#   shape; the coarser ones step by whole days. "Per month" is a calendar
+#   bucket rather than a fixed number of days, so it is handled apart from this
+#   map (see MONTH_BUCKET / _trend_frame).
 TREND_BUCKETS = {
-    "day": 1,
-    "2day": 2,
-    "week": 7,
+    "hour": timedelta(hours=1),
+    "12hour": timedelta(hours=12),
+    "day": timedelta(days=1),
+    "2day": timedelta(days=2),
+    "week": timedelta(days=7),
 }
 DEFAULT_TREND_BUCKET = "day"
 
@@ -57,6 +61,7 @@ DEFAULT_TREND_BUCKET = "day"
 MONTH_BUCKET = "month"
 
 TREND_RANGES = {
+    "2d": 2,
     "7d": 7,
     "14d": 14,
     "30d": 30,
@@ -67,12 +72,39 @@ TREND_RANGES = {
 }
 DEFAULT_TREND_RANGE = "30d"
 
+#   The windows that make sense once the bucket is finer than a day. A day
+#   scale window asked for by an hourly bucket would ask for 720 points, which
+#   reads as a smear rather than a chart, so the range menu swaps to these
+#   when the bucket is 12 hours or 1 hour (see the range swap in analytics.js).
+TREND_SUB_RANGES = {
+    "6h": timedelta(hours=6),
+    "12h": timedelta(hours=12),
+    "24h": timedelta(hours=24),
+    "48h": timedelta(hours=48),
+    "72h": timedelta(hours=72),
+}
+DEFAULT_TREND_SUB_RANGE = "24h"
+
 #   One colour per series, matched to the checkbox legend in analytics.js.
 SERIES_META = [
     {"key": "users", "name": "New users", "color": "#2563eb"},
     {"key": "views", "name": "Total views", "color": "#16a34a"},
     {"key": "stories", "name": "Stories", "color": "#d97706"},
     {"key": "likes", "name": "Likes", "color": "#dc2626"},
+]
+
+#   The series each chamber offers. Member lytics is about people, so the
+#   story-open series lives on the Story lytics page instead and is not
+#   offered (nor drawn by default) here.
+MEMBER_TREND_SERIES = [meta for meta in SERIES_META if meta["key"] != "views"]
+STORY_TREND_SERIES = [meta for meta in SERIES_META if meta["key"] in {"stories", "views"}]
+
+#   The colours a category series wears. Assigned by position in the category
+#   list, so a category keeps the same colour whether it is drawn alone or
+#   beside the others.
+CATEGORY_SERIES_COLORS = [
+    "#2563eb", "#d97706", "#16a34a", "#dc2626",
+    "#7c3aed", "#0891b2", "#db2777", "#65a30d",
 ]
 
 #   Per-story performance chart: the three signals an editor can overlay for a
@@ -95,12 +127,15 @@ STORY_PERIOD_CHOICES = [
     ("1y", "Last 12 months"),
 ]
 TREND_BUCKET_CHOICES = [
+    ("hour", "Per hour"),
+    ("12hour", "Per 12 hours"),
     ("day", "Per day"),
     ("2day", "Per 2 days"),
     ("week", "Per week"),
     ("month", "Per month"),
 ]
 TREND_RANGE_CHOICES = [
+    ("2d", "Last 2 days"),
     ("7d", "Last 7 days"),
     ("14d", "Last 14 days"),
     ("30d", "Last 30 days"),
@@ -108,6 +143,13 @@ TREND_RANGE_CHOICES = [
     ("90d", "Last 3 months"),
     ("6m", "Last 6 months"),
     ("1y", "Last 12 months"),
+]
+TREND_SUB_RANGE_CHOICES = [
+    ("6h", "Last 6 hours"),
+    ("12h", "Last 12 hours"),
+    ("24h", "Last 24 hours"),
+    ("48h", "Last 2 days"),
+    ("72h", "Last 3 days"),
 ]
 
 
@@ -160,6 +202,47 @@ def _bucket_counts(stamps, start, size, count):
 
 def _fmt_day(moment):
     return f"{moment:%b} {moment.day}"
+
+
+def _bucket_label(moment, size):
+    """The x-axis label for one bucket edge.
+
+    A bucket shorter than a day needs the hour to be readable, so it reads
+    "2pm" or "14:00" rather than repeating the same date all day; a day or
+    longer keeps the plain "Oct 18" wording.
+    """
+    if size >= timedelta(days=1):
+        return _fmt_day(moment)
+    if size >= timedelta(hours=12):
+        #   A 12-hour bucket: name the half of the day it opens on.
+        hour = moment.hour
+        if hour == 0:
+            return "12am"
+        if hour == 12:
+            return "12pm"
+        return f"{hour}am" if hour < 12 else f"{hour - 12}pm"
+    return f"{moment:%H:%M}"
+
+
+def _floor_to_bucket(moment, size):
+    """The edge of the bucket `moment` falls in, in local time.
+
+    A day bucket opens at midnight, a 12-hour bucket at midnight or noon, and
+    an hourly bucket on the hour. Without this a sub-day chart would start at
+    an arbitrary minute and every label would be a slightly different time.
+    """
+    local = timezone.localtime(moment)
+    if size >= timedelta(days=1):
+        return _local_midnight(local)
+    if size >= timedelta(hours=12):
+        return local.replace(hour=0 if local.hour < 12 else 12, minute=0, second=0, microsecond=0)
+    return local.replace(minute=0, second=0, microsecond=0)
+
+
+def _month_start(moment):
+    """The first midnight of the month `moment` falls in."""
+    local = timezone.localtime(moment)
+    return local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _fmt_range(start, end):
@@ -335,22 +418,39 @@ def _month_counts(stamps, months):
     return counts
 
 
-def _trend_frame(bucket, selected_range, start_iso=None, end_iso=None):
+def _trend_frame(bucket, selected_range, start_iso=None, end_iso=None, not_before=None):
     """Resolve the chart window and its bucket edges.
 
     A valid custom start/end pair overrides the preset range. Returns a plain
     dict the trend / growth helpers share: the window, the bucket labels, the
     number of buckets, and the edge list (fixed timedelta or month starts).
+
+    `not_before` is a floor on the window's start: a story's chart opens on
+    the day the story was published, so the left of the chart is never an
+    empty stretch of days the story could not have been read in. The range
+    still bounds how far back the chart looks.
     """
     now = timezone.localtime()
     custom = _custom_window(start_iso, end_iso)
     month = bucket == MONTH_BUCKET
+    size = TREND_BUCKETS.get(bucket, TREND_BUCKETS[DEFAULT_TREND_BUCKET])
+    sub_day = size < timedelta(days=1)
 
     if custom is not None:
         start, end_exclusive = custom
         #   Last instant the window can contain, so the +1 bucket rule below
         #   never appends an empty trailing bucket.
         span_end = end_exclusive - timedelta(microseconds=1)
+    elif sub_day:
+        #   A day scale window would ask an hourly bucket for 720 points, so a
+        #   sub-day bucket reads its window from the hour scale list instead.
+        #   A day scale key can only reach here with the script off (the menu
+        #   swaps scales otherwise), and the longest sub-day window is the
+        #   honest reading of it -- never a month of hourly points.
+        window = TREND_SUB_RANGES.get(selected_range, TREND_SUB_RANGES["72h"])
+        start = _floor_to_bucket(now - window, size)
+        end_exclusive = None
+        span_end = now
     else:
         range_days = TREND_RANGES.get(selected_range, TREND_RANGES[DEFAULT_TREND_RANGE])
         if bucket == "week":
@@ -359,6 +459,15 @@ def _trend_frame(bucket, selected_range, start_iso=None, end_iso=None):
             start = _local_midnight(now - timedelta(days=range_days - 1))
         end_exclusive = None
         span_end = now
+
+    if not_before is not None:
+        floor = _month_start(not_before) if month else _floor_to_bucket(not_before, size)
+        if floor > start:
+            start = floor
+            if end_exclusive is not None and end_exclusive <= start:
+                #   The floor has eaten the whole custom window.
+                end_exclusive = None
+                span_end = now
 
     if month:
         months = _month_starts(start, span_end)
@@ -371,7 +480,6 @@ def _trend_frame(bucket, selected_range, start_iso=None, end_iso=None):
             "labels": [f"{moment:%b %Y}" for moment in months],
         }
 
-    size = timedelta(days=TREND_BUCKETS.get(bucket, TREND_BUCKETS[DEFAULT_TREND_BUCKET]))
     #   +1 so the partial final bucket (today) is always included.
     count = max(int((span_end - start) // size) + 1, 1)
     return {
@@ -380,7 +488,7 @@ def _trend_frame(bucket, selected_range, start_iso=None, end_iso=None):
         "months": None,
         "size": size,
         "count": count,
-        "labels": [_fmt_day(start + size * index) for index in range(count)],
+        "labels": [_bucket_label(start + size * index, size) for index in range(count)],
     }
 
 
@@ -645,17 +753,13 @@ def _top_read_stories(start):
         if story is None:      #   deleted between the two reads
             continue
         views = row["views"]
-        liked = likes.get(story.pk, 0)
         stories.append(
             {
                 "heading": story.heading,
                 "slug": story.slug,
                 "category": story.category,
                 "views": views,
-                "likes": liked,
-                #   Likes per hundred views, so a low-traffic story that lands
-                #   well is not hidden behind a high-traffic one.
-                "engagement": round(liked * 100 / views) if views else 0,
+                "likes": likes.get(story.pk, 0),
             }
         )
     return stories
@@ -778,6 +882,194 @@ def reading_editorial(selected_range, cooled_since=None):
         "cooled_since_default": (
             today - timedelta(days=READING_COLD_MIN_AGE_DAYS)
         ).isoformat(),
+    }
+
+
+#   -------------------------------------------------------------------------
+#   STORIES PER DAY, BY CATEGORY -- the publishing rate of each subject
+#   -------------------------------------------------------------------------
+#   One line per category, each counting the stories published in that
+#   category inside the bucket. The window is the same one every other chart
+#   uses: a preset, or a custom start and end date when the admin wants
+#   exactly two days, or exactly one week.
+
+
+def category_palette(names):
+    """{name: colour} for the given category names, in the order given.
+
+    The colour follows the category's position in the list, so a category
+    keeps the same colour whether it is drawn alone or beside the others.
+    """
+    return {
+        name: CATEGORY_SERIES_COLORS[index % len(CATEGORY_SERIES_COLORS)]
+        for index, name in enumerate(names)
+    }
+
+
+def category_names():
+    """Every category the charts can talk about, in one stable order.
+
+    The menu (the Category table) comes first, because that is the order the
+    admin knows the categories by. A category that a story still carries but
+    the menu has dropped follows it, alphabetically, so nothing a reader has
+    published is ever left out of the count.
+    """
+    names = [name for name, _ in get_category_choices()]
+    known = set(names)
+    extra = sorted(
+        {
+            name
+            for name in Blog.objects.values_list("category", flat=True).distinct()
+            if name and name not in known
+        }
+    )
+    return names + extra
+
+
+def category_story_counts():
+    """{category: stories published}, busiest first.
+
+    Only used to decide which categories a chart starts out drawing: a card
+    that opens on subjects nobody has published in reads as an empty chart,
+    which is not the same thing as saying nothing has been published.
+    """
+    rows = _safe_rows(
+        Blog.objects.values("category").annotate(n=Count("id")).order_by("-n")
+    )
+    return {row["category"]: row["n"] for row in rows if row["category"]}
+
+
+def stories_per_day_by_category(
+    bucket, selected_range, categories, palette, start_iso=None, end_iso=None
+):
+    """Line chart data: stories published per bucket, one line per category.
+
+    `categories` is the set the admin left ticked and `palette` is the colour
+    map for every category, so a category keeps its colour whatever else is
+    drawn beside it. The buckets are the ones the trend charts use, so a day
+    bucket really is one story-published-per-day reading.
+    """
+    frame = _trend_frame(bucket, selected_range, start_iso, end_iso)
+    wanted = set(categories)
+    chosen = [name for name in palette if name in wanted]
+
+    rows = _safe_rows(
+        Blog.objects.filter(date_created__gte=frame["start"], category__in=chosen)
+        .values("date_created", "category")
+    )
+    stamps = {}
+    for row in rows:
+        stamps.setdefault(row["category"], []).append(row["date_created"])
+
+    series = []
+    for name in chosen:
+        if frame["months"] is not None:
+            values = _month_counts(stamps.get(name, []), frame["months"])
+        else:
+            values = _frame_counts(frame, stamps.get(name, []))
+        series.append(
+            {"key": name, "name": name, "color": palette[name], "values": values}
+        )
+
+    return {
+        "type": "line",
+        "labels": frame["labels"],
+        "series": series,
+        "bucket": bucket,
+        "range": selected_range,
+        "total": sum(sum(item["values"]) for item in series),
+    }
+
+
+#   -------------------------------------------------------------------------
+#   CATEGORY COMPARISON -- two subjects, head to head
+#   -------------------------------------------------------------------------
+#   The numbers a comparison is made of: how many stories each category
+#   published, how many likes and how many comments those stories drew.
+
+COMPARISON_METRICS = [
+    ("Stories", "stories"),
+    ("Likes", "likes"),
+    ("Comments", "comments"),
+]
+
+
+def category_comparison(
+    name_a, name_b, selected_range, palette, start_iso=None, end_iso=None
+):
+    """Two categories side by side over one window.
+
+    Stories, likes and comments for each category, counted inside the same
+    window -- a preset range or a custom start and end date -- so the
+    difference between the two is a difference over one period and never a
+    difference between two different periods.
+    """
+    custom = _custom_window(start_iso, end_iso)
+    if custom is not None:
+        start, end_exclusive = custom
+        range_label = "Custom range"
+    else:
+        range_days = TREND_RANGES.get(selected_range, TREND_RANGES[DEFAULT_TREND_RANGE])
+        start = _local_midnight(timezone.localtime() - timedelta(days=range_days - 1))
+        end_exclusive = None
+        range_label = _range_label(selected_range)
+
+    def totals(category):
+        published = Blog.objects.filter(category=category, date_created__gte=start)
+        liked = BlogLike.objects.filter(blog__category=category, created_at__gte=start)
+        commented = Comment.objects.filter(blog__category=category, date_created__gte=start)
+        if end_exclusive is not None:
+            published = published.filter(date_created__lt=end_exclusive)
+            liked = liked.filter(created_at__lt=end_exclusive)
+            commented = commented.filter(date_created__lt=end_exclusive)
+        return {
+            "stories": published.count(),
+            "likes": liked.count(),
+            "comments": commented.count(),
+        }
+
+    totals_a = totals(name_a)
+    totals_b = totals(name_b)
+
+    differences = []
+    for label, key in COMPARISON_METRICS:
+        first = totals_a[key]
+        second = totals_b[key]
+        gap = first - second
+        differences.append(
+            {
+                "metric": label,
+                "a": first,
+                "b": second,
+                "difference": gap,
+                #   Signed, so the direction is readable without relying on
+                #   colour alone.
+                "display": f"+{gap}" if gap > 0 else (f"-{abs(gap)}" if gap < 0 else "0"),
+                "leader": name_a if gap > 0 else (name_b if gap < 0 else ""),
+                "tie": gap == 0,
+            }
+        )
+
+    return {
+        "type": "bar",
+        "labels": [label for label, _ in COMPARISON_METRICS],
+        "series": [
+            {
+                "key": name_a,
+                "name": name_a,
+                "color": palette.get(name_a, CATEGORY_SERIES_COLORS[0]),
+                "values": [totals_a[key] for _, key in COMPARISON_METRICS],
+            },
+            {
+                "key": name_b,
+                "name": name_b,
+                "color": palette.get(name_b, CATEGORY_SERIES_COLORS[1]),
+                "values": [totals_b[key] for _, key in COMPARISON_METRICS],
+            },
+        ],
+        "differences": differences,
+        "range_label": range_label,
+        "categories": [name_a, name_b],
     }
 
 
@@ -929,7 +1221,13 @@ def story_performance(blog_id, bucket, selected_range, series_keys, start_iso=No
             "range": selected_range,
         }
 
-    frame = _trend_frame(bucket, selected_range, start_iso, end_iso)
+    #   The chart opens on the day the story was published. A window that
+    #   started earlier would leave the whole left of the chart empty and
+    #   squeeze the story's own life into one side of it; the range still
+    #   bounds how far back the chart looks.
+    published = timezone.localtime(story.date_created)
+    publish_day = _local_midnight(published)
+    frame = _trend_frame(bucket, selected_range, start_iso, end_iso, not_before=publish_day)
 
     def count_events(model, field):
         queryset = model.objects.filter(blog_id=story.pk)
@@ -960,6 +1258,8 @@ def story_performance(blog_id, bucket, selected_range, series_keys, start_iso=No
             "slug": story.slug,
             "author": story.author_name,
             "category": story.category,
+            "published": publish_day,
+            "published_label": _month_day(publish_day),
         },
         "bucket": bucket,
         "range": selected_range,

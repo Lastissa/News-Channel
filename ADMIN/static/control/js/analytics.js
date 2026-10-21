@@ -18,7 +18,10 @@
   var COMPACT_W = 560;          /* mount widths under this use the compact frame */
   var MIN_W = 220;              /* unmeasurable mount: fall back to the wide frame */
   var FALLBACK_W = 920;
-  var GRID_INTERVALS = 5;       /* horizontal gridlines above the baseline */
+  var GRID_INTERVALS = 5;       /* horizontal gridlines above the baseline at the natural height */
+  var GRID_STEP_PX = 64;        /* the height one gridline step should occupy */
+  var GRID_MIN_INTERVALS = 3;   /* never fewer than this many steps */
+  var GRID_MAX_INTERVALS = 16;  /* nor more than this many */
   var MAX_X_LABELS = 9;         /* never crowd the x-axis past this many labels */
   var LABEL_ROOM = 58;          /* rough px a date label needs, incl. its gap */
 
@@ -54,9 +57,25 @@
     return Math.round(factor * magnitude);
   }
 
-  function axisMax(maxValue) {
-    if (!maxValue || maxValue <= 0) return GRID_INTERVALS;
-    return niceStep(Math.ceil(maxValue / GRID_INTERVALS)) * GRID_INTERVALS;
+  /* How many gridline steps the vertical axis carries, from the height of the
+     plot itself.
+
+     A chart that has been made taller must not simply stretch its five
+     gridlines: the numerals would end up miles apart and the reader would
+     have to guess what the space between them meant. So the step count
+     follows the plot height -- one step for roughly every GRID_STEP_PX of
+     plot -- and the axis gets finer as the chart grows, instead of the
+     numerals growing. Shrinking the chart thins the axis in the same way. */
+  function gridIntervals(plotHeight) {
+    if (!plotHeight || plotHeight <= 0) return GRID_INTERVALS;
+    var steps = Math.round(plotHeight / GRID_STEP_PX);
+    return Math.max(GRID_MIN_INTERVALS, Math.min(GRID_MAX_INTERVALS, steps));
+  }
+
+  function axisMax(maxValue, intervals) {
+    var steps = intervals || GRID_INTERVALS;
+    if (!maxValue || maxValue <= 0) return steps;
+    return niceStep(Math.ceil(maxValue / steps)) * steps;
   }
 
   /* The drawing frame: measured width, an adaptive height and the matching
@@ -99,6 +118,33 @@
     };
   }
 
+  /* The frame maths, shared with the ApexCharts adapter.
+     The adapter draws the real chart and needs the same answers this file
+     works out for itself: how tall the chart is, and how many gridline steps
+     its vertical axis carries. Exposed as one small object so the two
+     renderers cannot drift apart; the adapter falls back to its own copy if
+     this file has not loaded. */
+  window.AnalyticsFrame = {
+    naturalHeight: function (width) {
+      return (width > 0 && width < COMPACT_W) ? COMPACT_H : DESKTOP_H;
+    },
+    heightFor: function (mount) {
+      var width = mount ? mount.clientWidth : 0;
+      var natural = this.naturalHeight(width);
+      var root = mount && mount.closest ? mount.closest("[data-chart]") : null;
+      var pct = root ? parseFloat(root.getAttribute("data-chart-h")) : NaN;
+      if (pct > 0) natural = Math.round(natural * pct / 100);
+      return Math.max(160, natural);
+    },
+    /* The plot height inside a chart of this height: the chart's own box
+       minus the room the axes and their labels take. */
+    plotHeightFor: function (height, compact) {
+      var margin = compact ? COMPACT_MARGIN : DESKTOP_MARGIN;
+      return Math.max(0, height - margin.top - margin.bottom);
+    },
+    intervalsFor: gridIntervals
+  };
+
   /* Thin the x labels to what the width can actually carry. */
   function labelStride(count, plotW) {
     var room = Math.floor(plotW / LABEL_ROOM);
@@ -130,35 +176,43 @@
 
   function drawAxes(svg, max, frame, box) {
     var m = frame.margin;
-    for (var i = 0; i <= GRID_INTERVALS; i++) {
-      var y = m.top + box.h - (box.h * i / GRID_INTERVALS);
+    var intervals = gridIntervals(box.h);
+    for (var i = 0; i <= intervals; i++) {
+      var y = m.top + box.h - (box.h * i / intervals);
       svg.appendChild(svgEl("line", {
         x1: m.left, y1: y,
         x2: m.left + box.w, y2: y,
         "class": "analytics-gridline" + (i === 0 ? " analytics-gridline--base" : "")
       }));
-      svg.appendChild(svgText(m.left - 8, y + 4, String(Math.round(max * i / GRID_INTERVALS)), "analytics-axis-label analytics-axis-label--y", "end"));
+      svg.appendChild(svgText(m.left - 8, y + 4, String(Math.round(max * i / intervals)), "analytics-axis-label analytics-axis-label--y", "end"));
     }
   }
 
   function renderBar(host, data, root) {
-    var values = (data.series && data.series[0] ? data.series[0].values : []) || [];
+    var series = data.series || [];
+    var values = (series[0] ? series[0].values : []) || [];
     var count = values.length;
     var frame = frameFor(host);
-    if (!count) { host.appendChild(emptySvg("Stories published per week", frame)); return; }
+    if (!count || !series.length) { host.appendChild(emptySvg("Stories published per week", frame)); return; }
 
     var box = plotBox(frame);
     var m = frame.margin;
-    var max = axisMax(Math.max.apply(null, values.concat([0])));
+    var intervals = gridIntervals(box.h);
+    var all = [];
+    series.forEach(function (s) { all = all.concat(s.values || []); });
+    var max = axisMax(Math.max.apply(null, all.concat([0])), intervals);
     var svg = newSvg("Stories published per week", frame);
     drawAxes(svg, max, frame, box);
 
     var slot = box.w / count;
-    var barW = Math.max(Math.min(slot * 0.6, 56), 3);
+    /* One group of bars per bucket: a single series takes the whole slot, a
+       comparison puts its subjects side by side inside it. */
+    var groupCount = series.length;
+    var groupW = Math.min(slot * 0.72, groupCount * 56);
+    var barW = Math.max((groupW - (groupCount - 1) * 3) / groupCount, 2);
     var stride = labelStride(count, box.w);
-    var colour = data.series[0].color || "#2563eb";
     /* Counts above a bar need room; drop them once the bars get thin. */
-    var showValues = slot >= 22;
+    var showValues = slot >= 22 && groupCount === 1;
     /* Bars are only pressable when the fragment carried one week per bar and
        a week endpoint to fetch that week's stories from. */
     var weeks = data.bucket_starts || [];
@@ -166,31 +220,37 @@
     var pressable = !!endpoint && weeks.length === count;
 
     for (var i = 0; i < count; i++) {
-      var value = values[i] || 0;
-      var height = max ? (box.h * value / max) : 0;
-      var x = m.left + slot * i + (slot - barW) / 2;
-      var y = m.top + box.h - height;
-      var tipText = (data.tooltips && data.tooltips[i]) || (data.labels[i] + ": " + value);
-      var rect = svgEl("rect", {
-        x: x, y: y, width: barW,
-        height: Math.max(height, value > 0 ? 2 : 0),
-        rx: 4, "class": "analytics-bar", fill: colour
-      });
-      var tip = svgEl("title");
-      tip.textContent = tipText;
-      rect.appendChild(tip);
+      var groupX = m.left + slot * i + (slot - groupW) / 2;
+      for (var s = 0; s < groupCount; s++) {
+        var seriesItem = series[s];
+        var seriesValues = seriesItem.values || [];
+        var value = seriesValues[i] || 0;
+        var height = max ? (box.h * value / max) : 0;
+        var x = groupX + s * (barW + 3);
+        var y = m.top + box.h - height;
+        var tipText = (data.tooltips && data.tooltips[i]) || (data.labels[i] + ": " + value);
+        if (groupCount > 1) tipText = seriesItem.name + " \u2014 " + tipText;
+        var rect = svgEl("rect", {
+          x: x, y: y, width: barW,
+          height: Math.max(height, value > 0 ? 2 : 0),
+          rx: 4, "class": "analytics-bar", fill: seriesItem.color || "#2563eb"
+        });
+        var tip = svgEl("title");
+        tip.textContent = tipText;
+        rect.appendChild(tip);
 
-      if (pressable) {
-        rect.setAttribute("class", "analytics-bar analytics-bar--pressable");
-        rect.setAttribute("tabindex", "0");
-        rect.setAttribute("role", "button");
-        rect.setAttribute("data-week", weeks[i]);
-        rect.setAttribute("aria-label", tipText + ". Opens this week's stories.");
-      }
-      svg.appendChild(rect);
+        if (pressable) {
+          rect.setAttribute("class", "analytics-bar analytics-bar--pressable");
+          rect.setAttribute("tabindex", "0");
+          rect.setAttribute("role", "button");
+          rect.setAttribute("data-week", weeks[i]);
+          rect.setAttribute("aria-label", tipText + ". Opens this week's stories.");
+        }
+        svg.appendChild(rect);
 
-      if (value > 0 && showValues) {
-        svg.appendChild(svgText(x + barW / 2, y - 7, String(value), "analytics-bar-value", "middle"));
+        if (value > 0 && showValues) {
+          svg.appendChild(svgText(x + barW / 2, y - 7, String(value), "analytics-bar-value", "middle"));
+        }
       }
       if (i % stride === 0 || i === count - 1) {
         var lx = m.left + slot * i + slot / 2;
@@ -337,7 +397,8 @@
     var m = frame.margin;
     var all = [];
     series.forEach(function (s) { all = all.concat(s.values || []); });
-    var max = axisMax(Math.max.apply(null, all.concat([0])));
+    var intervals = gridIntervals(box.h);
+    var max = axisMax(Math.max.apply(null, all.concat([0])), intervals);
 
     var svg = newSvg("Trend lines for the selected series", frame);
     drawAxes(svg, max, frame, box);
@@ -761,6 +822,67 @@
   });
 
   window.AnalyticsCharts = { render: renderAll, redraw: redrawAll };
+
+  /* ---------- Bucket / range scale swap ---------- */
+  /* The range menu carries two scales. A day scale window ("Last 30 days")
+     asked of an hourly bucket would ask for 720 points, which reads as a
+     smear rather than a chart, so when the time frame is 12 hours or 1 hour
+     the menu offers the hour scale instead ("Last 6 hours" ... "Last 3
+     days"). The two sets live in the one <select>: each option says which
+     scale it belongs to, and this hides the set that does not fit. With JS
+     off every option stays visible and the server reads the matching scale
+     on its own, so the chart is still right -- only the menu is longer. */
+  (function () {
+    var SUB_DAY_BUCKETS = { hour: true, "12hour": true };
+
+    function scaleFor(bucket) {
+      return SUB_DAY_BUCKETS[bucket] ? "hour" : "day";
+    }
+
+    function syncRangeOptions(scope) {
+      var bucket = scope.querySelector("[data-bucket-select]");
+      var range = scope.querySelector("[data-range-select]");
+      if (!bucket || !range || !range.options) return;
+      var wanted = scaleFor(bucket.value);
+      var options = range.options;
+      var first = null;
+      var currentStillThere = false;
+      for (var i = 0; i < options.length; i++) {
+        var option = options[i];
+        var scale = option.getAttribute("data-scale") || "day";
+        var show = scale === wanted;
+        option.hidden = !show;
+        option.disabled = !show;
+        if (show) {
+          if (!first) first = option.value;
+          if (option.value === range.value) currentStillThere = true;
+        }
+      }
+      if (!currentStillThere && first) range.value = first;
+    }
+
+    function syncAll() {
+      Array.prototype.forEach.call(
+        document.querySelectorAll("[data-bucket-range]"),
+        syncRangeOptions
+      );
+    }
+
+    /* The bucket select is the trigger, so the swap has to happen before the
+       form's own change handler serialises it. This listener is registered in
+       the capture phase on the document, which runs before the event reaches
+       the form at all: a bubble-phase listener would be too late, because
+       htmx would already have read the form and sent the old range. */
+    document.addEventListener("change", function (event) {
+      var bucket = event.target.closest && event.target.closest("[data-bucket-select]");
+      if (!bucket) return;
+      var scope = bucket.closest("[data-bucket-range]");
+      if (scope) syncRangeOptions(scope);
+    }, true);
+
+    document.addEventListener("DOMContentLoaded", syncAll);
+    document.addEventListener("htmx:afterSwap", syncAll);
+  })();
 
   /* ---------- Slow-network loading state ---------- */
   /* Every chart lives in an .analytics-chart-body. On a slow link the old
