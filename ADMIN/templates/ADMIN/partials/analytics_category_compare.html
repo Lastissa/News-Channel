@@ -1,10 +1,10 @@
 {% comment %}
   htmx fragment: the "Category, head to head" chart on Story lytics.
 
-  Two subjects, three numbers each: stories published, likes and comments,
-  all counted inside the same window. The line above the chart states the
-  difference between the two in figures, so the numbers can be read without
-  measuring the bars. Only ever returned to an htmx GET against
+  Two subjects, four numbers each: stories published, likes, comments and
+  story opens, all counted inside the same window. The line above the chart
+  states the difference between the two in figures, so the numbers can be read
+  without measuring the bars. Only ever returned to an htmx GET against
   control:analytics_category_compare.
 {% endcomment %}
 {% if chart %}
@@ -21,9 +21,9 @@
 </p>
 <div class="analytics-chart" data-chart data-chart-kind="bar"
      data-guide-title="Head to head chart"
-     data-guide-text="Three groups -- stories, likes and comments -- with one bar per subject. The taller bar is the subject that leads on that number.">
+     data-guide-text="Four groups -- stories, likes, comments and views -- with one bar per subject. The taller bar is the subject that leads on that number.">
   <div class="analytics-chart-canvas" data-chart-canvas role="img"
-       aria-label="Stories, likes and comments for two categories over the selected window"></div>
+       aria-label="Stories, likes, comments and views for two categories over the selected window"></div>
   {{ chart|json_script:"analytics-category-compare-data" }}
 </div>
 {% else %}

@@ -189,6 +189,19 @@ def _safe_values(queryset, field):
         return []
 
 
+def _safe_count(queryset):
+    """Count a queryset, or 0 while its table is still unmigrated.
+
+    StoryView is the only table this guards, matching _safe_values and
+    _safe_rows: ANALYTICS must show a zero, not a 500, before its migration.
+    """
+    try:
+        with transaction.atomic():
+            return queryset.count()
+    except DatabaseError:
+        return 0
+
+
 def _bucket_counts(stamps, start, size, count):
     """Drop each timestamp into its bucket. `start` is the first bucket edge."""
     counts = [0] * count
@@ -985,12 +998,14 @@ def stories_per_day_by_category(
 #   CATEGORY COMPARISON -- two subjects, head to head
 #   -------------------------------------------------------------------------
 #   The numbers a comparison is made of: how many stories each category
-#   published, how many likes and how many comments those stories drew.
+#   published, how many likes and how many comments those stories drew, and
+#   how many times the stories were opened.
 
 COMPARISON_METRICS = [
     ("Stories", "stories"),
     ("Likes", "likes"),
     ("Comments", "comments"),
+    ("Views", "views"),
 ]
 
 
@@ -999,10 +1014,10 @@ def category_comparison(
 ):
     """Two categories side by side over one window.
 
-    Stories, likes and comments for each category, counted inside the same
-    window -- a preset range or a custom start and end date -- so the
-    difference between the two is a difference over one period and never a
-    difference between two different periods.
+    Stories, likes, comments and story opens for each category, counted
+    inside the same window -- a preset range or a custom start and end date
+    -- so the difference between the two is a difference over one period and
+    never a difference between two different periods.
     """
     custom = _custom_window(start_iso, end_iso)
     if custom is not None:
@@ -1018,14 +1033,19 @@ def category_comparison(
         published = Blog.objects.filter(category=category, date_created__gte=start)
         liked = BlogLike.objects.filter(blog__category=category, created_at__gte=start)
         commented = Comment.objects.filter(blog__category=category, date_created__gte=start)
+        opened = StoryView.objects.filter(blog__category=category, created_at__gte=start)
         if end_exclusive is not None:
             published = published.filter(date_created__lt=end_exclusive)
             liked = liked.filter(created_at__lt=end_exclusive)
             commented = commented.filter(date_created__lt=end_exclusive)
+            opened = opened.filter(created_at__lt=end_exclusive)
         return {
             "stories": published.count(),
             "likes": liked.count(),
             "comments": commented.count(),
+            #   The story-open history is the one table that may not be
+            #   migrated yet, so it is counted through the safe helper.
+            "views": _safe_count(opened),
         }
 
     totals_a = totals(name_a)
@@ -1087,19 +1107,6 @@ STORY_KPI_RANGE_CHOICES = [
     ("90d", "90 days"),
 ]
 STORY_KPI_RANGES = tuple(value for value, _ in STORY_KPI_RANGE_CHOICES)
-
-
-def _safe_count(queryset):
-    """Count a queryset, or 0 while its table is still unmigrated.
-
-    StoryView is the only table this guards, matching _safe_values and
-    _safe_rows: ANALYTICS must show a zero, not a 500, before its migration.
-    """
-    try:
-        with transaction.atomic():
-            return queryset.count()
-    except DatabaseError:
-        return 0
 
 
 def _story_reads(start, end=None):

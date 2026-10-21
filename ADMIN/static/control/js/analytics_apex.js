@@ -54,14 +54,20 @@
     return Math.max(3, Math.min(16, steps));
   }
 
+  /* How many numerals the vertical axis carries.
+
+     The shared frame maths counts the intervals between the gridlines; Apex
+     counts the labels it draws, and a baseline numeral is a label too, so
+     the label count is one more than the interval count. That keeps the
+     Apex chart and the hand drawn one showing the same axis. */
   function tickAmount(mount, height) {
     var width = mount ? mount.clientWidth : 0;
     var compact = width > 0 && width < 560;
     var plot = height - (compact ? 56 : 76);
-    if (window.AnalyticsFrame && window.AnalyticsFrame.intervalsFor) {
-      return window.AnalyticsFrame.intervalsFor(plot);
-    }
-    return gridIntervals(plot);
+    var intervals = (window.AnalyticsFrame && window.AnalyticsFrame.intervalsFor)
+      ? window.AnalyticsFrame.intervalsFor(plot)
+      : gridIntervals(plot);
+    return intervals + 1;
   }
 
   function apexSeries(data) {

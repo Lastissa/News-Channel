@@ -1467,9 +1467,9 @@ class AnalyticsCategoryDailyTests(TestCase):
 class AnalyticsCategoryCompareTests(TestCase):
     """The "Category, head to head" chart (control:analytics_category_compare).
 
-    Two subjects, three numbers each -- stories published, likes and comments
-    -- all counted inside the same window, with the gap between the two stated
-    in figures.
+    Two subjects, four numbers each -- stories published, likes, comments and
+    story opens -- all counted inside the same window, with the gap between the
+    two stated in figures.
     """
 
     def setUp(self):
@@ -1492,6 +1492,13 @@ class AnalyticsCategoryCompareTests(TestCase):
             date_created=timezone.now() - timedelta(days=age_days)
         )
         return story
+
+    def add_view(self, story, age_days=0):
+        view = StoryView.objects.create(blog=story)
+        StoryView.objects.filter(pk=view.pk).update(
+            created_at=timezone.now() - timedelta(days=age_days)
+        )
+        return view
 
     #   ------------------------------------------------------------ access
     def test_the_endpoint_is_admin_only(self):
@@ -1517,6 +1524,8 @@ class AnalyticsCategoryCompareTests(TestCase):
         sport = self.make_story("Compare sport one", category="SPORT")
         BlogLike.objects.create(blog=news, user=self.member)
         Comment.objects.create(blog=sport, author=self.member, content="Nice one.")
+        self.add_view(news)
+        self.add_view(news)
 
         self.client.force_login(self.admin)
         chart = _chart_data(
@@ -1525,15 +1534,18 @@ class AnalyticsCategoryCompareTests(TestCase):
             "analytics-category-compare-data",
         )
         self.assertEqual(chart["type"], "bar")
-        self.assertEqual(chart["labels"], ["Stories", "Likes", "Comments"])
+        self.assertEqual(
+            chart["labels"], ["Stories", "Likes", "Comments", "Views"]
+        )
         self.assertEqual([s["key"] for s in chart["series"]], ["NEWS", "SPORT"])
-        self.assertEqual(chart["series"][0]["values"], [2, 1, 0])
-        self.assertEqual(chart["series"][1]["values"], [1, 0, 1])
+        self.assertEqual(chart["series"][0]["values"], [2, 1, 0, 2])
+        self.assertEqual(chart["series"][1]["values"], [1, 0, 1, 0])
 
     def test_the_difference_between_the_two_is_stated_in_figures(self):
-        self.make_story("Gap news one", category="NEWS")
+        news = self.make_story("Gap news one", category="NEWS")
         self.make_story("Gap news two", category="NEWS")
         self.make_story("Gap sport one", category="SPORT")
+        self.add_view(news)
 
         self.client.force_login(self.admin)
         chart = _chart_data(
@@ -1548,6 +1560,11 @@ class AnalyticsCategoryCompareTests(TestCase):
         self.assertEqual(rows["Likes"]["difference"], 0)
         self.assertEqual(rows["Likes"]["display"], "0")
         self.assertTrue(rows["Likes"]["tie"])
+        #   The views are counted in their own right, not left out of the
+        #   comparison because they live on the Story lytics page.
+        self.assertEqual(rows["Views"]["difference"], 1)
+        self.assertEqual(rows["Views"]["display"], "+1")
+        self.assertEqual(rows["Views"]["leader"], "NEWS")
 
     def test_the_note_line_states_the_difference(self):
         self.make_story("Note news one", category="NEWS")
@@ -1559,6 +1576,7 @@ class AnalyticsCategoryCompareTests(TestCase):
             self.url, {"a": "NEWS", "b": "SPORT", "range": "30d"}
         ).content.decode()
         self.assertIn("Stories +1", body)
+        self.assertIn("Views ", body)
 
     def test_the_two_subjects_must_differ(self):
         self.client.force_login(self.admin)
@@ -1587,6 +1605,7 @@ class AnalyticsCategoryCompareTests(TestCase):
         BlogLike.objects.filter(pk=like.pk).update(
             created_at=timezone.now() - timedelta(days=200)
         )
+        self.add_view(old, age_days=200)
 
         self.client.force_login(self.admin)
         wide = _chart_data(
@@ -1599,9 +1618,10 @@ class AnalyticsCategoryCompareTests(TestCase):
             self.client.get(self.url, {"a": "NEWS", "b": "SPORT", "range": "30d"}),
             "analytics-category-compare-data",
         )
-        self.assertEqual(wide["series"][0]["values"], [1, 1, 0])
-        #   The like is 200 days old, so a 30 day window leaves it out.
-        self.assertEqual(narrow["series"][0]["values"], [0, 0, 0])
+        self.assertEqual(wide["series"][0]["values"], [1, 1, 0, 1])
+        #   The like and the view are 200 days old, so a 30 day window leaves
+        #   them out.
+        self.assertEqual(narrow["series"][0]["values"], [0, 0, 0, 0])
 
 
 class AnalyticsStoryKpisTests(TestCase):
