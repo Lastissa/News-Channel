@@ -4,8 +4,8 @@
   Fetched on demand by analytics.js when a bar is pressed (not htmx-swapped,
    never part of the shell). `label` / `count` / `stories` come from
   ADMIN.analytics.week_stories as plain values, so the fragment holds the only
-  copy of the week's numbers. The author control is a button, not a link:
-  there is no author page yet, so analytics.js answers with the settled toast.
+  copy of the week's numbers. The author name links into the Author lytics
+  chamber, which now exists -- it replaced the old Staff placeholder.
 {% endcomment %}
 <div class="analytics-week-summary">
   <p class="analytics-week-range">{{ label }}</p>
@@ -18,7 +18,7 @@
     <a class="analytics-week-story" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
     <p class="analytics-week-meta">
       <span class="analytics-week-by">By</span>
-      <button type="button" class="analytics-week-author" data-author-toast="Author analytics is not built yet. It will live in Staff lytics.">{{ story.author }}</button>
+      <a class="analytics-week-author" href="{% url 'control:author_lytics' %}">{{ story.author }}</a>
       <span class="analytics-week-dates">
         <span class="analytics-week-posted">Posted {{ story.posted|date:"M j, Y" }}</span>
         {% if story.updated %}<span class="analytics-week-updated">Updated {{ story.updated|date:"M j, Y" }}</span>{% endif %}

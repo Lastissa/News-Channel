@@ -1,0 +1,58 @@
+{% comment %}
+  htmx fragment: the Authors window summary.
+
+  A slim, single-line strip rather than a wall of cards: the window in words
+  ("Last 7 days" or "2 days ago", whichever is honest) and the six headline
+  figures. Real totals over one window, so the ratios between them stay honest.
+  Returned by control:analytics_author_kpis and never rendered into the shell.
+{% endcomment %}
+<div class="analytics-author-summary"
+     data-guide-title="This window"
+     data-guide-text="Everything on this page is measured over the window shown here: authors who published or were read, stories published, how often those stories were opened, and the named readers who liked them.">
+
+  <p class="analytics-author-window-label">
+    <span class="analytics-author-window-kicker">Showing</span>
+    {{ range_label }}
+    <span class="analytics-author-window-ago">({{ relative_label }})</span>
+  </p>
+
+  <ul class="analytics-author-figures">
+    <li class="analytics-author-figure">
+      <span class="analytics-author-figure-value">{{ authors }}</span>
+      <span class="analytics-author-figure-label">author{{ authors|pluralize }}</span>
+    </li>
+    <li class="analytics-author-figure">
+      <span class="analytics-author-figure-value">{{ stories }}</span>
+      <span class="analytics-author-figure-label">stor{{ stories|pluralize:"y,ies" }} published</span>
+      {% if stories_delta %}
+      <span class="analytics-delta {{ stories_delta.tone }}" aria-label="{{ stories_delta.label }}">{{ stories_delta.display }}</span>
+      {% endif %}
+    </li>
+    <li class="analytics-author-figure">
+      <span class="analytics-author-figure-value">{{ reads }}</span>
+      <span class="analytics-author-figure-label">read{{ reads|pluralize }}</span>
+      {% if reads_delta %}
+      <span class="analytics-delta {{ reads_delta.tone }}" aria-label="{{ reads_delta.label }}">{{ reads_delta.display }}</span>
+      {% endif %}
+    </li>
+    <li class="analytics-author-figure">
+      <span class="analytics-author-figure-value">{{ reads_per_story }}</span>
+      <span class="analytics-author-figure-label">read{{ reads_per_story|pluralize }} per story</span>
+    </li>
+    <li class="analytics-author-figure">
+      <span class="analytics-author-figure-value">{{ likes }}</span>
+      <span class="analytics-author-figure-label">like{{ likes|pluralize }} by name</span>
+      {% if likes_delta %}
+      <span class="analytics-delta {{ likes_delta.tone }}" aria-label="{{ likes_delta.label }}">{{ likes_delta.display }}</span>
+      {% endif %}
+    </li>
+    <li class="analytics-author-figure">
+      <span class="analytics-author-figure-value">{{ comments }}</span>
+      <span class="analytics-author-figure-label">comment{{ comments|pluralize }}</span>
+    </li>
+  </ul>
+
+  {% if not stories and not reads %}
+  <p class="analytics-kpis-empty">Nothing was published or read in this window yet.</p>
+  {% endif %}
+</div>

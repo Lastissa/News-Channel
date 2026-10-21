@@ -811,6 +811,125 @@
     else if (window.htmx) window.htmx.trigger(form, "submit");
   });
 
+  /* ---------- Authors: open one author's detail ---------- */
+  /* Pressing any author in the list (or in the "Likes, by name" table) fills
+     the detail panel beside the list. It is a plain fetch rather than an htmx
+     swap so the list stays on screen and the pressed row can be marked. On a
+     narrow screen the panel sits below the list, so opening an author also
+     scrolls the panel into view -- the press and the answer are never a scroll
+     apart. The panel's own stories and likers lists page through
+     data-author-repage buttons, which reload the same author with a new page
+     offset and keep the detail and list reading as one movement. */
+  (function () {
+    var detailBody = document.getElementById("analytics-author-detail-body");
+    if (!detailBody) return;
+
+    var detailPanel = document.getElementById("analytics-author-detail-panel") || detailBody;
+    var authorsForm = document.getElementById("analytics-authors-form");
+    var detailUrl = detailBody.getAttribute("data-author-detail-endpoint") || detailBody.dataset.detailEndpoint || "";
+    var listBody = document.getElementById("analytics-authors-body");
+    var currentAuthor = "";
+    var currentPages = { stories_page: "", likes_page: "" };
+
+    function currentRange() {
+      if (!authorsForm) return "";
+      var field = authorsForm.querySelector('select[name="range"]');
+      return field ? field.value : "";
+    }
+
+    function currentSince() {
+      if (!authorsForm) return "";
+      var field = authorsForm.querySelector('input[name="since"]');
+      return field ? field.value : "";
+    }
+
+    function markRow(authorId) {
+      Array.prototype.forEach.call(document.querySelectorAll("[data-author-row]"), function (row) {
+        row.classList.toggle("is-selected", row.getAttribute("data-author-row") === authorId);
+      });
+    }
+
+    function scrollPanelIntoView() {
+      if (!detailPanel || !detailPanel.scrollIntoView) return;
+      detailPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function loadAuthor(authorId, pages) {
+      if (!authorId || !detailUrl) return;
+      currentAuthor = authorId;
+      currentPages = pages || currentPages || { stories_page: "", likes_page: "" };
+      markRow(authorId);
+      detailBody.setAttribute("aria-busy", "true");
+      scrollPanelIntoView();
+
+      var url = detailUrl + "?author=" + encodeURIComponent(authorId) +
+        "&range=" + encodeURIComponent(currentRange());
+      var since = currentSince();
+      if (since) url += "&since=" + encodeURIComponent(since);
+      if (currentPages.stories_page) url += "&stories_page=" + encodeURIComponent(currentPages.stories_page);
+      if (currentPages.likes_page) url += "&likes_page=" + encodeURIComponent(currentPages.likes_page);
+
+      var controller = window.AbortController ? new AbortController() : null;
+      if (detailBody.__authorAbort) detailBody.__authorAbort.abort();
+      detailBody.__authorAbort = controller;
+
+      fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        signal: controller ? controller.signal : undefined,
+      })
+        .then(function (response) { return response.text(); })
+        .then(function (html) {
+          detailBody.innerHTML = html;
+          detailBody.setAttribute("aria-busy", "false");
+          /* The newly-swapped markup is a fresh DOM subtree: hand it to the
+             guide so its step count and the height control pick it up. */
+          if (window.htmx) window.htmx.process(detailBody);
+        })
+        .catch(function (err) {
+          if (err && err.name === "AbortError") return;
+          detailBody.setAttribute("aria-busy", "false");
+          detailBody.innerHTML = '<p class="analytics-reading-empty">Couldn\'t load this author. Try again.</p>';
+        });
+    }
+
+    document.addEventListener("click", function (event) {
+      var repage = event.target.closest && event.target.closest("[data-author-repage]");
+      if (repage) {
+        event.preventDefault();
+        var pages = { stories_page: currentPages.stories_page, likes_page: currentPages.likes_page };
+        repage.getAttribute("data-author-repage").split("&").forEach(function (pair) {
+          var parts = pair.split("=");
+          if (parts.length === 2) pages[parts[0]] = parts[1];
+        });
+        loadAuthor(currentAuthor, pages);
+        return;
+      }
+
+      var trigger = event.target.closest && event.target.closest("[data-author-open]");
+      if (!trigger) return;
+      event.preventDefault();
+      /* A fresh pick starts both inner lists at page one. */
+      loadAuthor(trigger.getAttribute("data-author-open"), { stories_page: "", likes_page: "" });
+    });
+
+    /* The list itself re-renders when the range or "since" changes; if an author
+       is open, refresh the detail to the same window too. */
+    if (authorsForm) {
+      authorsForm.addEventListener("change", function () {
+        if (currentAuthor) loadAuthor(currentAuthor, { stories_page: "", likes_page: "" });
+        document.body.dispatchEvent(new CustomEvent("analytics:range"));
+      });
+    }
+
+    /* A focused author (arrived with ?focus=) opens itself once the list paints. */
+    if (listBody) {
+      listBody.addEventListener("htmx:afterSwap", function () {
+        var focused = listBody.querySelector("[data-author-row].is-focused");
+        if (focused) loadAuthor(focused.getAttribute("data-author-row"), { stories_page: "", likes_page: "" });
+      });
+    }
+  })();
+
   /* ---------- "How this works" guide ---------- */
   /* A bottom-docked coach rail: the rail itself never covers the page, and each
      step scrolls its target into view and rings it, so the guide explains each

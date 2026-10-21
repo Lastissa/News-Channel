@@ -671,8 +671,9 @@ class AnalyticsPageTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
         self.assertIn("Week story one", body)
-        # author button has data-author-toast
-        self.assertIn('data-author-toast="Author analytics is not built yet. It will live in Staff lytics."', body)
+        # the author name is a link into the Author lytics chamber
+        self.assertIn(reverse("control:author_lytics"), body)
+        self.assertIn("analytics-week-author", body)
 
     def test_week_stories_wednesday_and_sunday_return_same_fragment(self):
         url = reverse("control:member_week_stories")
@@ -1515,8 +1516,9 @@ class AnalyticsStoryPerformanceTests(TestCase):
 
 
 class AnalyticsChamberPlaceholderTests(TestCase):
-    """The staff and partner analytics pages are placeholders for now, and the
-    PANEL sidebar links to every chamber."""
+    """The partner analytics page is a placeholder for now, the panel sidebar
+    links to every chamber, and the Author chamber is a real shell (it replaced
+    the old Staff placeholder, which duplicated it)."""
 
     def setUp(self):
         super().setUp()
@@ -1525,24 +1527,37 @@ class AnalyticsChamberPlaceholderTests(TestCase):
         self.admin = Auth.objects.create_admin(email="chamber-admin@example.com")
         self.writer = Auth.objects.create_staff(email="chamber-writer@example.com")
 
-    def test_the_placeholders_are_admin_only(self):
-        for name in ["control:staff_lytics", "control:partner_lytics"]:
-            with self.subTest(name=name):
-                self.assertEqual(self.client.get(reverse(name)).status_code, 302)
-                self.client.force_login(self.writer)
-                self.assertEqual(self.client.get(reverse(name)).status_code, 302)
-                self.client.logout()
-                self.client.force_login(self.admin)
-                self.assertEqual(self.client.get(reverse(name)).status_code, 200)
-                self.client.logout()
+    def test_the_partner_placeholder_is_admin_only(self):
+        name = "control:partner_lytics"
+        self.assertEqual(self.client.get(reverse(name)).status_code, 302)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(reverse(name)).status_code, 302)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse(name)).status_code, 200)
+        self.client.logout()
 
     def test_the_panel_links_to_every_chamber(self):
         self.client.force_login(self.admin)
         body = self.client.get(reverse("control:panel")).content.decode()
         self.assertIn("Member lytics", body)
-        self.assertIn("Staff lytics", body)
+        self.assertIn("Author lytics", body)
         self.assertIn("Story lytics", body)
         self.assertIn("Partner lytics", body)
+        #   Staff lytics is gone: it duplicated Author lytics.
+        self.assertNotIn("Staff lytics", body)
+
+    def test_the_staff_chamber_is_gone(self):
+        from django.urls import NoReverseMatch
+        with self.assertRaises(NoReverseMatch):
+            reverse("control:staff_lytics")
+
+    def test_the_chamber_rail_drops_staff_and_keeps_author(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("Author", body)
+        self.assertNotIn(">Staff<", body)
+        self.assertNotIn(reverse("control:author_lytics").replace("/author/", "/staff/"), body)
 
     def test_the_story_chamber_is_a_real_shell_not_a_placeholder(self):
         self.assertEqual(self.client.get(reverse("control:story_lytics")).status_code, 302)
@@ -1565,3 +1580,287 @@ class AnalyticsChamberPlaceholderTests(TestCase):
         for title in ["Stories per week", "Reading &amp; editorial", "Story performance"]:
             with self.subTest(title=title):
                 self.assertIn('data-guide-title="%s"' % title, body)
+
+
+class AuthorLyticsTests(TestCase):
+    """The Author lytics chamber (control:author_lytics and its fragments).
+
+    It replaced the old Staff placeholder. Everything is windowed to one range
+    and counted from the event tables, so an author's reads here mean the same
+    as a read anywhere else in lytics. The named-likes list is the point of the
+    chamber: a like always belongs to a signed-in reader, so it always carries a
+    name.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="author-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="author-writer@example.com")
+        self.other_writer = Auth.objects.create_staff(email="author-second@example.com")
+        self.member = Auth.objects.create_user(email="author-member@example.com")
+        self.other_member = Auth.objects.create_user(email="author-member-two@example.com")
+
+        StaffProfile.objects.create(auth=self.writer, gender="O", full_name="Ada Writer")
+
+        self.shell_url = reverse("control:author_lytics")
+        self.table_url = reverse("control:analytics_authors")
+        self.kpis_url = reverse("control:analytics_author_kpis")
+        self.likes_url = reverse("control:analytics_author_likes")
+        self.detail_url = reverse("control:analytics_author_detail")
+
+    def make_story(self, heading, author=None, age_days=0):
+        story = Blog.objects.create(
+            author=author or self.writer, heading=heading, category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        Blog.objects.filter(pk=story.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days)
+        )
+        return story
+
+    def add_view(self, story, age_days=0, user=None):
+        view = StoryView.objects.create(blog=story, user=user)
+        StoryView.objects.filter(pk=view.pk).update(
+            created_at=timezone.now() - timedelta(days=age_days)
+        )
+        return view
+
+    def add_like(self, story, user, age_days=0):
+        like = BlogLike.objects.create(blog=story, user=user)
+        BlogLike.objects.filter(pk=like.pk).update(
+            created_at=timezone.now() - timedelta(days=age_days)
+        )
+        return like
+
+    def add_comment(self, story, age_days=0):
+        comment = Comment.objects.create(blog=story, author=self.member, content="Nice.")
+        Comment.objects.filter(pk=comment.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days)
+        )
+        return comment
+
+    #   ------------------------------------------------------------ access
+    def test_every_endpoint_is_admin_only(self):
+        for url in [self.shell_url, self.table_url, self.kpis_url, self.likes_url, self.detail_url]:
+            with self.subTest(url=url):
+                self.client.force_login(self.writer)
+                self.assertEqual(self.client.get(url).status_code, 302 if url == self.shell_url else 403)
+                self.client.logout()
+                self.client.force_login(self.admin)
+                self.assertEqual(self.client.get(url).status_code, 200)
+                self.client.logout()
+
+    #   ------------------------------------------------------------ shell
+    def test_the_shell_is_a_real_shell_not_a_placeholder(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.shell_url).content.decode()
+        self.assertIn("<h1 class=\"analytics-title\">Authors</h1>", body)
+        self.assertIn("analytics-author-kpis-body", body)
+        self.assertIn("analytics-authors-body", body)
+        self.assertIn("analytics-author-detail-body", body)
+        self.assertIn("analytics-author-likes-body", body)
+        #   The layout is a master and a detail side by side, not a stack.
+        self.assertIn("analytics-author-split", body)
+        self.assertNotIn("analytics-placeholder", body)
+
+    def test_the_shell_carries_the_chamber_rail_with_author_current(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self.shell_url).content.decode()
+        self.assertIn(reverse("control:analytics"), body)
+        self.assertIn(reverse("control:story_lytics"), body)
+        self.assertIn('aria-current="page"', body)
+
+    #   ------------------------------------------------------------ leaderboard
+    def test_the_leaderboard_ranks_authors_by_windowed_reads(self):
+        busy = self.make_story("Busy story")
+        quiet = self.make_story("Quiet story", author=self.other_writer)
+        for _ in range(3):
+            self.add_view(busy)
+        self.add_view(quiet)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.table_url, {"range": "30d"}).content.decode()
+        #   The staff full name wins for the writer who has a profile; the other
+        #   writer is only known by their masked (uppercased) email.
+        self.assertIn("Ada Writer", body)
+        self.assertIn("A***D@EXAMPLE.COM", body)
+        # busy writer is ranked above the quiet one
+        self.assertLess(body.index("Ada Writer"), body.index("A***D@EXAMPLE.COM"))
+
+    def test_stale_reads_fall_out_of_a_shorter_range(self):
+        #   Published and read forty days ago, so the author is invisible in a
+        #   seven-day window on both counts.
+        story = self.make_story("Old reader", age_days=40)
+        self.add_view(story, age_days=40)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.table_url, {"range": "7d"}).content.decode()
+        self.assertNotIn("Ada Writer", body)
+
+    def test_an_unknown_range_falls_back_to_the_default(self):
+        self.make_story("Fallback story")
+        self.client.force_login(self.admin)
+        response = self.client.get(self.table_url, {"range": "nonsense"})
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        #   The list labels the window in words ("30 days ago" for the default),
+        #   and the author who published in it is listed.
+        self.assertIn("30 days ago", body)
+        self.assertIn("Ada Writer", body)
+
+    #   ------------------------------------------------------------ KPIs
+    def test_the_kpi_strip_counts_reads_and_named_likes(self):
+        story = self.make_story("KPI story")
+        self.add_view(story, user=self.member)
+        self.add_view(story)
+        self.add_like(story, self.member)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.kpis_url, {"range": "30d"}).content.decode()
+        self.assertIn("Last 30 days", body)
+        self.assertIn("published", body)
+        self.assertIn("by name", body)
+        # two reads, one like
+        self.assertRegex(body, r"analytics-author-figure-value\">2<")
+        self.assertRegex(body, r"analytics-author-figure-value\">1<")
+
+    #   ------------------------------------------------------------ custom window
+    def test_a_custom_since_narrows_the_window(self):
+        recent = self.make_story("Recent story", age_days=1)
+        older = self.make_story("Older story", age_days=10)
+        self.add_view(recent, age_days=1)
+        self.add_view(older, age_days=10)
+
+        self.client.force_login(self.admin)
+        since = (timezone.localdate() - timedelta(days=2)).isoformat()
+        kpis = self.client.get(self.kpis_url, {"range": "30d", "since": since}).content.decode()
+        self.assertIn("Since", kpis)
+
+        #   Only the recent story's read survives the narrower window, so the one
+        #   author shows a single read rather than two.
+        body = self.client.get(self.table_url, {"range": "30d", "since": since}).content.decode()
+        self.assertIn("1 read", body)
+        self.assertNotIn("2 reads", body)
+
+    def test_a_since_date_in_the_future_is_ignored(self):
+        self.make_story("Present story")
+        self.client.force_login(self.admin)
+        tomorrow = (timezone.localdate() + timedelta(days=1)).isoformat()
+        body = self.client.get(self.table_url, {"range": "30d", "since": tomorrow}).content.decode()
+        #   Falls back to the preset, so the label is the preset's, not a "Since".
+        self.assertNotIn("Since", body)
+        self.assertIn("30 days ago", body)
+
+    def test_a_junk_since_date_is_ignored(self):
+        self.make_story("Present story")
+        self.client.force_login(self.admin)
+        body = self.client.get(self.table_url, {"range": "30d", "since": "not-a-date"}).content.decode()
+        self.assertNotIn("Since", body)
+
+    def test_the_window_labels_read_as_words(self):
+        self.make_story("Some story")
+        self.client.force_login(self.admin)
+        body = self.client.get(self.kpis_url, {"range": "7d"}).content.decode()
+        self.assertIn("Last 7 days", body)
+        self.assertIn("7 days ago", body)
+
+    #   ------------------------------------------------------------ pagination
+    def test_the_author_list_pages(self):
+        #   One distinct author per story, so the list is long enough to page.
+        for index in range(15):
+            author = Auth.objects.create_staff(email=f"paged-author-{index}@example.com")
+            self.make_story(f"Paged story {index}", author=author)
+
+        self.client.force_login(self.admin)
+        first = self.client.get(self.table_url, {"range": "30d", "page": 1}).content.decode()
+        second = self.client.get(self.table_url, {"range": "30d", "page": 2}).content.decode()
+
+        self.assertEqual(first.count('<li class="analytics-author-item'), 12)
+        self.assertEqual(second.count('<li class="analytics-author-item'), 3)
+        self.assertNotEqual(first, second)
+
+    def test_a_page_number_past_the_end_is_a_404(self):
+        self.make_story("Only story")
+        self.client.force_login(self.admin)
+        response = self.client.get(self.table_url, {"range": "30d", "page": 99})
+        self.assertEqual(response.status_code, 404)
+
+    def test_the_likers_list_pages_inside_the_detail(self):
+        story = self.make_story("Popular story")
+        for index in range(10):
+            reader = Auth.objects.create_user(email=f"liker-{index}@example.com")
+            self.add_like(story, reader)
+
+        self.client.force_login(self.admin)
+        first = self.client.get(
+            self.detail_url, {"author": self.writer.pk, "range": "30d", "likes_page": 1}
+        ).content.decode()
+        second = self.client.get(
+            self.detail_url, {"author": self.writer.pk, "range": "30d", "likes_page": 2}
+        ).content.decode()
+
+        #   Eight likers a page, ten in total.
+        self.assertEqual(first.count('<li class="analytics-author-liker">'), 8)
+        self.assertEqual(second.count('<li class="analytics-author-liker">'), 2)
+
+    #   ------------------------------------------------------------ named likes
+    def test_the_likes_list_names_every_liker(self):
+        story = self.make_story("Liked story")
+        self.add_like(story, self.member)
+        self.add_like(story, self.other_member)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.likes_url, {"range": "30d"}).content.decode()
+        self.assertIn("A***R@EXAMPLE.COM", body)
+        self.assertIn("A***O@EXAMPLE.COM", body)
+        self.assertIn("Liked story", body)
+
+    def test_the_likes_list_is_windowed_and_pages(self):
+        story = self.make_story("Windowed likes")
+        self.add_like(story, self.member)
+        self.add_like(story, self.other_member, age_days=40)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.likes_url, {"range": "7d"}).content.decode()
+        self.assertIn("A***R@EXAMPLE.COM", body)
+        self.assertNotIn("A***O@EXAMPLE.COM", body)
+
+    def test_the_likes_list_never_shows_a_full_address(self):
+        story = self.make_story("Masked likes")
+        self.add_like(story, self.member)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.likes_url, {"range": "30d"}).content.decode()
+        self.assertIn("A***R@EXAMPLE.COM", body)
+        self.assertNotIn("AUTHOR-MEMBER@EXAMPLE.COM", body)
+
+    #   ------------------------------------------------------------ detail
+    def test_the_detail_matches_the_leaderboard_for_the_same_author(self):
+        story = self.make_story("Detail story")
+        for _ in range(4):
+            self.add_view(story)
+        self.add_like(story, self.member)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(
+            self.detail_url, {"author": self.writer.pk, "range": "30d"}
+        ).content.decode()
+        self.assertIn("Ada Writer", body)
+        self.assertIn("Detail story", body)
+        self.assertIn("A***R@EXAMPLE.COM", body)
+
+    def test_the_detail_for_an_unknown_author_degrades_quietly(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(
+            self.detail_url, {"author": 999999, "range": "30d"}
+        ).content.decode()
+        self.assertIn("data-author-detail-hint", body)
+
+    def test_the_detail_rejects_a_non_numeric_author(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(self.detail_url, {"author": "abc", "range": "30d"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("data-author-detail-hint", response.content.decode())

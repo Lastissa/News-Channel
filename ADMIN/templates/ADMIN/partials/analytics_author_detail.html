@@ -1,0 +1,162 @@
+{% comment %}
+  htmx fragment: one author's detail (the detail half of the split).
+
+  Returned by control:analytics_author_detail with `detail` already shaped by
+  ADMIN.analytics.author_detail, so every figure here matches the list row for
+  the same author and window. An unknown or absent author renders the hint
+  rather than an error, so a stale link degrades quietly.
+
+  Both long lists -- the author's stories and the named likers -- page on their
+  own, so a prolific author stays a panel you read rather than one you scroll.
+{% endcomment %}
+{% if detail %}
+<header class="analytics-author-profile">
+  <span class="analytics-member-avatar analytics-member-avatar--lg{% if not detail.profile_img %} analytics-member-avatar--initial{% endif %}">
+    {% if detail.profile_img %}<img src="{{ detail.profile_img }}" alt="">{% else %}{{ detail.initial }}{% endif %}
+  </span>
+  <div class="analytics-author-profile-id">
+    <p class="analytics-author-profile-name">{{ detail.name }}</p>
+    <p class="analytics-author-profile-meta">
+      {{ detail.email_masked }}
+      {% if detail.role %} &middot; {{ detail.role }}{% endif %}
+      {% if not detail.is_active %} &middot; suspended{% endif %}
+    </p>
+    <p class="analytics-author-profile-sub">
+      Joined {{ detail.joined|date:"M j, Y" }} ({{ detail.joined_ago }})
+      &middot; {{ detail.stories_total }} stor{{ detail.stories_total|pluralize:"y,ies" }} all time
+      &middot; {{ detail.followers }} follower{{ detail.followers|pluralize }}
+    </p>
+  </div>
+</header>
+
+<ul class="analytics-author-stats">
+  <li class="analytics-author-stat">
+    <span class="analytics-author-stat-value">{{ detail.published }}</span>
+    <span class="analytics-author-stat-label">published</span>
+  </li>
+  <li class="analytics-author-stat">
+    <span class="analytics-author-stat-value">{{ detail.reads }}</span>
+    <span class="analytics-author-stat-label">read{{ detail.reads|pluralize }}</span>
+  </li>
+  <li class="analytics-author-stat">
+    <span class="analytics-author-stat-value">{{ detail.likes }}</span>
+    <span class="analytics-author-stat-label">like{{ detail.likes|pluralize }}</span>
+  </li>
+  <li class="analytics-author-stat">
+    <span class="analytics-author-stat-value">{{ detail.comments }}</span>
+    <span class="analytics-author-stat-label">comment{{ detail.comments|pluralize }}</span>
+  </li>
+  <li class="analytics-author-stat">
+    <span class="analytics-author-stat-value">{{ detail.readers }}</span>
+    <span class="analytics-author-stat-label">signed-in reader{{ detail.readers|pluralize }}</span>
+  </li>
+</ul>
+
+<p class="analytics-author-window-note">Figures cover {{ detail.range_label }} ({{ detail.relative_label }}).</p>
+
+<section class="analytics-author-block" aria-labelledby="analytics-author-stories">
+  <h3 id="analytics-author-stories" class="analytics-author-block-title">
+    Their stories
+    {% if detail.stories_page.paginator.count %}
+    <span class="analytics-author-block-count">{{ detail.stories_page.paginator.count }}</span>
+    {% endif %}
+  </h3>
+
+  {% if detail.stories %}
+  <div class="analytics-author-scroll">
+    <table class="analytics-authors-table">
+      <thead>
+        <tr>
+          <th scope="col">Story</th>
+          <th scope="col">Reads</th>
+          <th scope="col">Likes</th>
+          <th scope="col">Comments</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for story in detail.stories %}
+        <tr>
+          <td>
+            <a class="analytics-reading-story" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
+            <span class="analytics-reading-cat">{{ story.category }} &middot; {{ story.posted_ago }}</span>
+          </td>
+          <td class="analytics-authors-num">{{ story.views }}</td>
+          <td class="analytics-authors-num">{{ story.likes }}</td>
+          <td class="analytics-authors-num">{{ story.comments }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if detail.stories_page.paginator.num_pages > 1 %}
+  <nav class="story-pagination analytics-list-pagination" aria-label="Story pages">
+    {% if detail.stories_page.has_previous %}
+    <button type="button" class="story-page-btn page-nav"
+            data-author-repage="stories_page={{ detail.stories_page.previous_page_number }}">Prev</button>
+    {% endif %}
+    <span class="analytics-list-pagination-status">
+      Page {{ detail.stories_page.number }} of {{ detail.stories_page.paginator.num_pages }}
+    </span>
+    {% if detail.stories_page.has_next %}
+    <button type="button" class="story-page-btn page-nav"
+            data-author-repage="stories_page={{ detail.stories_page.next_page_number }}">Next</button>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <p class="analytics-reading-empty">Nothing published in this window.</p>
+  {% endif %}
+</section>
+
+<section class="analytics-author-block" aria-labelledby="analytics-author-likers">
+  <h3 id="analytics-author-likers" class="analytics-author-block-title">
+    Liked by
+    {% if detail.likes_in_range %}
+    <span class="analytics-author-block-count">{{ detail.likes_in_range }}</span>
+    {% endif %}
+  </h3>
+
+  {% if detail.likers %}
+  <ul class="analytics-author-likers">
+    {% for like in detail.likers %}
+    <li class="analytics-author-liker">
+      <span class="analytics-member-avatar analytics-member-avatar--sm{% if not like.reader_img %} analytics-member-avatar--initial{% endif %}">
+        {% if like.reader_img %}<img src="{{ like.reader_img }}" alt="" loading="lazy">{% else %}{{ like.reader_initial }}{% endif %}
+      </span>
+      <span class="analytics-author-liker-main">
+        <span class="analytics-author-liker-name">{{ like.reader_name }}</span>
+        <span class="analytics-member-sub">{{ like.reader_email }} &middot; {{ like.liked_ago }}</span>
+      </span>
+      <a class="analytics-author-liker-story" href="{% url 'blog:story_detail' like.story_slug %}">{{ like.story_heading }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+
+  {% if detail.likers_page.paginator.num_pages > 1 %}
+  <nav class="story-pagination analytics-list-pagination" aria-label="Liker pages">
+    {% if detail.likers_page.has_previous %}
+    <button type="button" class="story-page-btn page-nav"
+            data-author-repage="likes_page={{ detail.likers_page.previous_page_number }}">Prev</button>
+    {% endif %}
+    <span class="analytics-list-pagination-status">
+      Page {{ detail.likers_page.number }} of {{ detail.likers_page.paginator.num_pages }}
+    </span>
+    {% if detail.likers_page.has_next %}
+    <button type="button" class="story-page-btn page-nav"
+            data-author-repage="likes_page={{ detail.likers_page.next_page_number }}">Next</button>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <p class="analytics-reading-empty">No likes on this author's stories in this window.</p>
+  {% endif %}
+</section>
+
+{% else %}
+<p class="analytics-author-detail-hint" data-author-detail-hint>
+  Pick an author on the left to see what they published, how it read, and who liked it.
+</p>
+{% endif %}

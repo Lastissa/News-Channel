@@ -1239,9 +1239,16 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 /*  A video token pointing at a provider PAGE (YouTube / Vimeo) is an <iframe>
     embed: the provider draws its own controls, so the custom overlay buttons
     are not used, and the frame is given a fixed 16:9 box instead of sizing
-    itself to the clip. See _video_embed_url in BLOG/views.py. */
-.story-inline-video.is-embed { width: min(50%, 390px); }
-.story-inline-video.is-embed.story-inline-fig-center { width: min(65%, 598px); }
+    itself to the clip. See _video_embed_url in BLOG/views.py.
+
+    A video is watched, not skimmed, so -- unlike the imgl/imgr picture caps
+    it inherits -- these are deliberately generous: a floated embed takes a
+    clear majority of the reading column, and a centered one uses the whole
+    column (up to the same 720px the hero image caps at). max-width is set
+    here too: the base .story-inline-fig / -center cap is what actually
+    holds the box down, so overriding only `width` would change nothing. */
+.story-inline-video.is-embed { width: min(62%, 500px); max-width: min(62%, 500px); }
+.story-inline-video.is-embed.story-inline-fig-center { width: min(100%, 720px); max-width: min(100%, 720px); }
 .story-inline-video.is-embed .story-inline-video-frame { width: 100%; aspect-ratio: 16 / 9; }
 .story-inline-video-embed { display: block; width: 100%; height: 100%; border: 0; background: #000; }
 @media (max-width: 599.98px) {
@@ -1251,6 +1258,12 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   .story-inline-fig-center > .story-inline-img { max-height: 260px; }
   .story-inline-fig .story-inline-video-el { max-height: 247px; }
   .story-inline-fig-center .story-inline-video-el { max-height: 338px; }
+  /*  On a phone the inherited 200/320px picture caps would crush a video,
+     so the embed keeps the full column width on both variants. */
+  .story-inline-video.is-embed,
+  .story-inline-video.is-embed.story-inline-fig-left,
+  .story-inline-video.is-embed.story-inline-fig-right,
+  .story-inline-video.is-embed.story-inline-fig-center { width: 100%; max-width: 100%; }
   .story-inline-fig figcaption { font-size: 0.72rem; padding: 6px 8px 7px; }
 }
 /*  filel: inline downloadable file link (never floated -- a file has no

@@ -1,0 +1,83 @@
+{% comment %}
+  htmx fragment: the Authors list (the master half of the split).
+
+  Read only. Returned to a GET against control:analytics_authors with the range
+  and any custom "since" already applied by ADMIN.analytics.author_directory_rows,
+  so this template only ever lays out the rows it is handed -- one page of them.
+
+  Each row is a button, not a link: pressing it fills the detail panel beside it
+  and scrolls that panel into view, so the list never leaves the screen. Rows
+  are compact on purpose -- a rank, a face, a name, reads and a share bar -- so a
+  dozen authors read as one glance rather than one scroll. Addresses are shown
+  masked, never in full.
+{% endcomment %}
+<p class="analytics-list-summary">
+  <strong>{{ total_authors }}</strong> author{{ total_authors|pluralize }}
+  &middot; {{ relative_label }}
+</p>
+
+{% if rows %}
+<ol class="analytics-author-list" start="{{ page.start_index }}">
+  {% for row in rows %}
+  <li class="analytics-author-item{% if focus == row.id|stringformat:'s' %} is-focused{% endif %}"
+      data-author-row="{{ row.id }}">
+    <button type="button" class="analytics-author-card an-press"
+            data-author-open="{{ row.id }}"
+            aria-label="Open details for {{ row.name }}">
+      <span class="analytics-author-rank">{{ row.rank }}</span>
+
+      <span class="analytics-member-avatar analytics-member-avatar--sm{% if not row.profile_img %} analytics-member-avatar--initial{% endif %}">
+        {% if row.profile_img %}<img src="{{ row.profile_img }}" alt="" loading="lazy">{% else %}{{ row.initial }}{% endif %}
+      </span>
+
+      <span class="analytics-author-card-main">
+        <span class="analytics-author-card-name">{{ row.name }}</span>
+        <span class="analytics-author-card-meta">
+          {{ row.views }} read{{ row.views|pluralize }}
+          &middot; {{ row.likes }} like{{ row.likes|pluralize }}
+          {% if row.stories %} &middot; {{ row.stories }} published{% endif %}
+        </span>
+      </span>
+
+      <span class="analytics-author-card-share">
+        <span class="analytics-authors-bar" role="img"
+              aria-label="{{ row.share_percent }}% of this window's reads">
+          <span class="analytics-authors-bar-fill" style="width: {{ row.bar_percent }}%"></span>
+        </span>
+        <span class="analytics-authors-share-num">{{ row.share_percent }}%</span>
+      </span>
+    </button>
+  </li>
+  {% endfor %}
+</ol>
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="story-pagination analytics-list-pagination" aria-label="Author pages"
+     hx-target="#analytics-authors-body" hx-swap="innerHTML"
+     hx-include="#analytics-authors-form">
+  {% if page.has_previous %}
+  <button type="button" class="story-page-btn page-nav"
+          hx-get="{% url 'control:analytics_authors' %}?page={{ page.previous_page_number }}">Prev</button>
+  {% endif %}
+
+  {% for number in page_range %}
+    {% if number == page.paginator.ELLIPSIS %}
+  <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ number }}</span>
+    {% else %}
+  <button type="button" class="story-page-btn{% if number == page.number %} is-active{% endif %}"
+          hx-get="{% url 'control:analytics_authors' %}?page={{ number }}"
+          aria-label="Go to page {{ number }}"
+          {% if number == page.number %}aria-current="page"{% endif %}>{{ number }}</button>
+    {% endif %}
+  {% endfor %}
+
+  {% if page.has_next %}
+  <button type="button" class="story-page-btn page-nav"
+          hx-get="{% url 'control:analytics_authors' %}?page={{ page.next_page_number }}">Next</button>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<p class="analytics-authors-empty">No one published or was read in this window. Try a longer range.</p>
+{% endif %}

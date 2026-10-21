@@ -17,15 +17,16 @@ Design notes
 
 from datetime import datetime, time, timedelta
 
+from django.core.paginator import Paginator
 from django.db import DatabaseError, transaction
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
-from STAFF.models import AuthorFollow
+from STAFF.models import AuthorFollow, StaffProfile
 
 #   -------------------------------------------------------------------------
 #   PERIODS THE UI CAN ASK FOR
@@ -1113,3 +1114,502 @@ def member_page_details(account_list):
         details[row["follower_id"]]["following"] = row["n"]
 
     return details
+
+
+#   -------------------------------------------------------------------------
+#   AUTHOR LYTICS -- who writes, how much, and who liked it
+#   -------------------------------------------------------------------------
+#   The people-facing chamber. A story is owned by Blog.author, which is an
+#   Auth row (limit_choices_to is_staff), so an "author" here is any staff
+#   account that has published at least once -- deliberately not the StaffProfile
+#   table, so a story written by an admin without a profile still appears.
+#
+#   Every figure is counted from the event tables (StoryView / BlogLike /
+#   Comment) inside the chosen window, so an author's reads on this page mean the
+#   same thing as a read anywhere else in lytics. Blog.views / Blog.likes are the
+#   fast all-time counters the story page reads, and are used only where the
+#   figure is explicitly all-time.
+
+AUTHOR_RANGE_CHOICES = [
+    ("7d", "Last 7 days"),
+    ("30d", "Last 30 days"),
+    ("90d", "Last 3 months"),
+    ("1y", "Last 12 months"),
+]
+AUTHOR_DEFAULT_RANGE = "30d"
+AUTHOR_RANGES = dict(TREND_RANGES)
+
+#   Every list on the page is paged rather than cut off, so a busy instance
+#   stays a page you can read instead of a column you have to scroll.
+AUTHOR_LIST_PAGE_SIZE = 12
+AUTHOR_LIKES_PAGE_SIZE = 12
+AUTHOR_DETAIL_LIKES_PAGE_SIZE = 8
+AUTHOR_STORY_PAGE_SIZE = 8
+
+#   How far back a custom "since" date may reach, so a hand-typed date cannot
+#   ask the database for ten years of events in one page render.
+AUTHOR_SINCE_MAX_DAYS = 365 * 3
+
+
+def _parse_since(raw):
+    """A YYYY-MM-DD "since" date as the day it starts, or None if unusable.
+
+    Accepts only the plain date field the form posts; anything else (a blank, a
+    stray string, a date beyond the cap or in the future) is treated as "no
+    custom window", so a hand-typed querystring can never widen the window
+    without bound or reach into next week.
+    """
+    if not raw:
+        return None
+    parsed = parse_date(str(raw).strip())
+    if parsed is None:
+        return None
+
+    start = timezone.make_aware(
+        datetime.combine(parsed, time.min), timezone.get_current_timezone()
+    )
+    now = timezone.localtime()
+    if start > now:
+        return None
+    if (now - start).days > AUTHOR_SINCE_MAX_DAYS:
+        return None
+    return start
+
+
+def _month_day(moment):
+    """e.g. "Oct 18, 2026" -- strftime without the platform-specific %-d."""
+    return f"{moment:%b} {moment.day}, {moment.year}"
+
+
+def _relative_label(moment, nominal_days=None):
+    """How far back something reaches, in words: "2 days ago", "3 months ago".
+
+    Deliberately coarse: an admin reading the strip wants "since when", not a
+    to-the-second duration, so the biggest sensible unit wins. `nominal_days`
+    lets a preset window say "30 days ago" rather than the "29 days ago" its
+    own elapsed days would give, so the words match the preset's label.
+    """
+    days = nominal_days if nominal_days is not None else max((timezone.localtime() - moment).days, 0)
+    days = max(days, 0)
+    if days <= 0:
+        return "today"
+    if days == 1:
+        return "yesterday"
+    if days < 60:
+        return f"{days} days ago"
+    months = round(days / 30)
+    if months < 12:
+        return f"{months} month{'s' if months != 1 else ''} ago"
+    years = round(days / 365)
+    return f"{years} year{'s' if years != 1 else ''} ago"
+
+
+def _author_window(selected_range, since=None):
+    """The [start, now] window behind a range key, with a human label.
+
+    A usable custom `since` date wins over the preset, so the free "since"
+    field can narrow or widen the window past any of the four presets. The
+    second label says how far back the window reaches in words -- "3 days ago"
+    for a custom date, or the preset's own span ("30 days ago") -- which is what
+    keeps the two labels reading as one thought rather than two.
+    """
+    now = timezone.localtime()
+    start = _parse_since(since)
+    if start is None:
+        range_days = AUTHOR_RANGES.get(selected_range, AUTHOR_RANGES[AUTHOR_DEFAULT_RANGE])
+        start = _local_midnight(now - timedelta(days=range_days - 1))
+        label = _range_label(selected_range)
+        return start, now, label, _relative_label(start, nominal_days=range_days)
+
+    return start, now, f"Since {_month_day(start)}", _relative_label(start)
+
+
+def _author_event_counts(model, field, start, end=None):
+    """Views / likes / comments per author, in one grouped query per table.
+
+    Grouped by `blog__author_id` in the database rather than stitched together
+    in Python: one query per signal covers every author on the page, instead of
+    a query per (signal × story). Guarded with _safe_rows the same way the rest
+    of the module is, so an unmigrated StoryView yields zeroes, not a 500.
+    """
+    queryset = model.objects.filter(**{f"{field}__gte": start, "blog__author_id__isnull": False})
+    if end is not None:
+        queryset = queryset.filter(**{f"{field}__lt": end})
+    rows = _safe_rows(
+        queryset.values("blog__author_id").annotate(n=Count("id")).order_by()
+    )
+    return {row["blog__author_id"]: row["n"] for row in rows}
+
+
+def _story_event_counts(model, field, start, blog_ids):
+    """Views / likes / comments per story, across one author's own stories.
+
+    The same shape as _author_event_counts, grouped by story instead of author,
+    used by the per-author detail so each story can carry its own windowed
+    figures without a query per story.
+    """
+    if not blog_ids:
+        return {}
+    queryset = model.objects.filter(**{f"{field}__gte": start, "blog_id__in": blog_ids})
+    rows = _safe_rows(queryset.values("blog_id").annotate(n=Count("id")).order_by())
+    return {row["blog_id"]: row["n"] for row in rows}
+
+
+def _mask_email(email):
+    """m***a@gmail.com -- never show a full address client side."""
+    local, _, domain = (email or "").partition("@")
+    if not domain:
+        return email or ""
+    if len(local) <= 2:
+        masked = (local[:1] or "?") + "***"
+    else:
+        masked = local[0] + "***" + local[-1]
+    return f"{masked}@{domain}"
+
+
+def _author_names(models):
+    """{auth_id: display name} for a set of author accounts, in one query.
+
+    The staff full name wins when there is one; otherwise the masked email is
+    the name, so a raw address never reaches the page.
+    """
+    ids = {model.pk for model in models if model is not None}
+    if not ids:
+        return {}
+    full_names = {
+        profile.auth_id: profile.full_name
+        for profile in StaffProfile.objects.filter(auth_id__in=ids)
+        if profile.full_name
+    }
+    return {
+        model.pk: full_names.get(model.pk) or _mask_email(model.email) or "Unknown"
+        for model in models
+        if model is not None
+    }
+
+
+def _author_profiles(auth_ids):
+    """{auth_id: StaffProfile} for a set of accounts, in one query."""
+    if not auth_ids:
+        return {}
+    return {
+        profile.auth_id: profile
+        for profile in StaffProfile.objects.filter(auth_id__in=auth_ids)
+    }
+
+
+def author_directory_rows(selected_range, since=None, page_number=1):
+    """One page of authors that published or were read in the window.
+
+    Sorted by reads, so the leaderboard leads with whoever is actually being
+    read. An author with no reads in the window still appears if they published
+    in it, so a brand new author is never invisible. The rows are ranked in full
+    and then paged, because "top of the table" only means anything once every
+    author has been ranked -- but only one page is ever rendered.
+    """
+    start, now, range_label, relative_label = _author_window(selected_range, since)
+
+    published = {
+        row["author_id"]: row["n"]
+        for row in _safe_rows(
+            Blog.objects.filter(date_created__gte=start)
+            .values("author_id")
+            .annotate(n=Count("id"))
+        )
+    }
+
+    viewed = _author_event_counts(StoryView, "created_at", start)
+    liked = _author_event_counts(BlogLike, "created_at", start)
+    commented = _author_event_counts(Comment, "date_created", start)
+
+    per_author_readers = {}
+    reader_rows = (
+        StoryView.objects.filter(created_at__gte=start, user__isnull=False)
+        .values_list("blog__author_id", "user_id")
+        .distinct()
+    )
+    for author_id, user_id in _safe_rows(reader_rows):
+        per_author_readers.setdefault(author_id, set()).add(user_id)
+
+    author_ids = set(published) | set(viewed) | set(liked) | set(commented)
+    authors = Auth.objects.in_bulk(list(author_ids))
+    names = _author_names(list(authors.values()))
+    profiles = _author_profiles(author_ids)
+
+    followers = {
+        row["author_id"]: row["n"]
+        for row in _safe_rows(
+            AuthorFollow.objects.filter(author_id__in=author_ids)
+            .values("author_id")
+            .annotate(n=Count("id"))
+        )
+    }
+
+    rows = []
+    for author_id in author_ids:
+        author = authors.get(author_id)
+        if author is None:      #   account deleted between the reads
+            continue
+        views = viewed.get(author_id, 0)
+        like_count = liked.get(author_id, 0)
+        profile = profiles.get(author_id)
+        rows.append(
+            {
+                "id": author_id,
+                "name": names.get(author_id, author.email or "Unknown"),
+                "email_masked": _mask_email(author.email),
+                "profile_img": author.profile_img or "",
+                "initial": (author.email or "?")[:1].upper(),
+                "is_active": author.is_active,
+                "role": profile.get_role_display() if profile else "",
+                "stories": published.get(author_id, 0),
+                "views": views,
+                "likes": like_count,
+                "comments": commented.get(author_id, 0),
+                "readers": len(per_author_readers.get(author_id, ())),
+                "followers": followers.get(author_id, 0),
+                #   Likes per hundred reads, so a low-traffic author who lands
+                #   well is not hidden behind a high-traffic one.
+                "engagement": round(like_count * 100 / views) if views else 0,
+            }
+        )
+
+    rows.sort(key=lambda row: (row["views"], row["stories"], row["likes"]), reverse=True)
+
+    total_views = sum(row["views"] for row in rows)
+    top = max((row["views"] for row in rows), default=0)
+    for position, row in enumerate(rows, start=1):
+        row["rank"] = position
+        row["bar_percent"] = round(row["views"] * 100 / top) if top else 0
+        row["share_percent"] = round(row["views"] * 100 / total_views) if total_views else 0
+
+    paginator = Paginator(rows, AUTHOR_LIST_PAGE_SIZE)
+    page = paginator.get_page(page_number)
+
+    return {
+        "rows": page.object_list,
+        "page": page,
+        "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+        "total_authors": paginator.count,
+        "range_label": range_label,
+        "relative_label": relative_label,
+        "start": start,
+        "range": selected_range,
+    }
+
+
+def author_kpis(selected_range, since=None):
+    """The Author lytics KPI strip.
+
+    Authors, stories published, reads and non-anonymous likes, all measured to
+    the same window so the ratios between them stay honest.
+    """
+    start, now, range_label, relative_label = _author_window(selected_range, since)
+    published = _safe_rows(
+        Blog.objects.filter(date_created__gte=start).values("author_id").annotate(n=Count("id"))
+    )
+    author_count = len({row["author_id"] for row in published}) or Auth.objects.filter(
+        blogs__isnull=False
+    ).distinct().count()
+
+    stories = sum(row["n"] for row in published)
+    reads = _story_reads(start)
+    liked = _safe_count(
+        BlogLike.objects.filter(created_at__gte=start, user__isnull=False)
+    )
+    commented = _safe_count(Comment.objects.filter(date_created__gte=start))
+
+    span = now - start
+    previous_start = start - span
+    previous_stories = _stories_published(previous_start, start)
+    previous_reads = _story_reads(previous_start, start)
+    previous_liked = _safe_count(
+        BlogLike.objects.filter(created_at__gte=previous_start, created_at__lt=start, user__isnull=False)
+    )
+
+    return {
+        "range": selected_range,
+        "range_label": range_label,
+        "relative_label": relative_label,
+        "since_value": start.strftime("%Y-%m-%d"),
+        "authors": author_count,
+        "stories": stories,
+        "reads": reads,
+        "reads_per_story": round(reads / stories) if stories else 0,
+        "likes": liked,
+        "comments": commented,
+        "stories_delta": _delta_chip(stories, previous_stories),
+        "reads_delta": _delta_chip(reads, previous_reads),
+        "likes_delta": _delta_chip(liked, previous_liked),
+    }
+
+
+def author_likes(selected_range, page_number=1, since=None):
+    """Non-anonymous likes, newest first, with the reader's name.
+
+    A like can only ever come from a signed-in account (BlogLike.user is a
+    required FK and the like endpoint rejects anonymous readers), so every row
+    here is a named person -- that is the point of the list. Paged rather than
+    truncated so an admin can actually read who liked what.
+    """
+    start, now, range_label, relative_label = _author_window(selected_range, since)
+    queryset = (
+        BlogLike.objects.filter(created_at__gte=start)
+        .select_related("user", "blog", "blog__author")
+        .order_by("-created_at")
+    )
+    paginator = Paginator(queryset, AUTHOR_LIKES_PAGE_SIZE)
+    page = paginator.get_page(page_number)
+    likes = list(page.object_list)
+
+    #   One name query for the readers who liked, one for the authors who were
+    #   liked -- never a query per row.
+    author_names = _author_names([like.blog.author for like in likes])
+    reader_names = _author_names([like.user for like in likes])
+
+    items = []
+    for like in likes:
+        author = like.blog.author
+        items.append(
+            {
+                "reader_name": reader_names.get(like.user_id) or _mask_email(like.user.email) or "Unknown",
+                "reader_email": _mask_email(like.user.email),
+                "reader_img": like.user.profile_img or "",
+                "reader_initial": (like.user.email or "?")[:1].upper(),
+                "story_heading": like.blog.heading,
+                "story_slug": like.blog.slug,
+                "author_name": author_names.get(author.pk) or _mask_email(author.email) or "Unknown",
+                "author_id": author.pk,
+                "liked_at": timezone.localtime(like.created_at),
+            }
+        )
+
+    return {
+        "range_label": range_label,
+        "relative_label": relative_label,
+        "page": page,
+        "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+        "total": paginator.count,
+        "items": items,
+        "range": selected_range,
+        "since": since,
+    }
+
+
+def author_detail(author_id, selected_range, since=None, story_page=1, like_page=1):
+    """One author's production over the window, plus their named likers.
+
+    Every number matches the leaderboard row for the same author and range, so
+    opening a row never contradicts the table it came from. Both long lists --
+    the author's stories and the named likers -- are paged, so the panel stays
+    something you read rather than something you scroll.
+    """
+    start, now, range_label, relative_label = _author_window(selected_range, since)
+    author = Auth.objects.filter(pk=author_id).first()
+    if author is None:
+        return None
+
+    profile = StaffProfile.objects.filter(auth_id=author_id).first()
+    stories = Blog.objects.filter(author_id=author_id).order_by("-date_created")
+    published = stories.filter(date_created__gte=start).count()
+    story_ids = list(stories.values_list("pk", flat=True))
+
+    #   One grouped query per signal, windowed on the author's own stories.
+    viewed = _story_event_counts(StoryView, "created_at", start, story_ids)
+    liked = _story_event_counts(BlogLike, "created_at", start, story_ids)
+    commented = _story_event_counts(Comment, "date_created", start, story_ids)
+
+    reads = sum(viewed.values())
+    likes = sum(liked.values())
+    comments = sum(commented.values())
+    readers = (
+        StoryView.objects.filter(created_at__gte=start, user__isnull=False, blog_id__in=story_ids)
+        .values("user_id")
+        .distinct()
+        .count()
+    )
+    followers = AuthorFollow.objects.filter(author_id=author_id).count()
+
+    #   The named likers across this author's stories, paged and named with one
+    #   extra query rather than one per like.
+    likes_queryset = (
+        BlogLike.objects.filter(created_at__gte=start, blog_id__in=story_ids)
+        .select_related("user", "blog")
+        .order_by("-created_at")
+    )
+    likes_paginator = Paginator(likes_queryset, AUTHOR_DETAIL_LIKES_PAGE_SIZE)
+    likes_page = likes_paginator.get_page(like_page)
+    recent_likes = list(likes_page.object_list)
+    reader_names = _author_names([like.user for like in recent_likes])
+    like_rows = [
+        {
+            "reader_name": reader_names.get(like.user_id) or _mask_email(like.user.email) or "Unknown",
+            "reader_email": _mask_email(like.user.email),
+            "reader_img": like.user.profile_img or "",
+            "reader_initial": (like.user.email or "?")[:1].upper(),
+            "story_heading": like.blog.heading,
+            "story_slug": like.blog.slug,
+            "liked_at": timezone.localtime(like.created_at),
+            "liked_ago": _relative_label(timezone.localtime(like.created_at)),
+        }
+        for like in recent_likes
+    ]
+
+    #   The author's own stories, each carrying its windowed figures, paged so a
+    #   prolific author does not push the panel into a scroll.
+    stories_paginator = Paginator(stories, AUTHOR_STORY_PAGE_SIZE)
+    stories_page = stories_paginator.get_page(story_page)
+    story_rows = []
+    for story in stories_page.object_list:
+        story_views = viewed.get(story.pk, 0)
+        story_likes = liked.get(story.pk, 0)
+        story_rows.append(
+            {
+                "heading": story.heading,
+                "slug": story.slug,
+                "category": story.category,
+                "posted": timezone.localtime(story.date_created),
+                "posted_ago": _relative_label(timezone.localtime(story.date_created)),
+                "views": story_views,
+                "likes": story_likes,
+                "comments": commented.get(story.pk, 0),
+                "totals_views": story.views,
+                "totals_likes": story.likes,
+                "engagement": round(story_likes * 100 / story_views) if story_views else 0,
+            }
+        )
+
+    return {
+        "id": author_id,
+        "name": _author_names([author]).get(author_id) or _mask_email(author.email) or "Unknown",
+        "email_masked": _mask_email(author.email),
+        "profile_img": author.profile_img or "",
+        "initial": (author.email or "?")[:1].upper(),
+        "is_active": author.is_active,
+        "role": profile.get_role_display() if profile else "",
+        "joined": timezone.localtime(author.date_joined),
+        "joined_ago": _relative_label(timezone.localtime(author.date_joined)),
+        "range": selected_range,
+        "range_label": range_label,
+        "relative_label": relative_label,
+        "since": since,
+        "published": published,
+        "stories_total": stories.count(),
+        "reads": reads,
+        "likes": likes,
+        "likes_total": stories.aggregate(total=Sum("likes"))["total"] or 0,
+        "comments": comments,
+        "readers": readers,
+        "followers": followers,
+        "likers": like_rows,
+        "likers_page": likes_page,
+        "likers_page_range": list(
+            likes_paginator.get_elided_page_range(likes_page.number, on_each_side=1, on_ends=1)
+        ),
+        "likes_in_range": likes_paginator.count,
+        "stories": story_rows,
+        "stories_page": stories_page,
+        "stories_page_range": list(
+            stories_paginator.get_elided_page_range(stories_page.number, on_each_side=1, on_ends=1)
+        ),
+    }

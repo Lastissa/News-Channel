@@ -43,6 +43,8 @@ from SERVICE_INTERNAL.sessions import (
 from Partner.models import AdvertImage, Announcement
 from ADMIN.models import SiteSettings
 from ADMIN.analytics import (
+    AUTHOR_DEFAULT_RANGE,
+    AUTHOR_RANGE_CHOICES,
     DEFAULT_STORY_PERFORMANCE_SERIES,
     DEFAULT_STORY_PERIOD,
     DEFAULT_TREND_BUCKET,
@@ -61,6 +63,10 @@ from ADMIN.analytics import (
     TREND_BUCKET_CHOICES,
     TREND_RANGE_CHOICES,
     TREND_RANGES,
+    author_detail,
+    author_directory_rows,
+    author_kpis,
+    author_likes,
     member_category_filter_choices,
     member_directory_queryset,
     member_new_today,
@@ -1106,20 +1112,6 @@ class AnalyticsStoryKpisView(View):
         return render(request, "ADMIN/partials/analytics_story_kpis.html", context)
 
 
-class StaffLyticsView(View):
-    """Placeholder for the staff chamber of analytics (not built yet)."""
-
-    def get(self, request):
-        if not admin_only(request.user):
-            return admin_page_redirect(request)
-
-        return render(
-            request,
-            "ADMIN/analytics_placeholder.html",
-            {"heading": "Staff lytics", "message": "Staff analytics is not built yet. It will cover story production and authors.", "active_chamber": "staff"},
-        )
-
-
 class PartnerLyticsView(View):
     """Placeholder for the partner chamber of analytics (not built yet)."""
 
@@ -1134,8 +1126,29 @@ class PartnerLyticsView(View):
         )
 
 
+def _author_window_args(request):
+    """The (range, since) pair behind an Author lytics request.
+
+    `range` is snapped to the fixed choice list, and `since` is passed through
+    as the raw date string -- ADMIN.analytics parses it and silently ignores
+    anything unusable, so a hand typed date can never widen the window.
+    """
+    selected_range = _member_choice(
+        request, "range", AUTHOR_RANGE_CHOICES, default=AUTHOR_DEFAULT_RANGE
+    )
+    since = (request.GET.get("since") or "").strip()
+    return selected_range, since
+
+
 class AuthorLyticsView(View):
-    """Placeholder for the author chamber of analytics (not built yet)."""
+    """The Author lytics chamber: who writes, how much, and who liked it.
+
+    The people-facing chamber, replacing the old Staff placeholder (the two had
+    the same job). A leaderboard of authors with their production, reads, likes
+    and comments, the named readers behind every like, and a per-author detail
+    that opens from any row. Like the other chambers the shell holds no numbers
+    -- each figure arrives from its own htmx fragment.
+    """
 
     def get(self, request):
         if not admin_only(request.user):
@@ -1143,9 +1156,112 @@ class AuthorLyticsView(View):
 
         return render(
             request,
-            "ADMIN/analytics_placeholder.html",
-            {"heading": "Author lytics", "message": "Author analytics is not built yet. It will cover authors and their production.", "active_chamber": "author"},
+            "ADMIN/author_lytics.html",
+            {
+                "author_ranges": AUTHOR_RANGE_CHOICES,
+                "default_author_range": AUTHOR_DEFAULT_RANGE,
+                "active_chamber": "author",
+            },
         )
+
+
+class AnalyticsAuthorKpisView(View):
+    """htmx fragment: the Author lytics KPI strip.
+
+    Read only and admin only, like every other figure endpoint. The range is
+    validated against the fixed choice list, so a hand typed querystring can
+    only ever fall back to the default; a valid custom "since" date overrides it.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        selected_range, since = _author_window_args(request)
+        return render(
+            request,
+            "ADMIN/partials/analytics_author_kpis.html",
+            author_kpis(selected_range, since),
+        )
+
+
+class AnalyticsAuthorsView(View):
+    """htmx fragment: the Author lytics leaderboard table.
+
+    Admin only and read only. The range is validated against the fixed choice
+    list in ADMIN.analytics, so a hand typed querystring can only ever fall back
+    to the default. The "focus" query, when set, asks the fragment to open that
+    author's detail once the table has painted.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        selected_range, since = _author_window_args(request)
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
+        table = author_directory_rows(selected_range, since, page_number)
+        if page_number > table["page"].paginator.num_pages and table["page"].paginator.num_pages:
+            raise Http404("Page not found.")
+        return render(
+            request,
+            "ADMIN/partials/analytics_authors.html",
+            {**table, "focus": (request.GET.get("focus") or "").strip(), "since": since},
+        )
+
+
+class AnalyticsAuthorDetailView(View):
+    """htmx fragment: one author's production and their named likers.
+
+    Read only and admin only. `author` is the account id; an unknown id renders
+    the "no such author" notice rather than a 500, so a stale link degrades. The
+    stories and likers lists each carry their own page number so they page
+    independently inside the one panel.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        selected_range, since = _author_window_args(request)
+        author_id = request.GET.get("author")
+        try:
+            author_id = int(author_id)
+        except (TypeError, ValueError):
+            author_id = None
+
+        story_page = _resolve_page_number(request.GET.get("stories_page"), default=1)
+        like_page = _resolve_page_number(request.GET.get("likes_page"), default=1)
+        detail = (
+            author_detail(author_id, selected_range, since, story_page, like_page)
+            if author_id
+            else None
+        )
+        return render(
+            request,
+            "ADMIN/partials/analytics_author_detail.html",
+            {"detail": detail, "range": selected_range, "since": since},
+        )
+
+
+class AnalyticsAuthorLikesView(View):
+    """htmx fragment: the named, non-anonymous likes list, newest first.
+
+    Read only and admin only. Every like belongs to a signed-in reader, so the
+    list always carries a name; it pages rather than truncating so an admin can
+    read the whole run for the range.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        selected_range, since = _author_window_args(request)
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
+        context = author_likes(selected_range, page_number, since)
+        if page_number > context["page"].paginator.num_pages and context["page"].paginator.num_pages:
+            raise Http404("Page not found.")
+        return render(request, "ADMIN/partials/analytics_author_likes.html", context)
 
 
 class StoryLyticsView(View):

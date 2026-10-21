@@ -1042,3 +1042,286 @@ html[data-theme="dark"] .analytics-chart-canvas .apexcharts-tooltip {
   max-width: 460px; text-align: center;
   color: var(--slate); font-size: var(--an-text-m);
 }
+
+/* ---------- Authors (fragments from analytics_authors.html et al) ---------- */
+/* The people-facing chamber, laid out as a master and a detail side by side
+   rather than as a stack of tall cards: the author list is the master on the
+   left, the opened author is the detail on the right. Everything reads in the
+   same paper-and-ink grammar as the other chambers -- same avatars, chips and
+   pager -- but the page itself is built to be scanned, not scrolled. */
+
+/* --- The window strip: presets, a free "since" date, and the headline row -- */
+.analytics-author-window { margin-bottom: var(--an-gap-m); }
+.analytics-author-window-body { min-width: 0; }
+
+.analytics-author-summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--an-gap-s) var(--an-gap-l);
+  padding: var(--an-pad-card);
+  border: 1px solid var(--an-line);
+  border-left: 3px solid var(--an-accent);
+  border-radius: var(--an-radius-m);
+  background: var(--an-surface);
+  box-shadow: var(--an-shadow-1);
+}
+.analytics-author-window-label {
+  margin: 0; display: flex; flex-direction: column; gap: 2px;
+  font-size: var(--an-text-m); font-weight: 700; color: var(--an-ink);
+}
+.analytics-author-window-kicker {
+  font-size: var(--an-text-xs); font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--an-muted);
+}
+.analytics-author-window-ago { font-weight: 500; font-size: var(--an-text-s); color: var(--an-accent); }
+
+.analytics-author-figures {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--an-gap-s) var(--an-gap-l);
+}
+.analytics-author-figure { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.analytics-author-figure-value {
+  font-size: var(--an-text-l); font-weight: 800; color: var(--an-ink);
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.analytics-author-figure-label { font-size: var(--an-text-xs); color: var(--an-muted); }
+.analytics-author-figure .analytics-delta { margin-top: 2px; }
+
+/* --- The split: master list on the left, detail on the right -------------- */
+.analytics-author-split {
+  display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: var(--an-gap-l); align-items: start;
+}
+
+.analytics-author-master,
+.analytics-author-detail-panel,
+.analytics-author-likes-panel {
+  border: 1px solid var(--an-line);
+  border-radius: var(--an-radius-m);
+  background: var(--an-surface);
+  box-shadow: var(--an-shadow-1);
+  min-width: 0;
+}
+.analytics-author-master { position: sticky; top: 16px; }
+.analytics-author-likes-panel { margin-top: var(--an-gap-l); }
+
+.analytics-author-panel-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  padding: var(--an-gap-s) var(--an-pad-card);
+  border-bottom: 1px solid var(--an-line);
+}
+.analytics-author-panel-head h2 {
+  margin: 0; font-size: var(--an-text-l); font-weight: 700; color: var(--an-ink);
+}
+.analytics-panel-note {
+  margin: 0 0 0 auto; font-size: var(--an-text-xs); color: var(--an-muted);
+}
+
+/* The range and the free "since" date, pushed to the right of the head. */
+.analytics-author-range {
+  margin: 0 0 0 auto; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: flex-end; gap: 10px;
+}
+.analytics-since { display: flex; flex-direction: column; gap: 4px; }
+.analytics-since-label {
+  font-size: var(--an-text-xs); font-weight: 600; letter-spacing: 0.02em;
+  color: var(--an-muted);
+}
+.analytics-since input[type="date"] {
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--input-fill); color: var(--ink); font: inherit; font-size: var(--an-text-s);
+}
+.analytics-since input[type="date"]:hover { border-color: var(--slate); }
+html[data-theme="dark"] .analytics-since input[type="date"] { background: var(--paper-dim); }
+
+.analytics-visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* --- The master list: one compact, pressable row per author ---------------- */
+.analytics-list-summary {
+  margin: 0; padding: 12px var(--an-pad-card) 0;
+  color: var(--an-muted); font-size: var(--an-text-s);
+}
+.analytics-list-summary strong { color: var(--an-ink); font-variant-numeric: tabular-nums; }
+
+.analytics-author-list {
+  list-style: none; margin: 0; padding: 8px;
+  display: grid; gap: 4px;
+}
+.analytics-author-item { min-width: 0; }
+
+.analytics-author-card {
+  width: 100%; display: grid; align-items: center; gap: 12px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  padding: 10px 12px; border: 1px solid transparent; border-radius: var(--an-radius);
+  background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  transition: background var(--an-dur-micro) var(--an-ease-out),
+              border-color var(--an-dur-micro) var(--an-ease-out);
+}
+.analytics-author-card:hover { background: var(--paginator-bg); border-color: var(--line); }
+.analytics-author-card:focus-visible { outline: 2px solid var(--an-focus); outline-offset: 2px; }
+
+.analytics-author-item.is-selected .analytics-author-card {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 34%, transparent);
+}
+
+.analytics-author-rank {
+  min-width: 22px; font-size: var(--an-text-xs); font-weight: 700;
+  color: var(--an-muted); font-variant-numeric: tabular-nums; text-align: right;
+}
+.analytics-author-card-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.analytics-author-card-name {
+  font-size: var(--an-text-s); font-weight: 600; color: var(--an-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.analytics-author-item.is-selected .analytics-author-card-name { color: var(--brand-deep); }
+.analytics-author-card-meta { font-size: var(--an-text-xs); color: var(--an-muted); }
+
+.analytics-author-card-share {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  min-width: 84px;
+}
+.analytics-authors-bar {
+  display: block; width: 84px; height: 6px;
+  border-radius: 999px; background: var(--paginator-bg); overflow: hidden;
+}
+.analytics-authors-bar-fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), color-mix(in srgb, var(--brand) 60%, var(--brand-deep)));
+}
+.analytics-authors-share-num {
+  font-size: var(--an-text-xs); color: var(--an-muted); font-variant-numeric: tabular-nums;
+}
+
+/* --- The detail panel: one author, read at a glance ----------------------- */
+.analytics-author-detail { padding: var(--an-pad-card); }
+.analytics-author-detail-hint {
+  margin: 0; padding: 26px 6px; max-width: 40ch;
+  color: var(--an-muted); font-size: var(--an-text-m); line-height: 1.5;
+}
+.analytics-author-detail[aria-busy="true"] { opacity: 0.6; transition: opacity var(--an-dur-micro); }
+
+.analytics-author-profile { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.analytics-author-profile-id { min-width: 0; }
+.analytics-author-profile-name { margin: 0 0 2px; font-size: var(--an-text-l); font-weight: 700; color: var(--an-ink); }
+.analytics-author-profile-meta { margin: 0; font-size: var(--an-text-xs); color: var(--an-muted); }
+.analytics-author-profile-sub { margin: 4px 0 0; font-size: var(--an-text-xs); color: var(--an-muted); }
+
+.analytics-author-stats {
+  list-style: none; margin: 0 0 10px; padding: 12px 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 10px; border-top: 1px solid var(--an-line); border-bottom: 1px solid var(--an-line);
+}
+.analytics-author-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.analytics-author-stat-value {
+  font-size: var(--an-text-l); font-weight: 800; color: var(--an-ink);
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.analytics-author-stat-label { font-size: var(--an-text-xs); color: var(--an-muted); }
+.analytics-author-window-note { margin: 0 0 16px; font-size: var(--an-text-xs); color: var(--an-muted); }
+
+.analytics-author-block { margin-top: 18px; min-width: 0; }
+.analytics-author-block-title {
+  margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
+  font-size: var(--an-text-m); font-weight: 700; color: var(--an-ink);
+}
+.analytics-author-block-count {
+  padding: 1px 8px; border-radius: 999px; font-size: var(--an-text-xs); font-weight: 700;
+  background: var(--an-accent-wash); color: var(--an-accent);
+}
+.analytics-author-scroll { overflow-x: auto; }
+
+.analytics-author-likers { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.analytics-author-liker {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+  gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--an-line);
+}
+.analytics-author-liker:last-child { border-bottom: 0; }
+.analytics-author-liker-main { display: flex; flex-direction: column; min-width: 0; }
+.analytics-author-liker-name { font-weight: 600; color: var(--an-ink); font-size: var(--an-text-s); }
+.analytics-author-liker-story {
+  grid-column: 2; font-size: var(--an-text-xs); color: var(--brand-deep);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* --- Shared compact table grammar (stories, likes) ------------------------ */
+.analytics-authors-scroll { overflow-x: auto; }
+.analytics-authors-table { width: 100%; border-collapse: collapse; font-size: var(--an-text-s); }
+.analytics-authors-table th {
+  text-align: left; white-space: nowrap;
+  padding: 8px 12px; border-bottom: 1px solid var(--an-line);
+  font-size: var(--an-text-xs); font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--an-muted);
+}
+.analytics-authors-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--an-line); vertical-align: middle;
+}
+.analytics-authors-table tbody tr:last-child td { border-bottom: 0; }
+.analytics-authors-table tbody tr:hover { background: var(--paginator-bg); }
+.analytics-authors-num { font-variant-numeric: tabular-nums; color: var(--an-ink); white-space: nowrap; }
+.analytics-authors-empty {
+  margin: 0; padding: 26px var(--an-pad-card); text-align: center;
+  color: var(--an-muted); font-size: var(--an-text-s);
+}
+
+/* The inline author press, used in the likes table. */
+.analytics-author-open {
+  border: 0; background: none; padding: 0; margin: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  border-radius: var(--radius-s);
+}
+.analytics-author-open:hover .analytics-member-email { text-decoration: underline; }
+.analytics-author-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 45%, transparent); outline-offset: 3px;
+}
+.analytics-author-open--inline {
+  padding: 1px 8px; border: 1px solid var(--paginator-border);
+  background: var(--paginator-bg); font-weight: 600; color: var(--ink);
+}
+.analytics-author-open--inline:hover {
+  border-color: var(--paginator-hover-border);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+
+.analytics-author-likes-scroll { overflow-x: auto; }
+.analytics-likes-table { width: 100%; border-collapse: collapse; font-size: var(--an-text-s); }
+.analytics-likes-table th {
+  text-align: left; white-space: nowrap;
+  padding: 8px 12px; border-bottom: 1px solid var(--an-line);
+  font-size: var(--an-text-xs); font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--an-muted);
+}
+.analytics-likes-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--an-line); vertical-align: middle;
+}
+.analytics-likes-table tbody tr:last-child td { border-bottom: 0; }
+.analytics-likes-table tbody tr:hover { background: var(--paginator-bg); }
+
+/* Pager, shared by every paged list on the page. */
+.analytics-list-pagination { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 12px 6px 4px; }
+.analytics-list-pagination-status { font-size: var(--an-text-xs); color: var(--an-muted); }
+
+/* Avatar size steps. The Members table uses the default 34px; the detail head
+   wants a little more presence, an inline like row a little less. */
+.analytics-member-avatar--sm { width: 28px; height: 28px; font-size: 0.78rem; }
+.analytics-member-avatar--lg { width: 46px; height: 46px; font-size: 1.05rem; }
+
+@media (max-width: 980px) {
+  .analytics-author-split { grid-template-columns: minmax(0, 1fr); }
+  .analytics-author-master { position: static; }
+}
+
+@media (max-width: 760px) {
+  .analytics-author-range { margin-left: 0; width: 100%; }
+  .analytics-author-figures { gap: 10px 18px; }
+  .analytics-author-card { grid-template-columns: auto auto minmax(0, 1fr); }
+  .analytics-author-card-share { grid-column: 3; align-items: flex-start; min-width: 0; }
+  .analytics-authors-bar { width: 120px; }
+  .analytics-authors-table { font-size: var(--an-text-xs); }
+  .analytics-authors-table th,
+  .analytics-authors-table td { padding: 9px 9px; }
+  .analytics-author-liker { grid-template-columns: auto minmax(0, 1fr); }
+  .analytics-panel-note { margin-left: 0; flex-basis: 100%; }
+}
+

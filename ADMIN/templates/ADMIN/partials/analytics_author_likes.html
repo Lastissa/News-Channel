@@ -1,0 +1,81 @@
+{% comment %}
+  htmx fragment: the named, non-anonymous likes list.
+
+  Read only. Every row is a like by a signed-in reader -- the like endpoint
+  rejects anonymous readers -- so each row carries a real name, which is the
+  point of the card. Newest first and paged, so the whole run for the window can
+  be read. Returned by control:analytics_author_likes.
+{% endcomment %}
+<p class="analytics-list-summary">
+  <strong>{{ total }}</strong> like{{ total|pluralize }}
+  &middot; {{ relative_label }}
+</p>
+
+{% if items %}
+<div class="analytics-author-likes-scroll">
+  <table class="analytics-likes-table">
+    <thead>
+      <tr>
+        <th scope="col">Reader</th>
+        <th scope="col">Story</th>
+        <th scope="col">Author</th>
+        <th scope="col">When</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for like in items %}
+      <tr>
+        <td>
+          <span class="analytics-member-id">
+            <span class="analytics-member-avatar analytics-member-avatar--sm{% if not like.reader_img %} analytics-member-avatar--initial{% endif %}">
+              {% if like.reader_img %}<img src="{{ like.reader_img }}" alt="" loading="lazy">{% else %}{{ like.reader_initial }}{% endif %}
+            </span>
+            <span class="analytics-member-main">
+              <span class="analytics-member-email">{{ like.reader_name }}</span>
+              <span class="analytics-member-sub">{{ like.reader_email }}</span>
+            </span>
+          </span>
+        </td>
+        <td>
+          <a class="analytics-reading-story" href="{% url 'blog:story_detail' like.story_slug %}">{{ like.story_heading }}</a>
+        </td>
+        <td>
+          <button type="button" class="analytics-author-open analytics-author-open--inline"
+                  data-author-open="{{ like.author_id }}">{{ like.author_name }}</button>
+        </td>
+        <td class="analytics-member-when">{{ like.liked_at|date:"M j, Y" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="story-pagination analytics-list-pagination" aria-label="Like pages"
+     hx-target="#analytics-author-likes-body" hx-swap="innerHTML"
+     hx-include="#analytics-authors-form">
+  {% if page.has_previous %}
+  <button type="button" class="story-page-btn page-nav"
+          hx-get="{% url 'control:analytics_author_likes' %}?page={{ page.previous_page_number }}">Prev</button>
+  {% endif %}
+
+  {% for number in page_range %}
+    {% if number == page.paginator.ELLIPSIS %}
+  <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ number }}</span>
+    {% else %}
+  <button type="button" class="story-page-btn{% if number == page.number %} is-active{% endif %}"
+          hx-get="{% url 'control:analytics_author_likes' %}?page={{ number }}"
+          aria-label="Go to page {{ number }}"
+          {% if number == page.number %}aria-current="page"{% endif %}>{{ number }}</button>
+    {% endif %}
+  {% endfor %}
+
+  {% if page.has_next %}
+  <button type="button" class="story-page-btn page-nav"
+          hx-get="{% url 'control:analytics_author_likes' %}?page={{ page.next_page_number }}">Next</button>
+  {% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="analytics-reading-empty">No one liked a story in this window.</p>
+{% endif %}

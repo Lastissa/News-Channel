@@ -1,15 +1,16 @@
 {% comment %}
   The lytics chamber strip, shared by every lytics page.
 
-  The five chambers used to be reachable only by walking back to the PANEL and
-  picking the next one. This rail puts all five on every lytics page, with the
+  The chambers used to be reachable only by walking back to the PANEL and
+  picking the next one. This rail puts them all on every lytics page, with the
   current chamber marked aria-current="page", so one tap moves between them
-  without a detour.
+  without a detour. Staff was removed -- it duplicated Author, which is the real
+  people-facing chamber now.
 
   `active_chamber` is the slug of the chamber that owns the page (passed by its
   view); every link carries its own slug so the comparison is one step. Icons
-  come from the page's own sprite (`i-user` / `i-users` / `i-chart` /
-  `i-image`), which each lytics shell already ships.
+  come from the page's own sprite (`i-user` / `i-chart` / `i-image`), which each
+  lytics shell already ships.
 {% endcomment %}
 <nav class="analytics-chambers" aria-label="Analytics chambers">
   <a class="analytics-chamber{% if active_chamber == 'member' %} is-current{% endif %}"
@@ -17,14 +18,9 @@
     <svg class="ic" aria-hidden="true"><use href="#i-user"/></svg>
     <span>Member</span>
   </a>
-  <a class="analytics-chamber{% if active_chamber == 'staff' %} is-current{% endif %}"
-     href="{% url 'control:staff_lytics' %}"{% if active_chamber == 'staff' %} aria-current="page"{% endif %}>
-    <svg class="ic" aria-hidden="true"><use href="#i-users"/></svg>
-    <span>Staff</span>
-  </a>
   <a class="analytics-chamber{% if active_chamber == 'author' %} is-current{% endif %}"
      href="{% url 'control:author_lytics' %}"{% if active_chamber == 'author' %} aria-current="page"{% endif %}>
-    <svg class="ic" aria-hidden="true"><use href="#i-user"/></svg>
+    <svg class="ic" aria-hidden="true"><use href="#i-users"/></svg>
     <span>Author</span>
   </a>
   <a class="analytics-chamber{% if active_chamber == 'story' %} is-current{% endif %}"
