@@ -750,6 +750,18 @@ def _continue_popup_context(
     }
 
 
+def _partnership_email():
+    """The partnership mailbox exactly as the panel has it saved.
+
+    Read straight from the settings row rather than from the cached context
+    processor value, so a decision about whether the address exists is always
+    made on the current state of the row. Empty string when it is not set.
+    """
+    from ADMIN.models import SiteSettings
+
+    return (SiteSettings.get_solo().promotion_email or "").strip()
+
+
 def _teaser_items():
     """Data for the hero's side picture carousel (HOME/home.html). Each item is
     {heading, body, image, url}. Real data is the live Partner.AdvertImage rows
@@ -772,9 +784,8 @@ def _teaser_items():
         return [{"heading": row.heading, "body": row.body, "image": row.image_url, "url": row.url or ""} for row in live]
 
     from django.templatetags.static import static
-    from ADMIN.models import SiteSettings
 
-    partnership_email = (SiteSettings.get_solo().promotion_email or "").strip()
+    partnership_email = _partnership_email()
     placeholder_url = f"mailto:{partnership_email}" if partnership_email else reverse("home:advert_inquiry")
 
     curent_dummy_image = [
@@ -1700,9 +1711,22 @@ class AdvertInquiryView(View):
     alert -- anonymous visitors are neither tracked nor asked for one. The
     alert is rate limited to one per IP per hour and never raises: a failed
     mail must not break the page the visitor lands on.
+
+    The alert is about a MISSING address. When the panel already holds a
+    partnership mailbox there is nothing to tell the admins, so they are left
+    alone and the visitor is given the mailbox to write to instead. A stale
+    link or a crawler must never make the panel look unconfigured.
     """
 
     def get(self, request):
+        partnership_email = _partnership_email()
+        if partnership_email:
+            return render(
+                request,
+                "HOME/advert_coming_soon.html",
+                {"partnership_email": partnership_email},
+            )
+
         _, limited = is_rate_limited(request, 3600, 1, scope="advert_inquiry")
         if not limited:
             visitor_email = request.user.email if request.user.is_authenticated else ""

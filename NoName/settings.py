@@ -64,6 +64,7 @@ MIDDLEWARE = [
     'AUTHENTICATION.middleware.AuthEndpointThrottleMiddleware',
     'AUTHENTICATION.middleware.QueryCountMiddleware',
     'AUTHENTICATION.middleware.AdminMaxPeriod',
+    'AUTHENTICATION.middleware.ActiveSessionTracker',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -138,7 +139,7 @@ USE_TZ = True
 
 
 STATIC_URL = 'static/'
-SESSION_COOKIE_AGE = 7 * 60 * 60 # 7 days for reuGlar user
+SESSION_COOKIE_AGE = 7 * 24 * 60 * 60 # 7 days for regular user
 ADMIN_MAX_AGE_TOO = 24 * 60 * 60 # 1 day max for admins for security reason
 MAILERS = {
     'default': {
@@ -208,4 +209,6 @@ ARCHIVE_UPLOAD_ALERT_EMAIL = os.getenv('archive_upload_alert_email', 'lastissa11
 #   STORY VIEW ALERTS: staff with StaffProfile.get_blog_notification on get
 #   an email every N views their own story crosses (see BLOG.views.StoryDetailView
 #   and SERVICE_INTERNAL.email_single._try_send_story_views_alert_email).
-STORY_VIEWS_ALERT_INTERVAL = int(os.getenv('story_views_alert_interval', 5))
+#   Ten views, not five: a story that crossed five reads was barely warmed up,
+#   and the mail was landing before the story had found a reader at all.
+STORY_VIEWS_ALERT_INTERVAL = int(os.getenv('story_views_alert_interval', 10))

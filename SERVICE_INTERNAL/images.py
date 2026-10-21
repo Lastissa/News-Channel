@@ -37,8 +37,10 @@ cloudinary.config(
 )
 
 #   WHAT WE ACCEPT FROM A BROWSER FILE INPUT. Anything else is rejected
-#   before it ever leaves the server.
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
+#   before it ever leaves the server. WEBP is here because it is a real
+#   picture format that Cloudinary transforms and delivers like any other,
+#   and readers have cameras and editors that save it by default.
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 MAX_UPLOAD_BYTES = getattr(settings, "IMAGE_UPLOAD_MAX_MB", 5) * 1024 * 1024
 

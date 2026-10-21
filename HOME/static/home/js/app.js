@@ -160,6 +160,35 @@
     });
   }
 
+  /* Floating social buttons: the reader lays them out as a column or as a
+     row. The choice is remembered on the device, and the buttons are moved
+     into place rather than re-flowed, so the switch is smooth. */
+  var fabStacks = document.querySelectorAll("[data-fab-stack]");
+  fabStacks.forEach(function (stack) {
+    var toggle = stack.querySelector("[data-fab-toggle]");
+    if (!toggle) return;
+
+    function paint() {
+      var horizontal = stack.classList.contains("is-horizontal");
+      var label = horizontal
+        ? "Switch the social buttons to a column"
+        : "Switch the social buttons to a row";
+      toggle.setAttribute("aria-pressed", horizontal ? "true" : "false");
+      toggle.setAttribute("aria-label", label);
+      toggle.setAttribute("title", label);
+    }
+
+    paint();
+    toggle.addEventListener("click", function () {
+      stack.classList.toggle("is-horizontal");
+      var horizontal = stack.classList.contains("is-horizontal");
+      try {
+        localStorage.setItem("abureport-fab-layout", horizontal ? "row" : "column");
+      } catch (e) { /* storage unavailable, ignore */ }
+      paint();
+    });
+  });
+
   var logoutButtons = document.querySelectorAll("[data-logout-btn]");
   logoutButtons.forEach(function (button) {
     button.addEventListener("click", function (event) {

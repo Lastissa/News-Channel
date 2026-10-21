@@ -582,6 +582,54 @@ def _make_anonymous_request(blog_pk):
     return request
 
 
+class StoryViewsAlertIntervalTests(TestCase):
+    """The story view alert goes out every N views, not on every view. The
+    interval is ten views (NoName.settings.STORY_VIEWS_ALERT_INTERVAL): a
+    story that has only been read five times is barely warmed up, and the
+    mail was landing before the story had found a reader at all."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.author = _make_staff_with_profile(email="views-alert@example.com")
+        self.author.staffprofile.get_blog_notification = True
+        self.author.staffprofile.save()
+        self.blog = _make_blog(self.author, heading="Views alert story")
+        self.url = f"/story/{self.blog.slug}/"
+
+    def _visit(self, number):
+        """One counted view. Each call comes from a different address so the
+        per-address dedupe (BLOG.views.StoryDetailView) lets it through."""
+        return self.client.get(
+            self.url,
+            REMOTE_ADDR=f"198.51.100.{number}",
+            HTTP_USER_AGENT=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36"
+            ),
+        )
+
+    def test_the_alert_waits_for_ten_views(self):
+        with mock.patch("BLOG.views._try_send_story_views_alert_email") as alert:
+            for number in range(1, 10):
+                self._visit(number)
+            alert.assert_not_called()
+
+            self._visit(10)
+            alert.assert_called_once()
+
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.views, 10)
+
+    def test_the_alert_keeps_coming_every_ten_views(self):
+        with mock.patch("BLOG.views._try_send_story_views_alert_email") as alert:
+            for number in range(1, 21):
+                self._visit(number)
+
+        self.assertEqual(alert.call_count, 2)
+
+
 class StoryViewDeduplicationTests(TestCase):
     @override_settings(
         CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},

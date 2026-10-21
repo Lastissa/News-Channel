@@ -273,6 +273,14 @@ button { font-family: inherit; cursor: pointer; }
 .dropdown-toggle:hover { color: var(--nav-fg-light); }
 .chev { width: 12px; height: 12px; transition: transform 0.2s ease; }
 .has-dropdown.is-open .chev { transform: rotate(180deg); }
+
+/*  THE NAV'S OWN FOOTER. About, privacy, partner with us and the author
+    handbook belong to the site, not to the menu, so they sit at the bottom of
+    the phone drawer in the page footer's voice instead of in the row of
+    menu items. On a desktop the page footer already carries them, so this
+    block is hidden there. */
+.nav-footer-links { display: none; }
+.nav-panel-mobile { display: none; }
 /* Scoped above .primary-nav ul (0,1,1) so the menu stacks vertically instead
    of inheriting the navbar's display:flex row layout. */
 .primary-nav .dropdown-menu {
@@ -387,6 +395,28 @@ html[data-theme="dark"] .icon-moon { display: block; }
   }
   .has-dropdown.is-open .dropdown-menu { display: block; }
   .dropdown-menu li a { color: var(--ink); }
+
+  /*  On a phone the Panel is a row of its own; the copy inside the Profile
+      dropdown is the desktop's. */
+  .nav-panel-mobile { display: block; }
+  .nav-panel-desktop { display: none; }
+
+  /*  The nav's footer block. */
+  .nav-footer-links {
+    display: block;
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+  .nav-footer-list {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+  }
+  .nav-footer-list a {
+    display: block; padding: 9px 4px;
+    color: var(--slate); font-size: 0.9rem; font-weight: 500; letter-spacing: 0.01em;
+  }
+  .nav-footer-list a:hover { color: var(--amber-deep); }
 }
 
 /* ---------- 404 ---------- */
@@ -1013,10 +1043,26 @@ a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 .footer-bottom p { margin: 0; }
 
 /* ---------- Floating social buttons ---------- */
+/*  The stack is a corner anchor, not a list: every button is placed on its
+    own with its --i, so laying the buttons out as a row instead of a column
+    is a movement that can be animated. CSS cannot animate flex-direction,
+    and a re-flow of a column into a row looks like a glitch rather than a
+    switch. */
 .fab-stack {
   position: fixed; right: 16px; bottom: 24px; z-index: 200;
-  display: flex; flex-direction: column; gap: 10px;
+  width: 46px; height: 46px;
 }
+.fab-stack > .fab-btn,
+.fab-stack > .fab-toggle {
+  position: absolute;
+  right: 0; bottom: 0;
+  transition: right .36s cubic-bezier(.2,.7,.3,1), bottom .36s cubic-bezier(.2,.7,.3,1),
+              transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.fab-stack > .fab-btn { bottom: calc(var(--i, 0) * 56px); }
+/* The row runs away from the corner the stack is anchored to, so the icons
+   spread leftwards and the toggle stays in the corner. */
+.fab-stack.is-horizontal > .fab-btn { bottom: 0; right: calc(var(--i, 0) * 56px); }
 .fab-btn {
   width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: var(--ink); color: var(--paper); border: 1px solid rgba(12,18,24,0.15); box-shadow: 0 10px 24px rgba(15,27,40,0.18);
@@ -1029,9 +1075,32 @@ body.dark .fab-btn, */
 } */
 .fab-btn svg { width: 22px; height: 22px; }
 .fab-btn:hover { transform: translateY(-3px) scale(1.05); }
+.fab-stack.is-horizontal > .fab-btn:hover { transform: translateX(-3px) scale(1.05); }
 .fab-whatsapp:hover { background: #25D366; color: #0E1B2C; }
 .fab-twitter:hover { background: #1D9BF0; color: #fff; }
 .fab-facebook:hover { background: #1877F2; color: #fff; }
+
+/* The layout toggle: the one control that sits in the corner of the stack
+   while the social icons fan out from it. */
+.fab-toggle {
+  width: 46px; height: 46px; border-radius: 50%; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--line); box-shadow: 0 10px 24px rgba(15,27,40,0.16);
+  cursor: pointer;
+}
+.fab-toggle svg { width: 20px; height: 20px; }
+.fab-toggle:hover { background: var(--ink); color: var(--paper); }
+.fab-toggle-icon-row { display: none; }
+.fab-stack.is-horizontal .fab-toggle-icon-column { display: none; }
+.fab-stack.is-horizontal .fab-toggle-icon-row { display: inline; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fab-stack > .fab-btn,
+  .fab-stack > .fab-toggle {
+    transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+}
 @media (min-width: 900px) {
   .fab-stack { right: 24px; bottom: 32px; }
 }

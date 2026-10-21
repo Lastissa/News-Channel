@@ -166,6 +166,37 @@
       </button>
     </div>
   </div>
+  {# FILE PREVIEW: opened from a file card. The content is only fetched when #}
+  {# the reader asks for it, so browsing the gallery never downloads a file. #}
+  <div class="archive-preview" data-archive-preview hidden role="dialog" aria-modal="true" aria-label="File preview">
+    <div class="archive-preview-backdrop" data-archive-preview-close></div>
+    <div class="archive-preview-body">
+      <header class="archive-preview-head">
+        <div class="archive-preview-heading">
+          <span class="archive-eyebrow" data-preview-kind-label>Document</span>
+          <h2 class="archive-preview-title" data-preview-title></h2>
+          <p class="archive-preview-meta" data-preview-meta></p>
+        </div>
+        <button type="button" class="archive-preview-close" data-archive-preview-close aria-label="Close preview">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <div class="archive-preview-stage" data-preview-stage>
+        <iframe class="archive-preview-frame" data-preview-frame title="File preview" hidden></iframe>
+        <audio class="archive-preview-audio" data-preview-audio controls preload="none" hidden></audio>
+        <video class="archive-preview-video" data-preview-video controls playsinline preload="metadata" hidden></video>
+        <p class="archive-preview-note">If nothing shows here, download the file and open it on your device.</p>
+      </div>
+
+      <div class="archive-preview-actions">
+        <a class="archive-action-btn primary" data-preview-download href="#" rel="nofollow" download>
+          <svg viewBox="0 0 20 20" class="archive-btn-icon" aria-hidden="true"><path d="M10 3v9m0 0-3.5-3.5M10 12l3.5-3.5M4 15h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Download</span>
+        </a>
+      </div>
+    </div>
+  </div>
 </section>
 {% endblock %}
 

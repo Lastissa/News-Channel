@@ -174,6 +174,9 @@ html { scroll-behavior: smooth; }
   margin: 0; font-family: var(--font-body); font-size: 1rem; font-weight: 700;
   flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The header is a handle: tapping the name opens the section. */
+.panel-card-header h2 { cursor: pointer; }
+.panel-card-header h2:hover { text-decoration: underline; text-underline-offset: 3px; }
 .panel-card-icon {
   width: 32px; height: 32px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
   background: var(--ink); color: var(--paper); border-radius: var(--radius-s);

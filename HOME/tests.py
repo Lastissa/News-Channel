@@ -891,6 +891,23 @@ class AdvertInquiryViewTests(QuietTestCase):
 
         self.assertEqual(alert.call_count, 1)
 
+    def test_a_configured_mailbox_never_triggers_the_not_set_up_alert(self):
+        """The alert is about a MISSING address. With one saved in the panel
+        the admins must not be told the partnership address is unset, and the
+        visitor is handed the mailbox instead."""
+        row = SiteSettings.get_solo()
+        row.promotion_email = "partners@example.com"
+        row.save()
+
+        with mock.patch("HOME.views._try_send_partnership_inquiry_batch_email") as alert:
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        alert.assert_not_called()
+        self.assertContains(response, "partners@example.com")
+        self.assertContains(response, "mailto:partners@example.com")
+        self.assertNotContains(response, "still being set up")
+
 
 @mock.patch("HOME.views.ping_indexnow")
 class EditNewsViewTests(QuietTestCase):

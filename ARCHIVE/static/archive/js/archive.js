@@ -745,6 +745,7 @@
   });
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && viewer && !viewer.hidden) { closeViewer(); return; }
+    if (event.key === "Escape" && preview && !preview.hidden) { closePreview(); return; }
     if (event.key === "Escape" && overlayHost && overlayHost.querySelector("[data-archive-modal]")) { closeModal(); return; }
     var layer = overlayHost && overlayHost.querySelector("[data-archive-modal] [role='dialog']");
     if (layer) trapTab(layer, event);
@@ -852,6 +853,92 @@
       touchStartX = null;
       if (Math.abs(dx) > 60) stepViewer(dx < 0 ? 1 : -1);
     }, { passive: true });
+  }
+
+  /* ---------- file preview ----------
+     A document, a clip or a track opens in the browser instead of only
+     being downloadable. The content is fetched when the reader asks for it
+     -- the frame or the player is given its source on open -- so browsing
+     the gallery never downloads a file. Delegated on the document so it
+     keeps working after every htmx grid swap. ---------- */
+  var preview = document.querySelector("[data-archive-preview]");
+  var previewOpener = null;
+  var PREVIEW_KIND_LABEL = { document: "Document", audio: "Audio", video: "Video" };
+
+  function clearPreviewSources() {
+    if (!preview) return;
+    var frame = preview.querySelector("[data-preview-frame]");
+    var audio = preview.querySelector("[data-preview-audio]");
+    var video = preview.querySelector("[data-preview-video]");
+    if (frame) { frame.removeAttribute("src"); frame.hidden = true; }
+    if (audio) { try { audio.pause(); } catch (err) { /* not playing */ } audio.removeAttribute("src"); audio.hidden = true; }
+    if (video) { try { video.pause(); } catch (err) { /* not playing */ } video.removeAttribute("src"); video.hidden = true; }
+  }
+
+  function openPreview(opener) {
+    if (!preview) return;
+    var d = opener.dataset;
+    var kind = d.previewKind || "document";
+    previewOpener = opener;
+
+    preview.querySelector("[data-preview-title]").textContent = d.previewTitle || "";
+    preview.querySelector("[data-preview-kind-label]").textContent = PREVIEW_KIND_LABEL[kind] || "File";
+    preview.querySelector("[data-preview-meta]").textContent = [d.previewFilename, d.previewSize].filter(Boolean).join(" \u00b7 ");
+    var download = preview.querySelector("[data-preview-download]");
+    if (download) {
+      download.setAttribute("href", d.previewDownload || d.previewUrl || "#");
+      if (d.previewFilename) download.setAttribute("download", d.previewFilename);
+    }
+
+    clearPreviewSources();
+    if (kind === "audio") {
+      var audio = preview.querySelector("[data-preview-audio]");
+      if (audio) { audio.setAttribute("src", d.previewUrl || ""); audio.hidden = false; }
+    } else if (kind === "video") {
+      var video = preview.querySelector("[data-preview-video]");
+      if (video) { video.setAttribute("src", d.previewUrl || ""); video.hidden = false; }
+    } else {
+      var frame = preview.querySelector("[data-preview-frame]");
+      if (frame) { frame.setAttribute("src", d.previewUrl || ""); frame.hidden = false; }
+    }
+
+    preview.classList.remove("is-closing");
+    preview.hidden = false;
+    lockScroll(true);
+    var closeBtn = preview.querySelector(".archive-preview-close");
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
+  }
+
+  function closePreview() {
+    if (!preview || preview.hidden) return;
+    preview.classList.add("is-closing");
+    window.setTimeout(function () {
+      preview.hidden = true;
+      preview.classList.remove("is-closing");
+      clearPreviewSources();
+      if (!(overlayHost && overlayHost.querySelector("[data-archive-modal]"))) lockScroll(false);
+      if (previewOpener && document.body.contains(previewOpener)) previewOpener.focus({ preventScroll: true });
+      previewOpener = null;
+    }, 180);
+  }
+
+  if (preview) {
+    document.addEventListener("click", function (event) {
+      var opener = event.target.closest("[data-archive-file-open]");
+      if (opener) {
+        event.preventDefault();
+        openPreview(opener);
+        return;
+      }
+      if (preview.hidden) return;
+      if (event.target.closest("[data-archive-preview-close]")) closePreview();
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (preview.hidden) return;
+      if (event.key === "Escape") { closePreview(); return; }
+      trapTab(preview.querySelector(".archive-preview-body"), event);
+    });
   }
 
   /* ---------- archive video tiles ----------

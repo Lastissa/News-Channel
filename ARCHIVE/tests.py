@@ -210,7 +210,7 @@ class ArchiveAssetManagementTests(TestCase):
         item = ArchiveImage.objects.create(
             kind=ArchiveKind.IMAGE,
             url="/archive/cdn/image/upload/v123/abureport/archive/photo.jpg",
-            alt="Before",
+            alt="Before the edit",
             quality="medium",
             width=640,
             height=480,
@@ -223,12 +223,12 @@ class ArchiveAssetManagementTests(TestCase):
         ) as delivery_url:
             response = self.client.post(
                 reverse("archive:item_edit", args=[item.pk]),
-                {"alt": "After", "quality": "high"},
+                {"alt": "After the edit", "quality": "high"},
             )
 
         self.assertEqual(response.status_code, 200)
         item.refresh_from_db()
-        self.assertEqual(item.alt, "After")
+        self.assertEqual(item.alt, "After the edit")
         self.assertEqual(item.quality, "high")
         self.assertEqual(item.url, "/archive/cdn/image/upload/q_auto:best/v123/abureport/archive/photo.jpg")
         delivery_url.assert_called_once_with(
@@ -306,6 +306,132 @@ class ArchiveAdminDeleteReleasesAssetTests(TestCase):
 
 
 @override_settings(CLOUDINARY_CLOUD_NAME="test-cloud")
+class ArchiveUploadRulesTests(TestCase):
+    """The rules the Add image/file form has to keep: a description that
+    says something, and every picture format the site can actually store."""
+
+    def setUp(self):
+        self.user = Auth.objects.create_user(email="archive-rules@example.com")
+        with mock.patch("AUTHENTICATION.signals._try_send_login_email"):
+            self.client.force_login(self.user)
+
+    def _upload(self, **overrides):
+        payload = {
+            "alt": "A short clip of the market",
+            "quality": "medium",
+            "width": "800",
+            "height": "600",
+            "upload_file": SimpleUploadedFile("photo.jpg", b"image", content_type="image/jpeg"),
+        }
+        payload.update(overrides)
+        upload_result = {
+            "secure_url": "https://res.cloudinary.com/test-cloud/image/upload/v123/abureport/archive/photo.jpg",
+            "public_id": "abureport/archive/photo",
+            "resource_type": "image",
+            "width": 640,
+            "height": 480,
+        }
+        with (
+            mock.patch("ARCHIVE.views.is_rate_limited", return_value=(0, False)),
+            mock.patch("ARCHIVE.views.upload_archive_image", return_value=upload_result) as upload_image,
+        ):
+            response = self.client.post(reverse("archive:upload"), payload)
+        return response, upload_image
+
+    def test_a_description_under_ten_characters_is_refused(self):
+        response, upload_image = self._upload(alt="photo")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("at least 10 characters", response.json()["detail"])
+        upload_image.assert_not_called()
+        self.assertFalse(ArchiveImage.objects.exists())
+
+    def test_a_description_of_ten_characters_is_accepted(self):
+        response, upload_image = self._upload(alt="0123456789")
+
+        self.assertEqual(response.status_code, 201)
+        upload_image.assert_called_once()
+
+    def test_a_webp_picture_goes_through_the_image_pipeline(self):
+        response, upload_image = self._upload(
+            alt="A picture in the newer format",
+            upload_file=SimpleUploadedFile("photo.webp", b"image", content_type="image/webp"),
+        )
+
+        self.assertEqual(response.status_code, 201)
+        upload_image.assert_called_once()
+        self.assertEqual(ArchiveImage.objects.get().kind, ArchiveKind.IMAGE)
+
+    def test_editing_a_description_to_nothing_useful_is_refused(self):
+        item = ArchiveImage.objects.create(
+            kind=ArchiveKind.IMAGE,
+            url="/archive/cdn/image/upload/v123/abureport/archive/photo.jpg",
+            alt="A photo of the old bridge",
+            quality="medium",
+            width=640,
+            height=480,
+            public_id="abureport/archive/photo",
+            author=self.user,
+        )
+
+        response = self.client.post(reverse("archive:item_edit", args=[item.pk]), {"alt": "pic"})
+
+        self.assertEqual(response.status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.alt, "A photo of the old bridge")
+
+
+class ArchiveFilePreviewTests(TestCase):
+    """A file in the archive can be opened, not only downloaded: a document in
+    the browser's reader, a clip or a track in a player. The content is only
+    fetched when the reader asks for it."""
+
+    def setUp(self):
+        self.user = Auth.objects.create_user(email="archive-preview@example.com")
+        with mock.patch("AUTHENTICATION.signals._try_send_login_email"):
+            self.client.force_login(self.user)
+
+        self.report = ArchiveImage.objects.create(
+            kind=ArchiveKind.FILE,
+            url="/archive/cdn/raw/upload/v123/abureport/archive/report.pdf",
+            alt="The annual report",
+            original_filename="report.pdf",
+            file_size=2048,
+            public_id="abureport/archive/report",
+            author=self.user,
+        )
+        self.backup = ArchiveImage.objects.create(
+            kind=ArchiveKind.FILE,
+            url="/archive/cdn/raw/upload/v123/abureport/archive/backup.zip",
+            alt="A backup archive",
+            original_filename="backup.zip",
+            file_size=2048,
+            public_id="abureport/archive/backup",
+            author=self.user,
+        )
+
+    def test_a_document_card_offers_a_preview(self):
+        response = self.client.get(reverse("archive:gallery"))
+
+        self.assertContains(response, "data-archive-file-open")
+        self.assertContains(response, 'data-preview-kind="document"')
+        self.assertContains(response, 'data-preview-filename="report.pdf"')
+
+    def test_a_file_the_browser_cannot_show_offers_no_preview(self):
+        response = self.client.get(reverse("archive:gallery"))
+
+        self.assertContains(response, "A backup archive")
+        self.assertNotContains(response, 'data-preview-filename="backup.zip"')
+
+    def test_the_preview_overlay_is_ready_on_the_page(self):
+        response = self.client.get(reverse("archive:gallery"))
+
+        self.assertContains(response, "data-archive-preview")
+        self.assertContains(response, "data-preview-frame")
+        self.assertContains(response, "data-preview-download")
+
+
+@override_settings(CLOUDINARY_CLOUD_NAME="test-cloud")
 class ArchiveFilterTests(TestCase):
     """The category filter (picture quality for images, file-type family for
     plain files) and the added-by filter (the uploader's pk, shown as the
@@ -346,6 +472,15 @@ class ArchiveFilterTests(TestCase):
             public_id="abureport/archive/report",
             author=self.alice,
         )
+        self.clip = ArchiveImage.objects.create(
+            kind=ArchiveKind.FILE,
+            url="/archive/cdn/raw/upload/v123/abureport/archive/clip.mp4",
+            alt="Market day clip",
+            original_filename="clip.mp4",
+            file_size=4096,
+            public_id="abureport/archive/clip",
+            author=self.alice,
+        )
 
     def test_gallery_renders_category_and_added_by_dropdowns(self):
         response = self.client.get(reverse("archive:gallery"))
@@ -377,6 +512,17 @@ class ArchiveFilterTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Annual report")
         self.assertNotContains(response, "photo")
+
+    def test_the_video_category_finds_a_clip(self):
+        """Videos used to be impossible to filter for: the family mapping and
+        the filter's own list both left them out, so a clip could only be
+        found by its description."""
+        response = self.client.get(reverse("archive:gallery"), {"category": "video"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Market day clip")
+        self.assertNotContains(response, "Annual report")
+        self.assertContains(response, "Video", status_code=200)
 
     def test_uploader_filter_limits_to_that_person(self):
         response = self.client.get(reverse("archive:gallery"), {"uploader": str(self.bob.pk)})

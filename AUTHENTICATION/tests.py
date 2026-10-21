@@ -215,6 +215,53 @@ class SessionTrackingTests(TestCase):
         self.assertNotEqual(remaining.first().session_key, first_key)
 
 
+class ActiveSessionTrackerTests(TestCase):
+    """A signed in reader's session row has to keep up with the live Django
+    session. The row used to carry a frozen copy of the cookie age taken at
+    sign-in, so a reader who stayed signed in for longer than that was told
+    by the PANEL and by the profile that nobody was logged in while they were
+    plainly signed in."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = Auth.objects.create_user(email="tracker@example.com", password="secret123")
+
+    def test_the_row_is_refreshed_while_the_reader_browses(self):
+        client = _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        row = UserSession.objects.get(user=self.user)
+
+        stale = timezone.now() - timedelta(hours=1)
+        UserSession.objects.filter(pk=row.pk).update(last_seen=stale, expires_at=stale)
+
+        client.get("/")
+
+        row.refresh_from_db()
+        self.assertGreater(row.expires_at, timezone.now())
+        self.assertGreater(row.last_seen, stale)
+
+    def test_a_session_that_is_still_running_stays_live(self):
+        client = _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        row = UserSession.objects.get(user=self.user)
+
+        stale = timezone.now() - timedelta(hours=1)
+        UserSession.objects.filter(pk=row.pk).update(last_seen=stale, expires_at=stale)
+        self.assertEqual(live_sessions_for(self.user), [])
+
+        client.get("/")
+
+        self.assertEqual(len(live_sessions_for(self.user)), 1)
+
+    def test_the_refresh_is_throttled_to_one_write_a_minute(self):
+        client = _login_from(self.user.email, "secret123", "10.0.0.1", "AgentA")
+        row = UserSession.objects.get(user=self.user)
+        first_seen = row.last_seen
+
+        client.get("/")
+
+        row.refresh_from_db()
+        self.assertEqual(row.last_seen, first_seen)
+
+
 class ProfileSessionPlacardTests(TestCase):
     """The profile "Active sessions" control opens a placard listing the live
     sessions, and each row can end exactly one session."""

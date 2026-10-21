@@ -155,7 +155,7 @@
 full details 👇
 {{ site_domain }}{{ request.path }}
 
-{{ blog.author_name }} | ABUREPORT"
+{{ blog.author_name | upper}} | ABUREPORT"
                     aria-label="Share on WhatsApp">
               <img class="share-icon" src="{% static 'blog/file/WhatsApp-icon.svg' %}" alt="" width="16" height="16" loading="lazy">
               {% comment %} <span>WhatsApp</span> {% endcomment %}

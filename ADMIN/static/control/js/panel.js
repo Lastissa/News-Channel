@@ -136,6 +136,19 @@
         if (card) setCollapsed(card, !card.classList.contains("is-collapsed"));
         return;
       }
+      /*  The whole header is a handle. Tapping the section name -- "Active
+          Logins", "Categories" -- opens the section, not only the chevron on
+          the right. Anything that is itself a control inside the header keeps
+          its own click. */
+      var header = event.target.closest(".panel-card-header");
+      if (header) {
+        var ownControl = event.target.closest("button, a, input, select, textarea, [role='button']");
+        if (!ownControl) {
+          var card = header.closest(".panel-card");
+          if (card) setCollapsed(card, !card.classList.contains("is-collapsed"));
+        }
+        return;
+      }
       /*  A section link in the nav opens the section it points at, so a tap
           reveals content instead of landing on a folded header. */
       var link = event.target.closest(".panel-nav-link");

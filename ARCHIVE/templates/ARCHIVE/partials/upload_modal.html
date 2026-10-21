@@ -23,9 +23,9 @@
         <label class="archive-file-zone" for="archive-upload-file" data-archive-dropzone>
           <svg viewBox="0 0 24 24" class="archive-file-zone-icon" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span class="archive-file-zone-title">Choose a file or drop it here</span>
-          <span class="archive-file-zone-hint">JPEG or PNG pictures up to {{ image_max_mb }} MB. Videos (MP4, MOV) up to {{ video_max_mb }} MB. Other files (PDF, Office, text, audio, archives) up to {{ file_max_mb }} MB.</span>
+          <span class="archive-file-zone-hint">JPEG, PNG or WEBP pictures up to {{ image_max_mb }} MB. Videos (MP4, MOV) up to {{ video_max_mb }} MB. Other files (PDF, Office, text, audio, archives) up to {{ file_max_mb }} MB.</span>
           <input id="archive-upload-file" class="archive-file-zone-input" type="file" name="upload_file"
-                 accept="image/jpeg,image/png,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.zip,.rar,.7z,.mp3,.wav,.mp4,.mov,.json"
+                 accept="image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.zip,.rar,.7z,.mp3,.wav,.mp4,.mov,.json"
                  required data-archive-upload-file>
         </label>
         <div class="archive-modal-preview" data-archive-upload-preview hidden>
@@ -62,8 +62,9 @@
 
       <div class="archive-modal-field">
         <label for="archive-upload-alt">Description</label>
-        <input id="archive-upload-alt" type="text" name="alt" maxlength="150"
-               placeholder="Short description of the picture or file" required>
+        <input id="archive-upload-alt" type="text" name="alt" maxlength="150" minlength="10"
+               placeholder="What is this picture or file?" required>
+        <span class="archive-modal-hint">At least 10 characters, so people can tell what this is.</span>
       </div>
 
       <div class="archive-upload-progress" data-archive-upload-progress hidden role="progressbar" aria-label="Upload progress">

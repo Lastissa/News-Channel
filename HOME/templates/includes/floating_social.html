@@ -4,16 +4,47 @@ TO ADD ANOTHER ICON LATER:
    custom_context_processors() so it's available as a template variable.
 2. Duplicate one <a class="fab-btn" ...> block below, swap the href and the
    <svg> icon.
-3. No CSS changes needed -- .fab-stack lays out children automatically.
+3. Give it the next --i number. The --i is the button's place in the stack:
+   it is what lets the column and the row layouts be a movement rather than a
+   re-flow, so the switch can be animated. Nothing else in the CSS changes.
 {% endcomment %}
-<div class="fab-stack" aria-label="Contact us on social media">
-  <a class="fab-btn fab-whatsapp" href="{{ whatsapp }}" target="_self" rel="noopener noreferrer" aria-label="Chat with us on WhatsApp">
+<div class="fab-stack" data-fab-stack aria-label="Contact us on social media">
+  <a class="fab-btn fab-whatsapp" style="--i: 1" href="{{ whatsapp }}" target="_self" rel="noopener noreferrer" aria-label="Chat with us on WhatsApp">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 00-7.8 13.5L3 21l4.7-1.2A9 9 0 1012 3zm0 1.8a7.2 7.2 0 016.2 10.9l-.2.4.6 2.3-2.3-.6-.4.2A7.2 7.2 0 1112 4.8zm-3.4 3.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.1 0 1.2.9 2.4 1 2.6.1.1 1.7 2.8 4.3 3.8 2.1.9 2.5.7 3 .6.5 0 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.6-.3l-1.9-.9c-.3-.1-.5-.1-.7.1l-.7.9c-.1.2-.3.2-.5.1-.8-.3-1.7-.9-2.5-1.7-.7-.7-1.2-1.5-1.4-1.7-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.4.1-.6l-.9-2c-.1-.3-.3-.3-.5-.3z"/></svg>
   </a>
-  <a class="fab-btn fab-twitter" href="{{ tweeter }}" target="_self" rel="noopener noreferrer" aria-label="Follow us on Twitter">
+  <a class="fab-btn fab-twitter" style="--i: 2" href="{{ tweeter }}" target="_self" rel="noopener noreferrer" aria-label="Follow us on Twitter">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 3H22l-7.2 8.2L23 21h-6.4l-5-6.5L5.8 21H2.7l7.7-8.8L2 3h6.5l4.6 6 5.8-6zm-1.1 16.2h1.8L7.3 4.7H5.4l12.4 14.5z"/></svg>
   </a>
-  <a class="fab-btn fab-facebook" href="{{ facebook }}" target="_self" rel="noopener noreferrer" aria-label="Follow us on Facebook">
+  <a class="fab-btn fab-facebook" style="--i: 3" href="{{ facebook }}" target="_self" rel="noopener noreferrer" aria-label="Follow us on Facebook">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.6h2.6l.4-3h-3v-1.9c0-.9.2-1.5 1.5-1.5h1.6V4.3C15.9 4.2 15 4.1 14 4.1c-2.2 0-3.7 1.3-3.7 3.8v2.1H7.7v3H10.3V21h3.2z"/></svg>
   </a>
+  {% comment %}
+    THE LAYOUT TOGGLE: the reader can lay the buttons out as a column or as a
+    row. The button sits in the corner of the stack and the icons fan out from
+    it, so the switch is one tap and the choice is remembered on the device.
+  {% endcomment %}
+  <button type="button" class="fab-toggle" style="--i: 0" data-fab-toggle aria-pressed="false"
+          aria-label="Switch the social buttons to a row" title="Switch the social buttons to a row">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g class="fab-toggle-icon-column" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M6 6h12M6 12h12M6 18h12"/>
+      </g>
+      <g class="fab-toggle-icon-row" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M6 6v12M12 6v12M18 6v12"/>
+      </g>
+    </svg>
+  </button>
 </div>
+<script>
+/*  Apply the saved layout before the first paint. The stack is at the end of
+    the body, so reading the choice here means the buttons are never drawn in
+    the wrong shape first and then jump into the right one. */
+(function () {
+  try {
+    if (localStorage.getItem("abureport-fab-layout") !== "row") return;
+    document.querySelectorAll("[data-fab-stack]").forEach(function (stack) {
+      stack.classList.add("is-horizontal");
+    });
+  } catch (e) { /* storage unavailable, ignore */ }
+})();
+</script>

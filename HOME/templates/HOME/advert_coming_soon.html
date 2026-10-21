@@ -5,6 +5,10 @@
   partnership mailbox is configured yet (HOME.views.AdvertInquiryView). The
   click has already alerted the admins that the address still needs setting
   up; this page just tells the visitor it is not live yet.
+
+  When a mailbox IS configured the same view serves it instead: the alert is
+  about a missing address, so with one in place the admins are left alone and
+  the visitor is handed the address to write to.
 {% endcomment %}
 
 {% block title %}Advertising | {{ project_name }}{% endblock %}
@@ -15,8 +19,14 @@
 <section class="legal-page">
   <div class="legal-wrap">
     <p class="legal-eyebrow">Advertising &amp; partnerships</p>
+    {% if partnership_email %}
+    <h1>Reach us</h1>
+    <p class="legal-intro">Thanks for your interest in advertising with {{ project_name }}. Write to our partnership team and we will set your advert up for you.</p>
+    <p><a style="color:var(--amber-alt-deep);" href="mailto:{{ partnership_email }}?subject=Advert%20enquiry%20-%20{{ project_name|urlencode }}">{{ partnership_email }}</a></p>
+    {% else %}
     <h1>Coming soon</h1>
     <p class="legal-intro">Thanks for your interest in advertising with {{ project_name }}. Our partnership inbox is still being set up, so this part is not live yet - we have been notified and will have it ready shortly.</p>
+    {% endif %}
     <p>Read more about <a style="color:var(--amber-alt-deep);" href="{% url 'home:promote' %}">promoting your business with us</a>, or head back to the <a style="color:var(--amber-alt-deep);" href="{% url 'home:home' %}">home page</a>.</p>
   </div>
 </section>

@@ -28,6 +28,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import error_logger, is_rate_limited
 from SERVICE_INTERNAL.images import (
+    ALLOWED_CONTENT_TYPES,
     ARCHIVE_FILE_MAX_BYTES,
     ARCHIVE_VIDEO_MAX_BYTES,
     MAX_UPLOAD_BYTES,
@@ -56,6 +57,13 @@ MAX_DIMENSION = 4000
 
 ALT_MAX_LENGTH = 150
 
+#   THE DESCRIPTION HAS TO SAY SOMETHING. A one word description ("photo")
+#   is useless in the gallery and useless in the search, so an item needs a
+#   real sentence about it before it is accepted. The rule is enforced on
+#   upload and on edit; rows uploaded before it existed keep whatever they
+#   had.
+ALT_MIN_LENGTH = 10
+
 #   DESCRIPTION SEARCH ("descr" search key on the gallery page): a search word
 #   counts as matching a word in an item's description when they are at least
 #   this similar (0.70 == 70%), so typos and near spellings ("pictur",
@@ -82,8 +90,8 @@ ARCHIVE_CATEGORIES = (
     ("document", "Document"),
     # ("spreadsheet", "Spreadsheet"),
     # ("presentation", "Presentation"),
-    # ("audio", "Audio"),
-    # ("video", "Video"),
+    ("audio", "Audio"),
+    ("video", "Video"),
     ("archive", "Archive file"),
     ("data", "Data file"),
     ("other", "Other file"),
@@ -99,8 +107,8 @@ _EXT_TO_FAMILY = {
     "DOC": "document", "DOCX": "document", "RTF": "document", "TXT": "document", "ODT": "document",
     # "XLS": "spreadsheet", "XLSX": "spreadsheet", "CSV": "spreadsheet", "ODS": "spreadsheet",
     # "PPT": "presentation", "PPTX": "presentation", "ODP": "presentation",
-    # "MP3": "audio", "WAV": "audio", "OGG": "audio", "M4A": "audio", "AAC": "audio", "FLAC": "audio",
-    # "MP4": "video", "MOV": "video", "AVI": "video", "MKV": "video", "WEBM": "video", "M4V": "video",
+    "MP3": "audio", "WAV": "audio", "OGG": "audio", "M4A": "audio", "AAC": "audio", "FLAC": "audio",
+    "MP4": "video", "MOV": "video", "AVI": "video", "MKV": "video", "WEBM": "video", "M4V": "video",
     "ZIP": "archive", "RAR": "archive", "7Z": "archive", "TAR": "archive", "GZ": "archive",
     "JSON": "data", "XML": "data",
 }
@@ -156,6 +164,32 @@ def _file_extension(name):
     return name.rsplit(".", 1)[-1].upper() if "." in name else ""
 
 
+#   WHAT THE BROWSER CAN SHOW ON ITS OWN, so "Preview" has something to
+#   show. A document opens in the browser's own reader (a PDF, a text file),
+#   audio and video open in a player. Everything else (Office documents,
+#   archives) has no browser preview and only offers a download.
+PREVIEW_DOCUMENT_EXTENSIONS = {"pdf", "txt", "csv", "json", "rtf", "xml", "md", "log"}
+PREVIEW_AUDIO_EXTENSIONS = {"mp3", "wav", "ogg", "m4a", "aac", "flac"}
+PREVIEW_VIDEO_EXTENSIONS = {"mp4", "mov", "webm", "mkv", "avi", "m4v"}
+
+
+def _preview_kind(image):
+    """How a file can be previewed: "document", "audio", "video", or "" when
+    the browser has no way of showing it. Only plain files can be previewed;
+    a picture already has the image viewer and a clip already has its own
+    player on the card."""
+    if image.kind != ArchiveKind.FILE:
+        return ""
+    extension = _file_extension(image.original_filename).lower()
+    if extension in PREVIEW_DOCUMENT_EXTENSIONS:
+        return "document"
+    if extension in PREVIEW_AUDIO_EXTENSIONS:
+        return "audio"
+    if extension in PREVIEW_VIDEO_EXTENSIONS:
+        return "video"
+    return ""
+
+
 def _serialize_images(images):
     return [
         {
@@ -174,6 +208,9 @@ def _serialize_images(images):
             #   sheet (see ARCHIVE/templates/ARCHIVE/partials/gallery_grid.html).
             "is_video": image.kind == ArchiveKind.FILE
             and _file_extension(image.original_filename).lower() in VIDEO_FILE_EXTENSIONS,
+            #   HOW (AND WHETHER) THE BROWSER CAN SHOW THIS FILE, so the card
+            #   can offer a preview that actually opens something.
+            "preview_kind": _preview_kind(image),
             "file_size_label": _human_file_size(image.file_size),
             "uploader_email": _masked_email(image.author.email),
             "date_created": image.date_created,
@@ -569,11 +606,16 @@ class ArchiveUploadView(View):
             return JsonResponse({"detail": "Please choose a picture or file to upload.", "valid": False}, status=400)
         if not alt:
             return JsonResponse({"detail": "Please add a short description.", "valid": False}, status=400)
+        if len(alt) < ALT_MIN_LENGTH:
+            return JsonResponse(
+                {"detail": f"The description needs at least {ALT_MIN_LENGTH} characters.", "valid": False},
+                status=400,
+            )
         if len(alt) > ALT_MAX_LENGTH:
             return JsonResponse({"detail": f"The description is limited to {ALT_MAX_LENGTH} characters.", "valid": False}, status=400)
 
         content_type = (getattr(upload_file, "content_type", "") or "").lower()
-        is_image = content_type in {"image/jpeg", "image/png"}
+        is_image = content_type in ALLOWED_CONTENT_TYPES
         is_video = _file_extension(upload_file.name).lower() in VIDEO_FILE_EXTENSIONS
 
         #   RATE LIMIT BEFORE CLOUDINARY: a blocked request must never touch the upload.
@@ -762,6 +804,8 @@ class ArchiveItemEditView(View):
         error = None
         if not alt:
             error = "Description can't be empty."
+        elif len(alt) < ALT_MIN_LENGTH:
+            error = f"The description needs at least {ALT_MIN_LENGTH} characters."
         elif len(alt) > ALT_MAX_LENGTH:
             error = f"The description is limited to {ALT_MAX_LENGTH} characters."
 

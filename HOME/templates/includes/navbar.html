@@ -36,7 +36,7 @@
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <ul class="dropdown-menu">
-            {% if request.user.is_authenticated and request.user.is_admin %}<li><a href="{% url 'control:panel' %}">Panel</a></li>{% endif %}
+            {% if request.user.is_authenticated and request.user.is_admin %}<li class="nav-panel-desktop"><a href="{% url 'control:panel' %}">Panel</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
             {% if request.user.is_staff %}<li><a href="{% url 'home:profile' %}#publish-stories">Published stories</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
@@ -45,6 +45,13 @@
           </ul>
         </li>
         {% if request.user.is_staff %}<li><a href="{% url 'home:add_news' %}"><b>+ News</b></a></li>{% endif %}
+        {% comment %}
+          MOBILE PANEL LINK: on a phone the Panel is a link of its own, not an
+          item tucked inside the Profile menu where it is easy to miss. The
+          copy inside the Profile dropdown stays for the desktop, where the
+          dropdown is one tap away and the nav row is tight.
+        {% endcomment %}
+        {% if request.user.is_authenticated and request.user.is_admin %}<li class="nav-panel-mobile"><a href="{% url 'control:panel' %}">Panel</a></li>{% endif %}
         <li class="nav-logout-item">
           <form method="post" action="{% url 'auth:logout' %}" class="nav-logout-form" data-logout-form>
             {% csrf_token %}
@@ -57,6 +64,20 @@
           <a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}" class="nav-auth-login">Log in</a>
         </li>
         {% endif %}
+        {% comment %}
+          THE NAV'S OWN FOOTER: the quiet links that belong to the site rather
+          than to the menu. They sit at the bottom of the phone drawer, styled
+          like the page footer, because on a desktop the page footer already
+          carries them and the nav row has no room for them.
+        {% endcomment %}
+        <li class="nav-footer-links">
+          <ul class="nav-footer-list">
+            <li><a href="{% url 'home:about' %}">About</a></li>
+            <li><a href="{% url 'home:privacy_policy' %}">Privacy policy</a></li>
+            <li><a href="{% url 'home:promote' %}">Partner with us</a></li>
+            {% if request.user.is_staff %}<li><a href="{% url 'home:author_handbook' %}">Author handbook</a></li>{% endif %}
+          </ul>
+        </li>
         {% if request.user.is_authenticated and request.user.is_staff == True %}
         {% endif %}
       </ul>

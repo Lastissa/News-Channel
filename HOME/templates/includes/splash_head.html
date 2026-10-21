@@ -71,6 +71,12 @@ html { background-color: var(--paper); }
   /* system fonts only: a web font arriving mid-animation would change the letter widths */
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+/* On a wide screen the name is a line of text, not a poster: the same 104px
+   cap that reads right on a phone swallows a third of a desktop window, so
+   the desktop size is scaled down and capped lower. */
+@media (min-width: 900px) {
+  .sp-stage { --sp-fs: min(6.4vw, 8.6vmin, 72px); }
+}
 .sp-row {
   position: relative;
   display: flex;
