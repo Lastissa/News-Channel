@@ -74,7 +74,7 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
     <div class="continue-popup-body" data-continue-scroll>
       {% if continue_recent %}
       <section class="continue-popup-block" aria-label="Your Last 3 Story Read">
-        <h3 class="continue-popup-subhead">The last 3 article you read.</h3>
+        <h3 class="continue-popup-subhead">The last 5 article you read.</h3>
         <div class="continue-popup-rail">
           {% include "HOME/partials/continue_rail_items.html" with continue_items=continue_recent %}
         </div>

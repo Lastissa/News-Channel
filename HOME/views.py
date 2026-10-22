@@ -276,7 +276,7 @@ class SitemapXmlView(View):
                 }
             )
 
-        return render(request, "HOME/sitemap.xml", {"urls": urls}, content_type="application/xml")
+        return render(request, "HOME/sitemap.xml", {"urls": urls}, content_type="application/xml")  # Legacy - redirects to new structure via URL routing
 
 
 class LlmsTxtView(View):
