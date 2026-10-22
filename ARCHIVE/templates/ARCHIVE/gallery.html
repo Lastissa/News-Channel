@@ -73,6 +73,8 @@
          href="{% url 'archive:gallery' %}?kind=image{% if descr %}&amp;descr={{ descr|urlencode }}{% endif %}{% if category %}&amp;category={{ category }}{% endif %}{% if uploader %}&amp;uploader={{ uploader }}{% endif %}">Images</a>
       <a class="archive-tab{% if kind == 'file' %} is-active{% endif %}" data-archive-kind-btn="file" {% if kind == 'file' %}aria-current="true"{% endif %}
          href="{% url 'archive:gallery' %}?kind=file{% if descr %}&amp;descr={{ descr|urlencode }}{% endif %}{% if category %}&amp;category={{ category }}{% endif %}{% if uploader %}&amp;uploader={{ uploader }}{% endif %}">Files</a>
+      <a class="archive-tab{% if kind == 'video' %} is-active{% endif %}" data-archive-kind-btn="video" {% if kind == 'video' %}aria-current="true"{% endif %}
+         href="{% url 'archive:gallery' %}?kind=video{% if descr %}&amp;descr={{ descr|urlencode }}{% endif %}{% if category %}&amp;category={{ category }}{% endif %}{% if uploader %}&amp;uploader={{ uploader }}{% endif %}">Videos</a>
     </nav>
 
     <form class="archive-search{% if descr %} is-open{% endif %}" role="search" method="get" action="{% url 'archive:gallery' %}" data-archive-search-form>

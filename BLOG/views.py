@@ -910,7 +910,7 @@ class StoryDetailView(View):
                 except Exception as exc:
                     error_logger(msg=f"STORY VIEW LOG FAILED: blog={blog.pk} error={exc}")
 
-                alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 5)
+                alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 10)
                 if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
                     _try_send_story_views_alert_email(blog.author, blog)
 

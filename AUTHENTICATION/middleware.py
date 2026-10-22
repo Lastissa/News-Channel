@@ -135,11 +135,29 @@ class ActiveSessionTracker:
 
             row = UserSession.objects.filter(user=user, session_key=session_key).first()
             if row is None:
+                #   A LOGIN WITH NO ROW: the reader signed in before sessions
+                #   were tracked (or the row was lost), so the sign-in signal
+                #   never wrote one. They are plainly signed in right now, so
+                #   record this session instead of leaving the PANEL and the
+                #   profile saying nobody is logged in.
+                from SERVICE_INTERNAL.abstract import get_client_ip
+                from .signals import _valid_ip_or_none
+
+                UserSession.objects.get_or_create(
+                    session_key=session_key,
+                    defaults={
+                        "user": user,
+                        "ip": _valid_ip_or_none(get_client_ip(request)),
+                        "user_agent": (request.META.get("HTTP_USER_AGENT") or "")[:255],
+                        "expires_at": request.session.get_expiry_date(),
+                    },
+                )
                 return
 
             now = timezone.now()
             age = (now - row.last_seen).total_seconds()
-            if age < self.REFRESH_SECONDS:
+            #   a row with no expiry is skipped by live_sessions_for, so fix it at once
+            if age < self.REFRESH_SECONDS and row.expires_at is not None:
                 return
 
             expires_at = request.session.get_expiry_date()

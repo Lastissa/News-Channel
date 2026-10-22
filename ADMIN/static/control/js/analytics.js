@@ -1118,11 +1118,6 @@
       if (prevBtn) prevBtn.disabled = index === 0;
       if (nextBtn) nextBtn.textContent = index === sections.length - 1 ? "Done" : "Next";
 
-      if (mainEl) {
-        mainEl.classList.remove("is-enter");
-        void mainEl.offsetWidth; /* reflow so the step animation replays */
-        mainEl.classList.add("is-enter");
-      }
       scrollToSection(section);
     }
 
@@ -1167,4 +1162,33 @@
       else goTo(index + 1);
     });
   })();
+})();
+
+/* ---------- Tables read as stacked rows on a phone ----------
+   Nothing in lytics scrolls sideways. Each table cell is given its column's
+   heading as data-label, and analytics.css shows it as a small caption in
+   front of the value once the screen is narrow. Re-run after every htmx swap
+   because the tables arrive in fragments. */
+(function () {
+  "use strict";
+  function label(table) {
+    var heads = Array.prototype.map.call(table.querySelectorAll("thead th"), function (th) {
+      return th.textContent.replace(/\s+/g, " ").trim();
+    });
+    if (!heads.length) return;
+    Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function (row) {
+      Array.prototype.forEach.call(row.children, function (cell, i) {
+        if (cell.tagName === "TD" && heads[i] && !cell.hasAttribute("data-label")) cell.setAttribute("data-label", heads[i]);
+      });
+    });
+  }
+  function labelAll() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".analytics-members-table, .analytics-reading-table, .analytics-authors-table, .analytics-likes-table"),
+      label
+    );
+  }
+  document.addEventListener("DOMContentLoaded", labelAll);
+  document.addEventListener("htmx:afterSwap", labelAll);
+  document.addEventListener("htmx:afterSettle", labelAll);
 })();

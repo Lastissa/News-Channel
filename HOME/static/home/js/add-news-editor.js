@@ -862,8 +862,8 @@
      author says yes) a second placard asks them to confirm, so a stray click
      cannot mail every reader by accident. The answer travels as
      `newsletter=1` on the POST and the server only sends on that flag.
-     Both "exits" of the first placard publish the story: sending is what the
-     author has to choose deliberately, not publishing. */
+     Both exits of the first placard now ask once more before anything
+     happens: "send" confirms the send, "publish without" confirms the post. */
   function newsletterAudience() {
     var category = categorySelect ? categorySelect.value : "";
     var known = Object.prototype.hasOwnProperty.call(newsletterCounts, category);
@@ -899,6 +899,28 @@
     });
   }
 
+  /* Publishing WITHOUT the newsletter is asked about as well: a stray click
+     must not post a story either. "Go back" returns to the newsletter ask. */
+  function openPublishOnlyConfirm() {
+    openModal({
+      title: "Confirm publishing",
+      intro: "The story will go live now and no newsletter will be sent for it. Readers with news alerts on will not be emailed.",
+      items: [{ message: newsletterAudience().replace(/would get this story by email\./, "will not be emailed.").replace(/would reach nobody\./, "would have reached nobody anyway.") }],
+      question: "Publish without sending the newsletter?",
+      askToPost: true,
+      confirmLabel: "Yes, publish without newsletter",
+      editLabel: "Go back",
+      onConfirm: function () {
+        newsletterChoice = false;
+        submitStory(newsletterGateWarnings);
+      },
+      onEdit: function () {
+        newsletterChoice = null;
+        openNewsletterAsk();
+      }
+    });
+  }
+
   function openNewsletterAsk() {
     openModal({
       title: "Send Newsletter with this story?",
@@ -913,8 +935,7 @@
         openNewsletterConfirm();
       },
       onEdit: function () {
-        newsletterChoice = false;
-        submitStory(newsletterGateWarnings);
+        openPublishOnlyConfirm();
       }
     });
   }

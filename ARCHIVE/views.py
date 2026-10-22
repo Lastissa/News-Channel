@@ -72,7 +72,11 @@ DESCR_MATCH_THRESHOLD = 0.70
 
 #   TYPE FILTER ("kind" key on the gallery page): "" means everything, otherwise
 #   only rows of that ArchiveKind. Anything else a visitor types is ignored.
-KIND_FILTERS = (ArchiveKind.IMAGE, ArchiveKind.FILE)
+#   "video" is a tab of its own, not a stored kind: a clip is a FILE row whose
+#   name carries a video extension, so the tab is answered from the same rows as
+#   the Video category (see _paginate).
+VIDEO_KIND_FILTER = "video"
+KIND_FILTERS = (ArchiveKind.IMAGE, ArchiveKind.FILE, VIDEO_KIND_FILTER)
 
 #   {"low": "Low", "medium": "Medium", "high": "High"} -- the human word
 #   before the " - ..." blurb in ImageQuality.CHOICES.
@@ -446,6 +450,14 @@ def _public_id_from_url(url, resource_type):
 
 
 def _paginate(page_number, descr="", kind="", category="", uploader=""):
+    #   THE VIDEOS TAB: `kind` stays "video" in the answer (so the tab lights up
+    #   and the address bar keeps it), but the rows come from the FILE kind
+    #   narrowed to the Video category. A different category picked on top of the
+    #   Videos tab is kept as chosen, so it simply matches nothing.
+    shown_kind = kind
+    if kind == VIDEO_KIND_FILTER:
+        kind = ArchiveKind.FILE
+        category = category or "video"
     if descr:
         ranked_ids = _descr_ranked_ids(descr, kind, category, uploader)
         paginator = Paginator(ranked_ids, PAGE_SIZE)
@@ -469,10 +481,10 @@ def _paginate(page_number, descr="", kind="", category="", uploader=""):
     return {
         "images": _serialize_images(page_items),
         "descr": descr,
-        "kind": kind,
-        "category": category,
+        "kind": shown_kind,
+        "category": "" if shown_kind == VIDEO_KIND_FILTER and category == "video" else category,
         "uploader": uploader,
-        "category_label": _category_label(category),
+        "category_label": "" if shown_kind == VIDEO_KIND_FILTER and category == "video" else _category_label(category),
         "uploader_label": _uploader_label(uploader),
         #   REAL count of everything the current search + type filter matches,
         #   shown in the summary line above the grid (gallery_grid.html).

@@ -42,11 +42,10 @@ class PortfolioFeedTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Posts by Portfolio Author")
-        self.assertContains(response, "portfolio-feed-skeleton")
-        self.assertContains(response, "data-next-page=\"2\"")
-        # Resolve through static() so the assertion follows the hashed manifest
-        # name (e.g. portfolio-feed.<hash>.js) instead of a fixed ?v= string.
-        self.assertContains(response, static("staff/js/portfolio-feed.js"))
+        # Numbered pages replaced the infinite scroll feed.
+        self.assertContains(response, "portfolio-pager")
+        self.assertContains(response, "?page=2#portfolio-feed")
+        self.assertNotContains(response, "portfolio-feed-skeleton")
         self.assertNotContains(response, "Recent story reach")
         self.assertEqual(len(response.context["stories"]), 6)
         self.assertEqual(

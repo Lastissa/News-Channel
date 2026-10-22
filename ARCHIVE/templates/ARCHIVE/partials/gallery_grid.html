@@ -2,12 +2,12 @@
 {% load archive_extras %}
 <p class="archive-summary" aria-live="polite" data-archive-meta data-page="{{ page }}" data-kind="{{ kind }}" data-descr="{{ descr }}" data-category="{{ category }}" data-uploader="{{ uploader }}">
   {% if descr %}
-  <span>{{ total }} result{{ total|pluralize }} for &ldquo;{{ descr }}&rdquo;{% if kind == 'image' %} in images{% elif kind == 'file' %} in files{% endif %}</span>
+  <span>{{ total }} result{{ total|pluralize }} for &ldquo;{{ descr }}&rdquo;{% if kind == 'image' %} in images{% elif kind == 'file' %} in files{% elif kind == 'video' %} in videos{% endif %}</span>
   {% if category %}<span class="archive-filter-chip">{{ category_label }}</span>{% endif %}
   {% if uploader %}<span class="archive-filter-chip">Added by {{ uploader_label }}</span>{% endif %}
   <button type="button" class="archive-link-btn" data-archive-clear-search>Clear search</button>
   {% else %}
-  <span>{{ total }} {% if kind == 'image' %}image{% elif kind == 'file' %}file{% else %}item{% endif %}{{ total|pluralize }}{% if num_pages > 1 %} &middot; Page {{ page }} of {{ num_pages }}{% endif %}</span>
+  <span>{{ total }} {% if kind == 'image' %}image{% elif kind == 'file' %}file{% elif kind == 'video' %}video{% else %}item{% endif %}{{ total|pluralize }}{% if num_pages > 1 %} &middot; Page {{ page }} of {{ num_pages }}{% endif %}</span>
   {% if category %}<span class="archive-filter-chip">{{ category_label }}</span>{% endif %}
   {% if uploader %}<span class="archive-filter-chip">Added by {{ uploader_label }}</span>{% endif %}
   {% endif %}
@@ -152,7 +152,7 @@
     <p class="archive-empty-text">Check the spelling or try fewer words. Close spellings are matched too.</p>
     <button type="button" class="archive-action-btn" data-archive-clear-search>Clear search</button>
     {% else %}
-    <p class="archive-empty-title">{% if kind == 'image' %}No images yet{% elif kind == 'file' %}No files yet{% else %}The archive is empty{% endif %}</p>
+    <p class="archive-empty-title">{% if kind == 'image' %}No images yet{% elif kind == 'file' %}No files yet{% elif kind == 'video' %}No videos yet{% else %}The archive is empty{% endif %}</p>
     <p class="archive-empty-text">{% if can_upload %}Use &ldquo;Add image or file&rdquo; above to share the first one.{% else %}Sign in to share the first one.{% endif %}</p>
     {% endif %}
   </div>

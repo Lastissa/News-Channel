@@ -57,6 +57,39 @@ SYMBOL_ONLY_RE = re.compile(r"^[^\w]{4,}$", re.UNICODE)
 LONG_SYMBOL_RUN_RE = re.compile(r"([^\w\s])\1{7,}")
 
 
+#   SELF PROMOTION PHRASES. A story is a report, not a profile page, so it may
+#   not carry an "about us", "about me" or "follow me" section or line. Matched
+#   on markup free text, case blind, with any run of spaces or markup between
+#   the words, so "ABOUT   us", "**About me**" and "Follow_me" are all caught.
+FORBIDDEN_PHRASES = (
+    ("about us", re.compile(r"(?<!\w)about[\s_*]+us(?!\w)", re.IGNORECASE)),
+    ("about me", re.compile(r"(?<!\w)about[\s_*]+me(?!\w)", re.IGNORECASE)),
+    ("follow me", re.compile(r"(?<!\w)follow[\s_*]+me(?!\w)", re.IGNORECASE)),
+)
+
+
+def find_forbidden_phrases(heading, content):
+    """The banned self promotion phrases found in a heading or a body, in order
+    and without repeats. Empty list means the story is clean."""
+    text = f"{heading or ''}\n{content or ''}"
+    return [label for label, pattern in FORBIDDEN_PHRASES if pattern.search(text)]
+
+
+def forbidden_phrase_error(heading, content):
+    """A BLOCK finding for the banned phrases, or None. Shared by validate_story
+    (Add News) and by the Edit Story view, which does not run the full rule set
+    on older stories but must still refuse these phrases."""
+    found = find_forbidden_phrases(heading, content)
+    if not found:
+        return None
+    quoted = ", ".join(f'"{label}"' for label in found)
+    return _block(
+        "self_promotion_phrase",
+        f"Your article contains {quoted}. A story page must not carry an \"about us\", \"about me\" or \"follow me\" "
+        "section or line. Remove it and keep the page to the report itself.",
+    )
+
+
 def _block(code, message, rule=None):
     return {"code": code, "level": "block", "message": message, "rule": rule or code}
 
@@ -256,6 +289,11 @@ def validate_story(heading, content):
 
     def add(item):
         (errors if item["level"] == "block" else warnings).append(item)
+
+    #   RULE 13: NO "ABOUT US" / "ABOUT ME" / "FOLLOW ME" ON A STORY PAGE
+    forbidden = forbidden_phrase_error(heading, content)
+    if forbidden:
+        add(forbidden)
 
     #   RULE 5: EMPTY / SYMBOL-ONLY HEADINGS ("#", "##", "### ***")
     for block in blocks:

@@ -29,14 +29,12 @@
             {% endfor %}
           </ul>
         </li>
-        <li><a href="#" aria-disabled="true" class="soon">Services<span class="soon-tag">Soon</span></a></li>
         {% if request.user.is_authenticated %}
         <li class="has-dropdown">
           <button type="button" class="dropdown-toggle" aria-expanded="false" aria-haspopup="true">Profile
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <ul class="dropdown-menu">
-            {% if request.user.is_authenticated and request.user.is_admin %}<li class="nav-panel-desktop"><a href="{% url 'control:panel' %}">Panel</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
             {% if request.user.is_staff %}<li><a href="{% url 'home:profile' %}#publish-stories">Published stories</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
@@ -44,14 +42,12 @@
             <li><a href="{% url 'home:profile' %}#recent-comments">Comment history</a></li>
           </ul>
         </li>
-        {% if request.user.is_staff %}<li><a href="{% url 'home:add_news' %}"><b>+ News</b></a></li>{% endif %}
         {% comment %}
-          MOBILE PANEL LINK: on a phone the Panel is a link of its own, not an
-          item tucked inside the Profile menu where it is easy to miss. The
-          copy inside the Profile dropdown stays for the desktop, where the
-          dropdown is one tap away and the nav row is tight.
+          Panel (admins) comes right before + News (staff), on desktop and on a
+          phone alike. It is a link of its own, not an item in the Profile menu.
         {% endcomment %}
-        {% if request.user.is_authenticated and request.user.is_admin %}<li class="nav-panel-mobile"><a href="{% url 'control:panel' %}">Panel</a></li>{% endif %}
+        {% if request.user.is_admin %}<li class="nav-panel-link"><a href="{% url 'control:panel' %}"{% if request.resolver_match.namespace == 'control' %} class="is-current" aria-current="page"{% endif %}>Panel</a></li>{% endif %}
+        {% if request.user.is_staff %}<li class="nav-news-link"><a href="{% url 'home:add_news' %}">+ News</a></li>{% endif %}
         <li class="nav-logout-item">
           <form method="post" action="{% url 'auth:logout' %}" class="nav-logout-form" data-logout-form>
             {% csrf_token %}

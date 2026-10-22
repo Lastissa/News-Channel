@@ -54,7 +54,7 @@ from SERVICE_INTERNAL.images import (
 from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for, drop_single_session, describe_device, live_sessions_for
-from SERVICE_INTERNAL.story_validation import first_error_message, validate_story
+from SERVICE_INTERNAL.story_validation import first_error_message, forbidden_phrase_error, validate_story
 from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, StaffProfile
 
 logger = logging.getLogger(__name__)
@@ -216,7 +216,7 @@ class SitemapXmlView(View):
             #   /archive/ now also carries every image/file's own real,
             #   same-domain cdn/ URL (see ARCHIVE.views.CloudinaryProxyView),
             #   so the gallery page itself is worth indexing for SEO too.
-            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod.date().isoformat() if archive_lastmod else today.isoformat(), "changefreq": "daily", "priority": "0.6", "images": archive_images},
+            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod or today.isoformat(), "changefreq": "daily", "priority": "0.6", "images": archive_images},
         ]
 
         #   PERMANENT CATEGORY PAGES: /category/<slog>/ is a stable landing page
@@ -1419,6 +1419,16 @@ class EditNewsView(View):
             return _response({"detail": "The story content cannot be empty."}, status=400)
         if len(image_info) > Blog._meta.get_field("image_info").max_length:
             return _response({"detail": "The image description is limited to 100 characters."}, status=400)
+
+        #   NO "ABOUT US" / "ABOUT ME" / "FOLLOW ME" (same rule Add News enforces).
+        #   Only this one rule runs on an edit, so an older story is never held
+        #   back by the newer length or similarity rules.
+        forbidden = forbidden_phrase_error(blog.heading, content)
+        if forbidden:
+            return _response(
+                {"detail": forbidden["message"], "errors": [forbidden], "warnings": [], "blocked": True},
+                status=400,
+            )
 
         new_image_url = blog.image_1
         new_public_id = blog.image_public_id

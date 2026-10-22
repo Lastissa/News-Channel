@@ -1383,13 +1383,8 @@ html.archive-locked { overflow: hidden; }
   /* Category + Added by scroll sideways instead of stacking, so both stay
      reachable without pushing the grid down the page. */
   .archive-filters-form {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    padding-bottom: 4px;
   }
   .archive-filters-form::-webkit-scrollbar { height: 6px; }
   .archive-filters-form::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
@@ -1430,3 +1425,6 @@ html.archive-locked { overflow: hidden; }
   animation: none;
   background: var(--paper-dim);
 }
+
+/* A previewable file opens when its tile is tapped. */
+.archive-card:has([data-archive-file-open]) .archive-card-media-file:not(.archive-card-media-video) { cursor: pointer; }

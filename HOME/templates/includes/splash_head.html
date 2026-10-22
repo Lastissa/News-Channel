@@ -73,9 +73,9 @@ html { background-color: var(--paper); }
 }
 /* On a wide screen the name is a line of text, not a poster: the same 104px
    cap that reads right on a phone swallows a third of a desktop window, so
-   the desktop size is scaled down and capped lower. */
+   the desktop size is scaled down and capped at 52px. */
 @media (min-width: 900px) {
-  .sp-stage { --sp-fs: min(6.4vw, 8.6vmin, 72px); }
+  .sp-stage { --sp-fs: min(4.2vw, 6vmin, 52px); }
 }
 .sp-row {
   position: relative;

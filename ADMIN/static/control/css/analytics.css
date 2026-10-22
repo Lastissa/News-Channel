@@ -53,11 +53,8 @@
   display: flex; align-items: stretch; gap: 0;
   margin: 0 -18px; padding: 0 18px;
   border-top: 1px solid var(--line);
-  overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: thin;
+  flex-wrap: wrap;
 }
-.analytics-chambers::-webkit-scrollbar { height: 4px; }
-.analytics-chambers::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
 .analytics-chamber {
   position: relative;
   display: inline-flex; align-items: center; gap: 7px;
@@ -793,17 +790,11 @@ html[data-theme="dark"] .analytics-reading-cooled input[type="date"] { backgroun
      legend is a sibling and wraps underneath, always in view. */
   .analytics-controls { width: 100%; gap: 10px 12px; }
   .analytics-filter-row {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
+    flex-wrap: wrap;
     gap: 10px 12px;
     width: 100%;
     padding-bottom: 4px;
   }
-  .analytics-filter-row::-webkit-scrollbar { height: 6px; }
-  .analytics-filter-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
   .analytics-select { flex: 0 0 auto; }
   .analytics-select select { width: auto; }
 
@@ -818,105 +809,65 @@ html[data-theme="dark"] .analytics-reading-cooled input[type="date"] { backgroun
 
   .analytics-info { padding: 6px 9px; }
   .analytics-info span { display: none; }
-  .analytics-guide-card { padding: 14px 14px; }
-  .analytics-guide-foot { flex-wrap: wrap; }
+  .analytics-guide-card { padding: 10px 12px; }
 }
 
-/* ---------- "How this works" guided rail ---------- */
-/* A bottom-docked coach rail, not a modal: the page stays visible and each
-   step scrolls its section into view and rings it, so the guide explains the
-   page while showing it. Motion is spring-y by design. */
+/* ---------- "How this works" guide ---------- */
+/* A plain bottom card: the page stays visible and each step scrolls its
+   section into view and outlines it. No spring motion, no pulsing, no dot row
+   (a dot per section pushed the card wider than a phone). The step counter in
+   the kicker says where the reader is. */
 .analytics-guide {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 960;
   display: flex; justify-content: center;
-  padding: 0 14px 16px; pointer-events: none;
+  padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px)); pointer-events: none;
+  box-sizing: border-box; max-width: 100%;
 }
 .analytics-guide[hidden] { display: none; }
 .analytics-guide-card {
-  pointer-events: auto; width: min(780px, 100%);
+  pointer-events: auto; box-sizing: border-box; width: min(560px, 100%); max-width: 100%;
+  max-height: 46vh; overflow-y: auto;
   background: var(--paper); color: var(--ink);
   border: 1px solid var(--line); border-radius: var(--radius-m);
-  box-shadow: 0 18px 52px rgba(2, 6, 23, 0.3);
-  padding: 16px 18px; display: grid; gap: 10px;
-  transform-origin: bottom center;
-  animation: analyticsGuideIn .44s cubic-bezier(.34, 1.56, .64, 1) both;
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.22);
+  padding: 12px 14px; display: grid; gap: 8px;
 }
-html[data-theme="dark"] .analytics-guide-card {
-  background: var(--paper-dim); box-shadow: 0 18px 52px rgba(0, 0, 0, 0.6);
-}
-@keyframes analyticsGuideIn {
-  from { opacity: 0; transform: translateY(30px) scale(.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.analytics-guide-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+html[data-theme="dark"] .analytics-guide-card { background: var(--paper-dim); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55); }
+.analytics-guide-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; min-width: 0; }
+.analytics-guide-head > div { min-width: 0; }
 .analytics-guide-kicker {
   margin: 0 0 2px; font-size: 0.68rem; font-weight: 800;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-deep);
 }
-.analytics-guide-heading { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--ink); }
+.analytics-guide-heading { margin: 0; font-size: 1rem; font-weight: 800; color: var(--ink); overflow-wrap: anywhere; }
 .analytics-guide-close {
   flex: 0 0 auto; width: 44px; height: 44px; border-radius: var(--radius-s);
   border: 1px solid var(--line); background: var(--paginator-bg);
   color: var(--ink); font-size: 1.2rem; line-height: 1; cursor: pointer;
-  transition: transform .2s cubic-bezier(.34, 1.56, .64, 1), border-color .2s ease;
 }
-.analytics-guide-close:hover { transform: rotate(90deg) scale(1.06); border-color: var(--paginator-hover-border); }
-.analytics-guide-body { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--slate); }
-.analytics-guide-main.is-enter { animation: analyticsGuideStep .32s cubic-bezier(.22, 1, .36, 1) both; }
-@keyframes analyticsGuideStep {
-  from { opacity: 0; transform: translateY(9px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.analytics-guide-foot { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
-.analytics-guide-dots { display: flex; align-items: center; gap: 0; margin: 0 auto; }
-.analytics-guide-dot {
-  /* The dot stays 8px and the button around it is a full 44px target: the
-     padding is clipped out of the paint, so only the dot shows. Boxes touch
-     rather than overlap, so a tap lands on the step it points at. */
-  width: 8px; height: 8px; padding: 18px; border: 0; border-radius: 50%;
-  background: var(--paginator-border); background-clip: content-box; cursor: pointer;
-  transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), background-color .22s ease;
-}
-.analytics-guide-dot:hover { transform: scale(1.2); }
-.analytics-guide-dot.is-active { background: var(--brand-deep); transform: scale(1.4); }
+.analytics-guide-close:hover { border-color: var(--paginator-hover-border); }
+.analytics-guide-body { margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.analytics-guide-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.analytics-guide-dots { display: none; }
 .analytics-guide-nav {
   display: inline-flex; align-items: center; justify-content: center;
-  min-height: 44px;
+  min-height: 44px; min-width: 88px;
   padding: 7px 15px; border-radius: var(--radius-s); font-family: inherit;
-  font-size: 0.84rem; font-weight: 700; cursor: pointer;
+  font-size: 0.86rem; font-weight: 700; cursor: pointer;
   color: var(--ink); background: var(--paginator-bg); border: 1px solid var(--line);
-  transition: transform .16s cubic-bezier(.22, 1, .36, 1), border-color .16s ease, opacity .16s ease;
 }
 .analytics-guide-nav:hover { border-color: var(--paginator-hover-border); }
-.analytics-guide-nav:active { transform: scale(.96); }
 .analytics-guide-nav:disabled { opacity: .4; cursor: default; }
-.analytics-guide-nav--primary {
-  color: #04121a; background: var(--brand-deep); border-color: var(--brand-deep);
-}
+.analytics-guide-nav--primary { color: #04121a; background: var(--brand-deep); border-color: var(--brand-deep); }
 
-/* The target a guide step is describing, ringed and briefly pulsed so the eye
-   is pulled to it as the rail moves. Works for a whole card or a single figure
-   inside one, since a step can now point at either. */
+/* The section a step is describing: a plain outline, no animation. */
 [data-guide-title].is-guided {
   outline: 2px solid color-mix(in srgb, var(--brand) 65%, transparent);
   outline-offset: 3px;
   border-radius: var(--radius-s);
-  animation: analyticsGuided 1.3s cubic-bezier(.22, 1, .36, 1) 1;
 }
 html[data-theme="dark"] [data-guide-title].is-guided {
   outline-color: color-mix(in srgb, var(--brand-deep) 65%, transparent);
-}
-@keyframes analyticsGuided {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 40%, transparent); }
-  100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--brand) 0%, transparent); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .analytics-guide-card,
-  .analytics-guide-main.is-enter,
-  [data-guide-title].is-guided,
-  .analytics-guide-dot,
-  .analytics-guide-close,
-  .analytics-info { animation: none; transition: none; }
 }
 
 /* ---------- Story KPI strip (fragment from analytics_story_kpis.html) ---------- */
@@ -1334,3 +1285,28 @@ html[data-theme="dark"] .analytics-since input[type="date"] { background: var(--
   .analytics-panel-note { margin-left: 0; flex-basis: 100%; }
 }
 
+
+
+/* ---------- No sideways scrolling: tables stack on narrow screens ---------- */
+.analytics-members-scroll, .analytics-reading-scroll, .analytics-author-scroll,
+.analytics-authors-scroll, .analytics-author-likes-scroll { overflow-x: visible; max-width: 100%; }
+@media (max-width: 719px) {
+  .analytics-members-table, .analytics-reading-table, .analytics-authors-table, .analytics-likes-table,
+  .analytics-members-table tbody, .analytics-reading-table tbody, .analytics-authors-table tbody, .analytics-likes-table tbody,
+  .analytics-members-table tr, .analytics-reading-table tr, .analytics-authors-table tr, .analytics-likes-table tr,
+  .analytics-members-table td, .analytics-reading-table td, .analytics-authors-table td, .analytics-likes-table td { display: block; width: 100%; box-sizing: border-box; }
+  .analytics-members-table thead, .analytics-reading-table thead, .analytics-authors-table thead, .analytics-likes-table thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .analytics-members-table tr, .analytics-reading-table tr, .analytics-authors-table tr, .analytics-likes-table tr {
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+  }
+  .analytics-members-table td, .analytics-reading-table td, .analytics-authors-table td, .analytics-likes-table td {
+    display: flex; justify-content: space-between; gap: 12px; padding: 4px 2px; border: 0; text-align: right; overflow-wrap: anywhere;
+  }
+  .analytics-members-table td::before, .analytics-reading-table td::before, .analytics-authors-table td::before, .analytics-likes-table td::before {
+    content: attr(data-label); flex: 0 0 38%; text-align: left; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate);
+  }
+  .analytics-member-cats { max-width: none; }
+}

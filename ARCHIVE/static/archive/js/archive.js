@@ -925,6 +925,14 @@
   if (preview) {
     document.addEventListener("click", function (event) {
       var opener = event.target.closest("[data-archive-file-open]");
+      /* TAP THE FILE ITSELF: the whole tile of a previewable file opens the
+         preview, not only the small icon button. A file with no browser
+         preview has no such button, so its tile stays plain. */
+      if (!opener) {
+        var tile = event.target.closest(".archive-card-media-file:not(.archive-card-media-video)");
+        var card = tile && tile.closest(".archive-card");
+        if (card) opener = card.querySelector("[data-archive-file-open]");
+      }
       if (opener) {
         event.preventDefault();
         openPreview(opener);

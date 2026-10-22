@@ -2890,3 +2890,65 @@ body.video-theatre-open { overflow: hidden; }
   .video-theatre-el { max-height: 78vh; }
   .video-theatre-speed { padding: 6px 14px; }
 }
+
+
+/* ======================================================================
+   NAV, SIMPLIFIED
+   One quiet row on a desktop, one plain list in the phone drawer.
+   Order for staff: ... Profile, Panel, + News, Logout.
+   Declared last so it settles every earlier nav rule above.
+   ====================================================================== */
+.primary-nav a.is-current { color: var(--nav-fg-light); }
+.primary-nav > ul > li > a.is-current::after { transform: scaleX(1); }
+
+/* + News is the one call to action: a solid amber button, never a pill */
+.primary-nav > ul > li.nav-news-link > a {
+  background: var(--amber); color: #1a1205; font-weight: 700;
+  padding: 7px 14px; border-radius: var(--radius-s);
+}
+.primary-nav > ul > li.nav-news-link > a::after { display: none; }
+.primary-nav > ul > li.nav-news-link > a:hover { background: var(--amber-deep); color: #1a1205; }
+
+/* desktop: logout is a plain text link at the end of the row, not a bordered box */
+@media (min-width: 900px) {
+  .primary-nav ul { gap: clamp(10px, 1.6vw, 26px); }
+  .primary-nav .dropdown-menu { padding: 6px; min-width: 210px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); }
+  .dropdown-menu li a { padding: 9px 12px; }
+  .nav-logout-item { margin-left: auto; }
+  .nav-logout-btn {
+    border: 0; background: none; padding: 8px 2px; font-weight: 600; font-size: 0.92rem;
+    color: var(--nav-fg); text-align: left;
+  }
+  .nav-logout-btn:hover { background: none; color: var(--danger); }
+}
+
+@media (max-width: 899.98px) {
+  /* rows: same height, one hairline between, no stagger or slide-in per row */
+  .site-header .primary-nav > ul > li,
+  .site-header.nav-open .primary-nav > ul > li,
+  .site-header .primary-nav .dropdown-menu li,
+  .site-header .has-dropdown.is-open .dropdown-menu li {
+    opacity: 1; transform: none; transition: none; transition-delay: 0s;
+  }
+  .site-header .primary-nav > ul > li { border-bottom: 1px solid var(--line); }
+  .site-header .primary-nav > ul > li > a,
+  .site-header .primary-nav .dropdown-toggle { padding: 15px 20px; font-size: 1rem; font-weight: 600; }
+  .site-header .primary-nav > ul > li > a.is-current { box-shadow: inset 3px 0 0 var(--amber); }
+
+  /* sub rows sit indented under their parent */
+  .site-header .primary-nav .dropdown-menu li a { padding: 12px 20px 12px 34px; font-size: 0.96rem; font-weight: 500; }
+
+  /* + News: a full width button row inside the list */
+  .site-header .primary-nav > ul > li.nav-news-link { border-bottom: 0; padding: 14px 20px 6px; }
+  .site-header .primary-nav > ul > li.nav-news-link > a {
+    display: block; width: 100%; padding: 13px 16px; text-align: center; border-radius: var(--radius-s);
+    background: var(--amber); color: #1a1205; font-weight: 700;
+  }
+
+  /* quiet footer links: readable ink, small, two per row */
+  .nav-footer-links { margin: 8px 20px 0; padding: 14px 0 24px; border-top: 1px solid var(--line); }
+  .site-header .primary-nav > ul > li.nav-footer-links { border-bottom: 0; }
+  .nav-footer-list { flex-direction: row; flex-wrap: wrap; gap: 4px 18px; }
+  .nav-footer-list a { padding: 8px 0; color: var(--ink); font-size: 0.88rem; font-weight: 500; opacity: 0.85; }
+  .nav-footer-list a:hover { opacity: 1; color: var(--amber-deep); }
+}

@@ -224,7 +224,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 .portfolio-facts dt {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -287,7 +287,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 .portfolio-specialities-label {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -322,7 +322,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 .portfolio-stats-strip dt {
-  color: var(--slate);
+  color: var(--ink);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -790,7 +790,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 .donut-caption {
-  fill: var(--slate);
+  fill: var(--ink);
   font-family: var(--font-body);
   font-size: 2.6px;
   font-weight: 700;
@@ -1364,7 +1364,7 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
 .portfolio-popular-rank {
   flex: none;
   width: 2ch;
-  color: var(--slate);
+  color: var(--ink);
   font-family: var(--font-display);
   font-size: 1.5rem;
   line-height: 1;
@@ -1596,3 +1596,34 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
   .author-dock .fab-btn, .author-dock-tag, .author-dock-toggle { transition: none; animation: none !important; }
   .author-dock.is-intro .fab-btn, .author-dock.is-intro .author-dock-tag { animation: none; }
 }
+
+/* ---------- Author page: solid colours, numbered pages ---------- */
+/* Text that carries meaning uses the full ink colour, not slate or a faded
+   tint, and surfaces are flat paper instead of translucent layers. */
+.portfolio-feed-card, .portfolio-popular-section, .portfolio-feed-head {
+  background: var(--paper); color: var(--ink); border-color: var(--line);
+  backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none;
+}
+.portfolio-feed-card h2, .portfolio-feed-card h3, .portfolio-feed-card p,
+.portfolio-feed-card a, .portfolio-feed-head h2, .portfolio-popular-section a,
+.portfolio-popular-heading h2 { color: var(--ink); opacity: 1; }
+.portfolio-feed-eyebrow, .portfolio-feed-count { color: var(--brand-deep); opacity: 1; }
+.portfolio-feed-card { transition: none; animation: none; }
+.portfolio-feed-items { content-visibility: auto; contain-intrinsic-size: 1px 900px; }
+.portfolio-feed-card img { content-visibility: auto; }
+
+.portfolio-pager {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 8px; margin: 22px 0 6px;
+}
+.portfolio-pager-pages { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0; padding: 0; }
+.portfolio-pager-num, .portfolio-pager-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; padding: 0 12px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--paper); color: var(--ink); font-weight: 700; font-size: 0.92rem; text-decoration: none;
+}
+a.portfolio-pager-num:hover, a.portfolio-pager-btn:hover { border-color: var(--brand-deep); }
+.portfolio-pager-num.is-current { background: var(--brand-deep); border-color: var(--brand-deep); color: #04121a; }
+.portfolio-pager-btn.is-disabled { opacity: 0.4; }
+.portfolio-pager-gap { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); }

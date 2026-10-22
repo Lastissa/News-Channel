@@ -330,7 +330,14 @@ class PortfolioView(View):
 
         description_source = bio or f"{display_name}, {role_label} at {self._project_name()}."
 
-        stories_page = _portfolio_story_paginator(author).get_page(1)
+        #   NUMBERED PAGES: ?page=N, six stories a page. A bad or out of range
+        #   number falls back to the nearest real page (get_page), so the URL
+        #   can never 404 or raise.
+        story_paginator = _portfolio_story_paginator(author)
+        stories_page = story_paginator.get_page(request.GET.get("page"))
+        story_page_range = list(
+            story_paginator.get_elided_page_range(stories_page.number, on_each_side=1, on_ends=1)
+        ) if story_paginator.num_pages > 1 else []
         stories = _prepare_portfolio_stories(stories_page.object_list)
         top_viewed_stories = (
             Blog.objects.filter(author=author)
@@ -353,6 +360,8 @@ class PortfolioView(View):
             "top_category": coverage[0]["label"] if coverage else "",
             "stories": stories,
             "stories_page": stories_page,
+            "story_page_range": story_page_range,
+            "story_ellipsis": story_paginator.ELLIPSIS,
             "top_viewed_stories": top_viewed_stories,
             "follower_count": follower_count,
             "following_count": following_count,

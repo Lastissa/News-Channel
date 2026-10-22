@@ -366,6 +366,21 @@ def _try_send_partnership_inquiry_batch_email(visitor_email=""):
     an admin can reply. The dispatch runs on the shared email pool, so the
     request never waits on Resend.
     """
+    #   LAST LOOK BEFORE SENDING: this mail says the partnership address is
+    #   NOT set, so it is only true if the saved row is still empty right now.
+    #   The caller checked a moment ago, but a save in between, or a caller
+    #   that never checked, must not produce a mail that contradicts the panel.
+    try:
+        from ADMIN.models import SiteSettings
+
+        if (SiteSettings.get_solo().promotion_email or "").strip():
+            info_logger(msg="BATCH EMAIL: partnership alert skipped, the partnership email is set")
+            return
+    except Exception:
+        #   if the row cannot be read, stay quiet rather than send a claim we cannot back up
+        info_logger(msg="BATCH EMAIL: partnership alert skipped, settings row unreadable")
+        return
+
     recipients = _active_admin_emails()
     if getattr(settings, "DEBUG"):
         info_logger(
