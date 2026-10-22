@@ -2907,7 +2907,7 @@ body.video-theatre-open { overflow: hidden; }
   padding: 7px 14px; border-radius: var(--radius-s);
 }
 .primary-nav > ul > li.nav-news-link > a::after { display: none; }
-.primary-nav > ul > li.nav-news-link > a:hover { background: var(--amber-deep); color: #1a1205; }
+.primary-nav > ul > li.nav-news-link > a:hover { background: var(--amber-deep); color: #ff0000; }
 
 /* desktop: logout is a plain text link at the end of the row, not a bordered box */
 @media (min-width: 900px) {
@@ -2933,7 +2933,7 @@ body.video-theatre-open { overflow: hidden; }
   .site-header .primary-nav > ul > li { border-bottom: 1px solid var(--line); }
   .site-header .primary-nav > ul > li > a,
   .site-header .primary-nav .dropdown-toggle { padding: 15px 20px; font-size: 1rem; font-weight: 600; }
-  .site-header .primary-nav > ul > li > a.is-current { box-shadow: inset 3px 0 0 var(--amber); }
+  .site-header .primary-nav > ul > li > a.is-current { box-shadow: inset 2px 0 0 var(--ink-soft); }
 
   /* sub rows sit indented under their parent */
   .site-header .primary-nav .dropdown-menu li a { padding: 12px 20px 12px 34px; font-size: 0.96rem; font-weight: 500; }

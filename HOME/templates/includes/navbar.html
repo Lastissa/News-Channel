@@ -47,7 +47,8 @@
           phone alike. It is a link of its own, not an item in the Profile menu.
         {% endcomment %}
         {% if request.user.is_admin %}<li class="nav-panel-link"><a href="{% url 'control:panel' %}"{% if request.resolver_match.namespace == 'control' %} class="is-current" aria-current="page"{% endif %}>Panel</a></li>{% endif %}
-        {% if request.user.is_staff %}<li class="nav-news-link"><a href="{% url 'home:add_news' %}">+ News</a></li>{% endif %}
+        {% if request.user.is_staff %}<li class="nav-panel-link"><a href="{% url 'home:add_news' %}">+ News</a></li>{% endif %}
+        {% comment %} {% if request.user.is_staff %}<li class="nav-news-link"><a href="{% url 'home:add_news' %}">+ News</a></li>{% endif %} {% endcomment %}
         <li class="nav-logout-item">
           <form method="post" action="{% url 'auth:logout' %}" class="nav-logout-form" data-logout-form>
             {% csrf_token %}
