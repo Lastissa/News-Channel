@@ -1,0 +1,213 @@
+/* ======================================================================
+   IN-STORY ADVERT SLIDESHOW (blog/story_detail.html)
+   The skeleton and the loaded carousel share one exact geometry:
+   a 16:9 media box plus a fixed-height copy strip. Whichever advert the
+   endpoint returns -- any image, any heading length -- the box never
+   changes size, so the story text below can never jump.
+   ====================================================================== */
+.story-ad-slot {
+  --story-ad-copy-h: 104px;
+  position: relative;
+  clear: both;
+  width: 100%;
+  max-width: 620px;
+  margin: 22px auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+}
+.story-ad-slot[hidden] { display: none; }
+
+/* ---------- skeleton (server-rendered, before the GET resolves) ---------- */
+.story-ad-skeleton { display: block; }
+.story-ad-skeleton[hidden] { display: none; }
+.story-ad-skeleton-media,
+.story-ad-skeleton-line {
+  display: block;
+  border-radius: 2px;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--slate) 8%, var(--surface)) 20%,
+    color-mix(in srgb, var(--slate) 14%, var(--surface)) 42%,
+    color-mix(in srgb, var(--slate) 8%, var(--surface)) 64%
+  );
+  background-size: 220% 100%;
+  animation: story-ad-shimmer 1.6s ease-in-out infinite;
+}
+.story-ad-skeleton-media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+.story-ad-skeleton-copy {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  height: var(--story-ad-copy-h);
+  padding: 12px 14px;
+}
+.story-ad-skeleton-line { width: 84%; height: 9px; }
+.story-ad-skeleton-line-tag { width: 16%; height: 7px; }
+.story-ad-skeleton-line-short { width: 56%; }
+
+@keyframes story-ad-shimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+/* ---------- loaded carousel ---------- */
+.story-ad-carousel { position: relative; }
+.story-ad-carousel[hidden] { display: none; }
+
+.story-ad-track {
+  display: flex;
+  width: 100%;
+  transition: transform 0.35s ease;
+  will-change: transform;
+}
+.story-ad-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.story-ad-media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0b0b0b;
+}
+.story-ad-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.story-ad-copy {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  height: var(--story-ad-copy-h);
+  padding: 10px 14px;
+  overflow: hidden;
+}
+.story-ad-tag {
+  flex: none;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+.story-ad-heading {
+  flex: none;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.25;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.story-ad-text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--slate);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- arrows, dots, focus ---------- */
+.story-ad-nav {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: var(--story-ad-copy-h);
+  pointer-events: none;
+}
+.story-ad-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: #fff;
+  background: rgba(14, 27, 44, 0.62);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  transition: background 0.15s ease;
+}
+.story-ad-arrow:hover,
+.story-ad-arrow:focus-visible { background: rgba(14, 27, 44, 0.88); }
+.story-ad-arrow:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.story-ad-prev { left: 10px; }
+.story-ad-next { right: 10px; }
+
+.story-ad-dots {
+  position: absolute;
+  bottom: calc(var(--story-ad-copy-h) + 4px);
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  gap: 0;
+  padding: 2px 5px;
+  background: rgba(14, 27, 44, 0.55);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+/*  The visible dot is 8px, but the button around it is 24px: a 7px target is
+    impossible to hit on a phone. The pseudo-element paints the dot so the
+    button can stay transparent and large. */
+.story-ad-dot {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.story-ad-dot::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.story-ad-dot.is-active::after { background: #fff; transform: scale(1.2); }
+.story-ad-dot:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+
+/* the arrows/dots are useless on a touch phone where every ad fits -- the
+   swipe and the tap targets still work, so keep them but a little smaller */
+@media (max-width: 560px) {
+  .story-ad-slot { --story-ad-copy-h: 96px; }
+  .story-ad-arrow { width: 30px; height: 30px; }
+  .story-ad-heading { font-size: 0.9rem; }
+  .story-ad-text { font-size: 0.77rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-ad-skeleton-media,
+  .story-ad-skeleton-line { animation: none; }
+  .story-ad-track { transition: none; }
+  .story-ad-arrow,
+  .story-ad-dot::after { transition: none; }
+}

@@ -144,29 +144,76 @@ VID_FIG_CLASSES = {
 
 #   EXTERNAL VIDEO PROVIDERS. A vidl/vidr/vidc line normally points at a
 #   direct video FILE (an /archive/ upload, or any .mp4/.webm/.ogg/.mov/.m4v
-#   address), which a plain <video> plays. A YouTube or Vimeo address is a
-#   PAGE, not a file: "https://www.youtube.com/watch?v=..." is an HTML
-#   document, so a <video> can never load it -- the browser fires `error` and
-#   the old 404 fallback clip played in its place. Those addresses are
-#   recognised here and rendered as an <iframe> embed with the provider's own
-#   player instead. Anything unrecognised keeps the plain <video> path.
+#   address), which a plain <video> plays. A YouTube, Vimeo, TikTok, Facebook,
+#   Instagram, Dailymotion, Twitch, X, Rumble, Odysee, Streamable, VK, Loom or
+#   Google Drive address is a PAGE, not a file: it is HTML, so a <video> can
+#   never load it. Those addresses are recognised here and rendered as an
+#   <iframe> embed with the provider's own player instead. Anything
+#   unrecognised keeps the plain <video> path.
 YOUTUBE_ID_RE = re.compile(
     r"(?:youtube(?:-nocookie)?\.com/(?:watch\?[^\s#]*?v=|embed/|shorts/|live/|v/)|youtu\.be/)"
     r"([A-Za-z0-9_-]{11})"
 )
-VIMEO_ID_RE = re.compile(r"vimeo\.com/(?:video/)?(\d+)")
+VIMEO_ID_RE = re.compile(r"vimeo\.com/(?:video/|channels/[^/]+/|groups/[^/]+/videos/)?(\d+)")
+TIKTOK_ID_RE = re.compile(r"tiktok\.com/(?:@[^/]+/video/|v/|t/|share/video/|embed/v2/)?(\d+)")
+INSTAGRAM_ID_RE = re.compile(
+    r"(?:instagram\.com|instagr\.am)/(?:reels|reel|p|tv)/([A-Za-z0-9_-]+)"
+)
+FACEBOOK_ID_RE = re.compile(
+    r"facebook\.com/(?:watch/\?v=|[^/]+/videos/|video\.php\?v=|reel/)(\d+)"
+)
+DAILYMOTION_ID_RE = re.compile(r"dailymotion\.com/(?:video|embed/video)/([A-Za-z0-9]+)")
+TWITCH_CLIP_RE = re.compile(
+    r"clips\.twitch\.tv/(?:[A-Za-z0-9_-]+/)?([A-Za-z0-9_-]+)"
+    r"|twitch\.tv/(?:[^/]+/clip/|clip/)([A-Za-z0-9_-]+)"
+)
+TWITTER_STATUS_RE = re.compile(r"(?:twitter\.com|x\.com)/[^/]+/status/(\d+)")
+RUMBLE_ID_RE = re.compile(r"rumble\.com/(?:embed/)?([A-Za-z0-9]+)")
+ODYSEE_ID_RE = re.compile(r"odysee\.com/[@\w.:-]+/([A-Za-z0-9-]+)")
+STREAMABLE_ID_RE = re.compile(r"streamable\.com/(?:e/)?([A-Za-z0-9]+)")
+VK_ID_RE = re.compile(r"vk\.com/video(-?\d+)_(\d+)")
+LOOM_ID_RE = re.compile(r"loom\.com/(?:share|embed)/([A-Za-z0-9]+)")
+GDRIVE_ID_RE = re.compile(r"drive\.google\.com/file/d/([A-Za-z0-9_-]+)")
+
+#   Providers whose player is portrait, not landscape. The embed <figure>
+#   gets `is-vertical` so CSS can reserve a 9:16 box instead of a 16:9 one
+#   (a TikTok clip letterboxed into 16:9 is mostly black bars).
+VERTICAL_VIDEO_RE = re.compile(
+    r"tiktok\.com|instagram\.com/(?:reels|reel)/|youtube\.com/shorts/|facebook\.com/reel/",
+    re.IGNORECASE,
+)
+
+
+def _video_is_vertical(url):
+    """True when `url` is a portrait-video page (TikTok, Reels, Shorts)."""
+    return bool(VERTICAL_VIDEO_RE.search(url or ""))
+
+
+def _twitch_parents():
+    """The host names Twitch's clip player will accept. Twitch refuses to
+    frame a clip unless `parent` matches the page hosting the iframe, so build
+    it from this deployment's ALLOWED_HOSTS (the same list Django already
+    trusts) instead of a hard-coded localhost that only works in development."""
+    parents = []
+    for host in settings.ALLOWED_HOSTS:
+        host = (host or "").strip().lower().lstrip(".")
+        host = host.split(":")[0]
+        if host and host != "*" and host not in parents:
+            parents.append(host)
+    return parents or ["localhost"]
 
 
 def _video_embed_url(url):
-    """The <iframe> src for a recognised provider page (YouTube or Vimeo), or
-    None when `url` is not one -- e.g. a direct video file, which the caller
-    plays in a plain <video>.
+    """The <iframe> src for a recognised provider page, or None when `url` is
+    not one -- e.g. a direct video file, which the caller plays in a plain
+    <video>.
 
-    The embed autoplays muted and loops, matching the direct-file <video>
-    (browsers only allow autoplay while muted). The provider draws its own
-    controls for an embed, so the custom play/pause and sound overlay is not
-    used here (see _render_inline_video)."""
+    The embed autoplays muted and loops where the provider allows it, matching
+    the direct-file <video> (browsers only allow autoplay while muted). The
+    provider draws its own controls for an embed, so the custom play/pause and
+    sound overlay is not used here (see _render_inline_video)."""
     value = url or ""
+
     youtube = YOUTUBE_ID_RE.search(value)
     if youtube:
         video_id = youtube.group(1)
@@ -183,12 +230,91 @@ def _video_embed_url(url):
         if start:
             params.append(f"start={start.group(1)}")
         return f"https://www.youtube.com/embed/{video_id}?" + "&".join(params)
+
     vimeo = VIMEO_ID_RE.search(value)
     if vimeo:
         return (
             f"https://player.vimeo.com/video/{vimeo.group(1)}"
             "?autoplay=1&muted=1&loop=1&playsinline=1&dnt=1"
         )
+
+    tiktok = TIKTOK_ID_RE.search(value)
+    if tiktok:
+        return (
+            f"https://www.tiktok.com/embed/v2/{tiktok.group(1)}"
+            "?autoplay=1&loop=1"
+        )
+
+    instagram = INSTAGRAM_ID_RE.search(value)
+    if instagram:
+        return f"https://www.instagram.com/p/{instagram.group(1)}/embed/"
+
+    facebook = FACEBOOK_ID_RE.search(value)
+    if facebook:
+        watch_url = f"https://www.facebook.com/watch/?v={facebook.group(1)}"
+        query = urlencode(
+            {
+                "href": watch_url,
+                "show_text": "false",
+                "autoplay": "true",
+                "mute": "1",
+            }
+        )
+        return f"https://www.facebook.com/plugins/video.php?{query}"
+
+    dailymotion = DAILYMOTION_ID_RE.search(value)
+    if dailymotion:
+        return (
+            f"https://www.dailymotion.com/embed/video/{dailymotion.group(1)}"
+            "?autoplay=1&mute=1"
+        )
+
+    twitch = TWITCH_CLIP_RE.search(value)
+    if twitch:
+        clip_id = twitch.group(1) or twitch.group(2)
+        query = urlencode(
+            [("clip", clip_id), ("autoplay", "true")]
+            + [("parent", host) for host in _twitch_parents()]
+        )
+        return f"https://clips.twitch.tv/embed?{query}"
+
+    twitter = TWITTER_STATUS_RE.search(value)
+    if twitter:
+        return f"https://platform.twitter.com/embed/Tweet.html?id={twitter.group(1)}"
+
+    if "rumble.com/embed/" in value:
+        return value
+    rumble = RUMBLE_ID_RE.search(value)
+    if rumble:
+        return f"https://rumble.com/embed/{rumble.group(1)}/"
+
+    odysee = ODYSEE_ID_RE.search(value)
+    if odysee:
+        return f"https://odysee.com/$/embed/{odysee.group(1)}"
+
+    streamable = STREAMABLE_ID_RE.search(value)
+    if streamable:
+        return f"https://streamable.com/e/{streamable.group(1)}"
+
+    vk = VK_ID_RE.search(value)
+    if vk:
+        return (
+            "https://vk.com/video_ext.php?"
+            + urlencode({"oid": vk.group(1), "id": vk.group(2), "autoplay": "1"})
+        )
+
+    loom = LOOM_ID_RE.search(value)
+    if loom:
+        return f"https://www.loom.com/embed/{loom.group(1)}"
+
+    gdrive = GDRIVE_ID_RE.search(value)
+    if gdrive:
+        return f"https://drive.google.com/file/d/{gdrive.group(1)}/preview"
+
+    #   Google Photos share links are app pages, not embeddable players. A
+    #   link straight to the media file (googleusercontent.com/...mp4) has
+    #   already fallen through to the direct-file <video> path above; a share
+    #   page is left alone rather than framed as a broken player.
     return None
 
 #   INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
@@ -374,10 +500,13 @@ def _render_inline_video(direction, url, caption_text):
     exactly like the image token. With no trailing text no caption is drawn
     (the accessible name falls back to a plain "Story video" label).
 
-    A YouTube or Vimeo address (see _video_embed_url) is a page, not a file,
-    so it is rendered in an <iframe> with the provider's own player instead:
-    the figure carries `is-embed` and no overlay buttons are drawn. Every
-    other URL keeps the self-playing <video> below."""
+    A recognised provider page (see _video_embed_url -- YouTube, Vimeo,
+    TikTok, Facebook, Instagram, Dailymotion, Twitch, X, Rumble, Odysee,
+    Streamable, VK, Loom, Google Drive) is a page, not a file, so it is
+    rendered in an <iframe> with the provider's own player instead: the
+    figure carries `is-embed` and no overlay buttons are drawn. Portrait
+    providers (TikTok, Reels, Shorts) also carry `is-vertical` so CSS can
+    reserve a 9:16 box. Every other URL keeps the self-playing <video> below."""
     caption = (caption_text or "").strip()
     fig_class = VID_FIG_CLASSES.get(direction, "story-inline-fig-left")
     safe_aria = html.escape(caption or "Story video", quote=True)
@@ -386,8 +515,9 @@ def _render_inline_video(direction, url, caption_text):
     embed_url = _video_embed_url(url)
     if embed_url:
         safe_embed = html.escape(embed_url, quote=True)
+        vertical_class = " is-vertical" if _video_is_vertical(url) else ""
         return (
-            f'<figure class="story-inline-fig story-inline-video is-embed {fig_class}">'
+            f'<figure class="story-inline-fig story-inline-video is-embed{vertical_class} {fig_class}">'
             f'<div class="story-inline-video-frame">'
             f'<iframe class="story-inline-video-embed" src="{safe_embed}" '
             f'title="{safe_aria}" loading="lazy" '
@@ -1059,9 +1189,47 @@ class StoryDetailView(View):
         return render(request, "blog/story_detail.html", context)
 
 
+class StoryAdsView(View):
+    """Two random live image adverts for the story-page slideshow.
+
+    The story page starts with a fixed-size skeleton in the reading column
+    (blog/story_detail.html). story-ads.js calls this endpoint, and the two
+    creatives it returns fill that same box as a slideshow -- the reader can
+    step between them with the arrows, the dots, or a swipe. Picking at random
+    on every request means two readers (or the same reader on a refresh) do
+    not always see the same pair.
+
+    JSON, not HTML: the shape mirrors CategoryRecommendationsView above, and
+    the script builds nodes with textContent so an advert's heading or body
+    can never inject markup into the story page."""
+
+    def get(self, request):
+        from Partner.models import AdvertImage
+
+        live = (
+            AdvertImage.objects.filter(
+                is_active=True,
+                expiry_date__gte=timezone.now(),
+            )
+            .exclude(image_url="")
+            .order_by("?")[:2]
+        )
+        ads = [
+            {
+                "image": row.image_url,
+                "heading": row.heading or "",
+                "body": row.body or "",
+                "url": row.url or "",
+            }
+            for row in live
+        ]
+        response = JsonResponse({"ads": ads})
+        response["Cache-Control"] = "no-store"
+        return response
+
+
 class CategoryRecommendationsView(View):
     """Return the three newest stories in the current story's category."""
-
     def get(self, request, blog_slug):
         blog = get_object_or_404(Blog, slug=blog_slug)
         stories = (

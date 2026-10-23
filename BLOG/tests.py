@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from unittest import mock
 
 from django.apps import apps
@@ -9,6 +10,7 @@ from django.db.models import F
 from django.test import TestCase, RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 
 from hypothesis import given, settings as hyp_settings, HealthCheck
 from hypothesis import strategies as st
@@ -416,6 +418,97 @@ __Please note:__ deadlines are strict.
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 400)
         self.assertEqual(Comment.objects.filter(blog=blog, author=self.author).count(), 1)
+
+
+    def test_video_tokens_accept_other_social_providers(self):
+        cases = {
+            "https://www.tiktok.com/@user/video/7212345678901234567": "tiktok.com/embed/v2/7212345678901234567",
+            "https://www.instagram.com/reel/Cxyz123abc/": "instagram.com/p/Cxyz123abc/embed/",
+            "https://www.facebook.com/page/videos/123456789012345": "facebook.com/plugins/video.php",
+            "https://www.dailymotion.com/video/x8abc12": "dailymotion.com/embed/video/x8abc12",
+            "https://clips.twitch.tv/SomeClip": "clips.twitch.tv/embed?clip=SomeClip",
+            "https://x.com/user/status/1234567890123456789": "platform.twitter.com/embed/Tweet.html?id=1234567890123456789",
+            "https://streamable.com/abcd12": "streamable.com/e/abcd12",
+            "https://www.loom.com/share/abcdef1234567890": "loom.com/embed/abcdef1234567890",
+            "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view": "drive.google.com/file/d/1AbCdEfGhIjKlMnOp/preview",
+        }
+        for url, fragment in cases.items():
+            with self.subTest(url=url):
+                html = parse_story_content(f"vidc {url}")
+                #   every provider page is framed, never fed to a <video>
+                self.assertNotIn("<video", html)
+                self.assertIn('<iframe class="story-inline-video-embed"', html)
+                self.assertIn(fragment, html)
+
+    def test_portrait_providers_reserve_a_vertical_embed_box(self):
+        tiktok = parse_story_content(
+            "vidc https://www.tiktok.com/@user/video/7212345678901234567"
+        )
+        self.assertIn("is-vertical", tiktok)
+        reels = parse_story_content("vidc https://www.instagram.com/reel/Cxyz123abc/")
+        self.assertIn("is-vertical", reels)
+        shorts = parse_story_content("vidc https://www.youtube.com/shorts/dQw4w9WgXcQ")
+        self.assertIn("is-vertical", shorts)
+        #   a landscape provider keeps the 16:9 box
+        landscape = parse_story_content("vidc https://vimeo.com/123456789")
+        self.assertNotIn("is-vertical", landscape)
+
+
+class StoryAdsViewTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.author = Auth.objects.create_user(email="story-ads@example.com")
+
+    def _advert(self, heading, days=7, **kwargs):
+        from Partner.models import AdvertImage
+
+        return AdvertImage.objects.create(
+            author=self.author,
+            expiry_date=timezone.now() + timedelta(days=days),
+            heading=heading,
+            body=f"{heading} body",
+            image_url=f"https://example.com/{heading}.jpg",
+            url=f"https://example.com/{heading}",
+            **kwargs,
+        )
+
+    def test_endpoint_returns_two_random_live_adverts(self):
+        for index in range(5):
+            self._advert(f"advert-{index}")
+
+        response = self.client.get(reverse("blog:story_ads"), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "no-store")
+        payload = response.json()
+        self.assertEqual(len(payload["ads"]), 2)
+        self.assertEqual(
+            set(payload["ads"][0]),
+            {"image", "heading", "body", "url"},
+        )
+
+    def test_endpoint_never_returns_expired_or_inactive_adverts(self):
+        self._advert("live")
+        self._advert("expired", days=-1)
+        self._advert("inactive", is_active=False)
+
+        payload = self.client.get(reverse("blog:story_ads")).json()
+
+        self.assertEqual(len(payload["ads"]), 1)
+        self.assertEqual(payload["ads"][0]["heading"], "live")
+
+    @override_settings(DEBUG=True)
+    def test_story_page_ships_the_skeleton_slot_before_the_script_fills_it(self):
+        author = _make_staff_with_profile(email="story-ad-slot@example.com")
+        blog = _make_blog(author, heading="Story with an advert slot")
+
+        response = self.client.get(reverse("blog:story_detail", args=[blog.slug]))
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("data-story-ad", html)
+        self.assertIn("story-ad-skeleton", html)
+        self.assertIn(reverse("blog:story_ads"), html)
 
 
 class StoryReportTests(TestCase):

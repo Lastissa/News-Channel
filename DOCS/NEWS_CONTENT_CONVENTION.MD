@@ -191,7 +191,7 @@ vidc https://a.com/clip.mp4 Flood water rising
 
 Rule:
 - The first word on the line is the keyword: vidl, vidr, or vidc.
-- The second word is the video URL.
+- The second word is the video URL. A direct file (MP4/MOV/WEBM/OGG, e.g. an /archive/ upload) plays in a plain `<video>`. A provider PAGE is embedded with the provider's own player instead: YouTube (watch, share, Shorts, live), Vimeo, TikTok, Instagram Reels/posts, Facebook, Dailymotion, Twitch clips, X/Twitter, Rumble, Odysee, Streamable, VK, Loom and Google Drive. Portrait providers (TikTok, Reels, Shorts) reserve a 9:16 box; the others use 16:9. Paste the full video page URL (for TikTok use the `tiktok.com/@user/video/...` address, not a `vm.tiktok.com` short link).
 - Everything after the URL, on the same line, is the caption shown beneath the video.
 - vidl floats the video left. vidr floats the video right. In both cases the surrounding paragraph text wraps around the video; it is never rendered as its own full-width block.
 - vidc centers the video and blocks -- it sits on its own line, and unlike vidl/vidr nothing wraps around it.

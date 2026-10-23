@@ -1319,6 +1319,13 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .story-inline-video.is-embed { width: min(62%, 500px); max-width: min(62%, 500px); }
 .story-inline-video.is-embed.story-inline-fig-center { width: min(100%, 720px); max-width: min(100%, 720px); }
 .story-inline-video.is-embed .story-inline-video-frame { width: 100%; aspect-ratio: 16 / 9; }
+/*  Portrait providers (TikTok, Instagram Reels, YouTube Shorts): reserve a
+    9:16 box so the player is not letterboxed into a 16:9 strip. The widths
+    are capped so the 9:16 height never exceeds ~560px (560 * 9/16 = 315px);
+    clamping height alone would have widened the box and broken the ratio. */
+.story-inline-video.is-embed.is-vertical { width: min(42%, 280px); max-width: min(42%, 280px); }
+.story-inline-video.is-embed.is-vertical.story-inline-fig-center { width: min(80%, 315px); max-width: min(80%, 315px); }
+.story-inline-video.is-embed.is-vertical .story-inline-video-frame { aspect-ratio: 9 / 16; }
 .story-inline-video-embed { display: block; width: 100%; height: 100%; border: 0; background: #000; }
 @media (max-width: 599.98px) {
   .story-inline-fig { max-width: min(55%, 200px); }
@@ -1333,6 +1340,9 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   .story-inline-video.is-embed.story-inline-fig-left,
   .story-inline-video.is-embed.story-inline-fig-right,
   .story-inline-video.is-embed.story-inline-fig-center { width: 100%; max-width: 100%; }
+  .story-inline-video.is-embed.is-vertical.story-inline-fig-left,
+  .story-inline-video.is-embed.is-vertical.story-inline-fig-right,
+  .story-inline-video.is-embed.is-vertical.story-inline-fig-center { width: min(72%, 300px); max-width: min(72%, 300px); }
   .story-inline-fig figcaption { font-size: 0.72rem; padding: 6px 8px 7px; }
 }
 /*  filel: inline downloadable file link (never floated -- a file has no
