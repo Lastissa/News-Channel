@@ -2,6 +2,7 @@ import html
 import hashlib
 import hmac
 import logging
+import random
 import re
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -1189,33 +1190,37 @@ class StoryDetailView(View):
         return render(request, "blog/story_detail.html", context)
 
 
-class StoryAdsView(View):
-    """Two random live image adverts for the story-page slideshow.
+#   IN-STORY ADVERT POPUP: pool settings. A pool of live adverts is drawn from
+#   the database once, then every reader's GET is answered from the cache for
+#   the next STORY_ADS_CACHE_TTL seconds. When it expires the next request
+#   draws a fresh random pool, so the adverts keep rotating without the
+#   database being hit on every popup of every reader.
+STORY_ADS_POOL_SIZE = 3
+STORY_ADS_CACHE_TTL = 120  # seconds
+STORY_ADS_CACHE_KEY = "story_ads_pool_v1"
 
-    The story page starts with a fixed-size skeleton in the reading column
-    (blog/story_detail.html). story-ads.js calls this endpoint, and the two
-    creatives it returns fill that same box as a slideshow -- the reader can
-    step between them with the arrows, the dots, or a swipe. Picking at random
-    on every request means two readers (or the same reader on a refresh) do
-    not always see the same pair.
 
-    JSON, not HTML: the shape mirrors CategoryRecommendationsView above, and
-    the script builds nodes with textContent so an advert's heading or body
-    can never inject markup into the story page."""
+def _load_story_ads_pool():
+    """Draw up to STORY_ADS_POOL_SIZE random live adverts (the only DB hit).
 
-    def get(self, request):
-        from Partner.models import AdvertImage
+    Returned as a dict, never a bare list: SERVICE_INTERNAL.abstract.get_cache
+    treats a falsy value as "not cached", so an empty list would send every
+    request back to the database while no advert is live. {"ads": []} is
+    truthy, so "nothing live" is cached for the same two minutes."""
+    from Partner.models import AdvertImage
 
-        live = (
-            AdvertImage.objects.filter(
-                is_active=True,
-                expiry_date__gte=timezone.now(),
-            )
-            .exclude(image_url="")
-            .order_by("?")[:2]
+    live = (
+        AdvertImage.objects.filter(
+            is_active=True,
+            expiry_date__gte=timezone.now(),
         )
-        ads = [
+        .exclude(image_url="")
+        .order_by("?")[:STORY_ADS_POOL_SIZE]
+    )
+    return {
+        "ads": [
             {
+                "id": row.pk,
                 "image": row.image_url,
                 "heading": row.heading or "",
                 "body": row.body or "",
@@ -1223,7 +1228,37 @@ class StoryAdsView(View):
             }
             for row in live
         ]
-        response = JsonResponse({"ads": ads})
+    }
+
+
+class StoryAdsView(View):
+    """ONE live image advert for the story-page popup.
+
+    story-ads.js calls this the moment a story opens, shows the advert in a
+    small bottom-left popup, and calls it again 30 seconds after the popup
+    leaves. The adverts come from a pool of three that is cached for two
+    minutes (see _load_story_ads_pool), so this view is normally cache-only.
+    `?last=<id>` is the advert the reader just saw: it is skipped when the
+    pool has another one, so the same creative does not show twice in a row.
+
+    JSON, not HTML: the script builds nodes with textContent so an advert's
+    heading or body can never inject markup into the story page."""
+
+    def get(self, request):
+        pool = cache_or_run(
+            STORY_ADS_CACHE_KEY,
+            _load_story_ads_pool,
+            timeout=STORY_ADS_CACHE_TTL,
+        )
+        ads = pool.get("ads", []) if isinstance(pool, dict) else []
+
+        try:
+            last_id = int(request.GET.get("last", ""))
+        except ValueError:
+            last_id = None
+
+        choices = [ad for ad in ads if ad["id"] != last_id] or ads
+        response = JsonResponse({"ad": random.choice(choices) if choices else None})
         response["Cache-Control"] = "no-store"
         return response
 

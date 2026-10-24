@@ -38,7 +38,7 @@
   {% url 'home:category' blog.category|slugify as breadcrumb_category_url %}
   {% breadcrumb_schema "Home" breadcrumb_home_url blog.get_category_display|title breadcrumb_category_url blog.heading %}
   <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261013-1">
-  <link rel="stylesheet" href="{% static 'blog/css/story-ads.css' %}?v=20261023-1">
+  <link rel="stylesheet" href="{% static 'blog/css/story-ads.css' %}?v=20261023-2">
   {% if request.user.is_authenticated %}
   <link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261013-1">
   {% endif %}
@@ -194,27 +194,19 @@ full details 👇
       <hr style="color:red;height:4px;width:100%;">
 
       {% comment %}
-        In-story advert slideshow. This box is rendered server-side, at its
-        final size, before any ad is known: the shimmer below and the loaded
-        carousel share the SAME fixed geometry (16:9 media + a fixed-height
-        copy strip), and the slot is cleared, so no floating image/video or
-        long paragraph in the story can push into it or make it jump when the
-        two adverts arrive. story-ads.js fills it from blog:story_ads.
+        In-story advert popup. This is only the settings holder: story-ads.js
+        reads it, then builds the popup itself and appends it to <body>, a
+        small fixed card at the bottom-left that reserves no space in the
+        reading column. It asks blog:story_ads for ONE advert as soon as the
+        story opens, shows it for data-show-seconds with a progress bar that
+        drains right to left, removes it, waits data-gap-seconds, then asks
+        again. Its z-index sits below the continue-reading popup.
       {% endcomment %}
-      <aside class="story-ad-slot" data-story-ad
-             data-endpoint="{% url 'blog:story_ads' %}"
-             data-fallback-image="{% static '404.jpg' %}"
-             aria-label="Advertisement" aria-busy="true">
-        <div class="story-ad-skeleton" data-story-ad-skeleton aria-hidden="true">
-          <span class="story-ad-skeleton-media"></span>
-          <span class="story-ad-skeleton-copy">
-            <span class="story-ad-skeleton-line story-ad-skeleton-line-tag"></span>
-            <span class="story-ad-skeleton-line"></span>
-            <span class="story-ad-skeleton-line story-ad-skeleton-line-short"></span>
-          </span>
-        </div>
-        <div class="story-ad-carousel" data-story-ad-carousel hidden></div>
-      </aside>
+      <div data-story-ad hidden
+           data-endpoint="{% url 'blog:story_ads' %}"
+           data-fallback-image="{% static '404.jpg' %}"
+           data-show-seconds="10"
+           data-gap-seconds="30"></div>
 
       <div class="story-body" data-story-body>
         {{ blog_content_html|safe }}
@@ -457,7 +449,7 @@ full details 👇
   <script src="{% static 'blog/js/story-ticker.js' %}" defer></script>
   <script src="{% static 'blog/js/story-toc.js' %}?v=20261017-2" defer></script>
   <script src="{% static 'blog/js/category-recommendations.js' %}?v=20261012-1" defer></script>
-  <script src="{% static 'blog/js/story-ads.js' %}?v=20261023-1" defer></script>
+  <script src="{% static 'blog/js/story-ads.js' %}?v=20261023-2" defer></script>
   {% if continue_popup_enabled %}
   <script src="{% static 'home/js/continue-popup.js' %}?v=20261012-1" defer></script>
   {% endif %}

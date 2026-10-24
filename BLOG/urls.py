@@ -9,7 +9,8 @@ urlpatterns = [
     #   /blog/how-to-pass-jamb-2026-104/ instead of /blog/104/.
     path('', views.StoryHome.as_view(), name="story_home"), # redirect to the latest story, not meant to exist but for SEO purposes
     path("category-recommendations/<slug:blog_slug>/", views.CategoryRecommendationsView.as_view(), name="category_recommendations"),
-    #   In-story advert slideshow (two random live adverts). Kept above the
+    #   In-story advert popup (one live advert per request, from a cached pool
+    #   of three). Kept above the
     #   <slug> catch-all below so "ads" is never treated as a story slug.
     path("ads/", views.StoryAdsView.as_view(), name="story_ads"),
     path("<slug:blog_slug>/", views.StoryDetailView.as_view(), name="story_detail"),

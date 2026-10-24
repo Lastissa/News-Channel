@@ -284,6 +284,7 @@ def get_cache(key):
     return value
 
 def cache_or_run(key, fn, timeout=300):
+    """IT TRIES TO GET THE VALUE AND IF ITS NOT FOUND, IT SET THE CACHE, SAME AS GET -> IF NOT GET -> THEN SET"""
     value = get_cache(key)
     if value:
         return value

@@ -2746,7 +2746,7 @@ class ProfileView(View):
             "gender_choices": GENDER_CHOICES,
             "role_choices": StaffConfig.role_choices() if is_admin else [],
             "protected_roles": sorted(StaffConfig.PROTECTED_ROLES) if is_admin else [],
-            'staff_profile': get_cache('session-count') or 0,
+            # 'staff_profile': get_cache('session-count') or 0,
             "speciality_csv": ", ".join(profile.speciality) if profile and isinstance(profile.speciality, list) else "",
         }
         return render(request, "HOME/profile.html", context)

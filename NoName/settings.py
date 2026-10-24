@@ -173,6 +173,7 @@ if REDIS_URL and os.getenv('use_redis'):
         }
     }
 else:
+    print("i no use redis")
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",

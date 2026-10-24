@@ -35,7 +35,7 @@ These are v2+ concerns, to be revisited once 10+ paying partners exist and real 
 4. **Free trial first.** Every new advertiser gets 7 days free on the same plan. No card required. When it expires, ads stop until they pay.
 5. **Manual expiry.** A monthly payment extends `expires_at` by 30 days. When it lapses, ads stop showing. No cron-driven subscription logic in v1.
 6. **Fixed ad placements only.** No random injection into editorial content. Ads live in known, labeled positions.
-7. **Trust over revenue.** Every ad is labeled "Sponsored." Brand safety and reader trust come before filling inventory.
+7. **Trust over revenue.** Every ad is labeled "Ads." Brand safety and reader trust come before filling inventory.
 
 ---
 

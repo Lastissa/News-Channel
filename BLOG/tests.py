@@ -472,7 +472,7 @@ class StoryAdsViewTests(TestCase):
             **kwargs,
         )
 
-    def test_endpoint_returns_two_random_live_adverts(self):
+    def test_endpoint_returns_one_live_advert(self):
         for index in range(5):
             self._advert(f"advert-{index}")
 
@@ -480,25 +480,84 @@ class StoryAdsViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Cache-Control"], "no-store")
-        payload = response.json()
-        self.assertEqual(len(payload["ads"]), 2)
-        self.assertEqual(
-            set(payload["ads"][0]),
-            {"image", "heading", "body", "url"},
-        )
+        ad = response.json()["ad"]
+        self.assertEqual(set(ad), {"id", "image", "heading", "body", "url"})
+        self.assertTrue(ad["heading"].startswith("advert-"))
 
     def test_endpoint_never_returns_expired_or_inactive_adverts(self):
         self._advert("live")
         self._advert("expired", days=-1)
         self._advert("inactive", is_active=False)
 
-        payload = self.client.get(reverse("blog:story_ads")).json()
+        for _ in range(5):
+            cache.clear()
+            ad = self.client.get(reverse("blog:story_ads")).json()["ad"]
+            self.assertEqual(ad["heading"], "live")
 
-        self.assertEqual(len(payload["ads"]), 1)
-        self.assertEqual(payload["ads"][0]["heading"], "live")
+    def test_pool_is_three_random_adverts_cached_for_two_minutes(self):
+        from BLOG.views import STORY_ADS_CACHE_KEY, STORY_ADS_CACHE_TTL
+
+        for index in range(6):
+            self._advert(f"advert-{index}")
+        self.assertEqual(STORY_ADS_CACHE_TTL, 120)
+
+        #   the first request is the only one that reads the database
+        with self.assertNumQueries(1):
+            self.client.get(reverse("blog:story_ads"))
+        self.assertEqual(len(cache.get(STORY_ADS_CACHE_KEY)["ads"]), 3)
+
+        #   every request after that is answered from the cache
+        with self.assertNumQueries(0):
+            for _ in range(10):
+                self.assertEqual(self.client.get(reverse("blog:story_ads")).status_code, 200)
+
+    def test_expired_pool_is_replaced_by_a_fresh_draw(self):
+        from BLOG.views import STORY_ADS_CACHE_KEY
+
+        for index in range(4):
+            self._advert(f"advert-{index}")
+        self.client.get(reverse("blog:story_ads"))
+
+        #   the two minutes pass: the entry is gone, the next request redraws
+        cache.delete(STORY_ADS_CACHE_KEY)
+        with self.assertNumQueries(1):
+            self.client.get(reverse("blog:story_ads"))
+        self.assertEqual(len(cache.get(STORY_ADS_CACHE_KEY)["ads"]), 3)
+
+    def test_last_advert_is_skipped_while_another_is_available(self):
+        adverts = [self._advert(f"advert-{index}") for index in range(3)]
+        skipped = adverts[0].pk
+
+        for _ in range(25):
+            ad = self.client.get(reverse("blog:story_ads"), {"last": skipped}).json()["ad"]
+            self.assertNotEqual(ad["id"], skipped)
+
+    def test_a_lone_advert_is_still_served_when_it_was_the_last_one(self):
+        only = self._advert("only-one")
+
+        ad = self.client.get(reverse("blog:story_ads"), {"last": only.pk}).json()["ad"]
+
+        self.assertEqual(ad["id"], only.pk)
+
+    def test_garbage_last_value_is_ignored(self):
+        self._advert("live")
+
+        response = self.client.get(reverse("blog:story_ads"), {"last": "not-a-number"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["ad"]["heading"], "live")
+
+    def test_no_live_adverts_returns_null_and_is_cached_too(self):
+        with self.assertNumQueries(1):
+            payload = self.client.get(reverse("blog:story_ads")).json()
+        self.assertEqual(payload, {"ad": None})
+
+        #   an empty pool must not send every request back to the database
+        with self.assertNumQueries(0):
+            self.assertEqual(self.client.get(reverse("blog:story_ads")).json(), {"ad": None})
 
     @override_settings(DEBUG=True)
-    def test_story_page_ships_the_skeleton_slot_before_the_script_fills_it(self):
+    def test_story_page_ships_the_popup_settings_and_no_in_column_slot(self):
         author = _make_staff_with_profile(email="story-ad-slot@example.com")
         blog = _make_blog(author, heading="Story with an advert slot")
 
@@ -507,8 +566,12 @@ class StoryAdsViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("data-story-ad", html)
-        self.assertIn("story-ad-skeleton", html)
         self.assertIn(reverse("blog:story_ads"), html)
+        self.assertIn('data-show-seconds="10"', html)
+        self.assertIn('data-gap-seconds="30"', html)
+        #   the popup is fixed to the corner, so nothing is reserved in the column
+        self.assertNotIn("story-ad-skeleton", html)
+        self.assertNotIn("story-ad-slot", html)
 
 
 class StoryReportTests(TestCase):

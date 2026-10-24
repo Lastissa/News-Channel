@@ -1461,8 +1461,8 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   margin: 4px 0 28px;
   background: var(--toc-bg);
   color: var(--toc-fg);
-  border: 2px solid var(--toc-accent);
-  border-radius: 20px;
+  border: 2px solid transparent;
+  border-radius: 10px;
   overflow: hidden;
   /*  Opening or closing a branch changes the section's height. Without this,
       the browser's scroll anchoring re-anchors on whatever is below and yanks
