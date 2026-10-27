@@ -179,7 +179,7 @@ __Please note:__ deadlines are strict.
         #   OutboundLinkTaggingTests) and names the story that sent the click.
         self.assertIn(
             '<a href="https://example.edu/admission/guide'
-            '?utm_source=abureport.com.ng&amp;utm_medium=referral'
+            '?utm_source=abureport&amp;utm_medium=referral'
             '&amp;utm_campaign=admissions-update" rel="noopener noreferrer" target="_blank">admission guide</a>',
             html,
         )
@@ -221,7 +221,7 @@ __Please note:__ deadlines are strict.
 
         tagged = tag_outbound_url("https://example.com/news", "the-story-slug")
 
-        self.assertIn("utm_source=abureport.com.ng", tagged)
+        self.assertIn("utm_source=abureport", tagged)
         self.assertIn("utm_medium=referral", tagged)
         self.assertIn("utm_campaign=the-story-slug", tagged)
         self.assertTrue(tagged.startswith("https://example.com/news?"))
@@ -232,7 +232,7 @@ __Please note:__ deadlines are strict.
         tagged = tag_outbound_url("https://example.com/page?a=1#top", "slug")
 
         self.assertIn("a=1", tagged)
-        self.assertIn("utm_source=abureport.com.ng", tagged)
+        self.assertIn("utm_source=abureport", tagged)
         self.assertTrue(tagged.endswith("#top"))
 
     def test_a_link_already_carrying_a_query_is_not_mangled_when_rendered(self):
@@ -241,7 +241,7 @@ __Please note:__ deadlines are strict.
         #   both parameters survive and nothing turns into "&amp%3B".
         html = parse_story_content("See https://example.com/page?a=1&b=2 now.", "slug")
 
-        self.assertIn("https://example.com/page?a=1&amp;b=2&amp;utm_source=abureport.com.ng", html)
+        self.assertIn("https://example.com/page?a=1&amp;b=2&amp;utm_source=abureport", html)
         self.assertNotIn("amp%3B", html)
 
     def test_referral_tagging_never_touches_our_own_site_or_non_links(self):
@@ -249,12 +249,12 @@ __Please note:__ deadlines are strict.
 
         #   Our own domain and its subdomains stay untouched.
         self.assertEqual(
-            tag_outbound_url("https://abureport.com.ng/story/x", "slug"),
-            "https://abureport.com.ng/story/x",
+            tag_outbound_url("https://abureport/story/x", "slug"),
+            "https://abureport/story/x",
         )
         self.assertEqual(
-            tag_outbound_url("https://www.abureport.com.ng/story/x", "slug"),
-            "https://www.abureport.com.ng/story/x",
+            tag_outbound_url("https://www.abureport/story/x", "slug"),
+            "https://www.abureport/story/x",
         )
         #   Non-http schemes are not links we can tag.
         self.assertEqual(tag_outbound_url("mailto:tips@example.com", "slug"), "mailto:tips@example.com")
@@ -272,7 +272,7 @@ __Please note:__ deadlines are strict.
             "Read the [guide](https://example.edu/guide) now.", "admissions-update"
         )
 
-        self.assertIn("utm_source=abureport.com.ng", html)
+        self.assertIn("utm_source=abureport", html)
         self.assertIn("utm_campaign=admissions-update", html)
 
     def test_a_markdown_link_counts_its_words_but_not_the_address(self):

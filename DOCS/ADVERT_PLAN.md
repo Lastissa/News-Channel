@@ -1,6 +1,6 @@
 # Advertiser Platform — v1 Design Document
 
-**Project:** abureport.com.ng — Advertiser / Promotion Module
+**Project:** abureport — Advertiser / Promotion Module
 **Version:** 1.0 (launch scope)
 **Status:** Planning — no code yet
 **Last updated:** 2026-09-26
@@ -9,7 +9,7 @@
 
 ## 1. Purpose & Scope
 
-This document defines the **v1 advertiser platform** for abureport.com.ng.
+This document defines the **v1 advertiser platform** for abureport.
 
 The goal is to let small businesses and individuals pay to place a clearly-labeled ad on the news site, track basic performance, and manage their own creative — all with the minimum amount of moving parts.
 

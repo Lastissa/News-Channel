@@ -179,7 +179,7 @@
   {% endif %}
 
   <div class="portfolio-content-layout">
-    <section class="portfolio-feed" id="portfolio-feed" aria-labelledby="portfolio-feed-title">
+    <section class="portfolio-feed" id="portfolio-feed" aria-labelledby="portfolio-feed-title" data-feed-url="{% url 'staff:portfolio_stories' staff_profile.slug %}" data-next-page="{% if stories_page.has_next %}{{ stories_page.next_page_number }}{% endif %}">
       <header class="portfolio-feed-head">
         <div>
           <p class="portfolio-feed-eyebrow">Latest updates</p>
@@ -192,31 +192,23 @@
         <div class="portfolio-feed-items" data-feed-items>
           {% include "staff/partials/portfolio_feed_items.html" %}
         </div>
-        {% if story_page_range %}
-        <nav class="portfolio-pager" aria-label="Stories pages">
-          {% if stories_page.has_previous %}
-            <a class="portfolio-pager-btn" rel="prev" href="?page={{ stories_page.previous_page_number }}#portfolio-feed" aria-label="Previous page">Prev</a>
-          {% else %}
-            <span class="portfolio-pager-btn is-disabled" aria-hidden="true">Prev</span>
-          {% endif %}
-          <ol class="portfolio-pager-pages">
-            {% for n in story_page_range %}
-              {% if n == story_ellipsis %}
-                <li class="portfolio-pager-gap" aria-hidden="true">&hellip;</li>
-              {% elif n == stories_page.number %}
-                <li><span class="portfolio-pager-num is-current" aria-current="page">{{ n }}</span></li>
-              {% else %}
-                <li><a class="portfolio-pager-num" href="?page={{ n }}#portfolio-feed" aria-label="Page {{ n }}">{{ n }}</a></li>
-              {% endif %}
-            {% endfor %}
-          </ol>
-          {% if stories_page.has_next %}
-            <a class="portfolio-pager-btn" rel="next" href="?page={{ stories_page.next_page_number }}#portfolio-feed" aria-label="Next page">Next</a>
-          {% else %}
-            <span class="portfolio-pager-btn is-disabled" aria-hidden="true">Next</span>
-          {% endif %}
-        </nav>
-        {% endif %}
+        <div class="portfolio-feed-skeleton" data-feed-skeleton hidden aria-hidden="true">
+          {% for _ in "12345"|make_list %}
+          <article class="portfolio-feed-card is-skeleton">
+            <header class="portfolio-feed-card-head">
+              <div class="skeleton-line skeleton-avatar"></div>
+              <div class="skeleton-line skeleton-text short"></div>
+            </header>
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line skeleton-image"></div>
+            <div class="skeleton-line skeleton-text"></div>
+            <div class="skeleton-line skeleton-text short"></div>
+          </article>
+          {% endfor %}
+        </div>
+        <div class="portfolio-feed-sentinel" data-feed-sentinel {% if not stories_page.has_next %}hidden{% endif %}></div>
+        <p class="portfolio-feed-end" data-feed-end {% if stories_page.has_next %}hidden{% endif %}>No more stories</p>
+        <p class="portfolio-feed-status" data-feed-status aria-live="polite" aria-atomic="true"></p>
       {% else %}
         <p class="portfolio-feed-empty">No stories published yet.</p>
       {% endif %}
@@ -490,4 +482,5 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'staff/js/author-dock.js' %}?v=20261009-1" defer></script>
+  <script src="{% static 'staff/js/portfolio-feed.js' %}?v=20261027-1" defer></script>
 {% endblock %}

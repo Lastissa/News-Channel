@@ -599,8 +599,14 @@ html[data-theme="dark"] .analytics-story-result { background: var(--paper-dim); 
 .analytics-members-summary strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 .analytics-members-sep { padding: 0 3px; }
 
-.analytics-members-scroll { overflow-x: auto; }
-.analytics-members-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.analytics-members-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  display: block;
+  width: 100%;
+}
+.analytics-members-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .analytics-members-table th {
   text-align: left; white-space: nowrap;
   padding: 8px 12px; border-bottom: 1px solid var(--line);
@@ -822,11 +828,12 @@ html[data-theme="dark"] .analytics-reading-cooled input[type="date"] { backgroun
   display: flex; justify-content: center;
   padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px)); pointer-events: none;
   box-sizing: border-box; max-width: 100%;
+  overflow: visible;
 }
 .analytics-guide[hidden] { display: none; }
 .analytics-guide-card {
   pointer-events: auto; box-sizing: border-box; width: min(560px, 100%); max-width: 100%;
-  max-height: 46vh; overflow-y: auto;
+  max-height: min(46vh, 420px); overflow-y: auto; overflow-x: hidden;
   background: var(--paper); color: var(--ink);
   border: 1px solid var(--line); border-radius: var(--radius-m);
   box-shadow: 0 8px 28px rgba(2, 6, 23, 0.22);
@@ -1309,4 +1316,46 @@ html[data-theme="dark"] .analytics-since input[type="date"] { background: var(--
     letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate);
   }
   .analytics-member-cats { max-width: none; }
+}
+
+/* Allow horizontal scrolling for wide analytics/lytics tables */
+.analytics-table-wrap,
+.analytic-table-wrap,
+.table-responsive,
+.lytics-table-wrap,
+.analytics-card .table-wrap,
+.analytic-card .table-wrap,
+table.analytics-table,
+table.analytic-table,
+.lytics-table,
+.lytics-table-container {
+  overflow-x: auto;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+}
+.analytics-table-wrap::-webkit-scrollbar,
+.analytic-table-wrap::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar,
+.lytics-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+.analytics-table-wrap::-webkit-scrollbar-thumb,
+.analytic-table-wrap::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb,
+.lytics-table-wrap::-webkit-scrollbar-thumb {
+  background: rgba(15, 27, 40, 0.25);
+  border-radius: 4px;
+}
+
+.lytics-content,
+.lytics-layout,
+.analytics-content,
+.analytic-content {
+  min-width:0;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
 }

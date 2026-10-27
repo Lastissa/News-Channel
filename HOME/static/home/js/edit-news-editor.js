@@ -240,7 +240,7 @@
      carries a utm_source) is respected. The campaign story slug is added by
      the server on the published page; the preview omits it since the editor
      has no slug. */
-  var REFERRAL_SOURCE = "abureport.com.ng";
+  var REFERRAL_SOURCE = "abureport";
   var REFERRAL_MEDIUM = "referral";
 
   function tagOutboundUrl(url) {

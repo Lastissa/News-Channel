@@ -54,7 +54,34 @@
     popularList.classList.add("is-inview");
   }
 
-  if (!items || !sentinel || !skeleton || !nextPage) return;
+  if (!items) return;
+  if (!sentinel) sentinel = document.createElement('div');
+  if (!sentinel.classList.contains('portfolio-feed-sentinel')) sentinel.className = 'portfolio-feed-sentinel';
+  if (!skeleton) {
+    skeleton = document.createElement('div');
+    skeleton.className = 'portfolio-feed-skeleton';
+    skeleton.setAttribute('data-feed-skeleton', '');
+    skeleton.hidden = true;
+    skeleton.setAttribute('aria-hidden', 'true');
+    for (var si = 0; si < 5; si++) {
+      var sCard = document.createElement('article');
+      sCard.className = 'portfolio-feed-card is-skeleton';
+      sCard.innerHTML = '<header class="portfolio-feed-card-head"><div class="skeleton-line skeleton-avatar"></div><div class="skeleton-line skeleton-text short"></div></header><div class="skeleton-line skeleton-title"></div><div class="skeleton-line skeleton-image"></div><div class="skeleton-line skeleton-text"></div><div class="skeleton-line skeleton-text short"></div>';
+      skeleton.appendChild(sCard);
+    }
+  }
+  if (!endMessage) { endMessage = document.createElement('p'); endMessage.className = 'portfolio-feed-end'; endMessage.textContent = 'No more stories'; endMessage.hidden = true; }
+  if (!status) { status = document.createElement('p'); status.className = 'portfolio-feed-status'; status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true'); }
+
+  if (!nextPage) {
+    if (skeleton) skeleton.hidden = true;
+    if (endMessage) endMessage.hidden = false;
+    return;
+  }
+  if (items.parentNode && !items.parentNode.contains(sentinel)) items.parentNode.appendChild(sentinel);
+  if (items.parentNode && !items.parentNode.contains(skeleton)) items.parentNode.appendChild(skeleton);
+  if (items.parentNode && !items.parentNode.contains(endMessage)) items.parentNode.appendChild(endMessage);
+  if (items.parentNode && !items.parentNode.contains(status)) items.parentNode.appendChild(status);
 
   function showToast(message, tone) {
     if (typeof window.AbuToast === "function") {

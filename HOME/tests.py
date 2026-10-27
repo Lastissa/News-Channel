@@ -258,7 +258,7 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Check today")
         self.assertContains(response, "news first")
-        self.assertContains(response, "abureport.com.ng")
+        self.assertContains(response, "abureport")
         self.assertContains(
             response,
             "If we have not published that news yet, go ahead and write it.",
@@ -1861,7 +1861,7 @@ class ContinueReadingPopupTests(QuietTestCase):
         response = self.client.get(reverse("home:author_handbook"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "https://abureport.com.ng")
+        self.assertContains(response, "https://abureport")
         self.assertContains(response, "Check what we have already published")
         self.assertContains(
             response,

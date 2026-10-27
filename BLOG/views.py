@@ -42,7 +42,7 @@ URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 #   An author only ever has to paste a plain link. Before that link is drawn
 #   as an anchor it is stamped with our referral parameters so every site we
 #   send a reader to can see the traffic came from us: utm_source is our
-#   domain (the "primary tag" -- abureport.com.ng), utm_medium is "referral"
+#   domain (the "primary tag" -- abureport), utm_medium is "referral"
 #   and utm_campaign names the story that sent the click. This is done at
 #   RENDER time (never on save), so it is always current, needs no data
 #   migration, and every already-published story gets it too -- the stored
@@ -52,12 +52,12 @@ URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 #   and #anchors are left exactly as written. A link the author already
 #   tagged by hand (it carries a utm_source) is respected and left alone, so
 #   a deliberately chosen campaign is never overwritten.
-REFERRAL_SOURCE = "abureport.com.ng"
+REFERRAL_SOURCE = "abureport"
 REFERRAL_MEDIUM = "referral"
 
 
 def _is_internal_host(host):
-    """True when `host` is our own site (abureport.com.ng or any subdomain,
+    """True when `host` is our own site (abureport or any subdomain,
     plus localhost while developing), so a link that stays on the site is
     never handed our own referral parameters."""
     host = (host or "").split(":", 1)[0].lower()
