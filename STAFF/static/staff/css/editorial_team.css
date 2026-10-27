@@ -110,6 +110,10 @@
   margin: 0;
   font: 500 clamp(2.4rem, 4.4vw, 4.2rem)/1.02 Georgia, "Times New Roman", serif;
   letter-spacing: -.035em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .ef-hero h2 a {
@@ -209,12 +213,24 @@
 }
 
 .ef-card h3 {
-  display: inline;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
   margin: 16px 0 4px;
   font: 500 1.6rem/1.15 Georgia, "Times New Roman", serif;
   letter-spacing: -.02em;
   background: linear-gradient(var(--ef-accent), var(--ef-accent)) 0 100% / 0 2px no-repeat;
   transition: background-size 500ms cubic-bezier(.7, 0, .2, 1);
+}
+.ef-card h3 a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
 }
 
 .ef-card:hover h3,
@@ -511,6 +527,10 @@
   .ef-hero h2 {
     color: white;
     font-size: 2.5rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    max-width: 100%;
   }
 
   .ef-hero .ef-bio {

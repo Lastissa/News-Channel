@@ -1077,7 +1077,7 @@ class SearchView(View):
         else:
             base_qs = base_qs.none()
 
-        paginator = Paginator(base_qs, PAGE_SIZE)
+        paginator = Paginator(base_qs, 5)
         if page_number > paginator.num_pages and paginator.num_pages:
             raise Http404("Page not found.")
         page = paginator.get_page(page_number)

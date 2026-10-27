@@ -8,6 +8,9 @@
 
 {% block content %}
 <section class="profile-shell">
+  <div class="profile-quick-nav" style="margin-bottom: 16px;">
+    <a href="#profile-prefs" class="profile-add-news-link" style="display: inline-flex; align-items: center; gap: 6px;">Account Settings <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  </div>
   {% comment %} {% if is_admin_user %}
     <div class="profile-header-bar">
       <div class="profile-header-actions">
@@ -96,7 +99,7 @@
       {% include "HOME/partials/category_preferences.html" %}
       </div>
 
-      <div class="profile-prefs">
+      <div class="profile-prefs" id="profile-prefs">
         <div class="panel-header profile-prefs-head"><h3>Account settings</h3></div>
       <div class="profile-setting-block">
         <div class="setting-row">

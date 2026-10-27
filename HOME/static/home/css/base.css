@@ -696,6 +696,24 @@ a.teaser-slide { color: inherit; text-decoration: none; }
   padding: 7px 0;
   clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
 }
+.headline-ticker-segment a,
+.headline-ticker-segment span:not(.ticker-sep) {
+  pointer-events: auto;
+}
+.headline-ticker {
+  position: relative;
+}
+.headline-ticker::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(90deg, transparent, var(--paper));
+  pointer-events: none;
+  z-index: 1;
+}
 
 .headline-ticker-track {
   height: 20px;
@@ -708,12 +726,21 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 .headline-ticker-track:hover { animation-play-state: paused; }
 
 .headline-ticker-segment {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
   padding-right: 28px;
   font-family: var(--font-body);
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.01em;
+}
+.headline-ticker-segment a {
+  display: inline;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ticker-sep { margin: 0 14px; font-weight: 700; }

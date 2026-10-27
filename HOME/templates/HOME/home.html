@@ -25,6 +25,9 @@
 
 {% block content %}
 {% static 'home_no_bg.svg' as placeholder %}
+<div class="carousel-progress-bar" style="position: relative; height: 3px; background: rgba(250, 15, 15, 0.91); width: 100%; margin-bottom: 4px;">
+  <div class="carousel-progress-fill" style="height: 100%; background: var(--brand); width: 0%; transition: width 0.1s linear;"></div>
+</div>
 {% comment %}
   ANNOUNCEMENTS: rectangular scrolling bar. Every item comes from HomeView
   (announcement_items, see HOME/views.py) as {text, url}, and each one is an
@@ -169,10 +172,17 @@
       Headlines
     </h2>
     {% endif %}
-    {% if headline_ticker_text %}
-    <div class="headline-ticker" aria-hidden="true">
+    {% if headline_ticker_text or page_obj.object_list or featured_posts %}
+    <div class="headline-ticker">
       <div class="headline-ticker-track" data-ticker-track data-ticker-speed="35">
-        <span class="headline-ticker-segment" data-ticker-segment>{{ headline_ticker_text }}<span class="ticker-sep">*</span></span>
+        <span class="headline-ticker-segment" data-ticker-segment>
+          {% if page_obj.object_list %}
+            {% for post in page_obj.object_list %}{% if post.heading and forloop.counter0 < 5 %}<a href="{% url 'blog:story_detail' post.slug %}" style="color: inherit; text-decoration: none;">{{ post.heading }}</a><span class="ticker-sep">*</span>{% endif %}{% endfor %}
+          {% endif %}
+          {% if featured_posts %}
+            {% for post in featured_posts %}{% if post.heading %}<a href="{% url 'blog:story_detail' post.slug %}" style="color: inherit; text-decoration: none;">{{ post.heading }}</a><span class="ticker-sep">*</span>{% endif %}{% endfor %}
+          {% endif %}
+        </span>
       </div>
     </div>
     {% endif %}

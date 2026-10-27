@@ -24,18 +24,36 @@
     current = (index + slides.length) % slides.length;
     slides[current].classList.add("is-active");
     if (dots[current]) dots[current].classList.add("is-active");
+    if (progressBar) { progressBar.style.width = '0%'; progressStart = Date.now(); }
   }
 
   function next() { goTo(current + 1); }
   function prev() { goTo(current - 1); }
 
+  var progressBar = document.querySelector('.carousel-progress-fill');
+  var progressTimer = null;
+  var progressStart = Date.now();
+
+  function updateProgress() {
+    if (reducedMotion || !progressBar) return;
+    var elapsed = Date.now() - progressStart;
+    var pct = Math.min((elapsed / interval) * 100, 100);
+    progressBar.style.width = pct + '%';
+  }
+
   function start() {
     if (reducedMotion) return;
     stop();
+    progressStart = Date.now();
+    if (progressBar) progressBar.style.width = '0%';
+    if (progressTimer) window.clearInterval(progressTimer);
+    progressTimer = window.setInterval(updateProgress, 50);
     timer = window.setInterval(next, interval);
   }
   function stop() {
     if (timer) { window.clearInterval(timer); timer = null; }
+    if (progressTimer) { window.clearInterval(progressTimer); progressTimer = null; }
+    if (progressBar && !reducedMotion) progressBar.style.width = '0%';
   }
 
   if (nextBtn) nextBtn.addEventListener("click", function () { next(); start(); });
