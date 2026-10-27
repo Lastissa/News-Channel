@@ -14,6 +14,8 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.utils import timezone
 from django.views import View
 from django.contrib import messages
+from urllib.parse import unquote
+from urllib.parse import urlsplit
 
 from django.contrib.auth import get_user_model
 #   TEMPORARY IP DIAGNOSTIC -- import disabled with the helper; see
@@ -52,9 +54,31 @@ def _return_to(request):
     """Return a safe, local path supplied by the guest auth flow."""
 
     target = (request.POST.get("to") or request.GET.get("to") or "").strip()
-    if not target or target.startswith(("//", "/\\")):
+    if not target:
         return "/"
-
+    if target.startswith(("//", "/\\")):
+        return "/"
+    if len(target) > 512:
+        return "/"
+    # Decode recursively to prevent deeply encoded auth loops
+    for _ in range(8):
+        try:
+            decoded = unquote(target)
+            if decoded == target:
+                break
+            target = decoded
+            if len(target) > 512:
+                return "/"
+        except Exception:
+            break
+    target = target.strip()
+    if target.startswith(("//", "/\\")) or len(target) > 512:
+        return "/"
+    # Never redirect back into auth flows
+    auth_paths = ("/auth/login", "/auth/register", "/auth/")
+    for ap in auth_paths:
+        if target.startswith(ap):
+            return "/"
     parsed = urlsplit(target)
     if (
         not target.startswith("/")

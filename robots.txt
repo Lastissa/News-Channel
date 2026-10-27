@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /auth/
+Disallow: /admin/
+Disallow: /control/
+Disallow: /analytics/
+Allow: /
+
+Sitemap: https://abureport.com/sitemap.xml
