@@ -22,7 +22,7 @@
 
     <form method="post" class="auth-form" novalidate data-auth-form data-server-error="{{ error|escapejs }}">
       {% csrf_token %}
-      <input type="hidden" name="to" value="{{ return_to }}">
+      {% if return_to and return_to != "/" %}<input type="hidden" name="to" value="{{ return_to }}">{% endif %}
       <div class="field-group">
         <label for="register-email">Email address</label>
         <input id="register-email" type="email" name="email" placeholder="you@example.com" required autocomplete="email">
@@ -52,7 +52,7 @@
 
     <p class="auth-switch">
       Already have an account?
-      <a href="{% url 'auth:login' %}?to={{ return_to|urlencode }}">Sign in</a>
+      <a href="{% url 'auth:login' %}">Sign in</a>
     </p>
   </div>
 </div>

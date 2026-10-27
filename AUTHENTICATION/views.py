@@ -56,28 +56,37 @@ def _return_to(request):
     target = (request.POST.get("to") or request.GET.get("to") or "").strip()
     if not target:
         return "/"
+    if target.lower() in ("null", "undefined", "none"):
+        return "/"
     if target.startswith(("//", "/\\")):
         return "/"
     if len(target) > 512:
         return "/"
     # Decode recursively to prevent deeply encoded auth loops
-    for _ in range(8):
+    for _ in range(10):
         try:
             decoded = unquote(target)
             if decoded == target:
                 break
-            target = decoded
+            target = decoded.strip()
+            if not target:
+                return "/"
+            if target.lower() in ("null", "undefined", "none"):
+                return "/"
             if len(target) > 512:
                 return "/"
         except Exception:
             break
     target = target.strip()
+    if not target or target.lower() in ("null", "undefined", "none"):
+        return "/"
     if target.startswith(("//", "/\\")) or len(target) > 512:
         return "/"
     # Never redirect back into auth flows
-    auth_paths = ("/auth/login", "/auth/register", "/auth/")
-    for ap in auth_paths:
-        if target.startswith(ap):
+    bad_prefixes = ("/auth/", "/auth/login", "/auth/register")
+    low = target.lower()
+    for bp in bad_prefixes:
+        if low.startswith(bp):
             return "/"
     parsed = urlsplit(target)
     if (
@@ -99,9 +108,15 @@ def _auth_context(request, **context):
 
 
 class LoginView(View):
-    def get(self, request): 
+    def get(self, request):
         # TEMPORARY IP DIAGNOSTIC -- disabled; logged masked proxy/IP headers.
         # log_forwarded_headers(request, "login:get")
+        raw_to = (request.GET.get("to") or request.POST.get("to") or "").strip()
+        cleaned = _return_to(request)
+        if raw_to and cleaned == "/":
+            low_raw = raw_to.lower()
+            if low_raw.startswith("/auth/") or low_raw in ("null", "undefined", "none") or len(raw_to) > 512 or "%" in raw_to:
+                return redirect(reverse("auth:login"))
 
         if request.user.is_authenticated:
             return redirect(_return_to(request))
@@ -168,6 +183,12 @@ class LogoutView(View):
 
 class RegisterView(View):
     def get(self, request):
+        raw_to = (request.GET.get("to") or request.POST.get("to") or "").strip()
+        cleaned = _return_to(request)
+        if raw_to and cleaned == "/":
+            low_raw = raw_to.lower()
+            if low_raw.startswith("/auth/") or low_raw in ("null", "undefined", "none") or len(raw_to) > 512 or "%" in raw_to:
+                return redirect(reverse("auth:register"))
         if request.user.is_authenticated:
             return redirect(_return_to(request))
         return render(request, "auth/register.html", _auth_context(request))
