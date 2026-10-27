@@ -35,9 +35,9 @@
 <section class="archive-shell" data-gallery-endpoint="{% url 'archive:gallery' %}" data-csrf="{{ csrf_token }}">
   <header class="archive-hero">
     <div class="archive-heading">
-      <span class="archive-eyebrow">Public archive</span>
+      {% comment %} <span class="archive-eyebrow">Public archive</span> {% endcomment %}
       <h1>Archive</h1>
-      <p class="archive-subtitle">Images and files shared by signed in readers of {{ project_name }}. Download any item or copy its link.</p>
+      <p class="archive-subtitle">Images and files shared by {{ project_name }} members. Download any item or copy its link.</p>
     </div>
     <div class="archive-header-actions">
       {% if can_upload %}
