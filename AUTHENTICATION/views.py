@@ -112,6 +112,8 @@ class LoginView(View):
         # TEMPORARY IP DIAGNOSTIC -- disabled; logged masked proxy/IP headers.
         # log_forwarded_headers(request, "login:get")
         raw_to = (request.GET.get("to") or request.POST.get("to") or "").strip()
+        if raw_to.lower() in ("null", "undefined", "none"):
+            return redirect(reverse("auth:login"))
         cleaned = _return_to(request)
         if raw_to and cleaned == "/":
             low_raw = raw_to.lower()
@@ -184,6 +186,8 @@ class LogoutView(View):
 class RegisterView(View):
     def get(self, request):
         raw_to = (request.GET.get("to") or request.POST.get("to") or "").strip()
+        if raw_to.lower() in ("null", "undefined", "none"):
+            return redirect(reverse("auth:register"))
         cleaned = _return_to(request)
         if raw_to and cleaned == "/":
             low_raw = raw_to.lower()
