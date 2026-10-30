@@ -12,15 +12,15 @@ class AuthManager(BaseUserManager):
     def _blueprint(self, email, password=None, **extra_fields):
         if not email:raise ValueError('Users must have an email is req')
         user = self.model(email=email.upper(), **extra_fields)
-        user.save(using=self._db)
         if password:
             user.set_password(password)
             user.save(update_fields=['password'])
             info_logger(logger=logger, msg=f"ACCOUNT CREATION: user ({email.upper()}) created account with password set")
         else:
             user.set_unusable_password()
-            user.save(update_fields=['password'])
+            # user.save(update_fields=['password'])
             info_logger(logger=logger, msg=f"ACCOUNT CREATION: user ({email.upper()}) created account with NO password set")
+        user.save(using=self._db)
         return user
     
     def create_user(self, email, password=None, **extra_fields):
