@@ -167,14 +167,16 @@
     feeds `bio` for the meta description.
   {% endcomment %}
   {% if bio %}
-  <div class="portfolio-grid portfolio-about">
-    <article class="portfolio-card" id="portfolio-bio">
-      <header class="portfolio-card-head">
-        <div><h2>Profile</h2></div>
-        <span class="tag portfolio-section-tag">About</span>
-      </header>
-      <p class="portfolio-prose">{{ bio|linebreaksbr }}</p>
-    </article>
+  <div class="portfolio-content-layout portfolio-about">
+    <div class="portfolio-grid" style="grid-column: 1 / -1;">
+      <article class="portfolio-card span-12" id="portfolio-bio">
+        <header class="portfolio-card-head">
+          <div><h2>Profile</h2></div>
+          <span class="tag portfolio-section-tag">About</span>
+        </header>
+        <p class="portfolio-prose">{{ bio|linebreaksbr }}</p>
+      </article>
+    </div>
   </div>
   {% endif %}
 

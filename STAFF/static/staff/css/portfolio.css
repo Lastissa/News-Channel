@@ -1044,6 +1044,7 @@ html[data-theme="dark"] .portfolio-role {background: red;}
   }
 
   .portfolio-card {
+    width: 100%;
     padding: 22px 22px 24px;
   }
 
