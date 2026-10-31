@@ -118,3 +118,27 @@ class AuthorFollow(models.Model):
 
     def __str__(self):
         return f"{self.follower.email} follows author {self.author.email}"
+
+
+class StoryDraft(models.Model):
+    author = models.ForeignKey('AUTHENTICATION.Auth', on_delete=models.CASCADE, related_name='story_drafts')
+    slot = models.PositiveSmallIntegerField(default=1)
+    heading = models.CharField(max_length=100, blank=True, default='')
+    image_1 = models.URLField(blank=True, default='')
+    image_info = models.CharField(max_length=100, blank=True, default='')
+    category = models.CharField(max_length=20, blank=True, default='')
+    content = models.TextField(blank=True, default='')
+    toc_mode = models.PositiveSmallIntegerField(default=0)
+    newsletter = models.BooleanField(default=False)
+    image_quality = models.CharField(max_length=20, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['author', 'slot'], name='unique_story_draft_per_author_slot')
+        ]
+        ordering = ['slot']
+
+    def __str__(self):
+        return f"Draft {self.slot} for {self.author.email}"

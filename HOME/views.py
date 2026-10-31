@@ -3019,3 +3019,142 @@ class MostViewedView(View):
             for post in posts
         ]
         return JsonResponse({"results": results}, status=200)
+
+from STAFF.models import StoryDraft
+
+
+class AddNewsDraftSaveView(View):
+    """Save a draft for the add-news editor. Allows up to 5 different drafts per author."""
+    def dispatch(self, request, *args, **kwargs):
+        user = getattr(request, 'user', None)
+        if not (getattr(user, 'is_authenticated', False)):
+            return _response({"detail": "You need to sign in to save a draft. Please sign in and try again."}, status=401)
+        # Allow staff/admin/superuser
+        if not (getattr(user, 'is_staff', False) or getattr(user, 'is_admin', False) or getattr(user, 'is_superuser', False)):
+            return _response({"detail": "Only authors/staff can save drafts."}, status=403)
+        if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+            return _response({"detail": "This action must be done from the editor (invalid request)."}, status=400)
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request):
+        slot = (request.POST.get('slot') or '').strip()
+        try:
+            slot = int(slot)
+        except Exception:
+            slot = 1
+        if slot < 1 or slot > 5:
+            slot = 1
+
+        existing_slots = set(StoryDraft.objects.filter(author=request.user).values_list('slot', flat=True))
+        if slot not in existing_slots and len(existing_slots) >= 5:
+            return _response({"detail": "You already have 5 drafts saved. Delete one first to save a new one."}, status=400)
+
+        heading = (request.POST.get('heading') or '').strip()
+        image_1 = (request.POST.get('image_1') or '').strip()
+        image_info = (request.POST.get('image_info') or '').strip()
+        category = (request.POST.get('category') or '').strip().upper()
+        content = (request.POST.get('content') or '').strip()
+        toc_mode = (request.POST.get('toc_mode') or '0').strip()
+        try:
+            toc_mode = int(toc_mode)
+        except Exception:
+            toc_mode = 0
+        newsletter = (request.POST.get('newsletter') or '').strip().lower() in {'1', 'true', 'yes'}
+        image_quality = (request.POST.get('image_quality') or '').strip().lower()
+
+        # Frontend+backend validation: cannot save completely empty draft
+        if not heading and not content and not image_1:
+            return _response({"detail": "Cannot save an empty draft. Add a title (heading) or some story content before saving."}, status=400)
+
+        draft, _ = StoryDraft.objects.update_or_create(
+            author=request.user,
+            slot=slot,
+            defaults={
+                'heading': heading,
+                'image_1': image_1,
+                'image_info': image_info,
+                'category': category,
+                'content': content,
+                'toc_mode': toc_mode,
+                'newsletter': newsletter,
+                'image_quality': image_quality,
+            }
+        )
+        return _response({"detail": "Draft saved to slot {}.".format(slot), "slot": slot, "id": draft.pk}, status=200)
+
+
+class AddNewsDraftLoadView(View):
+    def dispatch(self, request, *args, **kwargs):
+        user = getattr(request, 'user', None)
+        if not (getattr(user, 'is_authenticated', False)):
+            return _response({"detail": "You need to sign in to load a draft."}, status=401)
+        if not (getattr(user, 'is_staff', False) or getattr(user, 'is_admin', False) or getattr(user, 'is_superuser', False)):
+            return _response({"detail": "Only authors/staff can load drafts."}, status=403)
+        if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+            return _response({"detail": "This action must be done from the editor."}, status=400)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        slot = (request.GET.get('slot') or '').strip()
+        try:
+            slot = int(slot)
+        except Exception:
+            slot = 1
+        if slot < 1 or slot > 5:
+            slot = 1
+        try:
+            draft = StoryDraft.objects.get(author=request.user, slot=slot)
+        except StoryDraft.DoesNotExist:
+            return _response({"detail": "No draft saved in slot {}.".format(slot)}, status=404)
+        return _response({
+            "slot": draft.slot,
+            "heading": draft.heading,
+            "image_1": draft.image_1,
+            "image_info": draft.image_info,
+            "category": draft.category,
+            "content": draft.content,
+            "toc_mode": draft.toc_mode,
+            "newsletter": draft.newsletter,
+            "image_quality": draft.image_quality,
+        })
+
+
+class AddNewsDraftListView(View):
+    def dispatch(self, request, *args, **kwargs):
+        if not staff_only(request.user):
+            return _response({"detail": "Not allowed"}, status=403)
+        if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+            return _response({"detail": "Invalid request"}, status=400)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        drafts = StoryDraft.objects.filter(author=request.user).order_by('slot')
+        data = []
+        for d in drafts:
+            data.append({
+                "slot": d.slot,
+                "heading": d.heading[:60],
+                "category": d.category,
+                "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+            })
+        return _response({"drafts": data})
+
+
+class AddNewsDraftDeleteView(View):
+    def dispatch(self, request, *args, **kwargs):
+        if not staff_only(request.user):
+            return _response({"detail": "Not allowed"}, status=403)
+        if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+            return _response({"detail": "Invalid request"}, status=400)
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request):
+        slot = (request.POST.get('slot') or '').strip()
+        try:
+            slot = int(slot)
+        except Exception:
+            slot = 1
+        if slot < 1 or slot > 5:
+            slot = 1
+        StoryDraft.objects.filter(author=request.user, slot=slot).delete()
+        return _response({"detail": "Deleted."})

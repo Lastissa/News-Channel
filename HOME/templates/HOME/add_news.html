@@ -83,6 +83,8 @@
         <button type="button" class="editor-tab" role="tab" aria-selected="false" data-editor-tab="preview">Preview</button>
       </div>
       <div class="editor-actions">
+        <button type="button" class="editor-btn" id="save-story-draft-btn" data-save-draft title="Save your story in progress to carry over later (up to 5)">Save Draft</button>
+        <button type="button" class="editor-btn" id="load-story-draft-btn" title="Load a saved draft">Load Draft</button>
         <button type="button" class="editor-btn" data-archive-open>Browse archive</button>
         <button type="button" class="editor-btn" data-editor-preview-toggle hidden>Hide preview</button>
       </div>
@@ -123,7 +125,17 @@
                   <ol class="fg-rules fg-rules-key">
                     <li data-guide-item="Before you write, open abureport.com.ng and check today's news. If we have not published that news yet, go ahead and write it. If we have already published it, do not publish it again.">Before you write, open abureport.com.ng and check today&rsquo;s news. If we have not published that news yet, go ahead and write it. If we have already published it, do not publish it again.</li>
                   </ol>
-                </section>
+                
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
+</section>
 
                 <section class="fg-block fg-block-key" data-guide-section="Review before you publish">
                   <h3>Review before you publish</h3>
@@ -139,7 +151,17 @@
                     <li data-guide-item="Avoid claims we cannot independently verify while writing news.">Avoid claims we cannot independently verify while writing news.</li>
                     <li data-guide-item="Check abureport.com.ng">Check <a href="{% url "home:author_handbook" %}">Check abureport.com.ng{% url "home:author_handbook"%}</a> for detailed guide on our guidelines.</li>
                   </ol>
-                </section>
+                
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
+</section>
 
                 <section class="fg-block" data-guide-section="Rules checked when you publish">
                   <h3>Rules checked when you publish</h3>
@@ -151,7 +173,17 @@
                     <li data-guide-item="Do not use lines of symbols such as ------ or ====== or ******. Leave a blank line instead.">Do not use lines of symbols such as '------' or '======' or '******' for content sepration. Leave a blank line instead.</li>
                     <li data-guide-item="Start with a normal paragraph where possible. Markdown headings are allowed for real sections, but do not repeat the main headline at the start of the story.">Start with a normal paragraph where possible. Markdown headings are allowed for real sections, but do not repeat the main headline at the start of the story.</li>
                   </ol>
-                </section>
+                
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
+</section>
 
                 <section class="fg-block" data-guide-section="Layout">
                   <h3>Layout GUIDE</h3>
@@ -163,7 +195,17 @@
                     <div class="fg-row" data-guide-item="* Text = bullet point"><dt><code>*</code> Text</dt><dd>Bullet point</dd></div>
                     <div class="fg-row" data-guide-item="1. Text = numbered point, then 2., 3. and so on"><dt><code>1.</code> Text</dt><dd>Numbered point (then 2., 3. and so on)</dd></div>
                   </dl>
-                </section>
+                
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
+</section>
 
                 <section class="fg-block" data-guide-section="Text style">
                   <h3>Text style</h3>
@@ -173,7 +215,17 @@
                     <div class="fg-row" data-guide-item="[words](https://...) = makes the words a link instead of showing a long web address"><dt><code>[words](https://...)</code></dt><dd>Makes the words a link</dd></div>
                     <div class="fg-row" data-guide-item="https://... = becomes a clickable link by itself (shows the whole address)"><dt><code>https://...</code></dt><dd>Becomes a clickable link by itself</dd></div>
                   </dl>
-                </section>
+                
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
+</section>
 
                 <section class="fg-block" data-guide-section="Images, videos and files (each on its own line)">
                   <h3>Images, videos and files <span>each on its own line</span></h3>
@@ -187,7 +239,17 @@
                     <div class="fg-row" data-guide-item="filel URL link text = download link for a file"><dt><code>filel</code> URL link text</dt><dd>Download link for a file</dd></div>
                   </dl>
                   <p class="fg-note" data-guide-item="The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.">The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.</p>
-                </section>
+                
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
+</section>
 
                 <section class="fg-block" data-guide-section="Button (each on its own line)">
                   <h3>Button <span>on its own line</span></h3>
@@ -195,7 +257,17 @@
                     <div class="fg-row" data-guide-item="btn URL text = a button the reader can tap, carrying your text"><dt><code>btn</code> URL text</dt><dd>A button the reader can tap, carrying your text</dd></div>
                   </dl>
                   <p class="fg-note" data-guide-item="Use [words](url) for a link inside a sentence. Use a btn line when the link should stand out as a button.">Use <code>[words](url)</code> for a link inside a sentence. Use a <code>btn</code> line when the link should stand out as a button.</p>
-                </section>
+                
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
+</section>
               </div>
             </div>
           </aside>
@@ -327,8 +399,28 @@
         <div class="archive-picker-loading" data-archive-loading role="status">Loading archive...</div>
         <iframe class="archive-picker-frame" data-src="{% url 'archive:gallery' %}" title="Image and file archive"></iframe>
       </div>
-    </section>
+    
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
   </div>
+
+</section>
+  </div>
+
+  <div id="story-draft-panel" style="display:none; position:fixed; right:16px; bottom:16px; background:#fff; border:1px solid #ddd; padding:12px; z-index:9999; max-width:320px; box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+      <strong>Saved Drafts (up to 5)</strong>
+      <button type="button" id="draft-panel-close" style="border:none;background:none">x</button>
+    </div>
+    <div id="draft-list"></div>
+    <div style="margin-top:8px; font-size:12px; color:#666">Click Load to restore, or Save Draft to add/update a slot.</div>
+  </div>
+
 </section>
 
 <script src="{% static 'blog/js/story-toc.js' %}?v=20261017-2" defer></script>

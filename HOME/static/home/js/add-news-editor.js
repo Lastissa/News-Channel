@@ -1333,3 +1333,212 @@
   toggleBtn.hidden = false;
   publishBtn.disabled = false;
 })();
+
+
+(function(){
+  const saveBtn = document.getElementById('save-story-draft-btn');
+  if(!saveBtn) return;
+  function getFormData(){
+    const form = document.getElementById('add-news-form');
+    const data = new URLSearchParams();
+    const heading = form.querySelector('[name="heading"]');
+    const image_1 = form.querySelector('[name="image_1"]');
+    const image_info = form.querySelector('[name="image_info"]');
+    const category = form.querySelector('[name="category"]');
+    const content = form.querySelector('[name="content"]');
+    const toc_mode = form.querySelector('[name="toc_mode"]');
+    const newsletter = form.querySelector('[name="newsletter"]');
+    const image_quality = form.querySelector('[name="image_quality"]');
+    if(heading) data.append('heading', heading.value||'');
+    if(image_1) data.append('image_1', image_1.value||'');
+    if(image_info) data.append('image_info', image_info.value||'');
+    if(category) data.append('category', category.value||'');
+    if(content) data.append('content', content.value||'');
+    if(toc_mode) data.append('toc_mode', toc_mode.value||'0');
+    if(newsletter && newsletter.checked) data.append('newsletter','1');
+    if(image_quality) data.append('image_quality', image_quality.value||'');
+    return data;
+  }
+  function getCsrfToken(){
+    const name = 'csrftoken';
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    if(input) return input.value;
+    return '';
+  }
+
+  saveBtn.addEventListener('click', function(){
+    const form = document.getElementById('add-news-form');
+    const headingEl = form ? form.querySelector('[name="heading"]') : null;
+    const contentEl = form ? form.querySelector('[name="content"]') : null;
+    const imageEl = form ? form.querySelector('[name="image_1"]') : null;
+    const heading = headingEl ? (headingEl.value||'').trim() : '';
+    const content = contentEl ? (contentEl.value||'').trim() : '';
+    const image_1 = imageEl ? (imageEl.value||'').trim() : '';
+    if(!heading && !content && !image_1){
+      alert('Cannot save an empty draft. Add a title (heading) or some story content before saving.');
+      return;
+    }
+    let slot = prompt('Save to draft slot (1-5):', '1');
+    if(slot === null) return;
+    slot = (slot||'1').trim();
+    if(!/^[1-5]$/.test(slot)){
+      slot = '1';
+    }
+
+    // Check if this slot already has a draft
+    fetch('/add-news/draft/list/', {headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken()}, credentials:'same-origin'})
+      .then(r=>r.json())
+      .then(j=>{
+        const drafts = j.drafts || [];
+        const exists = drafts.some(d => String(d.slot) === String(slot));
+        if(exists){
+          const ok = confirm('Draft ' + slot + ' already has something saved. Do you want to overwrite it?');
+          if(!ok){
+            return;
+          }
+        }
+        const data = getFormData();
+        data.append('slot', slot);
+        fetch('/add-news/draft/save/', {
+          method:'POST',
+          headers: {'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken()},
+          body: data,
+          credentials: 'same-origin'
+        }).then(r=>r.json().then(j2=>({ok:r.ok, j:j2}))).then(res=>{
+          if(res.ok){
+            alert(res.j.detail || 'Draft saved.');
+          } else {
+            alert(res.j.detail || 'Failed to save draft. Please check and try again.');
+          }
+        }).catch(()=>{ alert('Failed to save draft. Please check your connection and try again.'); });
+      })
+      .catch(()=>{
+        // If we can't check, still try to save but warn
+        const ok = confirm('Save to draft slot ' + slot + '? This may overwrite an existing draft.');
+        if(!ok) return;
+        const data = getFormData();
+        data.append('slot', slot);
+        fetch('/add-news/draft/save/', {
+          method:'POST',
+          headers: {'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken()},
+          body: data,
+          credentials: 'same-origin'
+        }).then(r=>r.json().then(j2=>({ok:r.ok, j:j2}))).then(res=>{
+          if(res.ok){
+            alert(res.j.detail || 'Draft saved.');
+          } else {
+            alert(res.j.detail || 'Failed to save draft. Please check and try again.');
+          }
+        }).catch(()=>{ alert('Failed to save draft. Please check your connection and try again.'); });
+      });
+  });
+})();
+
+
+(function(){
+  const loadBtn = document.getElementById('load-story-draft-btn');
+  const panel = document.getElementById('story-draft-panel');
+  const listEl = document.getElementById('draft-list');
+  const closeBtn = document.getElementById('draft-panel-close');
+  function getCsrfToken3(){
+    const name = 'csrftoken';
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    if(input) return input.value;
+    return '';
+  }
+  if(loadBtn && panel){
+    loadBtn.addEventListener('click', function(){
+      fetch('/add-news/draft/list/', {headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken3()}, credentials:'same-origin'})
+        .then(r=>r.json().then(j=>({ok:r.ok, j:j})))
+        .then(res=>{
+          if(!res.ok){
+            alert(res.j.detail || 'Failed to load drafts list.');
+            return;
+          }
+          const j = res.j;
+          listEl.innerHTML='';
+          const drafts = j.drafts||[];
+          if(drafts.length===0){
+            const d=document.createElement('div');
+            d.textContent='No saved drafts yet.';
+            listEl.appendChild(d);
+          } else {
+            drafts.forEach(function(draft){
+              const row = document.createElement('div');
+              row.style.display='flex';
+              row.style.justifyContent='space-between';
+              row.style.margin='4px 0';
+              const info = document.createElement('div');
+              info.style.flex='1';
+              info.textContent = 'Slot '+draft.slot + (draft.heading? ' - '+draft.heading:'');
+              const actions = document.createElement('div');
+              const load = document.createElement('button');
+              load.type='button';
+              load.textContent='Load';
+              load.onclick = function(){ loadDraft(draft.slot); };
+              const del = document.createElement('button');
+              del.type='button';
+              del.textContent='Del';
+              del.onclick = function(){ deleteDraft(draft.slot); };
+              actions.appendChild(load);
+              actions.appendChild(del);
+              row.appendChild(info);
+              row.appendChild(actions);
+              listEl.appendChild(row);
+            });
+          }
+          panel.style.display='block';
+        }).catch(()=>{ alert('Failed to load drafts list.'); });
+    });
+  }
+  if(closeBtn && panel){ closeBtn.addEventListener('click', function(){ panel.style.display='none'; }); }
+
+  function loadDraft(slot){
+    function getCsrfToken2(){
+      const name = 'csrftoken';
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      if(input) return input.value;
+      return '';
+    }
+    fetch('/add-news/draft/load/?slot='+encodeURIComponent(slot), {headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken2()}, credentials:'same-origin'})
+      .then(r=>r.json().then(j=>({ok:r.ok, j:j})))
+      .then(res=>{
+        if(!res.ok){
+          alert(res.j.detail || 'Failed to load draft.');
+          return;
+        }
+        const j = res.j;
+        const form = document.getElementById('add-news-form');
+        if(!form) { alert('Editor form not found.'); return; }
+        if(j.heading !== undefined){ const el=form.querySelector('[name="heading"]'); if(el) el.value=j.heading; }
+        if(j.image_1 !== undefined){ const el=form.querySelector('[name="image_1"]'); if(el) el.value=j.image_1; }
+        if(j.image_info !== undefined){ const el=form.querySelector('[name="image_info"]'); if(el) el.value=j.image_info; }
+        if(j.category !== undefined){ const el=form.querySelector('[name="category"]'); if(el) el.value=j.category; }
+        if(j.content !== undefined){ const el=form.querySelector('[name="content"]'); if(el) { el.value=j.content; try{ el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
+        if(j.toc_mode !== undefined){ const el=form.querySelector('[name="toc_mode"]'); if(el) el.value=j.toc_mode; }
+        if(j.newsletter !== undefined){ const el=form.querySelector('[name="newsletter"]'); if(el) el.checked=!!j.newsletter; }
+        if(j.image_quality !== undefined){ const el=form.querySelector('[name="image_quality"]'); if(el) el.value=j.image_quality; }
+        alert('Draft loaded to editor');
+        if(panel) panel.style.display='none';
+      }).catch(()=>{ alert('Failed to load draft. Please try again.'); });
+  }
+  function deleteDraft(slot){
+    const fd = new URLSearchParams();
+    fd.append('slot', slot);
+    fetch('/add-news/draft/delete/', {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': (function(){const name='csrftoken';const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();const inp=document.querySelector('input[name="csrfmiddlewaretoken"]');return inp?inp.value:'';})()}, body:fd, credentials:'same-origin'})
+      .then(r=>r.json())
+      .then(()=>{
+        alert('Deleted');
+        if(loadBtn) loadBtn.click();
+      }).catch(()=>{ alert('Failed to delete draft.'); });
+  }
+})();
