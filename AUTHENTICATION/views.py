@@ -216,8 +216,6 @@ class RegisterView(View):
             error = "Password must be at least 6 characters long."
         elif (password_error := first_password_error(password, user=get_user_model()(email=email))):
             error = password_error
-        elif get_user_model().objects.filter(email__iexact=email).exists():
-            error = "Email Taken OR Email Not Allowed"
         else:
             error = None
 
@@ -226,7 +224,12 @@ class RegisterView(View):
                 return _response({"detail": error}, status=400)
             return render(request, "auth/register.html", _auth_context(request, error=error), status=400)
 
-        user = get_user_model().objects.create_user(email=email, password=password)
+        try:
+            user = get_user_model().objects.create_user(email=email, password=password)
+        except Exception:
+            if is_ajax:
+                return _response({"detail": "Email Taken OR Email Not Allowed"}, status=400)
+            return render(request, "auth/register.html", _auth_context(request, error="Email Taken OR Email Not Allowed"), status=400)
         login(request, user)
         return_to = _return_to(request)
         if is_ajax:

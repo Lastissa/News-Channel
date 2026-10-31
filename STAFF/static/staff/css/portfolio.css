@@ -1079,8 +1079,8 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 /* Navy chips vanish on the dark theme surface, so they take a brand wash there. */
 html[data-theme="dark"] .portfolio-section-tag,
 html[data-theme="dark"] .portfolio-card .tag-mini {
-  background: red;
-  color: yellow;
+  background: var(--brand);
+  color: var(--on-brand);
 }
 
 html[data-theme="dark"] .coverage-pos {
@@ -1089,8 +1089,8 @@ html[data-theme="dark"] .coverage-pos {
 }
 
 html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
-  background: greenyellow;
-  color: black;
+  background: var(--brand-deep);
+  color: var(--nav-fg);
 }
 
 /* ---------- Author post feed ---------- */
@@ -1351,6 +1351,11 @@ html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.25;
+}
+
+html[data-theme="dark"] .portfolio-popular-heading h2 {
+  background: var(--brand);
+  color: var(--on-brand);
 }
 
 .portfolio-popular-list {
