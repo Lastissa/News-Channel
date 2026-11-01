@@ -62,11 +62,15 @@ class Auth(AbstractBaseUser):
      
     objects = AuthManager()
 
+    #   DJANGO ADMIN (/_admin/) IS FOR SUPERUSERS ONLY. These two answers are what
+    #   the admin asks for every model, so staff / admin accounts that are not
+    #   superusers get no permission there even if they somehow reach the site.
+    #   (The site gate in NoName/urls.py shuts the door; this keeps the rooms locked.)
     def has_perm(self, perm, obj=None):
-        return True
+        return bool(self.is_active and self.is_superuser)
 
     def has_module_perms(self, app_label):
-        return True
+        return bool(self.is_active and self.is_superuser)
 
     def has_module_perm(self, app_label):
         return self.has_module_perms(app_label)

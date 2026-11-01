@@ -15,7 +15,7 @@ from django.dispatch import receiver
 from django.core.cache import cache
 
 from SERVICE_INTERNAL.abstract import invalidate_cache
-from SERVICE_INTERNAL.cache_keys import HOME_BLOGS_CACHE_KEY
+from SERVICE_INTERNAL.cache_keys import HOME_BLOGS_CACHE_KEY, STORY_FEED_CACHE_KEY
 
 from .models import Blog, Category, refresh_category_cache
 
@@ -32,3 +32,5 @@ def category_changed(sender, **kwargs):
 @receiver(post_delete, sender=Blog, dispatch_uid="blog.story.deleted.invalidate_home_cache")
 def story_changed(sender, **kwargs):
     transaction.on_commit(lambda: invalidate_cache(HOME_BLOGS_CACHE_KEY), robust=True)
+    #   the RSS / Atom feeds list the same stories, so they are cleared with the home page
+    transaction.on_commit(lambda: invalidate_cache(STORY_FEED_CACHE_KEY), robust=True)

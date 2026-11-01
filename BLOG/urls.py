@@ -13,10 +13,12 @@ urlpatterns = [
     #   of three). Kept above the
     #   <slug> catch-all below so "ads" is never treated as a story slug.
     path("ads/", views.StoryAdsView.as_view(), name="story_ads"),
+    #   Same rule as "ads/": a fixed word must sit ABOVE the <slug> catch-all, or the
+    #   catch-all swallows it and the page treats it as a story called "bookmark-not-found".
+    path("bookmark-not-found/", views.BookmarkNotFoundView.as_view(), name="bookmark_not_found"),
     path("<slug:blog_slug>/", views.StoryDetailView.as_view(), name="story_detail"),
     path("<int:blog_id>/report/", views.StoryReportView.as_view(), name="story_report"),
     path("<int:blog_id>/like/", views.BlogLikeView.as_view(), name="blog_like"),
-    path("bookmark-not-found/", views.BookmarkNotFoundView.as_view(), name="bookmark_not_found"),
     path("<int:blog_id>/comment/", views.CommentCreateView.as_view(), name="comment_create"),
     path("comment/<int:comment_id>/delete/", views.CommentDeleteView.as_view(), name="comment_delete"),
     path("comment/<int:comment_id>/like/", views.CommentLikeView.as_view(), name="comment_like"),

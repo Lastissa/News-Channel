@@ -115,6 +115,7 @@ def organization_node(context):
     about = _about()
     base = domain()
     logo_url = _logo_url()
+
     logo = {"@type": "ImageObject", "url": logo_url}
     try:
         from django.contrib.staticfiles import finders

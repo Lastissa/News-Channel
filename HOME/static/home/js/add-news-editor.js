@@ -1335,210 +1335,246 @@
 })();
 
 
-(function(){
-  const saveBtn = document.getElementById('save-story-draft-btn');
-  if(!saveBtn) return;
-  function getFormData(){
-    const form = document.getElementById('add-news-form');
-    const data = new URLSearchParams();
-    const heading = form.querySelector('[name="heading"]');
-    const image_1 = form.querySelector('[name="image_1"]');
-    const image_info = form.querySelector('[name="image_info"]');
-    const category = form.querySelector('[name="category"]');
-    const content = form.querySelector('[name="content"]');
-    const toc_mode = form.querySelector('[name="toc_mode"]');
-    const newsletter = form.querySelector('[name="newsletter"]');
-    const image_quality = form.querySelector('[name="image_quality"]');
-    if(heading) data.append('heading', heading.value||'');
-    if(image_1) data.append('image_1', image_1.value||'');
-    if(image_info) data.append('image_info', image_info.value||'');
-    if(category) data.append('category', category.value||'');
-    if(content) data.append('content', content.value||'');
-    if(toc_mode) data.append('toc_mode', toc_mode.value||'0');
-    if(newsletter && newsletter.checked) data.append('newsletter','1');
-    if(image_quality) data.append('image_quality', image_quality.value||'');
-    return data;
-  }
-  function getCsrfToken(){
-    const name = 'csrftoken';
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-    const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
-    if(input) return input.value;
-    return '';
+/* ---------------------------------------------------------------------------
+   DRAFTS PLACARD
+   The "Drafts" button opens a placard that is drawn entirely from the JSON the
+   server sends (HOME/views.py, AddNewsDraft*View). Five numbered slots; every
+   sentence shown comes from the server or from the plain wording below.
+   Replacing, deleting and loading over unsaved text each ask for a second click
+   so nothing is lost by accident.
+--------------------------------------------------------------------------- */
+(function () {
+  "use strict";
+  var openBtn = document.querySelector("[data-drafts-open]");
+  var form = document.getElementById("add-news-form");
+  if (!openBtn || !form) return;
+
+  var URLS = {
+    list: "/add-news/draft/list/",
+    load: "/add-news/draft/load/",
+    save: "/add-news/draft/save/",
+    remove: "/add-news/draft/delete/"
+  };
+  var root = null, body = null, statusEl = null, closeBtn = null;
+  var data = null;          /* last JSON from the server */
+  var pending = null;       /* {slot, action} waiting for the second click */
+  var busy = false;
+
+  function csrf() {
+    var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+    if (m) return decodeURIComponent(m[1]);
+    var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return input ? input.value : "";
   }
 
-  saveBtn.addEventListener('click', function(){
-    const form = document.getElementById('add-news-form');
-    const headingEl = form ? form.querySelector('[name="heading"]') : null;
-    const contentEl = form ? form.querySelector('[name="content"]') : null;
-    const imageEl = form ? form.querySelector('[name="image_1"]') : null;
-    const heading = headingEl ? (headingEl.value||'').trim() : '';
-    const content = contentEl ? (contentEl.value||'').trim() : '';
-    const image_1 = imageEl ? (imageEl.value||'').trim() : '';
-    if(!heading && !content && !image_1){
-      alert('Cannot save an empty draft. Add a title (heading) or some story content before saving.');
-      return;
-    }
-    let slot = prompt('Save to draft slot (1-5):', '1');
-    if(slot === null) return;
-    slot = (slot||'1').trim();
-    if(!/^[1-5]$/.test(slot)){
-      slot = '1';
-    }
-
-    // Check if this slot already has a draft
-    fetch('/add-news/draft/list/', {headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken()}, credentials:'same-origin'})
-      .then(r=>r.json())
-      .then(j=>{
-        const drafts = j.drafts || [];
-        const exists = drafts.some(d => String(d.slot) === String(slot));
-        if(exists){
-          const ok = confirm('Draft ' + slot + ' already has something saved. Do you want to overwrite it?');
-          if(!ok){
-            return;
-          }
-        }
-        const data = getFormData();
-        data.append('slot', slot);
-        fetch('/add-news/draft/save/', {
-          method:'POST',
-          headers: {'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken()},
-          body: data,
-          credentials: 'same-origin'
-        }).then(r=>r.json().then(j2=>({ok:r.ok, j:j2}))).then(res=>{
-          if(res.ok){
-            alert(res.j.detail || 'Draft saved.');
-          } else {
-            alert(res.j.detail || 'Failed to save draft. Please check and try again.');
-          }
-        }).catch(()=>{ alert('Failed to save draft. Please check your connection and try again.'); });
-      })
-      .catch(()=>{
-        // If we can't check, still try to save but warn
-        const ok = confirm('Save to draft slot ' + slot + '? This may overwrite an existing draft.');
-        if(!ok) return;
-        const data = getFormData();
-        data.append('slot', slot);
-        fetch('/add-news/draft/save/', {
-          method:'POST',
-          headers: {'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken()},
-          body: data,
-          credentials: 'same-origin'
-        }).then(r=>r.json().then(j2=>({ok:r.ok, j:j2}))).then(res=>{
-          if(res.ok){
-            alert(res.j.detail || 'Draft saved.');
-          } else {
-            alert(res.j.detail || 'Failed to save draft. Please check and try again.');
-          }
-        }).catch(()=>{ alert('Failed to save draft. Please check your connection and try again.'); });
+  function request(url, options) {
+    options = options || {};
+    var headers = { "X-Requested-With": "XMLHttpRequest", "X-CSRFToken": csrf() };
+    return fetch(url, { method: options.method || "GET", headers: headers, body: options.body, credentials: "same-origin" })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, json: j }; });
       });
-  });
-})();
-
-
-(function(){
-  const loadBtn = document.getElementById('load-story-draft-btn');
-  const panel = document.getElementById('story-draft-panel');
-  const listEl = document.getElementById('draft-list');
-  const closeBtn = document.getElementById('draft-panel-close');
-  function getCsrfToken3(){
-    const name = 'csrftoken';
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-    const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
-    if(input) return input.value;
-    return '';
   }
-  if(loadBtn && panel){
-    loadBtn.addEventListener('click', function(){
-      fetch('/add-news/draft/list/', {headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken3()}, credentials:'same-origin'})
-        .then(r=>r.json().then(j=>({ok:r.ok, j:j})))
-        .then(res=>{
-          if(!res.ok){
-            alert(res.j.detail || 'Failed to load drafts list.');
-            return;
-          }
-          const j = res.j;
-          listEl.innerHTML='';
-          const drafts = j.drafts||[];
-          if(drafts.length===0){
-            const d=document.createElement('div');
-            d.textContent='No saved drafts yet.';
-            listEl.appendChild(d);
-          } else {
-            drafts.forEach(function(draft){
-              const row = document.createElement('div');
-              row.style.display='flex';
-              row.style.justifyContent='space-between';
-              row.style.margin='4px 0';
-              const info = document.createElement('div');
-              info.style.flex='1';
-              info.textContent = 'Slot '+draft.slot + (draft.heading? ' - '+draft.heading:'');
-              const actions = document.createElement('div');
-              const load = document.createElement('button');
-              load.type='button';
-              load.textContent='Load';
-              load.onclick = function(){ loadDraft(draft.slot); };
-              const del = document.createElement('button');
-              del.type='button';
-              del.textContent='Del';
-              del.onclick = function(){ deleteDraft(draft.slot); };
-              actions.appendChild(load);
-              actions.appendChild(del);
-              row.appendChild(info);
-              row.appendChild(actions);
-              listEl.appendChild(row);
-            });
-          }
-          panel.style.display='block';
-        }).catch(()=>{ alert('Failed to load drafts list.'); });
+
+  function field(name) { return form.querySelector('[name="' + name + '"]'); }
+  function value(name) { var el = field(name); return el ? (el.value || "") : ""; }
+
+  function screenHasStory() {
+    return !!(value("heading").trim() || value("content").trim() || value("image_1").trim());
+  }
+
+  function currentStory() {
+    var body = new URLSearchParams();
+    ["heading", "image_1", "image_info", "category", "content", "toc_mode", "image_quality"].forEach(function (n) {
+      body.append(n, value(n));
     });
+    var news = field("newsletter");
+    if (news && news.checked) body.append("newsletter", "1");
+    return body;
   }
-  if(closeBtn && panel){ closeBtn.addEventListener('click', function(){ panel.style.display='none'; }); }
 
-  function loadDraft(slot){
-    function getCsrfToken2(){
-      const name = 'csrftoken';
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
-      if(input) return input.value;
-      return '';
+  function setField(name, val, eventName) {
+    var el = field(name);
+    if (!el || val === undefined || val === null) return;
+    el.value = val;
+    try { el.dispatchEvent(new Event(eventName || "input", { bubbles: true })); } catch (e) {}
+  }
+
+  function fillEditor(j) {
+    setField("heading", j.heading);
+    setField("image_1", j.image_1);
+    setField("image_info", j.image_info);
+    setField("category", j.category, "change");
+    setField("content", j.content);
+    try { field("content").dispatchEvent(new Event("change", { bubbles: true })); } catch (e) {}
+    setField("toc_mode", j.toc_mode, "change");
+    setField("image_quality", j.image_quality, "change");
+    var news = field("newsletter");
+    if (news) news.checked = !!j.newsletter;
+  }
+
+  function say(text, isError) {
+    if (!statusEl) return;
+    statusEl.textContent = text || "";
+    statusEl.className = "draft-placard-status" + (isError ? " is-error" : "");
+  }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function button(label, className, onClick) {
+    var b = el("button", "editor-modal-btn " + (className || ""), label);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  /* ---------- drawing ---------- */
+  function draw() {
+    body.textContent = "";
+    if (!data) return;
+    body.appendChild(el("p", "draft-placard-summary", data.summary || ""));
+    var list = el("ol", "draft-slots");
+    data.slots.forEach(function (slot) { list.appendChild(drawSlot(slot)); });
+    body.appendChild(list);
+  }
+
+  function drawSlot(slot) {
+    var li = el("li", "draft-slot" + (slot.empty ? " is-empty" : ""));
+    li.appendChild(el("span", "draft-slot-tag", "Slot " + slot.slot));
+    var main = el("div", "draft-slot-main");
+    if (slot.empty) {
+      main.appendChild(el("p", "draft-slot-title", "Empty slot"));
+      main.appendChild(el("p", "draft-slot-meta", "Nothing saved here yet."));
+    } else {
+      main.appendChild(el("p", "draft-slot-title", slot.title));
+      main.appendChild(el("p", "draft-slot-meta", [slot.category, slot.words, slot.image, slot.saved].join("  |  ")));
     }
-    fetch('/add-news/draft/load/?slot='+encodeURIComponent(slot), {headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken2()}, credentials:'same-origin'})
-      .then(r=>r.json().then(j=>({ok:r.ok, j:j})))
-      .then(res=>{
-        if(!res.ok){
-          alert(res.j.detail || 'Failed to load draft.');
-          return;
-        }
-        const j = res.j;
-        const form = document.getElementById('add-news-form');
-        if(!form) { alert('Editor form not found.'); return; }
-        if(j.heading !== undefined){ const el=form.querySelector('[name="heading"]'); if(el) el.value=j.heading; }
-        if(j.image_1 !== undefined){ const el=form.querySelector('[name="image_1"]'); if(el) el.value=j.image_1; }
-        if(j.image_info !== undefined){ const el=form.querySelector('[name="image_info"]'); if(el) el.value=j.image_info; }
-        if(j.category !== undefined){ const el=form.querySelector('[name="category"]'); if(el) el.value=j.category; }
-        if(j.content !== undefined){ const el=form.querySelector('[name="content"]'); if(el) { el.value=j.content; try{ el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
-        if(j.toc_mode !== undefined){ const el=form.querySelector('[name="toc_mode"]'); if(el) el.value=j.toc_mode; }
-        if(j.newsletter !== undefined){ const el=form.querySelector('[name="newsletter"]'); if(el) el.checked=!!j.newsletter; }
-        if(j.image_quality !== undefined){ const el=form.querySelector('[name="image_quality"]'); if(el) el.value=j.image_quality; }
-        alert('Draft loaded to editor');
-        if(panel) panel.style.display='none';
-      }).catch(()=>{ alert('Failed to load draft. Please try again.'); });
+    li.appendChild(main);
+
+    var actions = el("div", "draft-slot-actions");
+    var asking = pending && pending.slot === slot.slot ? pending.action : null;
+
+    if (asking) {
+      var sentence = {
+        replace: "This replaces the draft in slot " + slot.slot + " with the story on your screen.",
+        remove: "This permanently deletes the draft in slot " + slot.slot + ".",
+        load: "This replaces what is on your screen with the draft from slot " + slot.slot + ". Save your screen first if you still need it."
+      }[asking];
+      li.appendChild(el("p", "draft-slot-warning", sentence));
+      actions.appendChild(button({ replace: "Yes, replace it", remove: "Yes, delete it", load: "Yes, load it" }[asking],
+        asking === "remove" ? "draft-btn-danger" : "editor-modal-btn-primary",
+        function () { pending = null; run(asking, slot.slot); }));
+      actions.appendChild(button("Cancel", "", function () { pending = null; say(""); draw(); }));
+    } else if (slot.empty) {
+      actions.appendChild(button("Save my story here", "editor-modal-btn-primary", function () { run("save", slot.slot); }));
+    } else {
+      actions.appendChild(button("Load into editor", "editor-modal-btn-primary", function () {
+        if (screenHasStory()) { pending = { slot: slot.slot, action: "load" }; draw(); } else { run("load", slot.slot); }
+      }));
+      actions.appendChild(button("Replace with my story", "", function () {
+        pending = { slot: slot.slot, action: "replace" }; draw();
+      }));
+      actions.appendChild(button("Delete", "", function () {
+        pending = { slot: slot.slot, action: "remove" }; draw();
+      }));
+    }
+    li.appendChild(actions);
+    return li;
   }
-  function deleteDraft(slot){
-    const fd = new URLSearchParams();
-    fd.append('slot', slot);
-    fetch('/add-news/draft/delete/', {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': (function(){const name='csrftoken';const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();const inp=document.querySelector('input[name="csrfmiddlewaretoken"]');return inp?inp.value:'';})()}, body:fd, credentials:'same-origin'})
-      .then(r=>r.json())
-      .then(()=>{
-        alert('Deleted');
-        if(loadBtn) loadBtn.click();
-      }).catch(()=>{ alert('Failed to delete draft.'); });
+
+  /* ---------- talking to the server ---------- */
+  function run(action, slot) {
+    if (busy) return;
+    var body_ = new URLSearchParams();
+    var call;
+    if (action === "save" || action === "replace") {
+      if (!screenHasStory()) { say("Add a headline or some story text before saving a draft.", true); return; }
+      body_ = currentStory(); body_.append("slot", slot);
+      call = request(URLS.save, { method: "POST", body: body_ });
+    } else if (action === "remove") {
+      body_.append("slot", slot);
+      call = request(URLS.remove, { method: "POST", body: body_ });
+    } else {
+      call = request(URLS.load + "?slot=" + encodeURIComponent(slot));
+    }
+    busy = true; root.classList.add("is-busy"); say("Working...");
+    call.then(function (res) {
+      if (res.json && res.json.drafts) { data = res.json.drafts; draw(); }
+      if (!res.ok) { say(res.json.detail || "Something went wrong. Please try again.", true); return; }
+      if (action === "load") {
+        fillEditor(res.json);
+        close();
+        if (window.editorToast) window.editorToast(res.json.detail);
+        return;
+      }
+      say(res.json.detail || "Done.");
+    }).catch(function () {
+      say("Could not reach the server. Check your connection and try again.", true);
+    }).then(function () { busy = false; root.classList.remove("is-busy"); });
   }
+
+  function refresh() {
+    say("Loading your drafts...");
+    request(URLS.list).then(function (res) {
+      if (!res.ok) { say(res.json.detail || "Your drafts could not be loaded. Please try again.", true); return; }
+      data = res.json; say(""); draw();
+    }).catch(function () { say("Could not reach the server. Check your connection and try again.", true); });
+  }
+
+  /* ---------- open / close ---------- */
+  function build() {
+    root = el("div", "editor-modal draft-placard");
+    root.hidden = true;
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "draft-placard-title");
+    var backdrop = el("div", "editor-modal-backdrop");
+    backdrop.addEventListener("click", close);
+    var card = el("div", "editor-modal-card draft-placard-card");
+    var head = el("div", "draft-placard-head");
+    var titles = el("div");
+    var title = el("h2", "editor-modal-title", "Your drafts");
+    title.id = "draft-placard-title";
+    titles.appendChild(title);
+    titles.appendChild(el("p", "editor-modal-intro", "Keep up to " + 5 + " unfinished stories here. Save what is on your screen into a slot or bring a saved draft back into the editor."));
+    head.appendChild(titles);
+    closeBtn = button("Close", "", close);
+    head.appendChild(closeBtn);
+    card.appendChild(head);
+    statusEl = el("p", "draft-placard-status");
+    statusEl.setAttribute("role", "status");
+    statusEl.setAttribute("aria-live", "polite");
+    card.appendChild(statusEl);
+    body = el("div", "draft-placard-body");
+    card.appendChild(body);
+    root.appendChild(backdrop);
+    root.appendChild(card);
+    document.body.appendChild(root);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !root.hidden) close(); });
+  }
+
+  function open() {
+    if (!root) build();
+    pending = null; data = null; body.textContent = "";
+    root.hidden = false;
+    document.documentElement.classList.add("editor-modal-open");
+    window.requestAnimationFrame(function () { root.classList.add("is-open"); });
+    closeBtn.focus();
+    refresh();
+  }
+
+  function close() {
+    if (!root || root.hidden) return;
+    root.classList.remove("is-open");
+    root.hidden = true;
+    document.documentElement.classList.remove("editor-modal-open");
+    openBtn.focus();
+  }
+
+  openBtn.addEventListener("click", open);
 })();

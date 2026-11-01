@@ -13,6 +13,11 @@ from HOME.sitemap_views import (
 )
 from STAFF.views import EditorialTeamView
 
+#   DJANGO ADMIN (/_admin/) IS OPEN TO SUPERUSERS ONLY. By default Django lets
+#   every account with is_staff in, and every journalist is is_staff, so the
+#   door check is replaced here. Everyone else is sent back to the admin login.
+admin.site.has_permission = lambda request: bool(request.user.is_active and request.user.is_superuser)
+
 handler404 = "HOME.views.handler404"
 handler500 = "HOME.views.handler500"
 

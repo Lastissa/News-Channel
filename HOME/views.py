@@ -35,7 +35,12 @@ from SERVICE_INTERNAL.abstract import (
     is_rate_limited,
 )
 from SERVICE_INTERNAL.config import About, StaffConfig, custom_context_processors
-from SERVICE_INTERNAL.cache_keys import HOME_BLOGS_CACHE_KEY, HOME_BLOGS_CACHE_TTL
+from SERVICE_INTERNAL.cache_keys import (
+    HOME_BLOGS_CACHE_KEY,
+    HOME_BLOGS_CACHE_TTL,
+    STORY_FEED_CACHE_KEY,
+    STORY_FEED_CACHE_TTL,
+)
 from SERVICE_INTERNAL.email_batch import (
     _try_send_account_deleted_batch_email,
     _try_send_new_story_batch_email,
@@ -153,10 +158,12 @@ class RobotsTxtView(View):
                 "Disallow: /promote-ads/",
                 "",
                 f"Sitemap: {domain}/sitemap.xml",
-                #   Syndication discovery: aggregators and feed readers read the
-                #   same two feeds every page <head> advertises.
-                f"RSS: {domain}/rss.xml",
-                f"Atom: {domain}/atom.xml",
+                #   RSS / Atom discovery lines are switched off on purpose: "RSS:"
+                #   and "Atom:" are not real robots.txt directives and Google
+                #   ignores them. Feeds are still advertised by the two
+                #   <link rel="alternate"> tags in base.html and by llms.txt.
+                # f"RSS: {domain}/rss.xml",
+                # f"Atom: {domain}/atom.xml",
             ]
         )
         return HttpResponse(body, content_type="text/plain; charset=utf-8")
@@ -484,13 +491,25 @@ class _FeedView(View):
     def get(self, request):
         context_processors = custom_context_processors(request)
         domain = (context_processors.get("site_domain") or About.domain).rstrip("/")
+        #   The 50 newest stories are cached for 15 minutes (shared by RSS and
+        #   Atom); BLOG.signals clears the key as soon as a story is saved or deleted.
+        items = cache_or_run(
+            STORY_FEED_CACHE_KEY,
+            lambda: self._items(domain),
+            timeout=STORY_FEED_CACHE_TTL,
+        )
         context = {
             "project_name": context_processors.get("project_name") or About.project_name,
             "catchphrase": context_processors.get("project_cachphrase") or About.project_cachphrase,
             "domain": domain,
             "feed_url": f"{domain}{self.feed_path}",
             "logo": f"{domain}{static('logo.jpg')}",
-            "items": self._items(domain),
+            "items": items,
+            #   The feed's own "last changed" stamp is the newest story date, NOT
+            #   the time of the request: a stamp that moves on every fetch tells
+            #   readers and crawlers the feed changed when it did not. An empty
+            #   feed has no story date, so only then does it fall back to now.
+            "last_updated": max((item["updated"] for item in items), default=None) or timezone.now(),
         }
         return render(request, self.template_name, context, content_type=self.content_type)
 
@@ -3020,141 +3039,222 @@ class MostViewedView(View):
         ]
         return JsonResponse({"results": results}, status=200)
 
+from django.utils.timesince import timesince
+
 from STAFF.models import StoryDraft
 
 
-class AddNewsDraftSaveView(View):
-    """Save a draft for the add-news editor. Allows up to 5 different drafts per author."""
+#   ADD NEWS DRAFTS (server side).
+#
+#   An author keeps up to five drafts, one per numbered slot. The editor page
+#   (HOME/static/home/js/add-news-editor.js) asks these four endpoints for JSON
+#   and draws the "Your drafts" placard from it, so every sentence in `detail`
+#   and in the slot cards is written to be shown to the author exactly as it is.
+#   Field names that the editor form needs (heading, content, ...) stay as they
+#   are; everything meant to be READ is plain words.
+DRAFT_SLOT_COUNT = 5
+DRAFT_IMAGE_QUALITIES = {"low", "medium", "high"}
+DRAFT_HEADING_MAX = StoryDraft._meta.get_field("heading").max_length
+DRAFT_IMAGE_INFO_MAX = StoryDraft._meta.get_field("image_info").max_length
+DRAFT_IMAGE_LINK_MAX = StoryDraft._meta.get_field("image_1").max_length
+DRAFT_SLOT_ERROR = f"Pick a draft slot from 1 to {DRAFT_SLOT_COUNT}."
+
+
+def _draft_slot(raw):
+    """The slot number (1 to 5), or None when the value is not a real slot."""
+    try:
+        slot = int(str(raw or "").strip())
+    except ValueError:
+        return None
+    return slot if 1 <= slot <= DRAFT_SLOT_COUNT else None
+
+
+def _draft_saved_label(moment):
+    """'Saved just now', 'Saved 3 hours ago' ... from a stored timestamp."""
+    if not moment:
+        return "Saved earlier"
+    gap = timesince(moment, timezone.now()).split(",")[0].replace("\xa0", " ").strip()
+    if gap.startswith("0 "):
+        return "Saved just now"
+    return f"Saved {gap} ago"
+
+
+def _draft_card(draft, category_labels):
+    """One filled slot, worded for the author to read."""
+    words = len((draft.content or "").split())
+    return {
+        "slot": draft.slot,
+        "empty": False,
+        "title": draft.heading or "No headline yet",
+        "category": category_labels.get(draft.category) or "No category chosen",
+        "words": f"{words} word{'' if words == 1 else 's'}",
+        "image": "Banner image added" if draft.image_1 else "No banner image",
+        "saved": _draft_saved_label(draft.updated_at),
+    }
+
+
+def _drafts_payload(user):
+    """All five slots, filled or empty, plus a one line summary."""
+    labels = {str(value): str(label) for value, label in get_category_choices()}
+    saved = {draft.slot: draft for draft in StoryDraft.objects.filter(author=user)}
+    slots = [
+        _draft_card(saved[number], labels) if number in saved else {"slot": number, "empty": True}
+        for number in range(1, DRAFT_SLOT_COUNT + 1)
+    ]
+    used = len(saved)
+    return {
+        "slots": slots,
+        "used": used,
+        "limit": DRAFT_SLOT_COUNT,
+        "summary": f"{used} of {DRAFT_SLOT_COUNT} draft slots in use.",
+    }
+
+
+class _DraftView(View):
+    """The one gate every draft endpoint goes through, so they all agree on who
+    may use drafts and what the author is told when they may not."""
+
     def dispatch(self, request, *args, **kwargs):
-        user = getattr(request, 'user', None)
-        if not (getattr(user, 'is_authenticated', False)):
-            return _response({"detail": "You need to sign in to save a draft. Please sign in and try again."}, status=401)
-        # Allow staff/admin/superuser
-        if not (getattr(user, 'is_staff', False) or getattr(user, 'is_admin', False) or getattr(user, 'is_superuser', False)):
-            return _response({"detail": "Only authors/staff can save drafts."}, status=403)
+        user = getattr(request, "user", None)
+        if not getattr(user, "is_authenticated", False):
+            return _response({"detail": "You are signed out. Sign in again to use your drafts."}, status=401)
+        if not staff_only(user):
+            return _response({"detail": "Only staff authors can use drafts."}, status=403)
         if request.headers.get("X-Requested-With") != "XMLHttpRequest":
-            return _response({"detail": "This action must be done from the editor (invalid request)."}, status=400)
+            return _response(
+                {"detail": "Drafts only work from the Add news page. Open that page and try again."},
+                status=400,
+            )
         return super().dispatch(request, *args, **kwargs)
 
+
+class AddNewsDraftSaveView(_DraftView):
+    """Save what is on the author's screen into one numbered slot. Saving into a
+    slot that already holds a draft replaces it."""
+
     def post(self, request):
-        slot = (request.POST.get('slot') or '').strip()
-        try:
-            slot = int(slot)
-        except Exception:
-            slot = 1
-        if slot < 1 or slot > 5:
-            slot = 1
+        slot = _draft_slot(request.POST.get("slot"))
+        if slot is None:
+            return _response({"detail": DRAFT_SLOT_ERROR}, status=400)
 
-        existing_slots = set(StoryDraft.objects.filter(author=request.user).values_list('slot', flat=True))
-        if slot not in existing_slots and len(existing_slots) >= 5:
-            return _response({"detail": "You already have 5 drafts saved. Delete one first to save a new one."}, status=400)
+        heading = (request.POST.get("heading") or "").strip()
+        image_1 = (request.POST.get("image_1") or "").strip()
+        image_info = (request.POST.get("image_info") or "").strip()
+        content = (request.POST.get("content") or "").strip()
 
-        heading = (request.POST.get('heading') or '').strip()
-        image_1 = (request.POST.get('image_1') or '').strip()
-        image_info = (request.POST.get('image_info') or '').strip()
-        category = (request.POST.get('category') or '').strip().upper()
-        content = (request.POST.get('content') or '').strip()
-        toc_mode = (request.POST.get('toc_mode') or '0').strip()
-        try:
-            toc_mode = int(toc_mode)
-        except Exception:
-            toc_mode = 0
-        newsletter = (request.POST.get('newsletter') or '').strip().lower() in {'1', 'true', 'yes'}
-        image_quality = (request.POST.get('image_quality') or '').strip().lower()
-
-        # Frontend+backend validation: cannot save completely empty draft
         if not heading and not content and not image_1:
-            return _response({"detail": "Cannot save an empty draft. Add a title (heading) or some story content before saving."}, status=400)
+            return _response(
+                {"detail": "Add a headline or some story text before saving a draft."},
+                status=400,
+            )
+        if len(heading) > DRAFT_HEADING_MAX:
+            return _response(
+                {"detail": f"The headline is too long to save. Keep it to {DRAFT_HEADING_MAX} characters or fewer."},
+                status=400,
+            )
+        if len(image_info) > DRAFT_IMAGE_INFO_MAX:
+            return _response(
+                {"detail": f"The image description is too long to save. Keep it to {DRAFT_IMAGE_INFO_MAX} characters or fewer."},
+                status=400,
+            )
+        if image_1:
+            if len(image_1) > DRAFT_IMAGE_LINK_MAX:
+                return _response({"detail": "The image link is too long to save."}, status=400)
+            try:
+                URLValidator(schemes=["http", "https"])(image_1)
+            except ValidationError:
+                return _response(
+                    {"detail": "The image link must be a full web address starting with http:// or https://."},
+                    status=400,
+                )
 
-        draft, _ = StoryDraft.objects.update_or_create(
+        #   A category that no longer exists is simply left blank: a draft should
+        #   never be refused for a choice the author can still make at publish time.
+        category = (request.POST.get("category") or "").strip().upper()
+        if category not in {str(value) for value, _label in get_category_choices()}:
+            category = ""
+
+        try:
+            toc_mode = int((request.POST.get("toc_mode") or "0").strip())
+        except ValueError:
+            toc_mode = 0
+        toc_mode = toc_mode if 0 <= toc_mode <= 3 else 0
+
+        image_quality = (request.POST.get("image_quality") or "").strip().lower()
+        if image_quality not in DRAFT_IMAGE_QUALITIES:
+            image_quality = ""
+
+        newsletter = (request.POST.get("newsletter") or "").strip().lower() in {"1", "true", "yes"}
+
+        _draft, created = StoryDraft.objects.update_or_create(
             author=request.user,
             slot=slot,
             defaults={
-                'heading': heading,
-                'image_1': image_1,
-                'image_info': image_info,
-                'category': category,
-                'content': content,
-                'toc_mode': toc_mode,
-                'newsletter': newsletter,
-                'image_quality': image_quality,
-            }
+                "heading": heading,
+                "image_1": image_1,
+                "image_info": image_info,
+                "category": category,
+                "content": content,
+                "toc_mode": toc_mode,
+                "newsletter": newsletter,
+                "image_quality": image_quality,
+            },
         )
-        return _response({"detail": "Draft saved to slot {}.".format(slot), "slot": slot, "id": draft.pk}, status=200)
+        detail = (
+            f"Your story was saved in slot {slot}."
+            if created
+            else f"Slot {slot} now holds your latest changes."
+        )
+        return _response({"detail": detail, "slot": slot, "drafts": _drafts_payload(request.user)})
 
 
-class AddNewsDraftLoadView(View):
-    def dispatch(self, request, *args, **kwargs):
-        user = getattr(request, 'user', None)
-        if not (getattr(user, 'is_authenticated', False)):
-            return _response({"detail": "You need to sign in to load a draft."}, status=401)
-        if not (getattr(user, 'is_staff', False) or getattr(user, 'is_admin', False) or getattr(user, 'is_superuser', False)):
-            return _response({"detail": "Only authors/staff can load drafts."}, status=403)
-        if request.headers.get("X-Requested-With") != "XMLHttpRequest":
-            return _response({"detail": "This action must be done from the editor."}, status=400)
-        return super().dispatch(request, *args, **kwargs)
+class AddNewsDraftLoadView(_DraftView):
+    """Hand one saved draft back so the editor can fill its fields with it."""
 
     def get(self, request):
-        slot = (request.GET.get('slot') or '').strip()
-        try:
-            slot = int(slot)
-        except Exception:
-            slot = 1
-        if slot < 1 or slot > 5:
-            slot = 1
+        slot = _draft_slot(request.GET.get("slot"))
+        if slot is None:
+            return _response({"detail": DRAFT_SLOT_ERROR}, status=400)
         try:
             draft = StoryDraft.objects.get(author=request.user, slot=slot)
         except StoryDraft.DoesNotExist:
-            return _response({"detail": "No draft saved in slot {}.".format(slot)}, status=404)
-        return _response({
-            "slot": draft.slot,
-            "heading": draft.heading,
-            "image_1": draft.image_1,
-            "image_info": draft.image_info,
-            "category": draft.category,
-            "content": draft.content,
-            "toc_mode": draft.toc_mode,
-            "newsletter": draft.newsletter,
-            "image_quality": draft.image_quality,
-        })
+            return _response({"detail": f"Slot {slot} is empty, so there is nothing to load."}, status=404)
+        return _response(
+            {
+                "detail": f"The draft from slot {slot} is back in the editor.",
+                "slot": draft.slot,
+                "heading": draft.heading,
+                "image_1": draft.image_1,
+                "image_info": draft.image_info,
+                "category": draft.category,
+                "content": draft.content,
+                "toc_mode": draft.toc_mode,
+                "newsletter": draft.newsletter,
+                "image_quality": draft.image_quality,
+            }
+        )
 
 
-class AddNewsDraftListView(View):
-    def dispatch(self, request, *args, **kwargs):
-        if not staff_only(request.user):
-            return _response({"detail": "Not allowed"}, status=403)
-        if request.headers.get("X-Requested-With") != "XMLHttpRequest":
-            return _response({"detail": "Invalid request"}, status=400)
-        return super().dispatch(request, *args, **kwargs)
+class AddNewsDraftListView(_DraftView):
+    """The five slots of the signed in author, filled or empty."""
 
     def get(self, request):
-        drafts = StoryDraft.objects.filter(author=request.user).order_by('slot')
-        data = []
-        for d in drafts:
-            data.append({
-                "slot": d.slot,
-                "heading": d.heading[:60],
-                "category": d.category,
-                "updated_at": d.updated_at.isoformat() if d.updated_at else None,
-            })
-        return _response({"drafts": data})
+        return _response(_drafts_payload(request.user))
 
 
-class AddNewsDraftDeleteView(View):
-    def dispatch(self, request, *args, **kwargs):
-        if not staff_only(request.user):
-            return _response({"detail": "Not allowed"}, status=403)
-        if request.headers.get("X-Requested-With") != "XMLHttpRequest":
-            return _response({"detail": "Invalid request"}, status=400)
-        return super().dispatch(request, *args, **kwargs)
+class AddNewsDraftDeleteView(_DraftView):
+    """Empty one slot."""
 
     def post(self, request):
-        slot = (request.POST.get('slot') or '').strip()
-        try:
-            slot = int(slot)
-        except Exception:
-            slot = 1
-        if slot < 1 or slot > 5:
-            slot = 1
-        StoryDraft.objects.filter(author=request.user, slot=slot).delete()
-        return _response({"detail": "Deleted."})
+        slot = _draft_slot(request.POST.get("slot"))
+        if slot is None:
+            return _response({"detail": DRAFT_SLOT_ERROR}, status=400)
+        removed, _details = StoryDraft.objects.filter(author=request.user, slot=slot).delete()
+        if not removed:
+            return _response(
+                {"detail": f"Slot {slot} was already empty.", "drafts": _drafts_payload(request.user)},
+                status=404,
+            )
+        return _response(
+            {"detail": f"The draft in slot {slot} was deleted.", "drafts": _drafts_payload(request.user)}
+        )

@@ -31,8 +31,8 @@ class About:
 
     #   CONTACTS - personal / one to one /consultancy
     email = "@shaefalaap.resend.app"
-    whatsapp_dm = "https://wa.me.09031394284"
-    mobile = "+234xxxxxxxxxxxx"
+    whatsapp_dm = "https://wa.me/2349031394284"
+    mobile = "+2348113577875"
     
     
 class StaffConfig:

@@ -17,3 +17,13 @@ HOME_BLOGS_CACHE_KEY = "home_page_blogs_v2"
 #   moment content changes, so the cache is normally invalidated long before
 #   this expires.
 HOME_BLOGS_CACHE_TTL = 60*60 # I CHANGED THE TTL TO 1 HOUR 
+
+#   RSS / Atom feed items (HOME.views._FeedView). The 50 newest stories are
+#   built once and shared by /rss.xml and /atom.xml. Written by HOME.views and
+#   cleared by BLOG.signals the moment a story is saved or deleted, so the
+#   TTL below is only a safety net (it also bounds how long a renamed author
+#   can show the old name in the feed). 15 minutes: feed readers and crawlers
+#   poll every 15-60 minutes, so a longer TTL gains nothing and a shorter one
+#   just rebuilds 50 excerpts for no reason.
+STORY_FEED_CACHE_KEY = "story_feed_items_v1"
+STORY_FEED_CACHE_TTL = 15 * 60

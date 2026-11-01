@@ -13,7 +13,7 @@ from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.templatetags.static import static
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import dateformat, timezone
 
 from ADMIN.models import SiteSettings
 from ARCHIVE.models import ArchiveImage
@@ -2036,11 +2036,24 @@ class StoryFeedTests(QuietTestCase):
         self.assertContains(response, "/rss.xml")
         self.assertContains(response, "/atom.xml")
 
-    def test_robots_and_llms_txt_point_at_both_feeds(self):
+    def test_feed_dates_follow_the_newest_story_not_the_request_time(self):
+        stamp = timezone.now() - timedelta(days=5)
+        Blog.objects.filter(pk=self.story.pk).update(date_created=stamp, last_updated=stamp)
+        cache.clear()
+
+        rss = self.client.get("/rss.xml").content.decode()
+        atom = self.client.get("/atom.xml").content.decode()
+
+        local_stamp = timezone.localtime(stamp)
+        self.assertIn(f"<lastBuildDate>{dateformat.format(local_stamp, 'r')}</lastBuildDate>", rss)
+        self.assertIn(f"<updated>{dateformat.format(local_stamp, 'c')}</updated>", atom)
+
+    def test_robots_leaves_feed_lines_out_and_llms_txt_keeps_both_feeds(self):
         robots = self.client.get("/robots.txt")
 
-        self.assertContains(robots, "/rss.xml")
-        self.assertContains(robots, "/atom.xml")
+        #   "RSS:" / "Atom:" are not real robots.txt directives, so they are commented out
+        self.assertNotContains(robots, "RSS:")
+        self.assertNotContains(robots, "Atom:")
 
         llms = self.client.get("/llms.txt")
 

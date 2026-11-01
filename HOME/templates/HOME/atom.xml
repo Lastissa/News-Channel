@@ -10,7 +10,7 @@
   <link href="{{ domain }}/" rel="alternate" type="text/html"/>
   <link href="{{ feed_url }}" rel="self" type="application/atom+xml"/>
   <id>{{ domain }}/</id>
-  <updated>{% now "c" %}</updated>
+  <updated>{{ last_updated|date:"c" }}</updated>
   <rights>{% now "Y" %} {{ project_name }}</rights>
   <icon>{{ logo }}</icon>
   <logo>{{ logo }}</logo>

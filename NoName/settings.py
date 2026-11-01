@@ -141,12 +141,6 @@ USE_TZ = True
 STATIC_URL = 'static/'
 SESSION_COOKIE_AGE = 7 * 24 * 60 * 60 # 7 days for regular user
 ADMIN_MAX_AGE_TOO = 24 * 60 * 60 # 1 day max for admins for security reason
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
-
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "staticfiles": {
