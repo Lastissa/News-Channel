@@ -155,8 +155,8 @@ class RobotsTxtView(View):
                 f"Sitemap: {domain}/sitemap.xml",
                 #   Syndication discovery: aggregators and feed readers read the
                 #   same two feeds every page <head> advertises.
-                f"# RSS: {domain}/rss.xml",
-                f"# Atom: {domain}/atom.xml",
+                f"RSS: {domain}/rss.xml",
+                f"Atom: {domain}/atom.xml",
             ]
         )
         return HttpResponse(body, content_type="text/plain; charset=utf-8")

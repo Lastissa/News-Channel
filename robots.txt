@@ -6,3 +6,7 @@ Disallow: /analytics/
 Allow: /
 
 Sitemap: https://abureport.com/sitemap.xml
+RSS: https://abureport.com.ng/rss.xml
+Atom: https://abureport.com.ng/atom.xml
+
+# NOT THE REAL ONE , JUST FOR UNIT TEST
