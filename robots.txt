@@ -3,6 +3,7 @@ Disallow: /auth/
 Disallow: /admin/
 Disallow: /control/
 Disallow: /analytics/
+# Allow story pages to be indexed
+Allow: /story/
 Allow: /
-
 Sitemap: https://abureport.com/sitemap.xml
