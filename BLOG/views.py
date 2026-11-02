@@ -22,7 +22,7 @@ from django.views import View
 from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from ARCHIVE.models import ArchiveImage
-from SERVICE_INTERNAL.abstract import _optimization, cache_or_run, error_logger, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
+from SERVICE_INTERNAL.abstract import cache_or_run, error_logger, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
 from SERVICE_INTERNAL.email_single import (
     _build_email_html,
     _dispatch_email,

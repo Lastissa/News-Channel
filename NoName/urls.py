@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from HOME.views import BingIndexNowView, YandexIndexNow, FavicoView, RobotsTxtView, LlmsTxtView, RssFeedView, AtomFeedView, UnsubscribeView
+from HOME.views import BingIndexNowView, YandexIndexNow, FavicoView, ManifestView, RobotsTxtView, LlmsTxtView, RssFeedView, AtomFeedView, UnsubscribeView
 from HOME.sitemap_views import (
     SitemapIndexView,
     RecentNewsSitemapView,
@@ -24,6 +24,7 @@ handler500 = "HOME.views.handler500"
 urlpatterns = [
     path('robots.txt', RobotsTxtView.as_view()),
     path('favicon.ico', FavicoView.as_view()),
+    path('site.webmanifest', ManifestView.as_view()),
     path('sitemap.xml', SitemapIndexView.as_view()),
     path('sitemap.xml/', SitemapIndexView.as_view()),
     path('sitemap_index.xml', SitemapIndexView.as_view()),

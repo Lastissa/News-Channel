@@ -2313,3 +2313,36 @@ class AuthorLyticsTests(TestCase):
         response = self.client.get(self.detail_url, {"author": "abc", "range": "30d"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("data-author-detail-hint", response.content.decode())
+
+
+class AuthorLyticsInsightsTests(TestCase):
+    """The rank, rhythm, readership and reader response charts that used to sit
+    on the public portfolio now live in the author detail panel."""
+
+    def setUp(self):
+        self.admin = Auth.objects.create_admin(email="insight-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="insight-writer@example.com")
+        StaffProfile.objects.create(auth=self.writer, gender="O", full_name="Ines Writer")
+
+    def _detail(self):
+        self.client.force_login(self.admin)
+        return self.client.get(reverse("control:analytics_author_detail"), {"author": self.writer.pk})
+
+    def test_panel_draws_every_chart_for_an_author_with_stories(self):
+        Blog.objects.create(
+            author=self.writer, heading="Insight story", category="NEWS",
+            content="Body.", image_1="https://example.com/a.jpg", views=12, likes=3,
+        )
+
+        body = self._detail().content.decode()
+
+        for heading in ("Author rank", "Publishing rhythm", "Readership by category", "Reader response"):
+            with self.subTest(heading=heading):
+                self.assertIn(heading, body)
+        self.assertIn("Insight story", body)
+
+    def test_panel_tells_the_admin_when_there_is_nothing_to_chart(self):
+        body = self._detail().content.decode()
+
+        self.assertIn("nothing to chart", body)
+        self.assertNotIn("Publishing rhythm", body)

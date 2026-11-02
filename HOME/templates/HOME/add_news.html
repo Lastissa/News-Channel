@@ -58,6 +58,12 @@
       .editor-shell[data-view="preview"] .editor-form-pane { display: none; }
       [data-editor-preview-toggle] { display: none !important; }
     }
+  
+    @media (max-width: 640px){
+      .editor-actions .editor-btn{ padding: 6px 10px; font-size: 0.8rem; }
+      #save-story-draft-btn, #load-story-draft-btn{ margin-right: 6px; }
+      .editor-toolbar-sub{ flex-wrap: wrap; gap: 8px; }
+    }
   </style>
 {% endblock %}
 

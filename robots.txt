@@ -5,8 +5,6 @@ Disallow: /control/
 Disallow: /analytics/
 Allow: /
 
-Sitemap: https://abureport.com.ng/sitemap.xml
-# RSS: https://abureport.com.ng/rss.xml
-# Atom: https://abureport.com.ng/atom.xml
+Sitemap: https://abureport.com/sitemap.xml
 
 # NOT THE REAL ONE , JUST FOR UNIT TEST

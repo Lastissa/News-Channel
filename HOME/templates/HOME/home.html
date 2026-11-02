@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% load format_copy_btn archive_extras %}
+{% load format_copy_btn archive_extras home_extras %}
 
 {% block title %}
 {% spaceless %}
@@ -50,7 +50,7 @@
   {% if featured_posts %}
   <div class="hero-track">
     {% for post in featured_posts %}
-        <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|cloudinary_proxy|default:placeholder|safe }}');" data-index="{{ forloop.counter0 }}">
+        <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|cloudinary_proxy|default:placeholder|css_url }}');" data-index="{{ forloop.counter0 }}">
       {% comment %}Real, crawlable <img> with alt text (the slide's CSS background stays as the fallback layer if it fails to load); removes it on error so the background shows through.{% endcomment %}
       {% if post.image_1 %}
       <img class="hero-slide-img" src="{{ post.image_1|cloudinary_proxy }}" alt="{{ post.heading }}" loading="{% if forloop.first %}eager{% else %}lazy{% endif %}" decoding="async" onload="if(!this.getAttribute('width')){this.width=this.naturalWidth;this.height=this.naturalHeight;}" onerror="this.remove();">
@@ -142,9 +142,9 @@
     {% for item in teaser_items %}
     {% if item.url %}<a class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %} aria-label="{{ item.heading|default:'Advert' }}"
          data-index="{{ forloop.counter0 }}"
-         {% if item.image %}style="--teaser-image: url('{{ item.image }}');"{% endif %}>{% else %}<div class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}"
+         {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% else %}<div class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}"
          data-index="{{ forloop.counter0 }}"
-         {% if item.image %}style="--teaser-image: url('{{ item.image }}');"{% endif %}>{% endif %}
+         {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% endif %}
       {% comment %} Mobile: picture only (CSS hides .teaser-slide-inner on .has-image). Desktop: caption bar at the bottom in paper/ink. {% endcomment %}
       {% if item.heading or item.body or not item.image %}
       <div class="teaser-slide-inner">

@@ -12,6 +12,23 @@ from django import template
 
 register = template.Library()
 
+#   Characters that can end a CSS url('...') early or escape the style="..."
+#   attribute it sits in. They are percent-encoded, never trusted.
+_CSS_URL_UNSAFE = re.compile(r"""[\s'"()\\<>`]""")
+
+
+@register.filter(name="css_url")
+def css_url(value):
+    """Makes an image link safe to drop inside url('...') in a style attribute.
+
+        style="--slide-image: url('{{ post.image_1|css_url }}');"
+
+    Quotes, brackets, backslashes, angle brackets and spaces are percent-encoded
+    so a link can never close the url() early or open a new CSS rule, and the
+    normal template escaping still protects the attribute itself. A normal
+    https link comes out unchanged."""
+    return _CSS_URL_UNSAFE.sub(lambda m: "%%%02X" % ord(m.group(0)), str(value or ""))
+
 #   WRITER MARKUP (see DOCS/NEWS_CONTENT_CONVENTION.MD) THAT MUST NEVER LEAK
 #   INTO A CARD EXCERPT: image directives, filel lines, headings, bullets, bold.
 _DIRECTIVE = re.compile(r"^(imgl|imgr|imgc|vidl|vidr|vidc|filel)\s+", re.IGNORECASE)

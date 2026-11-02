@@ -9,7 +9,6 @@ import time
 from django.core.cache import cache, caches
 from rest_framework.response import Response
 from django.http import JsonResponse
-from django.db import connection
 import logging
 
 
@@ -258,17 +257,6 @@ def error_logger(logger = logger, debug = debug_base, msg = "NOT PASSED"):
     if debug: print(msg)
     else: return logger.error(msg=msg)
 
-
-
-def _optimization(debug = debug_base):
-    """Analyze database queries"""
-    return 0
-    if debug:
-        for i, q in enumerate(connection.queries):
-            print(f'\nQuery {i + 1}: {q["sql"]}\n')
-        print("DB queries:", len(connection.queries))
-    else:
-        print('debug mode is off')
 
 
 def set_cache(key, value, timeout = None):

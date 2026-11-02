@@ -249,7 +249,7 @@
 
 {% if False %}
   Previous analytics dashboard retired in favor of the author post feed.
-  {# ---------- KEY NUMBERS: six totals plus two milestones ---------- #}
+  {# ---------- KEY NUMBERS: six totals ---------- #}
   <dl class="portfolio-stats-strip" aria-label="Editorial statistics">
     {% comment %} <div>
       <dt>Total story views</dt>
@@ -284,29 +284,6 @@
       <dd>{{ stats.average_likes|floatformat:"0g" }}</dd>
       <small>Per published story</small>
     </div>
-    <div class="portfolio-stat--milestone">
-      <dt>Author rank</dt>
-      {% if ranking.rank %}
-        <dd>#{{ ranking.rank }}</dd>
-        <small>of {{ ranking.total_authors }} author{{ ranking.total_authors|pluralize }} by stories posted</small>
-        <span class="rank-bars" aria-hidden="true">
-          {% for bar in ranking.bars %}<span class="rank-bar{% if bar.is_me %} is-me{% endif %}" style="height: {{ bar.height }}%"></span>{% endfor %}
-        </span>
-      {% else %}
-        <dd>Unranked</dd>
-        <small>No stories published yet</small>
-      {% endif %}
-    </div>
-    <div class="portfolio-stat--milestone">
-      <dt>Most viewed story</dt>
-      {% if top_story %}
-        <dd>{{ top_story.views|floatformat:"0g" }}</dd>
-        <small class="stat-story-title"><a href="{% url 'blog:story_detail' top_story.slug %}" title="{{ top_story.heading }}">{{ top_story.heading }}</a></small>
-      {% else %}
-        <dd>None yet</dd>
-        <small>No stories published yet</small>
-      {% endif %}
-    </div>
   </dl>
 
   <nav class="portfolio-tabs" aria-label="Portfolio sections">
@@ -314,10 +291,6 @@
     {% if tribute %}<a href="#portfolio-tribute">Endorsement</a>{% endif %}
     {% if stories %}
       <a href="#portfolio-work">Story reach</a>
-      <a href="#portfolio-coverage">Coverage</a>
-      <a href="#portfolio-rhythm">Rhythm</a>
-      <a href="#portfolio-readership">Readership</a>
-      <a href="#portfolio-response">Reader response</a>
     {% endif %}
     <a href="#portfolio-contact">Contact</a>
   </nav>
@@ -326,7 +299,7 @@
 
     {% if stories %}
       {# ---- recent story reach ---- #}
-      <section class="portfolio-card span-7" id="portfolio-work">
+      <section class="portfolio-card span-12" id="portfolio-work">
         <header class="portfolio-card-head">
           <div>
             <h2>Recent story reach</h2>
@@ -352,129 +325,13 @@
         </ul>
       </section>
 
-      {# ---- coverage ranking ---- #}
-      <section class="portfolio-card span-5" id="portfolio-coverage">
-        <header class="portfolio-card-head">
-          <div>
-            <h2>Coverage</h2>
-            <p>Published stories by category, ranked.</p>
-          </div>
-          <span class="tag portfolio-section-tag">By topic</span>
-        </header>
-        <ol class="coverage-list">
-          {% for row in coverage %}
-            <li>
-              <span class="coverage-pos" aria-hidden="true">{{ row.position }}</span>
-              <span class="coverage-label">{{ row.label }}</span>
-              <span class="coverage-track" role="img" aria-label="{{ row.label }}: {{ row.total }} stor{{ row.total|pluralize:'y,ies' }}, {{ row.share }} percent of published work">
-                <span class="coverage-fill" style="width: {{ row.width }}%"></span>
-              </span>
-              <span class="coverage-count"><strong>{{ row.total }}</strong><small>{{ row.share }}%</small></span>
-            </li>
-          {% endfor %}
-        </ol>
-      </section>
-
-      {# ---- publishing rhythm ---- #}
-      <section class="portfolio-card span-7" id="portfolio-rhythm">
-        <header class="portfolio-card-head">
-          <div>
-            <h2>Publishing rhythm</h2>
-            <p>Stories published per month over the last {{ rhythm_months }} months.</p>
-          </div>
-          <span class="tag portfolio-section-tag">Output</span>
-        </header>
-        <ol class="rhythm-cols">
-          {% for column in rhythm.columns %}
-            <li class="rhythm-col{% if column.total == 0 %} is-empty{% endif %}{% if column.is_current %} is-current{% endif %}" style="--p: {{ column.height }}">
-              <span class="rhythm-plot">
-                <span class="rhythm-value">{{ column.total }}</span>
-                <span class="rhythm-bar"></span>
-              </span>
-              <span class="rhythm-label">{{ column.label }}{% if column.year %}<small>{{ column.year }}</small>{% endif %}</span>
-              <span class="sr-only">{{ column.label }}: {{ column.total }} stor{{ column.total|pluralize:"y,ies" }}</span>
-            </li>
-          {% endfor %}
-        </ol>
-        <p class="portfolio-caption">
-          {% if rhythm.window_total %}
-            {{ rhythm.window_total }} stor{{ rhythm.window_total|pluralize:"y,ies" }} in this window. The tallest month is the full height of the chart.
-          {% else %}
-            No stories in this window. Older work is counted in the totals above.
-          {% endif %}
-        </p>
-      </section>
-
-      {# ---- readership by category ---- #}
-      <section class="portfolio-card span-5" id="portfolio-readership">
-        <header class="portfolio-card-head">
-          <div>
-            <h2>Readership</h2>
-            <p>Views by category.</p>
-          </div>
-          <span class="tag portfolio-section-tag">Audience</span>
-        </header>
-        {% if readership %}
-          <div class="readership">
-            <div class="donut">
-              {% localize off %}
-              <svg viewBox="0 0 42 42" role="img" aria-label="Share of {{ stats.total_views }} views by category">
-                <circle class="donut-track" cx="21" cy="21" r="15.9155" fill="none" stroke-width="6"/>
-                {% for slice in readership %}
-                  <circle class="donut-slice tone-{{ slice.tone }}" cx="21" cy="21" r="15.9155" fill="none" stroke-width="6"
-                          stroke-dasharray="{{ slice.dash }} {{ slice.gap }}" stroke-dashoffset="{{ slice.offset }}"/>
-                {% endfor %}
-                <text class="donut-total" x="21" y="21.6" text-anchor="middle">{{ stats.total_views|floatformat:"0g" }}</text>
-                <text class="donut-caption" x="21" y="26.4" text-anchor="middle">views</text>
-              </svg>
-              {% endlocalize %}
-            </div>
-            <ul class="donut-legend">
-              {% for slice in readership %}
-                <li>
-                  <span class="swatch tone-{{ slice.tone }}" aria-hidden="true"></span>
-                  <span class="legend-label">{{ slice.label }}</span>
-                  <span class="legend-value"><strong>{{ slice.views|floatformat:"0g" }}</strong><small>{{ slice.pct_label }}</small></span>
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% else %}
-          <p class="portfolio-empty">No views recorded yet.</p>
-        {% endif %}
-      </section>
-
-      {# ---- reader response ---- #}
-      <section class="portfolio-card span-12" id="portfolio-response">
-        <header class="portfolio-card-head">
-          <div>
-            <h2>Reader response</h2>
-            <p>What readers do after opening the work. Every bar is measured against total views.</p>
-          </div>
-          <span class="tag portfolio-section-tag">Engagement</span>
-        </header>
-        <ul class="response-list">
-          {% for row in reader_response %}
-            <li>
-              <div class="response-copy">
-                <span class="response-label">{{ row.label }}</span>
-                <small>{{ row.note }}</small>
-              </div>
-              <span class="response-track" role="img" aria-label="{{ row.label }}: {{ row.value }}{% if row.ratio %}, {{ row.ratio }}{% endif %}">
-                <span class="response-fill" style="width: {{ row.width }}%"></span>
-              </span>
-              <span class="response-nums"><strong>{{ row.value|floatformat:"0g" }}</strong>{% if row.ratio %}<small>{{ row.ratio }}</small>{% endif %}</span>
-            </li>
-          {% endfor %}
-        </ul>
-      </section>
     {% else %}
       <section class="portfolio-card span-12">
         <header class="portfolio-card-head">
           <div><h2>Published work</h2></div>
           <span class="tag portfolio-section-tag">Latest work</span>
         </header>
-        <p class="portfolio-empty">No stories published yet. Reach, coverage and readership charts appear here after the first story goes live.</p>
+        <p class="portfolio-empty">No stories published yet. The reach chart appears here after the first story goes live.</p>
       </section>
     {% endif %}
   </div>

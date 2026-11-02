@@ -2096,3 +2096,67 @@ class ArchiveUploadAlertToggleTests(QuietTestCase):
         member = Auth.objects.create_user(email="member2@example.com")
         self.client.force_login(member)
         self.assertNotContains(self.client.get(reverse("home:profile")), "Archive upload alerts")
+
+
+class HomeScreenHeadTests(QuietTestCase):
+    """Web manifest, iOS icon and address bar colour (HOME.views.ManifestView, base.html)."""
+
+    def test_manifest_is_served_with_name_colours_and_icons(self):
+        response = self.client.get("/site.webmanifest")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("application/manifest+json"))
+        data = response.json()
+        self.assertEqual(data["name"], "AbuReport")
+        self.assertEqual(data["start_url"], "/")
+        self.assertEqual(data["display"], "standalone")
+        sizes = {(icon["sizes"], icon["purpose"]) for icon in data["icons"]}
+        self.assertIn(("192x192", "any"), sizes)
+        self.assertIn(("512x512", "maskable"), sizes)
+
+    def test_every_page_links_the_manifest_ios_icon_and_theme_colour(self):
+        body = self.client.get("/").content.decode()
+
+        self.assertIn('rel="manifest" href="/site.webmanifest"', body)
+        self.assertIn('rel="apple-touch-icon"', body)
+        self.assertIn('<meta name="theme-color" content="#0E1B2C">', body)
+
+
+class ImageLinkSafetyTests(QuietTestCase):
+    """A banner link ends up inside CSS on the home page, so it is checked twice:
+    refused on save, and encoded by the css_url filter on output."""
+
+    UNSAFE = 'https://example.com/a.jpg"onmouseover="alert(1)'
+
+    def test_css_url_filter_encodes_quotes_brackets_and_spaces(self):
+        from HOME.templatetags.home_extras import css_url
+
+        self.assertEqual(css_url("https://example.com/a.jpg"), "https://example.com/a.jpg")
+        cleaned = css_url("https://x.com/a' b\"c)d")
+        for char in ("'", '"', " ", ")"):
+            self.assertNotIn(char, cleaned)
+
+    def test_publishing_with_a_quote_in_the_image_link_is_refused(self):
+        author = make_staff("link-check@example.com")
+        self.client.force_login(author)
+
+        response = self.client.post(
+            reverse("home:add_news"),
+            {"heading": "Link check story", "category": "GENERAL", "content": PUBLISHABLE_BODY, "image_1": self.UNSAFE},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("not allowed", response.json()["detail"])
+        self.assertFalse(Blog.objects.filter(heading="Link check story").exists())
+
+    def test_saving_a_draft_with_a_quote_in_the_image_link_is_refused(self):
+        author = make_staff("draft-link@example.com")
+        self.client.force_login(author)
+
+        response = self.client.post(
+            reverse("home:add_news_draft_save"),
+            {"slot": "1", "heading": "Draft", "content": "Some text", "image_1": self.UNSAFE},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)

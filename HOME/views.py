@@ -66,6 +66,17 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 25  #   THE AMOUNT OF NEWs  TO FIRDT LOAD excluding the feratured + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
+#   A banner link is later placed inside CSS (url('...')) on the home page. These
+#   characters are never part of a normal picture link, so they are refused at
+#   the door; the css_url template filter is the second lock.
+UNSAFE_IMAGE_LINK_CHARS = set("'\"\\<>` \t\r\n")
+IMAGE_LINK_UNSAFE_MESSAGE = "The image link contains a quote, space or other character that is not allowed. Paste the plain web address of the picture."
+
+
+def _image_link_is_unsafe(link):
+    return any(char in UNSAFE_IMAGE_LINK_CHARS for char in (link or ""))
+
+
 TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
 
 #   "CONTINUE READING" POPUP (HOME/partials/continue_popup.html). How many
@@ -167,123 +178,6 @@ class RobotsTxtView(View):
             ]
         )
         return HttpResponse(body, content_type="text/plain; charset=utf-8")
-
-
-class SitemapXmlView(View):
-    """Hand built sitemap: static pages, every published story and every
-    staff portfolio. No contrib.sitemaps dependency, domain comes from the
-    editable About.domain so it stays correct after a config change."""
-
-    def get(self, request):
-        domain = About.domain.rstrip("/")
-        #   The archive gallery entry gets a real lastmod from the newest item
-        #   (deferred import: HOME does not otherwise depend on ARCHIVE).
-        from ARCHIVE.models import ArchiveImage, ArchiveKind
-        from ARCHIVE.templatetags.archive_extras import cloudinary_proxy
-
-        newest_item = ArchiveImage.objects.order_by("-date_created").only("date_created").first()
-        archive_lastmod = (
-            newest_item.date_created.date().isoformat()
-            if newest_item and newest_item.date_created
-            else ""
-        )
-        #   IMAGE SITEMAP: every archive picture is listed as its own
-        #   <image:image> entry on the gallery URL, using the same-origin
-        #   /archive/cdn/ URL the page itself renders, so Google Images can
-        #   index the individual assets and not just the gallery page. Any URL
-        #   we do not host (an external link pasted in) is skipped, and the
-        #   list is capped like the stories below to keep one file small.
-        archive_images = []
-        for item in (
-            ArchiveImage.objects.filter(kind=ArchiveKind.IMAGE)
-            .only("url", "alt", "date_created")
-            .order_by("-date_created")[:2000]
-        ):
-            proxied = cloudinary_proxy(item.url)
-            if not proxied or not str(proxied).startswith("/"):
-                continue
-            archive_images.append(
-                {
-                    "loc": f"{domain}{proxied}",
-                    "title": item.alt,
-                    "caption": item.alt,
-                    "lastmod": item.date_created.date().isoformat() if item.date_created else "",
-                }
-            )
-        today = timezone.localdate()
-        urls = [
-            {"loc": f"{domain}/", "lastmod": today.isoformat(), "changefreq": "hourly", "priority": "1.0"},
-            {"loc": f"{domain}{reverse('home:about')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
-            #   /editorial/ is the public "who reports this and how" trust page;
-            #   it carries the same E-E-A-T weight as /about/ and is indexable,
-            #   so it belongs in the sitemap beside it.
-            {"loc": f"{domain}{reverse('editorial_team')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
-            {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": today.isoformat(), "changefreq": "yearly", "priority": "0.3"},
-            {"loc": f"{domain}{reverse('home:promote')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
-            #   /archive/ now also carries every image/file's own real,
-            #   same-domain cdn/ URL (see ARCHIVE.views.CloudinaryProxyView),
-            #   so the gallery page itself is worth indexing for SEO too.
-            {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod or today.isoformat(), "changefreq": "daily", "priority": "0.6", "images": archive_images},
-        ]
-
-        #   PERMANENT CATEGORY PAGES: /category/<slog>/ is a stable landing page
-        #   for each news category. Only categories that ACTUALLY HOLD STORIES
-        #   are listed: an empty category page is thin content, so putting every
-        #   configured category (including ones with zero stories) in the sitemap
-        #   asks Google to index empty pages.
-        published_categories = set(
-            Blog.objects.exclude(slug__isnull=True)
-            .exclude(slug="")
-            .values_list("category", flat=True)
-            .distinct()
-        )
-        for name, _ in get_category_choices():
-            if name not in published_categories:
-                continue
-            urls.append(
-                {
-                    "loc": f"{domain}{reverse('home:category', args=[slugify(name)])}",
-                    "lastmod": today.isoformat(),
-                    "changefreq": "daily",
-                    "priority": "0.7",
-                }
-            )
-
-        stories = Blog.objects.exclude(slug__isnull=True).exclude(slug="").only(
-            "id", "slug", "date_created", "last_updated"
-        ).order_by("-date_created")[:2000]
-        for story in stories:
-            last_mod = story.last_updated or story.date_created
-            if story.date_created and (not last_mod or story.date_created > last_mod):
-                last_mod = story.date_created
-            urls.append(
-                {
-                    "loc": f"{domain}{reverse('blog:story_detail', args=[story.slug])}",
-                    "lastmod": last_mod.date().isoformat() if last_mod else "",
-                    "changefreq": "weekly",
-                    "priority": "0.8",
-                }
-            )
-
-        profiles = (
-            StaffProfile.objects.filter(auth__is_active=True)
-            .filter(Q(auth__is_staff=True) | Q(auth__is_admin=True) | Q(auth__is_superuser=True))
-            .exclude(slug__isnull=True)
-            .exclude(slug="")
-            .only("id", "slug")
-            .order_by("slug")
-        )
-        for profile in profiles:
-            urls.append(
-                {
-                    "loc": f"{domain}{reverse('staff:portfolio', args=[profile.slug])}",
-                    "lastmod": today.isoformat(),
-                    "changefreq": "weekly",
-                    "priority": "0.6",
-                }
-            )
-
-        return render(request, "HOME/sitemap.xml", {"urls": urls}, content_type="application/xml")  # Legacy - redirects to new structure via URL routing
 
 
 class LlmsTxtView(View):
@@ -530,6 +424,34 @@ class AtomFeedView(_FeedView):
     template_name = "HOME/atom.xml"
     feed_path = "/atom.xml"
     content_type = "application/atom+xml; charset=utf-8"
+
+
+class ManifestView(View):
+    """/site.webmanifest: lets a phone offer "Add to home screen" with the right
+    name, colours and icons. Values come from config so the name never drifts
+    from the rest of the site; only the icon files live in static."""
+
+    def get(self, request):
+        data = {
+            "id": "/",
+            "name": About.project_name,
+            "short_name": About.project_name,
+            "description": About.project_cachphrase,
+            "lang": "en-NG",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#FFFFFF",
+            "theme_color": "#0E1B2C",
+            "icons": [
+                {"src": static("home/icons/icon-192.png"), "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                {"src": static("home/icons/icon-512.png"), "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                {"src": static("home/icons/icon-512-maskable.png"), "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+            ],
+        }
+        response = JsonResponse(data, content_type="application/manifest+json")
+        response["Cache-Control"] = "public, max-age=86400"
+        return response
 
 
 class FavicoView(View):
@@ -1305,6 +1227,8 @@ class AddNewsView(View):
                 validator(image_url)
             except ValidationError:
                 return _response({"detail": "The image link must be a valid http or https URL."}, status=400)
+            if _image_link_is_unsafe(image_url):
+                return _response({"detail": IMAGE_LINK_UNSAFE_MESSAGE}, status=400)
 
         #   THE SAME AUTHOR CANNOT PUBLISH THE SAME HEADING INTO THE SAME
         #   CATEGORY TWICE (mirrors the database constraint on Blog)
@@ -1461,6 +1385,8 @@ class EditNewsView(View):
                     return _response({"detail": "The image link must be a valid http or https URL."}, status=400)
                 if len(image_url) > Blog._meta.get_field("image_1").max_length:
                     return _response({"detail": "The image link is too long."}, status=400)
+                if _image_link_is_unsafe(image_url):
+                    return _response({"detail": IMAGE_LINK_UNSAFE_MESSAGE}, status=400)
                 #   THE BOX IS PREFILLED WITH THE CURRENT BANNER LINK, SO THE
                 #   SAME VALUE COMING BACK MEANS "LEAVE THE BANNER ALONE"
                 #   (this also keeps the Cloudinary public id of an uploaded one).
@@ -3167,6 +3093,8 @@ class AddNewsDraftSaveView(_DraftView):
                     {"detail": "The image link must be a full web address starting with http:// or https://."},
                     status=400,
                 )
+            if _image_link_is_unsafe(image_1):
+                return _response({"detail": IMAGE_LINK_UNSAFE_MESSAGE}, status=400)
 
         #   A category that no longer exists is simply left blank: a draft should
         #   never be refused for a choice the author can still make at publish time.

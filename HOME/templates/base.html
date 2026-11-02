@@ -27,6 +27,12 @@
     <meta name="twitter:description" content="{% block twitter_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
     {% comment %} ONCE WE HAVE AN OFFICAL X HANDLE, I WILL ATTACH twitter:site HERE {% endcomment %}
     <link rel="icon" type="image/jpeg" href="{% static "logo.jpg" %}">
+    {% comment %} HOME SCREEN / BROWSER CHROME: PNG favicon (Google asks for a multiple of 48px), iOS icon, web manifest (HOME.views.ManifestView) and the address bar colour (the navbar colour of the active theme). {% endcomment %}
+    <link rel="icon" type="image/png" sizes="48x48" href="{% static 'home/icons/favicon-48.png' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'home/icons/icon-192.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'home/icons/apple-touch-icon.png' %}">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="theme-color" content="{% if theme_preference == 'dark' %}#1C2E47{% else %}#0E1B2C{% endif %}">
     {% comment %} FEED DISCOVERY: the newest stories are syndicated as RSS 2.0 and Atom 1.0 (HOME.views.RssFeedView / AtomFeedView). Every page advertises both so readers and aggregators can auto-detect them. {% endcomment %}
     <link rel="alternate" type="application/rss+xml" title="{{ project_name }} | Newest stories" href="{{ site_domain }}/rss.xml">
     <link rel="alternate" type="application/atom+xml" title="{{ project_name }} | Newest stories" href="{{ site_domain }}/atom.xml">

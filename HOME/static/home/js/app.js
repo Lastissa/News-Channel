@@ -10,6 +10,9 @@
   /* Theme toggle */
   function applyTheme(theme) {
     root.setAttribute("data-theme", theme);
+    /* keep the phone's address bar colour in step with the navbar colour of the theme */
+    var bar = document.querySelector('meta[name="theme-color"]');
+    if (bar) bar.setAttribute("content", theme === "dark" ? "#1C2E47" : "#0E1B2C");
     try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* storage unavailable, ignore */ }
     try {
       document.cookie = THEME_KEY + "=" + theme + "; path=/; max-age=31536000; SameSite=Lax";

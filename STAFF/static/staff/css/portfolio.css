@@ -2,12 +2,6 @@
   --pf-track: rgba(14, 27, 44, 0.08);
   --pf-mute: rgba(14, 27, 44, 0.28);
   --pf-unfollow: #fa8773;
-  --pf-c1: #0b6e8a;
-  --pf-c2: #22d3ee;
-  --pf-c3: #0e1b2c;
-  --pf-c4: #5b6b7c;
-  --pf-c5: #9fe9f6;
-  --pf-other: #c3cdd8;
 width: 100vw;
   /* width: min(1180px, calc(100% - 24px)); moved to only desktop */
   /* margin: 16px auto 0; */ /*before the default v1 margin moved to only desktop*/
@@ -18,12 +12,6 @@ width: 100vw;
 html[data-theme="dark"] .portfolio-shell {
   --pf-track: rgba(243, 239, 230, 0.1);
   --pf-mute: rgba(243, 239, 230, 0.32);
-  --pf-c1: #22d3ee;
-  --pf-c2: #2b8cab;
-  --pf-c3: #f3efe6;
-  --pf-c4: #93a2b3;
-  --pf-c5: #b7eef8;
-  --pf-other: #4a5a6e;
 }
 
 .portfolio-card[id],
@@ -345,43 +333,6 @@ html[data-theme="dark"] .portfolio-role {background: red;}
   line-height: 1.35;
 }
 
-.portfolio-stat--milestone {
-  box-shadow: inset 0 4px 0 red;
-  padding-top: 16px !important;
-}
-
-.stat-story-title a {
-  display: block;
-  overflow: hidden;
-  color: var(--brand-deep);
-  font-weight: 600;
-  text-decoration: underline;
-  text-overflow: ellipsis;
-  text-underline-offset: 3px;
-  white-space: nowrap;
-}
-
-/* Author rank mini chart: one bar per ranked author, ours in brand colour. */
-.rank-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 26px;
-  margin-top: 8px;
-}
-
-.rank-bar {
-  flex: 1 1 0;
-  max-width: 16px;
-  min-height: 3px;
-  background: var(--pf-mute);
-}
-
-.rank-bar.is-me {
-  background: var(--brand);
-  box-shadow: inset 0 0 0 1px var(--brand-deep);
-}
-
 /* ---------- Section tabs ---------- */
 .portfolio-tabs {
   display: flex;
@@ -582,18 +533,14 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 
 /* All bars share one look: a track, a brand fill, a dark teal underside. */
-.reach-track,
-.coverage-track,
-.response-track {
+.reach-track {
   display: block;
   height: 12px;
   overflow: hidden;
   background: var(--pf-track);
 }
 
-.reach-fill,
-.coverage-fill,
-.response-fill {
+.reach-fill {
   display: block;
   height: 100%;
   background: var(--brand);
@@ -628,326 +575,6 @@ html[data-theme="dark"] .portfolio-role {background: red;}
 }
 .portfolio-feed-end { text-align: center; color: var(--slate); font-size: 0.9rem; margin: 0; }
 .portfolio-feed-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-
-/* ---------- Coverage ranking ---------- */
-.coverage-list {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.coverage-list li {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  grid-template-areas:
-    "pos label count"
-    "pos track count";
-  align-items: center;
-  gap: 4px 10px;
-}
-
-.coverage-pos {
-  grid-area: pos;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-  background: var(--nav-bg);
-  color: var(--nav-fg);
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.coverage-list li:first-child .coverage-pos {
-  background: var(--brand);
-  color: var(--on-brand);
-}
-
-.coverage-label {
-  grid-area: label;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 0.86rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.coverage-track {
-  grid-area: track;
-}
-
-.coverage-count {
-  grid-area: count;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.15;
-}
-
-.coverage-count strong {
-  color: var(--ink);
-  font-size: 1rem;
-}
-
-.coverage-count small,
-.legend-value small,
-.response-nums small {
-  color: var(--ink);
-  font-size: 0.7rem;
-}
-
-/* ---------- Publishing rhythm ---------- */
-.rhythm-cols {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
-  flex: 1 1 auto;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.rhythm-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* --p is the bar height as a whole percent of the plot, headroom kept for
-   the value that sits on top of the bar. */
-.rhythm-plot {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 190px;
-  border-bottom: 2px solid var(--ink);
-  background-image: repeating-linear-gradient(to top, var(--pf-track) 0, var(--pf-track) 1px, transparent 1px, transparent 25%);
-}
-
-.rhythm-bar {
-  position: absolute;
-  right: 14%;
-  bottom: 0;
-  left: 14%;
-  height: calc((100% - 26px) * var(--p) / 100);
-  background: var(--brand);
-  box-shadow: inset 0 -4px 0 var(--brand-deep);
-}
-
-.rhythm-value {
-  position: absolute;
-  right: 0;
-  bottom: calc((100% - 26px) * var(--p, 0) / 100 + 4px);
-  left: 0;
-  color: var(--ink);
-  font-size: 0.86rem;
-  font-weight: 800;
-  text-align: center;
-}
-
-.rhythm-col.is-empty .rhythm-bar {
-  height: 3px;
-  background: var(--pf-mute);
-  box-shadow: none;
-}
-
-.rhythm-col.is-empty .rhythm-value {
-  bottom: 7px;
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.rhythm-label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-top: 6px;
-  color: var(--ink-soft);
-  font-size: 0.74rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.rhythm-label small {
-  color: var(--ink);
-  font-size: 0.62rem;
-  font-weight: 600;
-}
-
-.rhythm-col.is-current .rhythm-label {
-  color: var(--ink);
-  box-shadow: 0 2px 0 var(--brand);
-}
-
-/* ---------- Readership donut ---------- */
-.readership {
-  display: grid;
-  gap: 16px;
-  justify-items: center;
-}
-
-.donut {
-  width: min(190px, 62cqi);
-}
-
-.donut svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  transform: rotate(0deg);
-}
-
-.donut-track {
-  stroke: var(--pf-track);
-}
-
-.donut-total {
-  fill: var(--ink);
-  font-family: var(--font-body);
-  font-size: 5.2px;
-  font-weight: 800;
-}
-
-.donut-caption {
-  fill: var(--ink);
-  font-family: var(--font-body);
-  font-size: 2.6px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-}
-
-.donut-slice.tone-c1, .swatch.tone-c1 { stroke: var(--pf-c1); background: var(--pf-c1); }
-.donut-slice.tone-c2, .swatch.tone-c2 { stroke: var(--pf-c2); background: var(--pf-c2); }
-.donut-slice.tone-c3, .swatch.tone-c3 { stroke: var(--pf-c3); background: var(--pf-c3); }
-.donut-slice.tone-c4, .swatch.tone-c4 { stroke: var(--pf-c4); background: var(--pf-c4); }
-.donut-slice.tone-c5, .swatch.tone-c5 { stroke: var(--pf-c5); background: var(--pf-c5); }
-.donut-slice.tone-other, .swatch.tone-other { stroke: var(--pf-other); background: var(--pf-other); }
-.donut-slice { background: none !important; }
-
-.donut-legend {
-  display: grid;
-  gap: 10px;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.donut-legend li {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-}
-
-.swatch {
-  width: 12px;
-  height: 12px;
-}
-
-.swatch.tone-c3 {
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.legend-label {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 0.86rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.legend-value {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.15;
-}
-
-.legend-value strong {
-  color: var(--ink);
-  font-size: 0.95rem;
-}
-
-@container (min-width: 470px) {
-  .readership {
-    grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
-    align-items: center;
-    gap: 24px;
-  }
-
-  .donut {
-    width: 100%;
-  }
-}
-
-/* ---------- Reader response ---------- */
-.response-list {
-  display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.response-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "copy nums"
-    "track track";
-  align-items: center;
-  gap: 6px 12px;
-}
-
-.response-copy {
-  grid-area: copy;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.response-label {
-  color: var(--ink);
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.response-copy small {
-  color: var(--ink);
-  font-size: 0.74rem;
-}
-
-.response-track {
-  grid-area: track;
-  height: 16px;
-}
-
-.response-nums {
-  grid-area: nums;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.15;
-}
-
-.response-nums strong {
-  color: var(--ink);
-  font-size: 1.15rem;
-  font-weight: 800;
-}
-
-@container (min-width: 620px) {
-  .response-list li {
-    grid-template-columns: minmax(180px, 26%) minmax(0, 1fr) minmax(96px, auto);
-    grid-template-areas: "copy track nums";
-    gap: 18px;
-  }
-}
 
 /* ---------- Wider screens: 12 column structure ---------- */
 @media (min-width: 720px) {
@@ -1021,16 +648,12 @@ html[data-theme="dark"] .portfolio-role {background: red;}
   }
 
   .portfolio-stats-strip {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-top: 20px;
   }
 
   .portfolio-stats-strip > div {
     padding: 16px 18px 18px;
-  }
-
-  .portfolio-stat--milestone {
-    padding-top: 20px !important;
   }
 
   .portfolio-tabs {
@@ -1082,16 +705,6 @@ html[data-theme="dark"] .portfolio-section-tag,
 html[data-theme="dark"] .portfolio-card .tag-mini {
   background: var(--brand);
   color: var(--on-brand);
-}
-
-html[data-theme="dark"] .coverage-pos {
-  background: var(--pf-track);
-  color: var(--ink);
-}
-
-html[data-theme="dark"] .coverage-list li:first-child .coverage-pos {
-  background: var(--brand-deep);
-  color: var(--nav-fg);
 }
 
 /* ---------- Author post feed ---------- */

@@ -1454,6 +1454,7 @@
       main.appendChild(el("p", "draft-slot-title", slot.title));
       main.appendChild(el("p", "draft-slot-meta", [slot.category, slot.words, slot.image, slot.saved].join("  |  ")));
     }
+<<<<<<< HEAD
     li.appendChild(main);
 
     var actions = el("div", "draft-slot-actions");
@@ -1485,6 +1486,71 @@
     }
     li.appendChild(actions);
     return li;
+=======
+    // Show loading placard/skeleton
+    let placard = document.getElementById('draft-load-placard');
+    if(!placard){
+      placard = document.createElement('div');
+      placard.id = 'draft-load-placard';
+      placard.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:8px 14px;border-radius:6px;z-index:10000;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+      document.body.appendChild(placard);
+    }
+    placard.textContent = 'Loading draft from slot ' + slot + '...';
+    placard.style.display = 'block';
+
+    let skel = document.getElementById('draft-load-skel');
+    if(!skel){
+      skel = document.createElement('div');
+      skel.id = 'draft-load-skel';
+      skel.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.6);z-index:9998;display:flex;align-items:center;justify-content:center;';
+      skel.innerHTML = '<div style="background:#fff;border:1px solid #eee;padding:16px 24px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.08);">Loading draft...</div>';
+      document.body.appendChild(skel);
+    }
+    skel.style.display = 'flex';
+
+    fetch('/add-news/draft/load/?slot='+encodeURIComponent(slot), {headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCsrfToken2()}, credentials:'same-origin'})
+      .then(r=>r.json().then(j=>({ok:r.ok, j:j})))
+      .then(res=>{
+        if(!res.ok){
+          placard.textContent = res.j.detail || 'Failed to load draft.';
+          setTimeout(function(){ placard.style.display='none'; skel.style.display='none'; }, 2000);
+          return;
+        }
+        const j = res.j;
+        const form = document.getElementById('add-news-form');
+        if(!form) { placard.textContent = 'Editor form not found.'; setTimeout(function(){ placard.style.display='none'; skel.style.display='none'; }, 2000); return; }
+        if(j.heading !== undefined){ const el=form.querySelector('[name="heading"]'); if(el){ el.value=j.heading; try{ el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
+        if(j.image_1 !== undefined){ const el=form.querySelector('[name="image_1"]'); if(el){ el.value=j.image_1; try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){} } }
+        if(j.image_info !== undefined){ const el=form.querySelector('[name="image_info"]'); if(el){ el.value=j.image_info; try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){} } }
+        if(j.category !== undefined){ const el=form.querySelector('[name="category"]'); if(el){ el.value=j.category; try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
+        if(j.content !== undefined){
+          // Try textarea with name=content or data-editor-content
+          let el = form.querySelector('[name="content"]') || form.querySelector('[data-editor-content]');
+          if(el){
+            el.value = j.content;
+            try{
+              el.dispatchEvent(new Event('input',{bubbles:true}));
+              el.dispatchEvent(new Event('change',{bubbles:true}));
+              el.dispatchEvent(new Event('keyup',{bubbles:true}));
+            }catch(e){}
+            // Also try to update any contenteditable if present
+            const ce = form.querySelector('.editor-content, [contenteditable="true"]');
+            if(ce && typeof j.content === 'string'){
+              try{ ce.innerText = j.content; }catch(e){ try{ ce.textContent = j.content; }catch(e2){} }
+            }
+          }
+        }
+        if(j.toc_mode !== undefined){ const el=form.querySelector('[name="toc_mode"]'); if(el){ el.value=j.toc_mode; try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
+        if(j.newsletter !== undefined){ const el=form.querySelector('[name="newsletter"]'); if(el) el.checked=!!j.newsletter; }
+        if(j.image_quality !== undefined){ const el=form.querySelector('[name="image_quality"]'); if(el){ el.value=j.image_quality; try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } }
+        placard.textContent = 'Draft loaded from slot ' + slot;
+        setTimeout(function(){ placard.style.display='none'; skel.style.display='none'; }, 1200);
+        if(panel) panel.style.display='none';
+      }).catch(()=>{
+        placard.textContent = 'Failed to load draft.';
+        setTimeout(function(){ placard.style.display='none'; skel.style.display='none'; }, 2000);
+      });
+>>>>>>> edb17d43002a5b6af59e9ddba2c8be9cb57b4aa5
   }
 
   /* ---------- talking to the server ---------- */

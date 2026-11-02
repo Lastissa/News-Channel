@@ -9,6 +9,7 @@
   Both long lists -- the author's stories and the named likers -- page on their
   own, so a prolific author stays a panel you read rather than one you scroll.
 {% endcomment %}
+{% load l10n %}
 {% if detail %}
 <header class="analytics-author-profile">
   <span class="analytics-member-avatar analytics-member-avatar--lg{% if not detail.profile_img %} analytics-member-avatar--initial{% endif %}">
@@ -53,6 +54,106 @@
 </ul>
 
 <p class="analytics-author-window-note">Figures cover {{ detail.range_label }} ({{ detail.relative_label }}).</p>
+
+{% with ins=detail.insights %}
+<section class="analytics-author-block analytics-insights" aria-labelledby="analytics-author-insights">
+  <h3 id="analytics-author-insights" class="analytics-author-block-title">
+    Standing and reach
+    <span class="analytics-insight-scope">all time, rhythm is the last {{ ins.rhythm.months }} months</span>
+  </h3>
+
+  {% if ins.has_stories %}
+  <div class="analytics-insight-grid">
+
+    <article class="analytics-insight">
+      <h4 class="analytics-insight-title">Author rank</h4>
+      <p class="analytics-insight-big">#{{ ins.ranking.rank }}</p>
+      <p class="analytics-insight-note">of {{ ins.ranking.total_authors }} active author{{ ins.ranking.total_authors|pluralize }} by stories posted</p>
+      <span class="analytics-rank-bars" aria-hidden="true">
+        {% for bar in ins.ranking.bars %}<span class="analytics-rank-bar{% if bar.is_me %} is-me{% endif %}" style="height: {{ bar.height }}%"></span>{% endfor %}
+      </span>
+      {% if ins.top_story %}
+      <p class="analytics-insight-note analytics-insight-top">
+        Most viewed story, {{ ins.top_story.views|floatformat:"0g" }} view{{ ins.top_story.views|pluralize }}:
+        <a href="{% url 'blog:story_detail' ins.top_story.slug %}">{{ ins.top_story.heading }}</a>
+      </p>
+      {% endif %}
+    </article>
+
+    <article class="analytics-insight">
+      <h4 class="analytics-insight-title">Publishing rhythm</h4>
+      <ol class="analytics-rhythm">
+        {% for column in ins.rhythm.columns %}
+        <li class="analytics-rhythm-col{% if column.total == 0 %} is-empty{% endif %}{% if column.is_current %} is-current{% endif %}" style="--p: {{ column.height }}">
+          <span class="analytics-rhythm-plot">
+            <span class="analytics-rhythm-value">{{ column.total }}</span>
+            <span class="analytics-rhythm-bar"></span>
+          </span>
+          <span class="analytics-rhythm-label">{{ column.label }}{% if column.year %}<small>{{ column.year }}</small>{% endif %}</span>
+          <span class="sr-only">{{ column.label }}: {{ column.total }} stor{{ column.total|pluralize:"y,ies" }}</span>
+        </li>
+        {% endfor %}
+      </ol>
+      <p class="analytics-insight-note">
+        {% if ins.rhythm.window_total %}{{ ins.rhythm.window_total }} stor{{ ins.rhythm.window_total|pluralize:"y,ies" }} in this window. The tallest month is the full height of the chart.{% else %}No stories in this window. Older work is counted in the totals above.{% endif %}
+      </p>
+    </article>
+
+    <article class="analytics-insight">
+      <h4 class="analytics-insight-title">Readership by category</h4>
+      {% if ins.readership %}
+      <div class="analytics-donut-wrap">
+        <div class="analytics-donut">
+          {% localize off %}
+          <svg viewBox="0 0 42 42" role="img" aria-label="Share of this author's views by category">
+            <circle class="analytics-donut-track" cx="21" cy="21" r="15.9155" fill="none" stroke-width="6"/>
+            {% for slice in ins.readership %}
+            <circle class="analytics-donut-slice tone-{{ slice.tone }}" cx="21" cy="21" r="15.9155" fill="none" stroke-width="6"
+                    stroke-dasharray="{{ slice.dash }} {{ slice.gap }}" stroke-dashoffset="{{ slice.offset }}"/>
+            {% endfor %}
+          </svg>
+          {% endlocalize %}
+        </div>
+        <ul class="analytics-donut-legend">
+          {% for slice in ins.readership %}
+          <li>
+            <span class="analytics-swatch tone-{{ slice.tone }}" aria-hidden="true"></span>
+            <span class="analytics-legend-label">{{ slice.label }}</span>
+            <span class="analytics-legend-value"><strong>{{ slice.views|floatformat:"0g" }}</strong><small>{{ slice.pct_label }}</small></span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% else %}
+      <p class="analytics-reading-empty">No views recorded yet.</p>
+      {% endif %}
+    </article>
+
+    <article class="analytics-insight">
+      <h4 class="analytics-insight-title">Reader response</h4>
+      <p class="analytics-insight-note">What readers do after opening the work. Every bar is measured against total views.</p>
+      <ul class="analytics-response">
+        {% for row in ins.response %}
+        <li>
+          <div class="analytics-response-copy">
+            <span class="analytics-response-label">{{ row.label }}</span>
+            <small>{{ row.note }}</small>
+          </div>
+          <span class="analytics-response-track" role="img" aria-label="{{ row.label }}: {{ row.value }}{% if row.ratio %}, {{ row.ratio }}{% endif %}">
+            <span class="analytics-response-fill" style="width: {{ row.width }}%"></span>
+          </span>
+          <span class="analytics-response-nums"><strong>{{ row.value|floatformat:"0g" }}</strong>{% if row.ratio %}<small>{{ row.ratio }}</small>{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </article>
+
+  </div>
+  {% else %}
+  <p class="analytics-reading-empty">No stories published yet, so there is nothing to chart.</p>
+  {% endif %}
+</section>
+{% endwith %}
 
 <section class="analytics-author-block" aria-labelledby="analytics-author-stories">
   <h3 id="analytics-author-stories" class="analytics-author-block-title">

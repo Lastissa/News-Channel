@@ -374,3 +374,21 @@ class StaffSlugFollowsNameTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Jane Smith")
         self.assertNotContains(response, "Jane Doe")
+
+
+class PortfolioHasNoDashboardChartsTests(TestCase):
+    """Rank, rhythm, readership and reader response belong to Author lytics now."""
+
+    def test_portfolio_no_longer_renders_the_old_dashboard_blocks(self):
+        author = Auth.objects.create_user(email="no-charts@example.com", is_staff=True)
+        profile = StaffProfile.objects.create(auth=author, gender="M", full_name="No Charts")
+        Blog.objects.create(
+            author=author, heading="Chartless story", category="GENERAL",
+            content="Body.", image_1="https://example.com/a.jpg", views=5,
+        )
+
+        body = self.client.get(reverse("staff:portfolio", args=[profile.slug])).content.decode()
+
+        for marker in ("Author rank", "Publishing rhythm", "portfolio-readership", "portfolio-response", "rank-bars"):
+            with self.subTest(marker=marker):
+                self.assertNotIn(marker, body)

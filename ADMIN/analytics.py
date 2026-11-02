@@ -26,6 +26,7 @@ from django.utils.dateparse import parse_date
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
+from SERVICE_INTERNAL.author_insights import author_insights
 from STAFF.models import AuthorFollow, StaffProfile
 
 #   -------------------------------------------------------------------------
@@ -1886,8 +1887,21 @@ def author_detail(author_id, selected_range, since=None, story_page=1, like_page
             }
         )
 
+    #   The charts that used to sit on the public portfolio. All time figures
+    #   (the rhythm covers the last six months), so they do not move with the
+    #   range picker above them.
+    stories_total = stories.count()
+    likes_total = stories.aggregate(total=Sum("likes"))["total"] or 0
+    insights = author_insights(
+        author,
+        stories_total,
+        stories.aggregate(total=Sum("views"))["total"] or 0,
+        likes_total,
+    )
+
     return {
         "id": author_id,
+        "insights": insights,
         "name": _author_names([author]).get(author_id) or _mask_email(author.email) or "Unknown",
         "email_masked": _mask_email(author.email),
         "profile_img": author.profile_img or "",
@@ -1901,10 +1915,10 @@ def author_detail(author_id, selected_range, since=None, story_page=1, like_page
         "relative_label": relative_label,
         "since": since,
         "published": published,
-        "stories_total": stories.count(),
+        "stories_total": stories_total,
         "reads": reads,
         "likes": likes,
-        "likes_total": stories.aggregate(total=Sum("likes"))["total"] or 0,
+        "likes_total": likes_total,
         "comments": comments,
         "readers": readers,
         "followers": followers,
