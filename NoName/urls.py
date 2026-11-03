@@ -22,6 +22,7 @@ handler404 = "HOME.views.handler404"
 handler500 = "HOME.views.handler500"
 
 urlpatterns = [
+    path("ads.txt", RedirectView.as_view(url="/static/ads.txt")),
     path('robots.txt', RobotsTxtView.as_view()),
     path('favicon.ico', FavicoView.as_view()),
     path('site.webmanifest', ManifestView.as_view()),
