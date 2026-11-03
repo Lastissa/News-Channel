@@ -1,0 +1,28 @@
+{% comment %}Stories whose category is no longer in the active Category list.{% endcomment %}
+<div class="analytics-table-wrap">
+  <div class="analytics-table-header">
+    <span>Count: {{ count }}</span>
+  </div>
+  <table class="analytics-table">
+    <thead>
+      <tr>
+        <th>Heading</th>
+        <th>Stored category</th>
+        <th>Date</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in stories %}
+      <tr>
+        <td>{{ s.heading }}</td>
+        <td>{{ s.category }}</td>
+        <td>{{ s.date|date:"M d, Y H:i" }}</td>
+        <td><a href="{% url 'story' slug=s.slug %}" target="_blank" rel="noopener">View</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">All stories have valid categories.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

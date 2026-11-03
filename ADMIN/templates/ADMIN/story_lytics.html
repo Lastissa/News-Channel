@@ -52,7 +52,12 @@
     {% include "ADMIN/partials/analytics_chambers.html" %}
   </div>
 
-  <div class="analytics-grid">
+  <nav class="analytics-tabs" role="tablist" aria-label="Story lytics sections">
+    <button type="button" class="analytics-tab is-active" data-analytics-tab="overview" role="tab" aria-selected="true">Overview</button>
+    <button type="button" class="analytics-tab" data-analytics-tab="uncategorized" role="tab" aria-selected="false">Stories without category</button>
+  </nav>
+
+  <div class="analytics-grid" data-analytics-panel="overview">
 
     <section class="analytics-card" aria-labelledby="analytics-kpis-title"
              data-guide-title="Story totals"
@@ -379,6 +384,22 @@
 
   </div>
 
+  <div class="analytics-grid" data-analytics-panel="uncategorized" style="display:none">
+    <section class="analytics-card" aria-labelledby="analytics-uncat-title">
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></span>
+        <h2 id="analytics-uncat-title">Stories with no valid category</h2>
+      </header>
+      <div class="analytics-chart-body" id="analytics-uncategorized-body"
+           hx-get="{% url 'control:analytics_uncategorized_stories' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading stories&hellip;</p>
+      </div>
+    </section>
+  </div>
+
   {% include "ADMIN/partials/analytics_guide.html" %}
 </section>
 {% endblock %}
@@ -389,6 +410,20 @@
   <script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
   <script src="{% static 'control/js/analytics_apex.js' %}" defer></script>
   <script src="{% static 'control/js/analytics.js' %}" defer></script>
+  <script>
+    document.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-analytics-tab]');
+      if(!btn) return;
+      var tab = btn.getAttribute('data-analytics-tab');
+      document.querySelectorAll('[data-analytics-tab]').forEach(function(b){
+        b.classList.toggle('is-active', b===btn);
+        b.setAttribute('aria-selected', b===btn ? 'true' : 'false');
+      });
+      document.querySelectorAll('[data-analytics-panel]').forEach(function(p){
+        p.style.display = p.getAttribute('data-analytics-panel') === tab ? '' : 'none';
+      });
+    });
+  </script>
 {% endblock %}
 
 {% block footer %}{% endblock %}

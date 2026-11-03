@@ -1205,6 +1205,23 @@ class AnalyticsStoryKpisView(View):
         return render(request, "ADMIN/partials/analytics_story_kpis.html", context)
 
 
+class AnalyticsUncategorizedStoriesView(View):
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+        valid = set([c[0] for c in get_category_choices()])
+        stories = (
+            Blog.objects.exclude(category__in=valid)
+            .order_by("-date")
+            .values("id", "heading", "category", "date", "slug")[:500]
+        )
+        return render(
+            request,
+            "ADMIN/partials/analytics_uncategorized.html",
+            {"stories": stories, "count": len(stories)},
+        )
+
+
 class PartnerLyticsView(View):
     """Placeholder for the partner chamber of analytics (not built yet)."""
 

@@ -87,7 +87,7 @@ class AdminMaxPeriod:
                 logout(request)
                 from django.contrib import messages
 
-                messages.error(request, "ADMIN (logged out)!")
+                messages.error(request, "ADMIN logged out!")
                 return redirect("auth:login")
             request.session['last_activity'] = now
 

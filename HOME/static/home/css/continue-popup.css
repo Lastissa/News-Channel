@@ -36,10 +36,12 @@
 
 /*  Sheet: full width, reaches the bottom, small margin at the top only
     (phones). The @media (min-width: 768px) block below turns this into a
-    centered, phone-width placard that floats clear of every edge. */
+    centered, phone-width placard that floats clear of every edge.
+    Configurable via CSS vars: --continue-sheet-mobile-height (60vh default),
+    --continue-sheet-mobile-top (24px). Set --continue-revert-full:1 to restore old behavior. */
 .continue-popup-sheet {
   position: absolute;
-  top: 24px;
+  top: var(--continue-sheet-mobile-top, 24px);
   left: 0;
   right: 0;
   bottom: 0;
@@ -50,13 +52,32 @@
   border-radius: 18px 18px 0 0;
   box-shadow: 0 -24px 70px rgba(0, 0, 0, 0.38);
   opacity: 0;
-  transform: translateY(14px);
-  transition: transform 0.32s ease, opacity 0.32s ease;
+  transform: translateY(120px) perspective(1200px) rotateX(8deg) scale(0.98);
+  transform-origin: bottom center;
+  transition: transform 0.48s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.36s ease;
+  will-change: transform, opacity;
+}
+
+@media (max-width: 767px) {
+  .continue-popup-sheet {
+    top: calc(100vh - var(--continue-sheet-mobile-height, 60vh));
+    height: var(--continue-sheet-mobile-height, 60vh);
+    max-height: var(--continue-sheet-mobile-height, 60vh);
+    bottom: auto;
+  }
+  /* Optional revert to old full-coverage behavior */
+  .continue-popup[data-continue-revert-full="1"] .continue-popup-sheet,
+  .continue-popup.continue-popup--revert .continue-popup-sheet {
+    top: var(--continue-sheet-mobile-top, 24px);
+    height: auto;
+    max-height: none;
+    bottom: 0;
+  }
 }
 
 .continue-popup.is-open .continue-popup-sheet {
   opacity: 1;
-  transform: none;
+  transform: translateY(0) perspective(1200px) rotateX(0deg) scale(1);
 }
 
 /* Slim header */
@@ -474,8 +495,18 @@ html.continue-popup-locked body {
 /* Phones: keep two columns with small thumbnails, tighten the chrome. */
 @media (max-width: 700px) {
   .continue-popup-sheet {
-    top: 16px;
+    top: calc(100vh - var(--continue-sheet-mobile-height, 60vh));
+    height: var(--continue-sheet-mobile-height, 60vh);
+    max-height: var(--continue-sheet-mobile-height, 60vh);
+    bottom: auto;
     border-radius: 14px 14px 0 0;
+  }
+  .continue-popup[data-continue-revert-full="1"] .continue-popup-sheet,
+  .continue-popup.continue-popup--revert .continue-popup-sheet {
+    top: 16px;
+    height: auto;
+    max-height: none;
+    bottom: 0;
   }
 
   .continue-popup-head {
@@ -517,6 +548,19 @@ html.continue-popup-locked body {
 }
 
 @media (max-width: 560px) {
+  .continue-popup-sheet {
+    top: calc(100vh - var(--continue-sheet-mobile-height, 60vh));
+    height: var(--continue-sheet-mobile-height, 60vh);
+    max-height: var(--continue-sheet-mobile-height, 60vh);
+    bottom: auto;
+  }
+  .continue-popup[data-continue-revert-full="1"] .continue-popup-sheet,
+  .continue-popup.continue-popup--revert .continue-popup-sheet {
+    top: 12px;
+    height: auto;
+    max-height: none;
+    bottom: 0;
+  }
   .continue-popup-grid--feed > .continue-popup-card:nth-child(7n + 1) .continue-popup-media {
     flex-basis: 38%;
     min-height: 104px;

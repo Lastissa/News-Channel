@@ -77,7 +77,7 @@
         </button>
         <a class="story-kicker" href="{% url 'home:category' blog.category|slugify %}">{{ blog.get_category_display|title }}</a>
         <span class="story-separator">•</span>
-        <time datetime="{{ blog.date_created|date:'c' }}">{{ blog.date_created|date:"j M Y" }}</time>
+        <time datetime="{{ blog.date_created|date:'c' }}">{{ blog.date_created|date:"j M Y, g:i A" }}</time>
       </div>
 
       <h1 id="story-heading">{{ blog.heading }}</h1>

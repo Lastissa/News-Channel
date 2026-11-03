@@ -27,7 +27,8 @@ home:continue_feed for page 2+ as the reader scrolls, with a skeleton loader.
      data-next-page="{{ continue_next_page }}"
      data-continue-scope="{{ continue_scope|default:'home' }}"
      data-continue-cooldown="{{ continue_cooldown_ms|default:43200000 }}"
-     {% if continue_popup_guest %}data-guest="true"{% endif %}>
+     {% if continue_popup_guest %}data-guest="true"{% endif %}
+     style="--continue-sheet-mobile-height: 60vh;">
   <div class="continue-popup-backdrop" data-continue-backdrop></div>
   <div class="continue-popup-sheet" role="document">
     <header class="continue-popup-head">
