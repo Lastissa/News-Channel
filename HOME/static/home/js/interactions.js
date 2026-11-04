@@ -375,6 +375,16 @@
     var hideTimer = null;
     var finished = false;
 
+    function isChipVisible() {
+      if (!chip || !document.body.contains(chip)) return false;
+      var rect = chip.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      var vw = window.innerWidth || document.documentElement.clientWidth;
+      if (rect.bottom < 0 || rect.top > vh || rect.right < 0 || rect.left > vw) return false;
+      return true;
+    }
+
     function listen(on) {
       var method = on ? "addEventListener" : "removeEventListener";
       window[method]("scroll", onScroll, { passive: true });
@@ -430,19 +440,32 @@
       /* The site header is sticky, so never pin the tip underneath it. */
       var ceiling = (header ? Math.max(0, header.getBoundingClientRect().bottom) : 0) + 12;
       var rect = chip.getBoundingClientRect();
-      var room = window.innerWidth - tip.offsetWidth - 12;
-      var left = Math.min(Math.max(12, rect.left), Math.max(12, room));
-      /* A refresh restores the reader's scroll position, which can leave the
-         chip off screen: keep the reminder on screen rather than pointing at a
-         chip nobody can see. */
-      var top = Math.max(rect.bottom + 10, ceiling);
-      top = Math.min(top, Math.max(ceiling, window.innerHeight - tip.offsetHeight - 12));
+      var margin = 8;
+      var maxWidth = Math.min(280, window.innerWidth - margin * 2);
+      tip.style.maxWidth = maxWidth + "px";
+      var tipW = tip.offsetWidth;
+      var centerX = rect.left + rect.width / 2;
+      var left = centerX - tipW / 2;
+      left = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - tipW - margin));
+      /* Place above the button to avoid blocking title text */
+      var top = rect.top - tip.offsetHeight - 10;
+      if (top < ceiling) {
+        top = rect.bottom + 10;
+      }
+      top = Math.min(top, Math.max(ceiling, window.innerHeight - tip.offsetHeight - margin));
       tip.style.left = left + "px";
       tip.style.top = top + "px";
+      var arrowLeft = centerX - left;
+      arrowLeft = Math.min(Math.max(18, arrowLeft), tipW - 18);
+      tip.style.setProperty("--bookmark-tip-arrow", arrowLeft + "px");
     }
 
     function show() {
       if (finished || !document.body.contains(chip)) return;
+      if (!isChipVisible()) {
+        dismiss();
+        return;
+      }
       tip = document.createElement("span");
       tip.className = "bookmark-tip";
       tip.setAttribute("role", "presentation");
@@ -458,7 +481,11 @@
     }
 
     listen(true);
-    showTimer = window.setTimeout(show, TIP_DELAY_MS);
+    if (isChipVisible()) {
+      showTimer = window.setTimeout(show, TIP_DELAY_MS);
+    } else {
+      finished = true;
+    }
   })();
 
   /* ---------- share: copy link, instant feedback ---------- */
