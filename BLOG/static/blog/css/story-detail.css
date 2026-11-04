@@ -3,8 +3,7 @@
   background: linear-gradient(var(--brand) , 90%, var(--brand-deep));
   overflow: hidden;
   white-space: nowrap;
-  padding: 10px 0;
-  margin-bottom: 18px;
+  padding: 9px 0;
 }
 
 .story-ticker-track {

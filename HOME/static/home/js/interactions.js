@@ -447,7 +447,7 @@
       tip.className = "bookmark-tip";
       tip.setAttribute("role", "presentation");
       tip.setAttribute("aria-hidden", "true");
-      tip.textContent = "Tap the bookmark to save this story and read it later.";
+      tip.textContent = "Tap To Read This Story Later.";
       document.body.appendChild(tip);
       place();
       /* Read a layout value back so the browser commits the starting state
