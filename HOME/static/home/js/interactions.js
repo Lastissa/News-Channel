@@ -296,7 +296,7 @@
           setBookmarkVisual(btn, wasSaved);
           if (countNode) countNode.textContent = String(oldCount);
           if (result.status === 401) {
-            openAuthGate("bookmark", extractDetail(result.text, "Sign in to save stories."));
+            openAuthGate("bookmark", extractDetail(result.text, "GGGGGGGGGGGGGG."));
           } else if (result.status === 403) {
             bottomtoast(extractDetail(result.text, "Security check failed. Please reload & try again."), "error");
           } else if (result.status >= 500) {
@@ -1571,7 +1571,7 @@
         button.dataset.pending = "false";
         setStoryLikePending(false);
         if (!result.ok) {
-          if (result.status === 401) { openAuthGate("like", extractDetail(result.text, "Sign in to like this story.")); return; }
+          if (result.status === 401) { openAuthGate("like", extractDetail(result.text, "All Likes Count - Sign In To Appreciate Author.")); return; }
           toast(extractDetail(result.text, "Could not update your like."), "error");
           return;
         }
@@ -2277,7 +2277,7 @@
     var STORAGE_KEY = "abureport-newsletter-popup-state";
     var ONCE_PER_DAY_MS = 24 * 60 * 60 * 1000; // asked at most once per day, even if the visitor just ignores it
     var DISMISS_MS = 3 * 24 * 60 * 60 * 1000; // re-offer 3 days after a manual dismiss (longer than the daily rule)
-    var FALLBACK_DELAY_MS = 8000; // used only when the page can't scroll at all
+    var FALLBACK_DELAY_MS = 13000; // used only when the page can't scroll at all (delayed by +5s)
 
     function readState() {
       try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }

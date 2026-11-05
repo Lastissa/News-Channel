@@ -42,11 +42,11 @@
 
     <figure class="story-hero-figure">
       <img src="{% static '404.jpg' %}" alt="NOT FOUND" loading="eager" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
-      <figcaption>404, page not found, this page does not exist</figcaption>
+      <figcaption>this page does not exist</figcaption>
     </figure>
 
     <div class="story-body">
-      <p><b>{{ decoy_content }}</b></p>
+      <p>{{ decoy_content }}</p>
     </div>
 
     {% comment %} <div class="article-actions">

@@ -332,9 +332,9 @@ FILE_TOKEN_RE = re.compile(r"^filel\s+(\S+)(?:\s+(.*))?$")
 BTN_TOKEN_RE = re.compile(r"^btn\s+(\S+)(?:\s+(.*))?$")
 
 STORY_404_CONTENT = (
-    "This page does not exist. We may not have enough stories published yet, "
+    "We may not have enough stories published yet"
     "or the story you are looking for was deleted by the publisher and is no "
-    "longer in existence.".upper()
+    "longer in existence.".capitalize()
 )
 
 

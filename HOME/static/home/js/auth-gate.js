@@ -13,12 +13,12 @@
   /* Copy per action. Edit the words here, nothing else reads them. */
   var COPY = {
     like: {
-      title: "Sign in to like this story.",
+      title: "Show The Author Some Love.",
       hook: "Create an account or sign in.",
       verb: "like this story"
     },
     comment: {
-      title: "Sign in to post a comment.",
+      title: "We Want Your Take On This.",
       hook: "Create an account or sign in.",
       verb: "post your comment"
     },
@@ -28,12 +28,12 @@
       verb: "like this comment"
     },
     bookmark: {
-      title: "Sign in to save this story.",
+      title: "Save the Story For Later.",
       hook: "Create an account or sign in.",
       verb: "save this story"
     },
     follow: {
-      title: "Sign in to follow this author.",
+      title: "Follow This Author To Receive Updates.",
       hook: "Create an account or sign in.",
       verb: "follow this author"
     }
@@ -61,7 +61,7 @@
         '<button type="button" class="auth-gate-close" data-gate-close aria-label="Close">' +
           '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
         '</button>' +
-        '<p class="auth-gate-eyebrow">Members only</p>' +
+        '<p class="auth-gate-eyebrow">Members</p>' +
         '<h2 class="auth-gate-title" id="auth-gate-title" data-gate-title></h2>' +
         '<p class="auth-gate-hook" data-gate-hook></p>' +
         '<div class="auth-gate-frame-wrap"><iframe class="auth-gate-frame" title="Create an account or sign in" data-gate-frame></iframe></div>' +
