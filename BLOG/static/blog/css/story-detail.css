@@ -260,7 +260,23 @@ html[data-theme="dark"] .share-btn-twitter .share-icon { filter: invert(1); }
 }
 .story-reading-column { min-width: 0; }
 .story-rail { min-width: 0; }
-.story-reading-column .story-body { margin-left: auto; margin-right: auto; }
+.story-reading-column .story-body {
+  margin-left: auto;
+  margin-right: auto;
+}
+.story-reading-column .story-body h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24.6px;
+  word-break: break-all;
+}
+.story-reading-column .story-body h3 {
+  font-size: 20.5px;
+  word-break: break-all;
+}
+.story-reading-column .story-body h4 {
+  font-size: 17.22px;
+  word-break: break-all;
+}
 .story-reading-column .story-body p,
 .story-reading-column .story-body li {
   text-align: start;
