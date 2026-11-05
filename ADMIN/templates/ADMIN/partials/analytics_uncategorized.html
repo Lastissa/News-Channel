@@ -1,7 +1,8 @@
-{% comment %}Stories whose category is no longer in the active Category list.{% endcomment %}
+{% comment %}Stories with a blank category or a value outside the active category list.{% endcomment %}
 <div class="analytics-table-wrap">
   <div class="analytics-table-header">
-    <span>Count: {{ count }}</span>
+    <span><strong>{{ count }}</strong> uncategorized stor{{ count|pluralize:"y,ies" }}</span>
+    <span>{{ uncategorized_percent }}% of {{ total_stories }} stories</span>
   </div>
   <table class="analytics-table">
     <thead>
@@ -16,13 +17,37 @@
       {% for s in stories %}
       <tr>
         <td>{{ s.heading }}</td>
-        <td>{{ s.category }}</td>
-        <td>{{ s.date|date:"M d, Y H:i" }}</td>
-        <td><a href="{% url 'story' slug=s.slug %}" target="_blank" rel="noopener">View</a></td>
+        <td>{{ s.category|default:"(blank)" }}</td>
+        <td>{{ s.date_created|date:"M d, Y H:i" }}</td>
+        <td><a href="{% url 'blog:story_detail' blog_slug=s.slug %}" target="_blank" rel="noopener">View</a></td>
       </tr>
       {% empty %}
-      <tr><td colspan="4">All stories have valid categories.</td></tr>
+      <tr><td colspan="4">All stories have an active category.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+
+  {% if page.paginator.num_pages > 1 %}
+  <nav class="story-pagination analytics-list-pagination" aria-label="Uncategorized story pages"
+       hx-target="#analytics-uncategorized-body" hx-swap="innerHTML">
+    {% if page.has_previous %}
+    <button type="button" class="story-page-btn page-nav"
+            hx-get="{% url 'control:analytics_uncategorized_stories' %}?page={{ page.previous_page_number }}">Prev</button>
+    {% endif %}
+    {% for number in page_range %}
+      {% if number == page.paginator.ELLIPSIS %}
+    <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ number }}</span>
+      {% else %}
+    <button type="button" class="story-page-btn{% if number == page.number %} is-active{% endif %}"
+            hx-get="{% url 'control:analytics_uncategorized_stories' %}?page={{ number }}"
+            aria-label="Go to page {{ number }}"
+            {% if number == page.number %}aria-current="page"{% endif %}>{{ number }}</button>
+      {% endif %}
+    {% endfor %}
+    {% if page.has_next %}
+    <button type="button" class="story-page-btn page-nav"
+            hx-get="{% url 'control:analytics_uncategorized_stories' %}?page={{ page.next_page_number }}">Next</button>
+    {% endif %}
+  </nav>
+  {% endif %}
 </div>

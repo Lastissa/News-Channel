@@ -23,7 +23,7 @@ from django.utils.dateparse import parse_datetime
 from django.views import View
 
 from AUTHENTICATION.models import Auth, UserSession
-from BLOG.models import Blog, Category
+from BLOG.models import Blog, Category, get_category_choices
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
@@ -55,6 +55,8 @@ from ADMIN.analytics import (
     MEMBER_NEWSLETTER_CHOICES,
     MEMBER_STATE_CHOICES,
     MEMBER_TREND_SERIES,
+    NO_CATEGORY_KEY,
+    NO_CATEGORY_LABEL,
     SERIES_META,
     STORY_KPI_RANGE_CHOICES,
     STORY_KPI_RANGES,
@@ -1212,13 +1214,30 @@ class AnalyticsUncategorizedStoriesView(View):
         valid = set([c[0] for c in get_category_choices()])
         stories = (
             Blog.objects.exclude(category__in=valid)
-            .order_by("-date")
-            .values("id", "heading", "category", "date", "slug")[:500]
+            .order_by("-date_created", "-pk")
+            .values("id", "heading", "category", "date_created", "slug")
         )
+        paginator = Paginator(stories, 25)
+        page_number = _resolve_page_number(request.GET.get("page"), default=1)
+        page = paginator.get_page(page_number)
+        total_stories = Blog.objects.count()
+        if page_number > paginator.num_pages and paginator.num_pages:
+            raise Http404("Page not found.")
         return render(
             request,
             "ADMIN/partials/analytics_uncategorized.html",
-            {"stories": stories, "count": len(stories)},
+            {
+                "stories": page.object_list,
+                "count": paginator.count,
+                "total_stories": total_stories,
+                "uncategorized_percent": (
+                    round(paginator.count * 100 / total_stories) if total_stories else 0
+                ),
+                "page": page,
+                "page_range": list(
+                    paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)
+                ),
+            },
         )
 
 
@@ -1407,7 +1426,11 @@ class StoryLyticsView(View):
                 "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
                 #   The per-category charts work from the live category list.
                 "categories": [
-                    {"name": name, "color": color}
+                    {
+                        "name": name,
+                        "label": NO_CATEGORY_LABEL if name == NO_CATEGORY_KEY else name,
+                        "color": color,
+                    }
                     for name, color in category_palette(category_names()).items()
                 ],
                 #   The per-category card opens on the subjects that have

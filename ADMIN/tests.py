@@ -17,7 +17,12 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from ADMIN.analytics import _week_start, member_new_today, member_overview
+from ADMIN.analytics import (
+    NO_CATEGORY_KEY,
+    _week_start,
+    member_new_today,
+    member_overview,
+)
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
@@ -1380,6 +1385,25 @@ class AnalyticsCategoryDailyTests(TestCase):
         self.assertEqual(chart["series"], [])
         self.assertEqual(chart["total"], 0)
 
+    def test_blank_category_uses_the_no_category_series(self):
+        self.make_story("Retired category story", category="RETIRED")
+        self.make_story("Blank category story", category="")
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"bucket": "day", "range": "30d", "category": [NO_CATEGORY_KEY]},
+            ),
+            "analytics-story-category-daily-data",
+        )
+
+        self.assertEqual(len(chart["series"]), 1)
+        self.assertEqual(chart["series"][0]["key"], NO_CATEGORY_KEY)
+        self.assertEqual(chart["series"][0]["name"], "No category")
+        self.assertEqual(sum(chart["series"][0]["values"]), 1)
+
     def test_a_custom_period_narrows_the_window_to_exactly_two_days(self):
         self.make_story("Inside the two days", category="NEWS", age_days=1)
         self.make_story("Outside the two days", category="NEWS", age_days=5)
@@ -1541,6 +1565,25 @@ class AnalyticsCategoryCompareTests(TestCase):
         self.assertEqual(chart["series"][0]["values"], [2, 1, 0, 2])
         self.assertEqual(chart["series"][1]["values"], [1, 0, 1, 0])
 
+    def test_no_category_bucket_is_comparable(self):
+        blank = self.make_story("Blank category", category="")
+        self.make_story("Category comparison news", category="NEWS")
+        self.add_view(blank)
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"a": NO_CATEGORY_KEY, "b": "NEWS", "range": "30d"},
+            ),
+            "analytics-category-compare-data",
+        )
+
+        self.assertEqual(chart["categories"], ["No category", "NEWS"])
+        self.assertEqual(chart["series"][0]["name"], "No category")
+        self.assertEqual(chart["series"][0]["values"], [1, 0, 0, 1])
+
     def test_the_difference_between_the_two_is_stated_in_figures(self):
         news = self.make_story("Gap news one", category="NEWS")
         self.make_story("Gap news two", category="NEWS")
@@ -1622,6 +1665,54 @@ class AnalyticsCategoryCompareTests(TestCase):
         #   The like and the view are 200 days old, so a 30 day window leaves
         #   them out.
         self.assertEqual(narrow["series"][0]["values"], [0, 0, 0, 0])
+
+
+class AnalyticsUncategorizedStoriesTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = Auth.objects.create_admin(email="uncategorized-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="uncategorized-writer@example.com")
+        self.url = reverse("control:analytics_uncategorized_stories")
+
+    def make_story(self, heading, category):
+        return Blog.objects.create(
+            author=self.writer,
+            heading=heading,
+            category=category,
+            content="Body.",
+            image_1="https://example.com/a.jpg",
+        )
+
+    def test_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_lists_blank_and_retired_categories_with_a_real_total(self):
+        self.make_story("Retired story", "RETIRED")
+        self.make_story("Blank story", "")
+        self.client.force_login(self.admin)
+
+        response = self.client.get(self.url)
+        body = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(">2</strong> uncategorized stories", body)
+        self.assertIn("100% of 2 stories", body)
+        self.assertIn("Retired story", body)
+        self.assertIn("Blank story", body)
+
+    def test_list_is_paginated_without_reporting_a_truncated_count(self):
+        for index in range(26):
+            self.make_story(f"Uncategorized story {index:02}", "RETIRED")
+        self.client.force_login(self.admin)
+
+        first_page = self.client.get(self.url).content.decode()
+        second_page = self.client.get(self.url, {"page": 2}).content.decode()
+
+        self.assertIn(">26</strong> uncategorized stories", first_page)
+        self.assertIn("Uncategorized story 25", first_page)
+        self.assertIn("Uncategorized story 00", second_page)
 
 
 class AnalyticsStoryKpisTests(TestCase):
@@ -2300,6 +2391,22 @@ class AuthorLyticsTests(TestCase):
         self.assertIn("Ada Writer", body)
         self.assertIn("Detail story", body)
         self.assertIn("A***R@EXAMPLE.COM", body)
+
+    def test_author_story_totals_distinguish_the_window_from_all_time(self):
+        self.make_story("Recent count story")
+        self.make_story("Older count story", age_days=40)
+
+        self.client.force_login(self.admin)
+        leaderboard = self.client.get(self.table_url, {"range": "30d"}).content.decode()
+        detail = self.client.get(
+            self.detail_url, {"author": self.writer.pk, "range": "30d"}
+        ).content.decode()
+
+        self.assertIn("1 published in range", leaderboard)
+        self.assertIn("2 all time", leaderboard)
+        self.assertIn("published in range", detail)
+        self.assertIn("2 all time", detail)
+        self.assertIn("All stories", detail)
 
     def test_the_detail_for_an_unknown_author_degrades_quietly(self):
         self.client.force_login(self.admin)

@@ -33,7 +33,7 @@
 <ul class="analytics-author-stats">
   <li class="analytics-author-stat">
     <span class="analytics-author-stat-value">{{ detail.published }}</span>
-    <span class="analytics-author-stat-label">published</span>
+    <span class="analytics-author-stat-label">published in range</span>
   </li>
   <li class="analytics-author-stat">
     <span class="analytics-author-stat-value">{{ detail.reads }}</span>
@@ -157,9 +157,9 @@
 
 <section class="analytics-author-block" aria-labelledby="analytics-author-stories">
   <h3 id="analytics-author-stories" class="analytics-author-block-title">
-    Their stories
+    All stories
     {% if detail.stories_page.paginator.count %}
-    <span class="analytics-author-block-count">{{ detail.stories_page.paginator.count }}</span>
+    <span class="analytics-author-block-count">{{ detail.stories_page.paginator.count }} all time</span>
     {% endif %}
   </h3>
 

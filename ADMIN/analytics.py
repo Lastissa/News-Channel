@@ -19,7 +19,7 @@ from datetime import datetime, time, timedelta
 
 from django.core.paginator import Paginator
 from django.db import DatabaseError, transaction
-from django.db.models import Count, Max, Sum
+from django.db.models import Case, CharField, Count, F, Max, Sum, Value, When
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -107,6 +107,9 @@ CATEGORY_SERIES_COLORS = [
     "#2563eb", "#d97706", "#16a34a", "#dc2626",
     "#7c3aed", "#0891b2", "#db2777", "#65a30d",
 ]
+
+NO_CATEGORY_KEY = "__no_category__"
+NO_CATEGORY_LABEL = "No category"
 
 #   Per-story performance chart: the three signals an editor can overlay for a
 #   single chosen story. Same shape as SERIES_META so the JS renderer does not
@@ -921,23 +924,26 @@ def category_palette(names):
 
 
 def category_names():
-    """Every category the charts can talk about, in one stable order.
-
-    The menu (the Category table) comes first, because that is the order the
-    admin knows the categories by. A category that a story still carries but
-    the menu has dropped follows it, alphabetically, so nothing a reader has
-    published is ever left out of the count.
-    """
+    """Active categories, stored legacy values, and one empty-category bucket."""
     names = [name for name, _ in get_category_choices()]
     known = set(names)
-    extra = sorted(
+    legacy = sorted(
         {
             name
             for name in Blog.objects.values_list("category", flat=True).distinct()
             if name and name not in known
         }
     )
-    return names + extra
+    return names + legacy + [NO_CATEGORY_KEY]
+
+
+def _category_bucket_expression():
+    category_values = [name for name in category_names() if name != NO_CATEGORY_KEY]
+    return Case(
+        When(category__in=category_values, then=F("category")),
+        default=Value(NO_CATEGORY_KEY),
+        output_field=CharField(),
+    )
 
 
 def category_story_counts():
@@ -948,9 +954,12 @@ def category_story_counts():
     which is not the same thing as saying nothing has been published.
     """
     rows = _safe_rows(
-        Blog.objects.values("category").annotate(n=Count("id")).order_by("-n")
+        Blog.objects.annotate(analytics_category=_category_bucket_expression())
+        .values("analytics_category")
+        .annotate(n=Count("id"))
+        .order_by("-n")
     )
-    return {row["category"]: row["n"] for row in rows if row["category"]}
+    return {row["analytics_category"]: row["n"] for row in rows}
 
 
 def stories_per_day_by_category(
@@ -968,12 +977,14 @@ def stories_per_day_by_category(
     chosen = [name for name in palette if name in wanted]
 
     rows = _safe_rows(
-        Blog.objects.filter(date_created__gte=frame["start"], category__in=chosen)
-        .values("date_created", "category")
+        Blog.objects.filter(date_created__gte=frame["start"])
+        .annotate(analytics_category=_category_bucket_expression())
+        .filter(analytics_category__in=chosen)
+        .values("date_created", "analytics_category")
     )
     stamps = {}
     for row in rows:
-        stamps.setdefault(row["category"], []).append(row["date_created"])
+        stamps.setdefault(row["analytics_category"], []).append(row["date_created"])
 
     series = []
     for name in chosen:
@@ -982,7 +993,12 @@ def stories_per_day_by_category(
         else:
             values = _frame_counts(frame, stamps.get(name, []))
         series.append(
-            {"key": name, "name": name, "color": palette[name], "values": values}
+            {
+                "key": name,
+                "name": NO_CATEGORY_LABEL if name == NO_CATEGORY_KEY else name,
+                "color": palette[name],
+                "values": values,
+            }
         )
 
     return {
@@ -1030,11 +1046,15 @@ def category_comparison(
         end_exclusive = None
         range_label = _range_label(selected_range)
 
+    stories = Blog.objects.annotate(analytics_category=_category_bucket_expression())
+
     def totals(category):
-        published = Blog.objects.filter(category=category, date_created__gte=start)
-        liked = BlogLike.objects.filter(blog__category=category, created_at__gte=start)
-        commented = Comment.objects.filter(blog__category=category, date_created__gte=start)
-        opened = StoryView.objects.filter(blog__category=category, created_at__gte=start)
+        category_stories = stories.filter(analytics_category=category)
+        published = category_stories.filter(date_created__gte=start)
+        story_ids = category_stories.order_by().values("pk")
+        liked = BlogLike.objects.filter(blog_id__in=story_ids, created_at__gte=start)
+        commented = Comment.objects.filter(blog_id__in=story_ids, date_created__gte=start)
+        opened = StoryView.objects.filter(blog_id__in=story_ids, created_at__gte=start)
         if end_exclusive is not None:
             published = published.filter(date_created__lt=end_exclusive)
             liked = liked.filter(created_at__lt=end_exclusive)
@@ -1052,6 +1072,8 @@ def category_comparison(
     totals_a = totals(name_a)
     totals_b = totals(name_b)
 
+    display_a = NO_CATEGORY_LABEL if name_a == NO_CATEGORY_KEY else name_a
+    display_b = NO_CATEGORY_LABEL if name_b == NO_CATEGORY_KEY else name_b
     differences = []
     for label, key in COMPARISON_METRICS:
         first = totals_a[key]
@@ -1066,7 +1088,7 @@ def category_comparison(
                 #   Signed, so the direction is readable without relying on
                 #   colour alone.
                 "display": f"+{gap}" if gap > 0 else (f"-{abs(gap)}" if gap < 0 else "0"),
-                "leader": name_a if gap > 0 else (name_b if gap < 0 else ""),
+                "leader": display_a if gap > 0 else (display_b if gap < 0 else ""),
                 "tie": gap == 0,
             }
         )
@@ -1077,20 +1099,20 @@ def category_comparison(
         "series": [
             {
                 "key": name_a,
-                "name": name_a,
+                "name": display_a,
                 "color": palette.get(name_a, CATEGORY_SERIES_COLORS[0]),
                 "values": [totals_a[key] for _, key in COMPARISON_METRICS],
             },
             {
                 "key": name_b,
-                "name": name_b,
+                "name": display_b,
                 "color": palette.get(name_b, CATEGORY_SERIES_COLORS[1]),
                 "values": [totals_b[key] for _, key in COMPARISON_METRICS],
             },
         ],
         "differences": differences,
         "range_label": range_label,
-        "categories": [name_a, name_b],
+        "categories": [display_a, display_b],
     }
 
 
@@ -1625,6 +1647,12 @@ def author_directory_rows(selected_range, since=None, page_number=1):
             .annotate(n=Count("id"))
         )
     }
+    stories_total = {
+        row["author_id"]: row["n"]
+        for row in _safe_rows(
+            Blog.objects.values("author_id").annotate(n=Count("id"))
+        )
+    }
 
     viewed = _author_event_counts(StoryView, "created_at", start)
     liked = _author_event_counts(BlogLike, "created_at", start)
@@ -1671,6 +1699,7 @@ def author_directory_rows(selected_range, since=None, page_number=1):
                 "is_active": author.is_active,
                 "role": profile.get_role_display() if profile else "",
                 "stories": published.get(author_id, 0),
+                "stories_total": stories_total.get(author_id, 0),
                 "views": views,
                 "likes": like_count,
                 "comments": commented.get(author_id, 0),

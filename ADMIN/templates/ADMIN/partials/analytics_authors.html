@@ -35,7 +35,8 @@
         <span class="analytics-author-card-meta">
           {{ row.views }} read{{ row.views|pluralize }}
           &middot; {{ row.likes }} like{{ row.likes|pluralize }}
-          {% if row.stories %} &middot; {{ row.stories }} published{% endif %}
+          &middot; {{ row.stories }} published in range
+          &middot; {{ row.stories_total }} all time
         </span>
       </span>
 

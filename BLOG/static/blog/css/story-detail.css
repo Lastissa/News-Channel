@@ -476,10 +476,16 @@ html[data-theme="dark"] .share-btn-twitter .share-icon { filter: invert(1); }
 @media (max-width: 560px) {
   .story-rail-heading h2 { padding: 7px 13px; font-size: .86rem; }
   .read-also-skeleton,
-  .read-also-card { grid-template-columns: 60px minmax(0, 1fr); gap: 10px; }
+  .read-also-card {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 8px;
+    min-height: 64px;
+    padding: 7px 0 7px 13px;
+  }
   .read-also-skeleton-image,
-  .read-also-card-image { width: 60px; height: 54px; }
-  .read-also-card h3 { font-size: .84rem; }
+  .read-also-card-image { width: 48px; height: 44px; }
+  .read-also-card h3 { font-size: .76rem; line-height: 1.25; }
+  .read-also-card-meta { margin-bottom: 3px; font-size: .58rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

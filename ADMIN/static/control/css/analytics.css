@@ -1294,70 +1294,88 @@ html[data-theme="dark"] .analytics-since input[type="date"] { background: var(--
 
 
 
-/* ---------- No sideways scrolling: tables stack on narrow screens ---------- */
-.analytics-members-scroll, .analytics-reading-scroll, .analytics-author-scroll,
-.analytics-authors-scroll, .analytics-author-likes-scroll { overflow-x: visible; max-width: 100%; }
-@media (max-width: 719px) {
-  .analytics-members-table, .analytics-reading-table, .analytics-authors-table, .analytics-likes-table,
-  .analytics-members-table tbody, .analytics-reading-table tbody, .analytics-authors-table tbody, .analytics-likes-table tbody,
-  .analytics-members-table tr, .analytics-reading-table tr, .analytics-authors-table tr, .analytics-likes-table tr,
-  .analytics-members-table td, .analytics-reading-table td, .analytics-authors-table td, .analytics-likes-table td { display: block; width: 100%; box-sizing: border-box; }
-  .analytics-members-table thead, .analytics-reading-table thead, .analytics-authors-table thead, .analytics-likes-table thead {
-    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
-  }
-  .analytics-members-table tr, .analytics-reading-table tr, .analytics-authors-table tr, .analytics-likes-table tr {
-    padding: 8px 0; border-bottom: 1px solid var(--line);
-  }
-  .analytics-members-table td, .analytics-reading-table td, .analytics-authors-table td, .analytics-likes-table td {
-    display: flex; justify-content: space-between; gap: 12px; padding: 4px 2px; border: 0; text-align: right; overflow-wrap: anywhere;
-  }
-  .analytics-members-table td::before, .analytics-reading-table td::before, .analytics-authors-table td::before, .analytics-likes-table td::before {
-    content: attr(data-label); flex: 0 0 38%; text-align: left; font-size: 0.72rem; font-weight: 700;
-    letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate);
-  }
-  .analytics-member-cats { max-width: none; }
-}
+/* Keep horizontal scrolling inside the data surface, never on the whole page.
+   The table headers remain visible on phones instead of collapsing every
+   cell into a cramped label/value stack. */
+.analytics-shell,
+.analytics-grid,
+.analytics-card,
+.analytics-author-split,
+.lytics-content,
+.lytics-layout,
+.analytics-content,
+.analytic-content { min-width: 0; }
 
-/* Allow horizontal scrolling for wide analytics/lytics tables */
+.analytics-members-scroll,
+.analytics-reading-scroll,
+.analytics-author-scroll,
+.analytics-author-likes-scroll,
+.analytics-authors-scroll,
 .analytics-table-wrap,
 .analytic-table-wrap,
 .table-responsive,
 .lytics-table-wrap,
 .analytics-card .table-wrap,
-.analytic-card .table-wrap,
-table.analytics-table,
-table.analytic-table,
-.lytics-table,
-.lytics-table-container {
-  overflow-x: auto;
+.analytic-card .table-wrap {
   display: block;
   width: 100%;
+  min-width: 0;
   max-width: 100%;
-  min-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  white-space: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: var(--slate) transparent;
 }
+
+.analytics-members-table { min-width: 760px; }
+.analytics-reading-table,
+.analytics-authors-table,
+.analytics-table,
+.analytic-table,
+.lytics-table { min-width: 600px; }
+.analytics-likes-table { min-width: 520px; }
+.analytics-members-table,
+.analytics-reading-table,
+.analytics-authors-table,
+.analytics-likes-table,
+.analytics-table,
+.analytic-table,
+.lytics-table { width: 100%; white-space: normal; }
+
 .analytics-table-wrap::-webkit-scrollbar,
-.analytic-table-wrap::-webkit-scrollbar,
-.table-responsive::-webkit-scrollbar,
-.lytics-table-wrap::-webkit-scrollbar {
-  height: 8px;
-}
+.analytics-members-scroll::-webkit-scrollbar,
+.analytics-reading-scroll::-webkit-scrollbar,
+.analytics-author-scroll::-webkit-scrollbar,
+.analytics-author-likes-scroll::-webkit-scrollbar,
+.analytics-authors-scroll::-webkit-scrollbar { height: 8px; }
 .analytics-table-wrap::-webkit-scrollbar-thumb,
-.analytic-table-wrap::-webkit-scrollbar-thumb,
-.table-responsive::-webkit-scrollbar-thumb,
-.lytics-table-wrap::-webkit-scrollbar-thumb {
+.analytics-members-scroll::-webkit-scrollbar-thumb,
+.analytics-reading-scroll::-webkit-scrollbar-thumb,
+.analytics-author-scroll::-webkit-scrollbar-thumb,
+.analytics-author-likes-scroll::-webkit-scrollbar-thumb,
+.analytics-authors-scroll::-webkit-scrollbar-thumb {
   background: rgba(15, 27, 40, 0.25);
   border-radius: 4px;
 }
 
-.lytics-content,
-.lytics-layout,
-.analytics-content,
-.analytic-content {
-  min-width:0;
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
+@media (max-width: 719px) {
+  .analytics-card { padding: 12px 12px 6px; }
+  .analytics-card-header { flex-wrap: wrap; gap: 8px; }
+  .analytics-card-header h2 { flex: 1 1 160px; }
+  .analytics-controls .analytics-select,
+  .analytics-filter-row .analytics-select { flex: 1 1 145px; min-width: 0; }
+  .analytics-select select,
+  .analytics-select input { max-width: 100%; }
+  .analytics-series { gap: 8px; }
+  .analytics-series-option { padding: 5px 9px; }
+  .analytics-chambers {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .analytics-chamber { flex: 0 0 auto; }
 }
 
 /* ---------- Author lytics: standing and reach (rank, rhythm, readership, reader response) ---------- */

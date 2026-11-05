@@ -9,7 +9,7 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
-  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}">
+  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261105-1">
 {% endblock %}
 
 {% block content %}
@@ -54,7 +54,7 @@
 
   <nav class="analytics-tabs" role="tablist" aria-label="Story lytics sections">
     <button type="button" class="analytics-tab is-active" data-analytics-tab="overview" role="tab" aria-selected="true">Overview</button>
-    <button type="button" class="analytics-tab" data-analytics-tab="uncategorized" role="tab" aria-selected="false">Stories without category</button>
+    <button type="button" class="analytics-tab" data-analytics-tab="uncategorized" role="tab" aria-selected="false">No category</button>
   </nav>
 
   <div class="analytics-grid" data-analytics-panel="overview">
@@ -181,7 +181,7 @@
           <label class="analytics-series-option" style="--series-color: {{ category.color }}">
             <input type="checkbox" name="category" value="{{ category.name }}"{% if category.name in default_categories %} checked{% endif %}>
             <span class="analytics-series-swatch" aria-hidden="true"></span>
-            <span>{{ category.name }}</span>
+            <span>{{ category.label }}</span>
           </label>
           {% endfor %}
         </fieldset>
@@ -223,7 +223,7 @@
             <span class="analytics-select-label">Subject A</span>
             <select name="a">
               {% for category in categories %}
-              <option value="{{ category.name }}"{% if category.name == default_categories.0 %} selected{% endif %}>{{ category.name }}</option>
+              <option value="{{ category.name }}"{% if category.name == default_categories.0 %} selected{% endif %}>{{ category.label }}</option>
               {% endfor %}
             </select>
           </label>
@@ -232,7 +232,7 @@
             <span class="analytics-select-label">Subject B</span>
             <select name="b">
               {% for category in categories %}
-              <option value="{{ category.name }}"{% if category.name == default_categories.1 %} selected{% endif %}>{{ category.name }}</option>
+              <option value="{{ category.name }}"{% if category.name == default_categories.1 %} selected{% endif %}>{{ category.label }}</option>
               {% endfor %}
             </select>
           </label>
@@ -388,7 +388,7 @@
     <section class="analytics-card" aria-labelledby="analytics-uncat-title">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></span>
-        <h2 id="analytics-uncat-title">Stories with no valid category</h2>
+        <h2 id="analytics-uncat-title">No category</h2>
       </header>
       <div class="analytics-chart-body" id="analytics-uncategorized-body"
            hx-get="{% url 'control:analytics_uncategorized_stories' %}"
