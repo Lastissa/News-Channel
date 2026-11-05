@@ -1253,8 +1253,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 .story-body {
   overflow-wrap: anywhere;
-  width: 100%; max-width: 760px; margin: 0 auto; font-size: 18px; line-height: 1.66; color: var(--ink
-  );
+  width: 100%; max-width: 760px; margin: 0 auto; font-size: 18px; line-height: 1.66; color: var(--ink);
 }
 .story-body p,
 .story-body li { text-align: justify; text-justify: inter-word; }
@@ -2113,8 +2112,8 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   bottom: 0;
   z-index: 260; /* above the fab-stack (200), below toast/auth layers (300+) */
   display: flex;
-  justify-content: center;
-  padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  justify-content: stretch;
+  padding: 0;
   pointer-events: none;
   visibility: hidden;
   font-weight: bold;
@@ -2122,19 +2121,20 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .newsletter-popup-card {
   pointer-events: auto;
   width: 100%;
-  max-width: 520px;
+  max-width: 100%;
   max-height: min(35vh, 320px);
   background: var(--surface);
   border-top: 4px double red;
   /* border-radius: var(--radius-l) var(--radius-l) 0 0; */
   box-shadow: var(--shadow-raised);
-  padding: 16px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   position: relative;
   transform: translateY(115%);
   transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin: 0;
 }
 .newsletter-popup-body {
   overflow-y: auto;
@@ -2247,18 +2247,30 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .newsletter-popup-status.is-ok { color: var(--success); }
 .newsletter-popup-status.is-error { color: var(--danger); }
 
+/* Ensure ad containers span full width to edges when needed */
+.adsbygoogle,
+ins.adsbygoogle,
+.google-auto-placed {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  display: block !important;
+}
+
 @media (min-width: 640px) {
   .newsletter-popup {
-    left: auto;
-    right: 20px;
-    bottom: 20px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     padding: 0;
-    justify-content: flex-end;
+    justify-content: stretch;
   }
   .newsletter-popup-card {
-    max-width: 380px;
-    border-radius: var(--radius-l);
-    padding: 20px 20px 18px;
+    max-width: 100%;
+    border-radius: 0;
+    border-top: 4px double red;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
   }
   .newsletter-popup-form { flex-direction: row; flex-wrap: wrap; }
   .newsletter-popup-form input { flex: 1 1 auto; min-width: 0; }

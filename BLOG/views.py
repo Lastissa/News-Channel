@@ -787,7 +787,7 @@ def _story_toc_html(headings, toc_mode):
     )
 
 
-def enhance_story_body(html_body, toc_mode=0):
+def enhance_story_body(html_body, toc_mode=0, author_name=""):
     """When the author chose a table of contents for a story (Blog.toc_mode
     other than "Off"), give every heading in the parsed body a stable `id`
     and splice the "TABLE OF CONTENT" section in right after the first
@@ -818,6 +818,11 @@ def enhance_story_body(html_body, toc_mode=0):
     #   added) is returned as the parser made it.
     if not headings:
         return with_ids
+
+    #   Add "About Author" as the last item in TOC when author name is provided
+    author_name_clean = (author_name or "Abureport-Author").strip().capitalize()
+    if author_name_clean:
+        headings.append((2, "about-author", f"About Author - {author_name_clean}"))
 
     #   Blocks are newline-joined (see parse_story_content), so walk them and
     #   drop the TOC just after the first real paragraph -- one that starts
@@ -975,7 +980,7 @@ class StoryDetailView(View):
         #   `blog` can arrive from a 100s Redis cache, so a row pickled just
         #   before this field shipped would not carry `toc_mode`. getattr keeps
         #   that first request from 500-ing; the cache self-heals in 100s.
-        blog_content = enhance_story_body(parse_story_content(blog.content, blog.slug), getattr(blog, "toc_mode", 0))
+        blog_content = enhance_story_body(parse_story_content(blog.content, blog.slug), getattr(blog, "toc_mode", 0), getattr(blog, "author_name", "") or "")
         ticker_text = build_ticker_text(blog.content)
 
         comments = blog.comments.select_related("author__staffprofile").order_by("id")
