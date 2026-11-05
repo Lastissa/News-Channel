@@ -233,6 +233,66 @@
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  position: relative;
+  scroll-behavior: smooth;
+}
+
+/* 3D scroll hint */
+.continue-popup-rail::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%) translateZ(0);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(16,24,40,0.92));
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.12);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 280ms ease;
+  z-index: 2;
+}
+.continue-popup-rail::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: translateY(-50%) rotate(-45deg) translateZ(0);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 280ms ease, transform 420ms cubic-bezier(0.25,0.8,0.25,1);
+  z-index: 3;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+}
+.continue-popup-rail.has-scroll-hint::after,
+.continue-popup-rail.has-scroll-hint::before {
+  opacity: 1;
+  animation: continue-rail-hint 1600ms ease-in-out infinite;
+}
+.continue-popup-rail.has-scroll-hint.scrolled::after,
+.continue-popup-rail.has-scroll-hint.scrolled::before {
+  opacity: 0;
+  animation: none;
+  transition: opacity 320ms ease;
+}
+
+@keyframes continue-rail-hint {
+  0% { transform: translateY(-50%) translateX(0) rotate(-45deg) translateZ(0); }
+  50% { transform: translateY(-50%) translateX(6px) rotate(-45deg) translateZ(10px); }
+  100% { transform: translateY(-50%) translateX(0) rotate(-45deg) translateZ(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .continue-popup-rail.has-scroll-hint::after,
+  .continue-popup-rail.has-scroll-hint::before {
+    animation: none;
+  }
 }
 
 .continue-popup-rail-card {

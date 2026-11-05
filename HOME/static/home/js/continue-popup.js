@@ -45,6 +45,31 @@
   var sheet = popup.querySelector(".continue-popup-sheet");
   var lastFocus = null;
 
+  function initRailHints() {
+    var rails = popup.querySelectorAll(".continue-popup-rail");
+    rails.forEach(function (rail) {
+      if (rail.dataset.hintInit) return;
+      rail.dataset.hintInit = "1";
+      function check() {
+        if (rail.scrollWidth > rail.clientWidth + 4) {
+          rail.classList.add("has-scroll-hint");
+        } else {
+          rail.classList.remove("has-scroll-hint");
+        }
+      }
+      function onScroll() {
+        if (rail.scrollLeft > 10) {
+          rail.classList.add("scrolled");
+        } else {
+          rail.classList.remove("scrolled");
+        }
+      }
+      check();
+      rail.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", check);
+    });
+  }
+
   function open() {
     if (isOpen) return;
     isOpen = true;
@@ -66,6 +91,7 @@
     if (closeBtn) closeBtn.focus({ preventScroll: true });
     writeState(String(Date.now() + COOLDOWN_MS));
     startFeed();
+    window.setTimeout(initRailHints, 120);
   }
 
   function close() {
