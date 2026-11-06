@@ -74,5 +74,6 @@ urlpatterns = [
     path('story/', include("BLOG.urls")),
     path('portfolio/', include("STAFF.urls")),
     path('archive/', include("ARCHIVE.urls")),
+    
     path('', include("HOME.urls")),
 ]

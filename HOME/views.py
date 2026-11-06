@@ -1008,13 +1008,30 @@ class SearchView(View):
     instead of being folded back onto "/".
     """
 
+    SCOPE_HEADLINE = "headline"
+    SCOPE_CONTENT = "content"
+    SCOPE_ALL = "all"
+    SCOPE_CHOICES = {
+        SCOPE_HEADLINE: "Headline only",
+        SCOPE_ALL: "Headline and story content",
+        SCOPE_CONTENT: "Story content only",
+    }
+
     def get(self, request):
         query = request.GET.get("q", "").strip()
+        scope = (request.GET.get("scope") or self.SCOPE_HEADLINE).strip().lower()
+        if scope not in self.SCOPE_CHOICES:
+            scope = self.SCOPE_HEADLINE
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
 
         base_qs = _home_blog_queryset()
         if query:
-            base_qs = base_qs.filter(heading__icontains=query)
+            if scope == self.SCOPE_CONTENT:
+                base_qs = base_qs.filter(content__icontains=query)
+            elif scope == self.SCOPE_ALL:
+                base_qs = base_qs.filter(Q(heading__icontains=query) | Q(content__icontains=query))
+            else:
+                base_qs = base_qs.filter(heading__icontains=query)
         else:
             base_qs = base_qs.none()
 
@@ -1035,12 +1052,16 @@ class SearchView(View):
 
         context = {
             "query": query,
+            "search_scope": scope,
+            "search_scope_choices": self.SCOPE_CHOICES,
             "is_filtered": bool(query),
             "canonical_url": canonical_url,
             "meta_description": meta_description,
             "page_range": list(paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
             **_page_context(page, request.user),
         }
+        if request.headers.get("HX-Request"):
+            return render(request, "HOME/partials/search_results.html", context)
         return render(request, "HOME/search.html", context)
 
 

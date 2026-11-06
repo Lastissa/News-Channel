@@ -1,0 +1,33 @@
+<div class="story-grid">
+  {% for post in page_obj.object_list %}
+    {% include "HOME/partials/_story_card.html" with post=post %}
+  {% empty %}
+    <p class="empty-state">
+      {% if query %}No results match &ldquo;{{ query }}&rdquo; for this filter. Try a different keyword or filter.
+      {% else %}Type a keyword above to search stories.{% endif %}
+    </p>
+  {% endfor %}
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="story-pagination" aria-label="Search result pages">
+  {% if page_obj.has_previous %}
+    <a class="story-page-btn page-nav" href="?q={{ query|urlencode }}&amp;scope={{ search_scope|urlencode }}&amp;page={{ page_obj.previous_page_number }}#headline" aria-label="Go to previous page">Prev</a>
+  {% endif %}
+
+  {% for page_num in page_range %}
+    {% if page_num == page_obj.paginator.ELLIPSIS %}
+      <span class="story-page-btn is-ellipsis" aria-hidden="true">{{ page_num }}</span>
+    {% else %}
+      <a class="story-page-btn {% if page_num == page_obj.number %}is-active{% endif %}"
+         href="?q={{ query|urlencode }}&amp;scope={{ search_scope|urlencode }}&amp;page={{ page_num }}#headline"
+         aria-label="Go to page {{ page_num }}"
+         {% if page_num == page_obj.number %}aria-current="page"{% endif %}>{{ page_num }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+    <a class="story-page-btn page-nav" href="?q={{ query|urlencode }}&amp;scope={{ search_scope|urlencode }}&amp;page={{ page_obj.next_page_number }}#headline" aria-label="Go to next page">Next</a>
+  {% endif %}
+</nav>
+{% endif %}
