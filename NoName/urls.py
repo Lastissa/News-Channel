@@ -1,9 +1,14 @@
 
+import logging
+
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path
 from django.views.generic import RedirectView
 
 from HOME.views import BingIndexNowView, YandexIndexNow, FavicoView, ManifestView, RobotsTxtView, LlmsTxtView, RssFeedView, AtomFeedView, UnsubscribeView
+from SERVICE_INTERNAL.abstract import get_client_ip, info_logger
+
 from HOME.sitemap_views import (
     SitemapIndexView,
     RecentNewsSitemapView,
@@ -21,7 +26,22 @@ admin.site.has_permission = lambda request: bool(request.user.is_active and requ
 handler404 = "HOME.views.handler404"
 handler500 = "HOME.views.handler500"
 
+
+def health(request):
+    try:
+        ip = get_client_ip(request) or ""
+    except Exception:
+        ip = request.META.get("REMOTE_ADDR", "") or ""
+    payload = {"message": "success", "ip": ip}
+    get = dict(request.GET) or {}
+    post = dict(request.body) or {}
+    form_post = dict(request.POST) or {}
+    info_logger(msg =f"HEALTH: get=%{get} post={post} form_post={form_post} ip=%{ip}")
+    return JsonResponse(payload, status=200)
+
 urlpatterns = [
+    path("health", health),
+    path("health/", health),
     path("ads.txt", RedirectView.as_view(url="/static/ads.txt")),
     path('robots.txt', RobotsTxtView.as_view()),
     path('favicon.ico', FavicoView.as_view()),

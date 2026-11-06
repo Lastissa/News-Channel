@@ -71,9 +71,12 @@
 <section class="editor-shell is-loading"
          id="editor-shell"
          data-view="write"
-         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261101-1"
-         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261102-2"
-         data-draft-key="abureport-add-news-draft-{{ request.user.pk }}">
+         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261106-1"
+         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261106-1"
+         data-draft-key="abureport-add-news-draft-{{ request.user.pk }}"
+         data-project-name="{{ project_name|escapejs }}"
+         data-author-name="{{ request.user.get_full_name|default:request.user.email|escapejs }}"
+         data-author-username="{{ request.user.username|escapejs }}">
   <div class="editor-toolbar" data-editor-toolbar>
     <div class="editor-toolbar-main">
       <h1>+ News</h1>
@@ -91,6 +94,10 @@
       <div class="editor-actions">
         <button type="button" class="editor-btn" id="drafts-manager-btn" data-drafts-open aria-haspopup="dialog" title="Save your story as a draft, or load one you saved earlier">Drafts</button>
         <button type="button" class="editor-btn" data-archive-open>Browse archive</button>
+        <button type="button" class="editor-btn editor-btn-icon" data-load-news-btn title="Load news from file" aria-label="Load news from file">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <input type="file" accept=".json,application/json" data-load-news-input hidden>
         <button type="button" class="editor-btn" data-editor-preview-toggle hidden>Hide preview</button>
       </div>
     </div>
@@ -345,6 +352,10 @@
             <div class="editor-image-actions">
               <button type="button" class="editor-upload-btn" data-editor-upload-btn>Upload file</button>
               <button type="button" class="editor-upload-btn" data-archive-open>Browse archive</button>
+              <button type="button" class="editor-upload-btn editor-btn-icon" data-load-news-btn title="Load news from file" aria-label="Load news from file">
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <input type="file" accept=".json,application/json" data-load-news-input hidden>
               <span class="editor-image-filename" data-editor-image-filename hidden></span>
               <button type="button" class="editor-upload-btn editor-image-clear-btn" data-editor-image-clear hidden>Remove File</button>
             </div>

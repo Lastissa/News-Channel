@@ -1458,7 +1458,13 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .story-body h4 { font-size: calc(21px * 0.82); line-height: 1.28; margin-top: 20px; margin-bottom: 10px; color: var(--ink); }
 /*  Every heading is a jump target for the story's table of contents, so an
     anchor scroll must leave the sticky .site-header (height --header-h) its
-    room instead of hiding the heading underneath it. */
+    room instead of hiding the heading underneath it.
+    Headings must always remain block-level and clear floated inline images
+    (imgl/imgr) so they never wrap beside them. */
+.story-body h1, .story-body h2, .story-body h3, .story-body h4, .story-body h5, .story-body h6 {
+  display: block;
+  clear: both;
+}
 .story-body h2, .story-body h3, .story-body h4 {
   scroll-margin-top: calc(var(--header-h, 64px) + 14px);
   /*  Lets the "you landed here" wash below fade back out after a table-of-

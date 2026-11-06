@@ -82,6 +82,57 @@ html.editor-modal-open { overflow: hidden; }
 .editor-publish-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .editor-publish-btn.is-pending { opacity: 0.6; pointer-events: none; }
 
+.editor-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  min-width: 34px;
+  min-height: 34px;
+  line-height: 1;
+}
+.editor-btn-icon svg { display: block; }
+
+.draft-slot-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.draft-slot-actions-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.draft-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.draft-icon-btn svg { display: block; flex-shrink: 0; }
+.draft-icon-btn--danger {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.06);
+  padding: 6px;
+  min-width: 34px;
+  min-height: 34px;
+}
+.draft-icon-btn--danger:hover,
+.draft-icon-btn--danger:focus-visible {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.5);
+}
+.draft-icon-btn--share:hover,
+.draft-icon-btn--share:focus-visible {
+  background: var(--paper-dim);
+}
+
 .editor-btn:focus-visible,
 .editor-publish-btn:focus-visible,
 .editor-tab:focus-visible { outline: 2px solid var(--amber-alt-deep); outline-offset: 2px; }
@@ -658,5 +709,4 @@ html.editor-modal-open { overflow: hidden; }
 .draft-slot-title { margin: 0; font-weight: 700; font-size: 0.95rem; overflow-wrap: anywhere; }
 .draft-slot-meta { margin: 2px 0 0; font-size: 0.8rem; color: var(--slate); }
 .draft-slot-warning { grid-column: 1 / -1; margin: 4px 0 0; font-size: 0.85rem; color: var(--danger); }
-.draft-slot-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
 .editor-modal-btn.draft-btn-danger { background: var(--careful-btn-bg); border-color: var(--careful-btn-bg); color: #fff; }

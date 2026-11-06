@@ -1,1582 +1,3238 @@
-/* Add news editor: heavy components. Loaded asynchronously by the light
-   loader in add_news.html so the page skeleton paints first.
-
-   The preview engine below is a direct port of BLOG.views.parse_story_content
-   and _linkify_text (see DOCS/NEWS_CONTENT_CONVENTION.MD) so what the author
-   sees here is exactly what every reader will get on the published page. */
-(function () {
-  "use strict";
-
-  var shell = document.getElementById("editor-shell");
-  if (!shell) return;
-
-  var form = shell.querySelector("[data-editor-form]");
-  var headingInput = shell.querySelector("[data-editor-heading]");
-  var imageInput = shell.querySelector("[data-editor-image]");
-  var imageFileInput = shell.querySelector("[data-editor-image-file]");
-  var imageFilenameEl = shell.querySelector("[data-editor-image-filename]");
-  var imageClearBtn = shell.querySelector("[data-editor-image-clear]");
-  var imageQualityField = shell.querySelector("[data-editor-image-quality-field]");
-  var imageInfoInput = shell.querySelector("[data-editor-image-info]");
-  var categorySelect = shell.querySelector("[data-editor-category]");
-  var contentInput = shell.querySelector("[data-editor-content]");
-  var tocModeSelect = shell.querySelector("[data-editor-toc-mode]");
-  var output = shell.querySelector("[data-editor-preview-output]");
-  var toggleBtn = shell.querySelector("[data-editor-preview-toggle]");
-  var publishBtn = shell.querySelector("[data-editor-publish]");
-  var uploadBtn = shell.querySelector("[data-editor-upload-btn]");
-  var note = shell.querySelector("[data-editor-loading-note]");
-  var draftStatus = shell.querySelector("[data-editor-draft-status]");
-  var archiveModal = shell.querySelector("[data-archive-modal]");
-  var archiveFrame = archiveModal ? archiveModal.querySelector(".archive-picker-frame") : null;
-  var archiveRefreshBtn = archiveModal ? archiveModal.querySelector("[data-archive-refresh]") : null;
-  var modal = shell.querySelector("[data-editor-modal]");
-  var modalCard = modal ? modal.querySelector(".editor-modal-card") : null;
-  var modalTitle = modal ? modal.querySelector("[data-editor-modal-title]") : null;
-  var modalIntro = modal ? modal.querySelector("[data-editor-modal-intro]") : null;
-  var modalList = modal ? modal.querySelector("[data-editor-modal-list]") : null;
-  var modalQuestion = modal ? modal.querySelector("[data-editor-modal-question]") : null;
-  var modalEditBtn = modal ? modal.querySelector("[data-editor-modal-edit]") : null;
-  var modalConfirmBtn = modal ? modal.querySelector("[data-editor-modal-confirm]") : null;
-  var guideCopyBtn = shell.querySelector("[data-guide-copy-all]");
-  var guideToggleBtn = shell.querySelector("[data-guide-toggle]");
-  var guideEl = shell.querySelector("[data-format-guide]");
-  var toolbarEl = shell.querySelector("[data-editor-toolbar]");
-  var tabButtons = shell.querySelectorAll("[data-editor-tab]");
-  var archiveStage = archiveModal ? archiveModal.querySelector(".archive-picker-stage") : null;
-  var modalEditTarget = null;
-  var modalConfirmWarnings = true;
-  var modalConfirmAction = null;
-  var modalEditAction = null;
-
-  /* The newsletter choice for the publish in progress:
-       null  = not asked yet for this attempt
-       false = publish without the newsletter
-       true  = the author asked for it (and confirmed it)  */
-  var newsletterChoice = null;
-  var newsletterGateWarnings = false;
-  var newsletterCounts = {};
-  (function readNewsletterCounts() {
-    var el = document.getElementById("news-alert-counts");
-    if (!el) return;
-    try { newsletterCounts = JSON.parse(el.textContent || "{}") || {}; } catch (e) { newsletterCounts = {}; }
-  })();
-
-  var PREVIEW_KEY = "abu-editor-preview";
-  var DRAFT_KEY = shell.dataset.draftKey;
-  var DRAFT_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
-  var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-  var pendingPublish = false;
-  var MOBILE_QUERY = window.matchMedia ? window.matchMedia("(max-width: 899.98px)") : { matches: false };
-  var MODAL_CLOSE_MS = 240;
-
-  /* Local-only preview of a chosen file. No upload happens here, that
-     only happens inside the publish handler further down, via the real
-     `image_file` FormData entry the browser already attached to the form. */
-  var selectedImageObjectUrl = null;
-
-  function setDraftStatus(message, isError) {
-    if (!draftStatus) return;
-    draftStatus.textContent = message;
-    draftStatus.classList.toggle("is-error", Boolean(isError));
-  }
-
-  function readDraft() {
-    var rawDraft;
-    try {
-      rawDraft = window.localStorage.getItem(DRAFT_KEY);
-    } catch (error) {
-      console.error("Could not read the saved story draft.", error);
-      setDraftStatus("Autosave is unavailable in this browser.", true);
-      return null;
-    }
-    if (!rawDraft) return null;
-
-    try {
-      var draft = JSON.parse(rawDraft);
-      if (!draft || typeof draft !== "object" || typeof draft.savedAt !== "number") {
-        throw new Error("Saved story draft has an invalid format.");
-      }
-      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE) {
-        window.localStorage.removeItem(DRAFT_KEY);
-        return null;
-      }
-      return draft;
-    } catch (error) {
-      console.error("Could not restore the saved story draft.", error);
-      try {
-        window.localStorage.removeItem(DRAFT_KEY);
-      } catch (removeError) {
-        console.error("Could not remove the invalid saved story draft.", removeError);
-      }
-      setDraftStatus("The saved draft could not be restored.", true);
-      return null;
-    }
-  }
-
-  function restoreDraft() {
-    var draft = readDraft();
-    if (!draft) return;
-
-    headingInput.value = typeof draft.heading === "string" ? draft.heading : "";
-    imageInput.value = typeof draft.image === "string" ? draft.image : "";
-    imageInfoInput.value = typeof draft.imageInfo === "string" ? draft.imageInfo : "";
-    contentInput.value = typeof draft.content === "string" ? draft.content : "";
-    if (tocModeSelect) {
-      if (typeof draft.tocMode === "string") {
-        tocModeSelect.value = draft.tocMode;
-      } else if (typeof draft.showToc === "boolean") {
-        //   A draft saved before the three-level picker existed only stored a
-        //   boolean; carry it over as full-open or off.
-        tocModeSelect.value = draft.showToc ? "3" : "0";
-      }
-    }
-    if (typeof draft.category === "string") categorySelect.value = draft.category;
-    if (typeof draft.imageQuality === "string" && imageQualityField) {
-      var qualitySelect = imageQualityField.querySelector("select");
-      if (qualitySelect) qualitySelect.value = draft.imageQuality;
-    }
-    setDraftStatus(
-      draft.uploadedImageSelected
-        ? "Draft restored. Reselect the uploaded image file."
-        : "Draft restored."
-    );
-  }
-
-  function saveDraft() {
-    try {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        heading: headingInput.value,
-        image: imageInput.value,
-        imageInfo: imageInfoInput.value,
-        category: categorySelect.value,
-        imageQuality: imageQualityField
-          ? imageQualityField.querySelector("select").value
-          : "",
-        content: contentInput.value,
-        tocMode: tocModeSelect ? tocModeSelect.value : "0",
-        uploadedImageSelected: Boolean(imageFileInput && imageFileInput.files && imageFileInput.files.length),
-        savedAt: Date.now()
-      }));
-      setDraftStatus("Draft saved in this browser.");
-    } catch (error) {
-      console.error("Could not save the story draft.", error);
-      setDraftStatus("Autosave failed. Keep this page open and copy your text.", true);
-    }
-  }
-
-  function clearDraft() {
-    try {
-      window.localStorage.removeItem(DRAFT_KEY);
-      setDraftStatus("");
-    } catch (error) {
-      console.error("Could not clear the published story draft.", error);
-      setDraftStatus("Story published, but its local draft could not be cleared.", true);
-    }
-  }
-
-  /* ---------- animated dialogs ----------
-     `hidden` can not be transitioned, so a dialog opens by clearing it and
-     adding .is-open on the next frame, and closes by dropping .is-open and
-     setting `hidden` once the fade is done. The page behind is locked from
-     scrolling while any dialog is open. */
-  function showDialog(el) {
-    if (!el) return;
-    window.clearTimeout(el._closeTimer);
-    el.hidden = false;
-    document.documentElement.classList.add("editor-modal-open");
-    void el.offsetWidth;
-    window.requestAnimationFrame(function () { el.classList.add("is-open"); });
-  }
-
-  function hideDialog(el) {
-    if (!el || el.hidden) return;
-    el.classList.remove("is-open");
-    el._closeTimer = window.setTimeout(function () {
-      el.hidden = true;
-      var anyOpen = shell.querySelector(".editor-modal:not([hidden])");
-      if (!anyOpen) document.documentElement.classList.remove("editor-modal-open");
-    }, MODAL_CLOSE_MS);
-  }
-
-  /* ---------- archive picker ----------
-     The picker shows the real /archive/ page in a frame. It is same-origin,
-     so once it has loaded the site header, footer, splash and floating
-     buttons are hidden and the gallery gets a compact, touch friendly layout
-     (two columns on a phone). Only the picker is affected, the real archive
-     page keeps its own styles. */
-  var ARCHIVE_EMBED_CSS = [
-    "#splash,.dummy-loading,.site-header,.site-footer,.fab-stack,#newsletter-popup{display:none!important}",
-    "html,body{background:var(--paper)!important}",
-    "body{padding-top:0!important}",
-    ".archive-shell{padding:16px 16px 32px!important}",
-    ".archive-hero{padding-bottom:12px!important}",
-    ".archive-hero::after,.archive-heading,.archive-header-actions{animation:none!important}",
-    ".archive-eyebrow{display:none!important}",
-    ".archive-hero h1{font-size:1.4rem!important}",
-    ".archive-subtitle{margin-top:4px!important;font-size:0.84rem!important}",
-    ".archive-toolbar{position:sticky;top:0;z-index:20;background:var(--paper);padding:10px 0 6px!important}",
-    ".archive-tab{padding:11px 14px!important}",
-    "@media (max-width:560px){",
-    ".archive-shell{padding:12px 12px 28px!important}",
-    ".archive-subtitle{display:none!important}",
-    ".archive-hero{gap:10px!important}",
-    ".archive-header-actions .archive-action-btn{padding:9px 10px!important;font-size:0.8rem!important}",
-    ".archive-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}",
-    ".archive-card-media{aspect-ratio:1/1!important}",
-    ".archive-card-media .archive-tag{top:8px!important;font-size:0.6rem!important;padding:4px 12px 4px 7px!important}",
-    ".archive-card-body{padding:9px 9px 10px!important;gap:7px!important}",
-    ".archive-card-desc{font-size:0.8rem!important;-webkit-line-clamp:2}",
-    ".archive-card-specs,.archive-card-credit{display:none!important}",
-    ".archive-card-btn{min-height:38px!important;font-size:0.74rem!important;padding:7px 8px!important}",
-    ".archive-card-btn.is-icon{flex:0 0 38px!important}",
-    ".archive-card-btn-icon{width:14px!important;height:14px!important}",
-    ".archive-pagination{flex-wrap:wrap;justify-content:center}",
-    "}"
-  ].join("\n");
-
-  var PICKER_TIMEOUT_MS = 5000;
-  var pickerWatchdogTimer = null;
-
-  function clearPickerWatchdog() {
-    if (pickerWatchdogTimer) {
-      window.clearTimeout(pickerWatchdogTimer);
-      pickerWatchdogTimer = null;
-    }
-  }
-
-  function styleArchiveFrame() {
-    clearPickerWatchdog();
-    if (!archiveFrame) return;
-    try {
-      var doc = archiveFrame.contentDocument;
-      if (doc && doc.querySelector(".archive-shell") && !doc.getElementById("picker-embed-css")) {
-        var styleEl = doc.createElement("style");
-        styleEl.id = "picker-embed-css";
-        styleEl.textContent = ARCHIVE_EMBED_CSS;
-        doc.head.appendChild(styleEl);
-      }
-    } catch (error) {
-      console.error("Could not style the archive picker.", error);
-    }
-    if (archiveStage) archiveStage.classList.add("is-loaded");
-    if (archiveRefreshBtn) archiveRefreshBtn.disabled = false;
-  }
-
-  /* Same watchdog the /archive/ page uses: if the picker frame has not
-     loaded within 5 seconds (server down, slow connection), stop the
-     spinner, re-enable refresh and say what happened instead of leaving
-     the frame loading forever. */
-  function loadArchiveFrame(force) {
-    if (!archiveFrame) return;
-    var url = archiveFrame.getAttribute("data-src");
-    if (!url) return;
-    if (!force && archiveFrame.getAttribute("src")) return;
-    clearPickerWatchdog();
-    if (archiveStage) archiveStage.classList.remove("is-loaded");
-    archiveFrame.setAttribute("src", url);
-    pickerWatchdogTimer = window.setTimeout(function () {
-      pickerWatchdogTimer = null;
-      if (archiveStage) archiveStage.classList.add("is-loaded");
-      if (archiveRefreshBtn) archiveRefreshBtn.disabled = false;
-      toast("Timeout, please try again.", "error");
-    }, PICKER_TIMEOUT_MS);
-  }
-
-  function closeArchivePicker() {
-    hideDialog(archiveModal);
-  }
-
-  shell.querySelectorAll("[data-archive-open]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      if (!archiveModal) return;
-      loadArchiveFrame(false);
-      showDialog(archiveModal);
-      var closeButton = archiveModal.querySelector("[data-archive-close]");
-      if (closeButton) closeButton.focus({ preventScroll: true });
-    });
-  });
-  if (archiveModal) {
-    if (archiveFrame) archiveFrame.addEventListener("load", styleArchiveFrame);
-    if (archiveRefreshBtn && archiveFrame) {
-      archiveRefreshBtn.addEventListener("click", function () {
-        archiveRefreshBtn.disabled = true;
-        loadArchiveFrame(true);
-      });
-    }
-    archiveModal.querySelectorAll("[data-archive-close]").forEach(function (button) {
-      button.addEventListener("click", closeArchivePicker);
-    });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && !archiveModal.hidden) closeArchivePicker();
-    });
-  }
-
-  function toast(message, tone) {
-    if (typeof window.AbuToast === "function") {
-      window.AbuToast(message, tone);
-      return;
-    }
-    if (window.editorToast) {
-      window.editorToast(message, tone);
-      return;
-    }
-    window.alert(message);
-  }
-
-  function extractDetail(rawText, genericMessage) {
-    if (!rawText) return genericMessage;
-    try {
-      var data = JSON.parse(rawText);
-      return data && data.detail ? data.detail : genericMessage;
-    } catch (e) {
-      return genericMessage;
-    }
-  }
-
-  /* ---------- shared formatting helpers (port of the server parser) ---------- */
-  function escapeHtml(value) {
-    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  function escapeAttr(value) {
-    return escapeHtml(value).replace(/"/g, "&quot;");
-  }
-
-  /* Undo the escaping above. A URL is escaped before it is parsed for
-     tagging, so "&" in the author's query string is sitting here as "&amp;";
-     the real query string has to be read back before tagOutboundUrl runs, or
-     a second "&" would come out as "&amp%3B" and break the link. Mirrors the
-     html.unescape in _linkify_text (BLOG/views.py). */
-  function unescapeHtml(value) {
-    return String(value)
-      .replace(/&quot;/g, '"')
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&amp;/g, "&");
-  }
-
-  /* OUTBOUND REFERRAL TAGGING -- mirrors tag_outbound_url in BLOG/views.py.
-     A pasted link is stamped with our referral parameters before it becomes
-     an anchor, so sites we send readers to see the traffic came from us.
-     Only links that leave the site are tagged; our own domain, mailto:/tel:
-     and #anchors are left alone, and a link the author already tagged (it
-     carries a utm_source) is respected. The campaign story slug is added by
-     the server on the published page; the preview omits it since the editor
-     has no slug. */
-  var REFERRAL_SOURCE = "abureport";
-  var REFERRAL_MEDIUM = "referral";
-
-  function tagOutboundUrl(url) {
-    var parsed;
-    try { parsed = new URL(url); } catch (error) { return url; }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return url;
-    var host = parsed.hostname.toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1") return url;
-    var bare = REFERRAL_SOURCE.toLowerCase();
-    if (host === bare || host.slice(-(bare.length + 1)) === "." + bare) return url;
-    if (parsed.searchParams.has("utm_source")) return url;
-    parsed.searchParams.set("utm_source", REFERRAL_SOURCE);
-    parsed.searchParams.set("utm_medium", REFERRAL_MEDIUM);
-    return parsed.toString();
-  }
-
-  function linkifyText(value) {
-    var safe = escapeHtml(value);
-    safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    safe = safe.replace(/__(.+?)__/g, "<em>$1</em>");
-    /* Markdown link ([words](url)) and bare URL in one pass, so a URL that
-       already sits inside "[words](...)" is never linkified twice -- mirrors
-       _linkify_text / _LINK_OR_URL_RE in BLOG/views.py. */
-    safe = safe.replace(/\[([^\[\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>'"]+)/g, function (match, label, url, bare) {
-      if (url === undefined) { url = bare; label = bare; }
-      return '<a href="' + escapeAttr(tagOutboundUrl(unescapeHtml(url))) + '" rel="noopener noreferrer" target="_blank">' + label + "</a>";
-    });
-    return safe;
-  }
-
-  /* INLINE IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text" (floated,
-     text wraps around it) / "imgc URL alt text" (centered, blocking --
-     never floated/wrapped, still kept smaller than the hero image).
-     Checked before headings/bold/italic so the URL + alt text are never
-     consumed by those markers -- mirrors IMG_TOKEN_RE in BLOG/views.py. */
-  var imgTokenRe = /^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$/;
-
-  /* INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
-     the image token above (keyword, URL, optional trailing text) but
-     renders as a downloadable link in the normal flow of the paragraph --
-     mirrors FILE_TOKEN_RE / _render_inline_file in BLOG/views.py. */
-  var fileTokenRe = /^filel\s+(\S+)(?:\s+(.*))?$/;
-
-  var IMG_SIDE_CLASSES = {
-    imgl: "story-inline-fig-left",
-    imgr: "story-inline-fig-right",
-    imgc: "story-inline-fig-center"
-  };
-
-  /* INLINE VIDEO TOKEN: "vidl URL caption" / "vidr URL caption" (floated,
-     text wraps around it) / "vidc URL caption" (centered, blocking). Same
-     shape as the image token above but renders a self-playing <video> whose
-     only control is a play/pause button -- mirrors VID_TOKEN_RE /
-     _render_inline_video in BLOG/views.py. */
-  var vidTokenRe = /^(vidl|vidr|vidc)\s+(\S+)(?:\s+(.*))?$/;
-
-  var VID_SIDE_CLASSES = {
-    vidl: "story-inline-fig-left",
-    vidr: "story-inline-fig-right",
-    vidc: "story-inline-fig-center"
-  };
-
-  /* BUTTON TOKEN: "btn URL label text". A whole line that starts with `btn`
-     becomes one button-style link -- the URL is the destination and the
-     trailing text is the label printed on the button. Mirrors BTN_TOKEN_RE /
-     _render_inline_button in BLOG/views.py. */
-  var btnTokenRe = /^btn\s+(\S+)(?:\s+(.*))?$/;
-
-  function imageFilenameFromUrl(url) {
-    var withoutQuery = url.split(/[?#]/)[0];
-    var parts = withoutQuery.split("/");
-    return parts[parts.length - 1] || url;
-  }
-
-  /* The description typed after the URL is shown beneath the picture, like
-     the banner description. With no description the file name is only used
-     for the alt attribute and no caption is printed. Mirrors
-     _render_inline_image in BLOG/views.py. */
-  function renderInlineImage(direction, url, altText) {
-    var caption = (altText || "").trim();
-    var alt = caption || imageFilenameFromUrl(url);
-    var figClass = IMG_SIDE_CLASSES[direction] || "story-inline-fig-left";
-    return '<figure class="story-inline-fig ' + figClass + '">' +
-      '<img class="story-inline-img" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">' +
-      (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
-      "</figure>";
-  }
-
-  function renderInlineFile(url, displayText) {
-    var label = (displayText || "").trim() || imageFilenameFromUrl(url);
-    return '<a class="story-inline-file" href="' + escapeAttr(tagOutboundUrl(url)) + '" download rel="noopener noreferrer">' +
-      '<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>' + escapeHtml(label) + "</a>";
-  }
-
-  /* Mirrors _render_inline_button in BLOG/views.py: one block-level button
-     link. With no label the URL itself is printed so the button is never
-     blank. */
-  function renderInlineButton(url, labelText) {
-    var label = (labelText || "").trim() || url;
-    return '<p class="story-inline-btn-row"><a class="story-inline-btn" href="' + escapeAttr(tagOutboundUrl(url)) + '" rel="noopener noreferrer" target="_blank">' + escapeHtml(label) + "</a></p>";
-  }
-
-  /* EXTERNAL VIDEO PROVIDERS - mirrors _video_embed_url in BLOG/views.py. A
-     YouTube or Vimeo address is a page, not a file, so a <video> can never
-     play it; it is shown in an <iframe> with the provider's own player. Any
-     other URL stays on the plain <video> path below. */
-  var YOUTUBE_ID_RE = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?[^\s#]*?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
-  var VIMEO_ID_RE = /vimeo\.com\/(?:video\/)?(\d+)/;
-
-  function videoEmbedUrl(url) {
-    var value = url || "";
-    var youtube = value.match(YOUTUBE_ID_RE);
-    if (youtube) {
-      var params = ["rel=0", "playsinline=1", "modestbranding=1", "autoplay=1", "mute=1", "loop=1", "playlist=" + youtube[1]];
-      var start = value.match(/[?&](?:t|start)=(\d+)/);
-      if (start) params.push("start=" + start[1]);
-      return "https://www.youtube.com/embed/" + youtube[1] + "?" + params.join("&");
-    }
-    var vimeo = value.match(VIMEO_ID_RE);
-    if (vimeo) {
-      return "https://player.vimeo.com/video/" + vimeo[1] + "?autoplay=1&muted=1&loop=1&playsinline=1&dnt=1";
-    }
-    return "";
-  }
-
-  /* Mirrors _render_inline_video in BLOG/views.py: the same autoplay/muted/
-     loop <video> with no native controls, plus the play/pause and sound
-     buttons - except a YouTube/Vimeo URL, which becomes an <iframe> embed
-     with the provider's own controls (is-embed, no overlay buttons). */
-  function renderInlineVideo(direction, url, captionText) {
-    var caption = (captionText || "").trim();
-    var figClass = VID_SIDE_CLASSES[direction] || "story-inline-fig-left";
-    var aria = caption || "Story video";
-    var captionHtml = caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "";
-    var embedUrl = videoEmbedUrl(url);
-    if (embedUrl) {
-      return '<figure class="story-inline-fig story-inline-video is-embed ' + figClass + '">' +
-        '<div class="story-inline-video-frame">' +
-        '<iframe class="story-inline-video-embed" src="' + escapeAttr(embedUrl) + '" title="' + escapeAttr(aria) + '" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>' +
-        '</div>' + captionHtml +
-        "</figure>";
-    }
-    return '<figure class="story-inline-fig story-inline-video ' + figClass + '">' +
-      '<div class="story-inline-video-frame">' +
-      '<video class="story-inline-video-el" onerror="this.onerror=null;this.src=\'/static/404_video.mp4\';" src="' + escapeAttr(url) + '" muted loop playsinline autoplay preload="metadata" aria-label="' + escapeAttr(aria) + '"></video>' +
-      '<button type="button" class="story-inline-video-toggle" data-video-toggle aria-label="Pause video">' +
-      '<svg class="story-inline-video-icon story-inline-video-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>' +
-      '<svg class="story-inline-video-icon story-inline-video-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>' +
-      '</button>' +
-      '<button type="button" class="story-inline-video-toggle story-inline-video-sound" data-video-sound aria-label="Unmute video">' +
-      '<svg class="story-inline-video-icon story-inline-video-icon-sound-on" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>' +
-      '<svg class="story-inline-video-icon story-inline-video-icon-sound-off" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line></svg>' +
-      '</button></div>' +
-      (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
-      "</figure>";
-  }
-
-  function parseStoryContent(content) {
-    if (!content) return "";
-    var normalized = String(content).replace(/\r\n?/g, "\n").trim();
-    var lines = normalized.split("\n").map(function (line) { return line.replace(/\s+$/, ""); });
-    var blocks = [];
-    var i = 0;
-    var headingRe = /^(#+)\s*(.*)$/;
-    var bulletRe = /^\*\s+/;
-    var orderedRe = /^\d+\.\s+/;
-    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+|btn\s+)/;
-
-    while (i < lines.length) {
-      var line = lines[i].trim();
-      if (!line) { i += 1; continue; }
-
-      var imgMatch = line.match(imgTokenRe);
-      if (imgMatch) {
-        blocks.push(renderInlineImage(imgMatch[1], imgMatch[2], imgMatch[3]));
-        i += 1;
-        continue;
-      }
-
-      var fileMatch = line.match(fileTokenRe);
-      if (fileMatch) {
-        blocks.push(renderInlineFile(fileMatch[1], fileMatch[2]));
-        i += 1;
-        continue;
-      }
-
-      var vidMatch = line.match(vidTokenRe);
-      if (vidMatch) {
-        blocks.push(renderInlineVideo(vidMatch[1], vidMatch[2], vidMatch[3]));
-        i += 1;
-        continue;
-      }
-
-      var btnMatch = line.match(btnTokenRe);
-      if (btnMatch) {
-        blocks.push(renderInlineButton(btnMatch[1], btnMatch[2]));
-        i += 1;
-        continue;
-      }
-
-      var headingMatch = line.match(headingRe);
-      if (headingMatch) {
-        var level = Math.min(headingMatch[1].length + 1, 4);
-        var headingText = headingMatch[2].trim();
-        if (headingText) blocks.push("<h" + level + ">" + linkifyText(headingText) + "</h" + level + ">");
-        i += 1;
-        continue;
-      }
-
-      if (bulletRe.test(line)) {
-        var bullets = [];
-        while (i < lines.length) {
-          var bulletLine = lines[i].trim();
-          if (!bulletLine || !bulletRe.test(bulletLine)) break;
-          var bulletItem = bulletLine.slice(2).trim();
-          if (bulletItem) bullets.push("<li>" + linkifyText(bulletItem) + "</li>");
-          i += 1;
-        }
-        if (bullets.length) blocks.push("<ul>" + bullets.join("") + "</ul>");
-        continue;
-      }
-
-      if (orderedRe.test(line)) {
-        var ordered = [];
-        while (i < lines.length) {
-          var orderedLine = lines[i].trim();
-          if (!orderedLine || !orderedRe.test(orderedLine)) break;
-          var orderedMatch = orderedLine.match(/^\d+\.\s+(.*)$/);
-          if (orderedMatch && orderedMatch[1].trim()) ordered.push("<li>" + linkifyText(orderedMatch[1].trim()) + "</li>");
-          i += 1;
-        }
-        if (ordered.length) blocks.push("<ol>" + ordered.join("") + "</ol>");
-        continue;
-      }
-
-      var paragraphLines = [];
-      while (i < lines.length) {
-        var paragraphLine = lines[i].trim();
-        if (!paragraphLine) break;
-        if (starterRe.test(paragraphLine)) break;
-        paragraphLines.push(paragraphLine);
-        i += 1;
-        if (i < lines.length && !lines[i].trim()) break;
-      }
-      var paragraph = paragraphLines.join(" ").trim();
-      if (paragraph) blocks.push("<p>" + linkifyText(paragraph) + "</p>");
-    }
-
-    return blocks.join("\n");
-  }
-
-  /* ---------- table of contents (mirrors BLOG.views.enhance_story_body) ----------
-     When the author picks any Table of contents mode other than Off, give every
-     heading an id and splice the "TABLE OF CONTENT" section in right after the
-     first paragraph, exactly as the published page will. The list is the same
-     nested #/##/### tree with the same three starting states: level 2 and 3 open
-     the outer disclosure, level 3 also opens every branch. Kept off the
-     parseStoryContent path so the preview body still mirrors the parser. */
-  var TOC_CHEVRON = '<svg class="story-toc-chevron" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" focusable="false"><path d="M4 6.5 8 10.5 12 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-  function plainHeadingText(inner) {
-    var host = document.createElement("div");
-    host.innerHTML = inner;
-    return (host.textContent || "").trim();
-  }
-
-  function tocSlug(text) {
-    var value = String(text || "");
-    if (value.normalize) value = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-    value = value.replace(/[^\w\s-]/g, "").toLowerCase();
-    value = value.replace(/[-\s]+/g, "-");
-    return value.replace(/^[-_]+|[-_]+$/g, "");
-  }
-
-  function tocTree(headings) {
-    var roots = [];
-    var stack = [];
-    headings.forEach(function (heading) {
-      var node = { level: heading.level, slug: heading.slug, text: heading.text, children: [] };
-      while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop();
-      (stack.length ? stack[stack.length - 1].children : roots).push(node);
-      stack.push(node);
-    });
-    return roots;
-  }
-
-  function renderTocNodes(nodes, branchesOpen) {
-    return nodes.map(function (node) {
-      var link = '<a class="story-toc-link" href="#' + node.slug + '">' + escapeHtml(node.text) + "</a>";
-      if (node.children.length) {
-        var expanded = branchesOpen ? "true" : "false";
-        var hidden = branchesOpen ? "" : " hidden";
-        return '<li class="story-toc-item story-toc-item--has-children" data-level="' + node.level + '">' +
-          '<div class="story-toc-row">' + link +
-          '<button type="button" class="story-toc-branch" aria-expanded="' + expanded + '" aria-label="Toggle subsections">' +
-          TOC_CHEVRON + "</button></div>" +
-          '<ol class="story-toc-children"' + hidden + ">" +
-          renderTocNodes(node.children, branchesOpen) + "</ol></li>";
-      }
-      return '<li class="story-toc-item" data-level="' + node.level + '">' +
-        '<div class="story-toc-row">' + link + "</div></li>";
-    }).join("");
-  }
-
-  function enhanceStoryBody(htmlBody, tocMode) {
-    var mode = parseInt(tocMode, 10) || 0;
-    if (!htmlBody || !mode) return htmlBody;
-
-    var headings = [];
-    var seen = {};
-    var withIds = htmlBody.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, function (match, level, inner) {
-      var plain = plainHeadingText(inner);
-      var base = tocSlug(plain) || "part";
-      var slug = "section-" + base;
-      var suffix = 2;
-      while (Object.prototype.hasOwnProperty.call(seen, slug)) {
-        slug = "section-" + base + "-" + suffix;
-        suffix += 1;
-      }
-      seen[slug] = true;
-      headings.push({ level: parseInt(level, 10), slug: slug, text: plain });
-      return "<h" + level + ' id="' + slug + '">' + inner + "</h" + level + ">";
-    });
-
-    if (!headings.length) return withIds;
-
-    var branchesOpen = mode === 3;
-    var shellOpen = (mode === 2 || mode === 3) ? " open" : "";
-    var rows = renderTocNodes(tocTree(headings), branchesOpen);
-    var toc = '<nav class="story-toc" aria-label="Table of contents" data-story-toc data-toc-mode="' + mode + '">' +
-      '<details class="story-toc-shell"' + shellOpen + ">" +
-      '<summary class="story-toc-head"><span class="story-toc-title">TABLE OF CONTENT</span>' + TOC_CHEVRON + "</summary>" +
-      '<ol class="story-toc-list">' + rows + "</ol></details></nav>";
-
-    var blocks = withIds.split("\n");
-    var insertAt = 0;
-    for (var index = 0; index < blocks.length; index += 1) {
-      if (blocks[index].indexOf("<p>") === 0) { insertAt = index + 1; break; }
-    }
-    blocks.splice(insertAt, 0, toc);
-    return blocks.join("\n");
-  }
-
-  /* ---------- preview ---------- */
-  var debounceTimer = null;
-
-  function currentCategoryLabel() {
-    if (!categorySelect.value || categorySelect.selectedIndex < 0) return "";
-    return categorySelect.options[categorySelect.selectedIndex].text;
-  }
-
-  function todayLabel() {
-    return new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  }
-
-  function renderPreview() {
-    var heading = headingInput.value.trim();
-    var imageUrl = selectedImageObjectUrl || imageInput.value.trim();
-    var imageInfo = imageInfoInput.value.trim() || "The image is self explanatory.";
-    var categoryLabel = currentCategoryLabel();
-    var tocMode = tocModeSelect ? parseInt(tocModeSelect.value, 10) || 0 : 0;
-    var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode);
-
-    var html = '<div class="editor-preview-frame"><article class="story-article no-inner-shell">';
-    html += '<header class="story-header">';
-    html += '<div class="story-kicker-row"><span class="story-kicker">' + escapeHtml(categoryLabel || "Category") + '</span>';
-    html += '<span class="story-separator">&bull;</span><time>' + escapeHtml(todayLabel()) + "</time></div>";
-    html += "<h1>" + escapeHtml(heading || "Untitled story") + "</h1>";
-    html += "</header>";
-
-    if (imageUrl) {
-      html += '<figure class="story-hero-figure">';
-      html += '<img src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(heading || "Story image") + '" loading="eager" onerror="this.onerror=null;this.src=\'/static/404.jpg\';">';
-      html += "<figcaption>" + escapeHtml(imageInfo) + "</figcaption>";
-      html += "</figure>";
-    }
-
-    html += '<div class="story-body">';
-    html += bodyHtml || '<p class="editor-preview-empty">Live Preview Plcaeholder Text</p>';
-    html += "</div>";
-    html += "</article></div>";
-
-    /* The preview pane IS the scroll container, so replacing its html would
-       otherwise snap it back to the top on every keystroke. Keep the reader's
-       place in the preview. */
-    var previewScrollTop = output.scrollTop;
-    output.innerHTML = html;
-    if (previewScrollTop) output.scrollTop = previewScrollTop;
-
-    /* freshly built <video> elements need their play/pause glyph synced */
-    document.dispatchEvent(new CustomEvent("story-video:sync"));
-  }
-
-  function schedulePreview() {
-    if (debounceTimer) window.clearTimeout(debounceTimer);
-    debounceTimer = window.setTimeout(renderPreview, 120);
-  }
-
-  /* ---------- closeable preview ---------- */
-  function applyPreviewState(off) {
-    shell.classList.toggle("preview-off", off);
-    toggleBtn.classList.toggle("is-off", off);
-    toggleBtn.textContent = off ? "Show preview" : "Hide preview";
-  }
-
-  toggleBtn.addEventListener("click", function () {
-    var nextOff = !shell.classList.contains("preview-off");
-    applyPreviewState(nextOff);
-    try { window.localStorage.setItem(PREVIEW_KEY, nextOff ? "off" : "on"); } catch (e) { /* storage unavailable */ }
-  });
-
-  var storedPreview = null;
-  try { storedPreview = window.localStorage.getItem(PREVIEW_KEY); } catch (e) { /* ignore */ }
-  applyPreviewState(storedPreview === "off");
-
-  /* ---------- publish ---------- */
-  function setPublishPending(pending) {
-    pendingPublish = pending;
-    publishBtn.disabled = pending;
-    publishBtn.classList.toggle("is-pending", pending);
-    publishBtn.textContent = pending ? "Publishing..." : "Publish";
-  }
-
-  /* ---------- validation dialog ----------
-     Modes, all fed by the server's answer where rules are involved (the
-     server is the single source of truth for the writing rules, see
-     SERVICE_INTERNAL/story_validation.py):
-       blocked  (HTTP 400 + errors)             -> explains what to fix, one button
-       warnings (HTTP 409 + needs_confirmation) -> explains, then asks YES / NO
-       newsletter (asked here, before the POST) -> asks, then asks again
-     "Go back and edit" simply keeps the story unposted. */
-  var modalReturnFocus = null;
-
-  function closeModal() {
-    if (!modal) return;
-    hideDialog(modal);
-    var focusTarget = modalEditTarget || modalReturnFocus;
-    if (focusTarget) setView("write");
-    if (focusTarget && focusTarget.focus) focusTarget.focus({ preventScroll: true });
-    modalEditTarget = null;
-    modalReturnFocus = null;
-  }
-
-  function openModal(options) {
-    if (!modal) {
-      /* the dialog markup is missing: fall back to a plain message, and never auto post */
-      toast(options.items.map(function (i) { return i.message; }).join(" "), "error");
-      return;
-    }
-    modalReturnFocus = document.activeElement;
-    modalEditTarget = options.editTarget || contentInput;
-    modalConfirmWarnings = options.confirmWarnings !== false;
-    modalConfirmAction = options.onConfirm || null;
-    modalEditAction = options.onEdit || null;
-    modalTitle.textContent = options.title;
-    modalIntro.textContent = options.intro;
-    modalList.innerHTML = "";
-    options.items.forEach(function (item) {
-      var li = document.createElement("li");
-      li.textContent = item.message;
-      modalList.appendChild(li);
-    });
-    modalQuestion.textContent = options.question || (options.askToPost ? "Do you still want to post this story now?" : "");
-    modalConfirmBtn.hidden = !options.askToPost;
-    modalConfirmBtn.textContent = options.confirmLabel || "Yes, post anyway";
-    modalEditBtn.textContent = options.editLabel || (options.askToPost ? "No, let me edit" : "Back to editing");
-    showDialog(modal);
-    modalEditBtn.focus({ preventScroll: true });
-  }
-
-  if (modal) {
-    modal.querySelectorAll("[data-editor-modal-close]").forEach(function (el) {
-      el.addEventListener("click", closeModal);
-    });
-    modalEditBtn.addEventListener("click", function () {
-      var action = modalEditAction;
-      closeModal();
-      if (action) action();
-    });
-    modalConfirmBtn.addEventListener("click", function () {
-      var action = modalConfirmAction;
-      var confirmWarnings = modalConfirmWarnings;
-      closeModal();
-      if (action) { action(); return; }
-      startPublish(confirmWarnings);
-    });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && !modal.hidden) closeModal();
-    });
-  }
-
-  /* ---------- the newsletter ask ----------
-     The newsletter is optional. Every fresh publish attempt stops here
-     first: one placard asks whether it should go out, and (only when the
-     author says yes) a second placard asks them to confirm, so a stray click
-     cannot mail every reader by accident. The answer travels as
-     `newsletter=1` on the POST and the server only sends on that flag.
-     Both exits of the first placard now ask once more before anything
-     happens: "send" confirms the send, "publish without" confirms the post. */
-  function newsletterAudience() {
-    var category = categorySelect ? categorySelect.value : "";
-    var known = Object.prototype.hasOwnProperty.call(newsletterCounts, category);
-    var count = known ? newsletterCounts[category] : null;
-    if (count === 0) {
-      return "No reader has news alerts on for this category right now, so a newsletter would reach nobody.";
-    }
-    if (count === 1) {
-      return "1 reader has news alerts on and would get this story by email.";
-    }
-    if (typeof count === "number") {
-      return count + " readers have news alerts on and would get this story by email.";
-    }
-    return "Readers who turned news alerts on would get this story by email.";
-  }
-
-  function openNewsletterConfirm() {
-    openModal({
-      title: "Confirm the newsletter",
-      intro: "One more check before it goes out. The newsletter is sent the moment the story is published and cannot be recalled.",
-      items: [{ message: newsletterAudience() }],
-      question: "Send the newsletter now?",
-      askToPost: true,
-      confirmLabel: "Yes, send the newsletter",
-      editLabel: "Go back",
-      onConfirm: function () {
-        submitStory(newsletterGateWarnings);
-      },
-      onEdit: function () {
-        newsletterChoice = null;
-        openNewsletterAsk();
-      }
-    });
-  }
-
-  /* Publishing WITHOUT the newsletter is asked about as well: a stray click
-     must not post a story either. "Go back" returns to the newsletter ask. */
-  function openPublishOnlyConfirm() {
-    openModal({
-      title: "Confirm publishing",
-      intro: "The story will go live now and no newsletter will be sent for it. Readers with news alerts on will not be emailed.",
-      items: [{ message: newsletterAudience().replace(/would get this story by email\./, "will not be emailed.").replace(/would reach nobody\./, "would have reached nobody anyway.") }],
-      question: "Publish without sending the newsletter?",
-      askToPost: true,
-      confirmLabel: "Yes, publish without newsletter",
-      editLabel: "Go back",
-      onConfirm: function () {
-        newsletterChoice = false;
-        submitStory(newsletterGateWarnings);
-      },
-      onEdit: function () {
-        newsletterChoice = null;
-        openNewsletterAsk();
-      }
-    });
-  }
-
-  function openNewsletterAsk() {
-    openModal({
-      title: "Send Newsletter with this story?",
-      intro: "The newsletter is optional. Decide whether readers are emailed about this story, then confirm before it goes out.",
-      items: [{ message: newsletterAudience() }],
-      question: "Should the newsletter go out when this story is published?",
-      askToPost: true,
-      confirmLabel: "Send Newsletter",
-      editLabel: "Publish without Sending newsletter",
-      onConfirm: function () {
-        newsletterChoice = true;
-        openNewsletterConfirm();
-      },
-      onEdit: function () {
-        openPublishOnlyConfirm();
-      }
-    });
-  }
-
-  function startPublish(confirmWarnings) {
-    if (!modal) {
-      /* No placard markup: never hold the story hostage over the optional
-         newsletter. Publish without it. */
-      newsletterChoice = false;
-      submitStory(confirmWarnings);
-      return;
-    }
-    if (newsletterChoice !== null) {
-      submitStory(confirmWarnings);
-      return;
-    }
-    newsletterGateWarnings = confirmWarnings;
-    openNewsletterAsk();
-  }
-
-  function submitStory(confirmWarnings) {
-    if (pendingPublish) return;
-
-    setPublishPending(true);
-    var data = new FormData(form);
-    if (confirmWarnings) data.set("confirm_warnings", "1");
-    if (newsletterChoice) data.set("newsletter", "1");
-
-    fetch(form.dataset.endpoint, {
-      method: "POST",
-      headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-      credentials: "same-origin",
-      body: data,
-    })
-      .then(function (response) {
-        var contentType = response.headers.get("Content-Type") || "";
-        return response.text().then(function (text) {
-          return { ok: response.ok, status: response.status, text: text, isJson: contentType.indexOf("application/json") !== -1 };
-        });
-      })
-      .then(function (result) {
-        setPublishPending(false);
-        var payload = {};
-        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* ignore */ }
-
-        /* The session can expire while the editor sits open. The server now
-           answers a signed-out publish with 401 JSON instead of a login-page
-           redirect. If an older or proxied server still redirects, the fetch
-           follows it and we get HTML with a 200 -- never treat that as a
-           published story either. */
-        if (result.status === 401 || result.status === 403 || (result.ok && !result.isJson)) {
-          toast(extractDetail(result.text, "Your session has expired. Refresh the page and sign in again to publish."), "error");
-          window.setTimeout(function () { window.location.reload(); }, 1200);
-          return;
-        }
-
-        /* advisory notes: tell the author, then let THEM decide */
-        if (result.status === 409 && payload.needs_confirmation && payload.warnings && payload.warnings.length) {
-          openModal({
-            title: "Check these before posting",
-            intro: "Some Issue Require Your Attention Before Story Can Be Published. These are suggestions, not errors:",
-            items: payload.warnings,
-            askToPost: true
-          });
-          return;
-        }
-
-        /* blocked by a writing rule: say exactly what to correct */
-        if (!result.ok && payload.errors && payload.errors.length) {
-          /* a fresh attempt after this gets a fresh newsletter decision */
-          newsletterChoice = null;
-          openModal({
-            title: "This story cannot be submitted yet",
-            intro: payload.errors.length > 1
-              ? "Fix the following " + payload.errors.length + " problems, then publish again:"
-              : "Fix the following problem, then publish again:",
-            items: payload.errors,
-            askToPost: false
-          });
-          return;
-        }
-
-        if (!result.ok) {
-          newsletterChoice = null;
-          var detail = extractDetail(result.text, "Could not publish the story.");
-          toast(detail, "error");
-          if (/already/i.test(detail)) {
-            headingInput.classList.add("is-error");
-            headingInput.focus();
-            headingInput.select();
-          }
-          return;
-        }
-
-        clearDraft();
-        if (selectedImageObjectUrl) { URL.revokeObjectURL(selectedImageObjectUrl); selectedImageObjectUrl = null; }
-        var publishedMessage = payload.detail || "Story published.";
-        if (payload.newsletter_sent) publishedMessage += " The newsletter is on its way to readers who have news alerts on.";
-        newsletterChoice = null;
-        toast(publishedMessage);
-        if (payload.story_url) {
-          window.setTimeout(function () { window.location.href = payload.story_url; }, 700);
-        }
-      })
-      .catch(function () {
-        setPublishPending(false);
-        toast("Network Error. Refresh Browser", "error");
-      });
-  }
-
-  form.addEventListener("submit", function (event) {
-    event.preventDefault();
-    if (pendingPublish) return;
-
-    if (!headingInput.value.trim()) {
-      toast("You Forgot To Add Heading", "error");
-      setView("write");
-      headingInput.focus();
-      return;
-    }
-    if (!categorySelect.value) {
-      toast("Select a category for the story.", "error");
-      setView("write");
-      categorySelect.focus();
-      return;
-    }
-    if (!contentInput.value.trim()) {
-      toast("The story content cannot be empty.", "error");
-      setView("write");
-      contentInput.focus();
-      return;
-    }
-
-    var hasMainImage = Boolean(
-      imageInput.value.trim()
-      || (imageFileInput && imageFileInput.files && imageFileInput.files.length)
-    );
-    if (!hasMainImage) {
-      openModal({
-        title: "No main image added",
-        intro: "This story does not have a main image. Stories with a main image are more engaging and easier to recognize.",
-        items: [{ message: "You can add an image URL or upload an image before publishing." }],
-        askToPost: true,
-        editTarget: imageInput,
-        confirmWarnings: false
-      });
-      return;
-    }
-
-    startPublish(false);
-  });
-
-  /* ---------- insert bar: drop a command at the cursor ----------
-     Only commands that act the moment they are typed live here (line-start
-     markers and img/file tokens). **bold** and __italic__ are left out
-     because they only work once the closing marker is typed.
-     A line-start command (data-insert-kind="line", the default) always lands
-     at the start of a line, because the parser only recognises those at the
-     start of a line. An inline command (data-insert-kind="inline", e.g. the
-     Link button) is dropped in place at the cursor instead. If text is
-     selected, the marker is put in front of it. */
-  function insertAtCursor(text) {
-    contentInput.focus();
-    var done = false;
-    try { done = document.execCommand("insertText", false, text); } catch (e) { done = false; }
-    if (!done) {
-      var s = contentInput.selectionStart, e2 = contentInput.selectionEnd;
-      contentInput.setRangeText(text, s, e2, "end");
-      contentInput.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-  }
-
-  shell.querySelectorAll("[data-insert]").forEach(function (btn) {
-    btn.addEventListener("mousedown", function (event) { event.preventDefault(); });
-    btn.addEventListener("click", function () {
-      var token = btn.getAttribute("data-insert");
-      var value = contentInput.value;
-      var start = contentInput.selectionStart;
-      var end = contentInput.selectionEnd;
-      var atLineStart = start === 0 || value.charAt(start - 1) === "\n";
-      var selected = value.slice(start, end);
-      var inline = btn.getAttribute("data-insert-kind") === "inline";
-
-      /* a selection that is already a whole line keeps its text, the marker goes in front */
-      var prefix = (!inline && !atLineStart) ? "\n" : "";
-      contentInput.focus();
-      if (selected) {
-        contentInput.setSelectionRange(start, end);
-        insertAtCursor(prefix + token + selected);
-      } else {
-        insertAtCursor(prefix + token);
-      }
-    });
-  });
-
-  /* ---------- formatting guide: Copy All ---------- */
-  function buildGuideText() {
-    var guide = shell.querySelector("[data-format-guide]");
-    if (!guide) return "";
-    var out = ["FORMATTING GUIDE", "Follow the review checks before you publish. The formatting codes are optional but help segment the article for search engines."];
-    guide.querySelectorAll("[data-guide-section]").forEach(function (section) {
-      out.push("", section.getAttribute("data-guide-section").toUpperCase());
-      section.querySelectorAll("[data-guide-item]").forEach(function (item) {
-        out.push("- " + item.getAttribute("data-guide-item"));
-      });
-    });
-    return out.join("\n");
-  }
-
-  function fallbackCopy(text) {
-    var area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
-    document.body.appendChild(area);
-    area.select();
-    var done = false;
-    try { done = document.execCommand("copy"); } catch (e) { done = false; }
-    area.remove();
-    return done;
-  }
-
-  if (guideCopyBtn) {
-    var copyResetTimer = null;
-    guideCopyBtn.addEventListener("click", function () {
-      var text = buildGuideText();
-      var copyLabel = guideCopyBtn.getAttribute("data-label") || guideCopyBtn.textContent;
-      guideCopyBtn.setAttribute("data-label", copyLabel);
-      function showCopied(ok) {
-        guideCopyBtn.textContent = ok ? "Copied" : "Copy failed";
-        if (copyResetTimer) window.clearTimeout(copyResetTimer);
-        copyResetTimer = window.setTimeout(function () {
-          guideCopyBtn.textContent = copyLabel;
-        }, 1800);
-      }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function () { showCopied(true); }, function () { showCopied(fallbackCopy(text)); });
-      } else {
-        showCopied(fallbackCopy(text));
-      }
-    });
-  }
-
-  function getCookie(name) {
-    var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
-    return match ? decodeURIComponent(match.pop()) : "";
-  }
-
-  function clearSelectedImageFile() {
-    if (imageFileInput) imageFileInput.value = "";
-    if (selectedImageObjectUrl) {
-      URL.revokeObjectURL(selectedImageObjectUrl);
-      selectedImageObjectUrl = null;
-    }
-    imageInput.disabled = false;
-    if (imageFilenameEl) { imageFilenameEl.hidden = true; imageFilenameEl.textContent = ""; }
-    if (imageClearBtn) imageClearBtn.hidden = true;
-    if (imageQualityField) imageQualityField.hidden = true;
-  }
-
-  if (uploadBtn && imageFileInput) {
-    uploadBtn.addEventListener("click", function () {
-      imageFileInput.click();
-    });
-
-    imageFileInput.addEventListener("change", function () {
-      var file = imageFileInput.files && imageFileInput.files[0];
-      if (!file) return;
-
-      if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
-        toast("Unsupported image type. Use JPEG, PNG, WEBP or GIF.", "error");
-        clearSelectedImageFile();
-        return;
-      }
-      if (file.size > MAX_IMAGE_BYTES) {
-        toast("Image is too large. Max allowed size is 8MB.", "error");
-        clearSelectedImageFile();
-        return;
-      }
-
-      if (selectedImageObjectUrl) URL.revokeObjectURL(selectedImageObjectUrl);
-      selectedImageObjectUrl = URL.createObjectURL(file);
-
-      /* the file replaces the pasted URL, so it is disabled (and left out
-         of the form submit) while a file is selected */
-      imageInput.disabled = true;
-      if (imageFilenameEl) { imageFilenameEl.textContent = file.name; imageFilenameEl.hidden = false; }
-      if (imageClearBtn) imageClearBtn.hidden = false;
-      if (imageQualityField) imageQualityField.hidden = false;
-      saveDraft();
-      schedulePreview();
-    });
-  }
-
-  if (imageClearBtn) {
-    imageClearBtn.addEventListener("click", function () {
-      clearSelectedImageFile();
-      saveDraft();
-      schedulePreview();
-    });
-  }
-
-  /* ---------- mobile: Write / Preview tabs ----------
-     On a phone only one pane shows at a time, so the author never scrolls
-     past a long preview to reach the form. Desktop keeps both panes. */
-  function setView(view) {
-    if (!MOBILE_QUERY.matches || shell.getAttribute("data-view") === view) return;
-    shell.setAttribute("data-view", view);
-    tabButtons.forEach(function (tab) {
-      var active = tab.getAttribute("data-editor-tab") === view;
-      tab.classList.toggle("is-active", active);
-      tab.setAttribute("aria-selected", active ? "true" : "false");
-    });
-    if (view === "preview") renderPreview();
-    var top = shell.getBoundingClientRect().top + window.pageYOffset;
-    if (window.pageYOffset > top) window.scrollTo({ top: top, behavior: "smooth" });
-  }
-
-  tabButtons.forEach(function (tab) {
-    tab.addEventListener("click", function () { setView(tab.getAttribute("data-editor-tab")); });
-  });
-
-  /* The site sets `html { scroll-behavior: smooth }`. On the editor that
-     fights the browser's own "keep the caret in view" scrolling while the
-     author types, so the page looks like it scrolls on its own. Force instant
-     scrolling for this tool page; the Write/Preview tab switch still asks for
-     smooth explicitly. */
-  document.documentElement.style.scrollBehavior = "auto";
-
-  /* the sticky insert bar sits right under the sticky toolbar */
-  function syncToolbarHeight() {
-    if (toolbarEl) shell.style.setProperty("--editor-toolbar-h", toolbarEl.offsetHeight + "px");
-  }
-  syncToolbarHeight();
-  if (window.ResizeObserver && toolbarEl) new ResizeObserver(syncToolbarHeight).observe(toolbarEl);
-  window.addEventListener("resize", syncToolbarHeight);
-
-  /* the textarea grows with its text on small screens (page scroll only) */
-  function autosizeContent() {
-    if (!MOBILE_QUERY.matches) { contentInput.style.height = ""; return; }
-    contentInput.style.height = "auto";
-    contentInput.style.height = contentInput.scrollHeight + 2 + "px";
-  }
-  contentInput.addEventListener("input", autosizeContent);
-  if (MOBILE_QUERY.addEventListener) MOBILE_QUERY.addEventListener("change", autosizeContent);
-
-  /* ---------- formatting guide: sits at the top, closed until the author opens it ---------- */
-  function setGuideOpen(open) {
-    if (!guideEl || !guideToggleBtn) return;
-    guideEl.classList.toggle("is-collapsed", !open);
-    guideToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    guideToggleBtn.textContent = open ? "Hide guide" : "Read before publishing";
-  }
-  if (guideToggleBtn) {
-    guideToggleBtn.addEventListener("click", function () {
-      setGuideOpen(guideEl.classList.contains("is-collapsed"));
-    });
-    setGuideOpen(false);
-  }
-
-  /* ---------- wire up + reveal ---------- */
-  headingInput.addEventListener("input", function () {
-    headingInput.classList.remove("is-error");
-    saveDraft();
-    schedulePreview();
-  });
-  imageInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
-  imageInfoInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
-  categorySelect.addEventListener("change", function () { saveDraft(); schedulePreview(); });
-  contentInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
-
-  /*  Changing the Table of contents level only changes how the list looks, so
-      it saves the draft and refreshes the preview immediately. The select shows
-      its own value, so there is no separate state word to keep in sync. */
-  if (tocModeSelect) {
-    tocModeSelect.addEventListener("change", function () {
-      saveDraft();
-      schedulePreview();
-    });
-  }
-  if (imageQualityField) {
-    var imageQualitySelect = imageQualityField.querySelector("select");
-    if (imageQualitySelect) imageQualitySelect.addEventListener("change", saveDraft);
-  }
-
-  restoreDraft();
-  autosizeContent();
-
-  renderPreview();
-  applyPreviewState(shell.classList.contains("preview-off"));
-
-  shell.classList.remove("is-loading");
-  shell.classList.add("is-ready");
-  if (note) note.remove();
-  toggleBtn.hidden = false;
-  publishBtn.disabled = false;
-})();
-
-
-/* ---------------------------------------------------------------------------
-   DRAFTS PLACARD
-   The "Drafts" button opens a placard that is drawn entirely from the JSON the
-   server sends (HOME/views.py, AddNewsDraft*View). Five numbered slots; every
-   sentence shown comes from the server or from the plain wording below.
-   Replacing, deleting and loading over unsaved text each ask for a second click
-   so nothing is lost by accident.
---------------------------------------------------------------------------- */
-(function () {
-  "use strict";
-  var openBtn = document.querySelector("[data-drafts-open]");
-  var form = document.getElementById("add-news-form");
-  if (!openBtn || !form) return;
-
-  var URLS = {
-    list: "/add-news/draft/list/",
-    load: "/add-news/draft/load/",
-    save: "/add-news/draft/save/",
-    remove: "/add-news/draft/delete/"
-  };
-  var root = null, body = null, statusEl = null, closeBtn = null;
-  var data = null;          /* last JSON from the server */
-  var pending = null;       /* {slot, action} waiting for the second click */
-  var busy = false;
-
-  function csrf() {
-    var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
-    if (m) return decodeURIComponent(m[1]);
-    var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
-    return input ? input.value : "";
-  }
-
-  function request(url, options) {
-    options = options || {};
-    var headers = { "X-Requested-With": "XMLHttpRequest", "X-CSRFToken": csrf() };
-    return fetch(url, { method: options.method || "GET", headers: headers, body: options.body, credentials: "same-origin" })
-      .then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, json: j }; });
-      });
-  }
-
-  function field(name) { return form.querySelector('[name="' + name + '"]'); }
-  function value(name) { var el = field(name); return el ? (el.value || "") : ""; }
-
-  function screenHasStory() {
-    return !!(value("heading").trim() || value("content").trim() || value("image_1").trim());
-  }
-
-  function currentStory() {
-    var body = new URLSearchParams();
-    ["heading", "image_1", "image_info", "category", "content", "toc_mode", "image_quality"].forEach(function (n) {
-      body.append(n, value(n));
-    });
-    var news = field("newsletter");
-    if (news && news.checked) body.append("newsletter", "1");
-    return body;
-  }
-
-  function setField(name, val, eventName) {
-    var el = field(name);
-    if (!el || val === undefined || val === null) return;
-    el.value = val;
-    try { el.dispatchEvent(new Event(eventName || "input", { bubbles: true })); } catch (e) {}
-  }
-
-  function fillEditor(j) {
-    setField("heading", j.heading);
-    setField("image_1", j.image_1);
-    setField("image_info", j.image_info);
-    setField("category", j.category, "change");
-    setField("content", j.content);
-    try { field("content").dispatchEvent(new Event("change", { bubbles: true })); } catch (e) {}
-    setField("toc_mode", j.toc_mode, "change");
-    setField("image_quality", j.image_quality, "change");
-    var news = field("newsletter");
-    if (news) news.checked = !!j.newsletter;
-  }
-
-  function say(text, isError) {
-    if (!statusEl) return;
-    statusEl.textContent = text || "";
-    statusEl.className = "draft-placard-status" + (isError ? " is-error" : "");
-  }
-
-  function el(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
-
-  function button(label, className, onClick) {
-    var b = el("button", "editor-modal-btn " + (className || ""), label);
-    b.type = "button";
-    b.addEventListener("click", onClick);
-    return b;
-  }
-
-  /* ---------- drawing ---------- */
-  function draw() {
-    body.textContent = "";
-    if (!data) return;
-    body.appendChild(el("p", "draft-placard-summary", data.summary || ""));
-    var list = el("ol", "draft-slots");
-    data.slots.forEach(function (slot) { list.appendChild(drawSlot(slot)); });
-    body.appendChild(list);
-  }
-
-  function drawSlot(slot) {
-    var li = el("li", "draft-slot" + (slot.empty ? " is-empty" : ""));
-    li.appendChild(el("span", "draft-slot-tag", "Slot " + slot.slot));
-    var main = el("div", "draft-slot-main");
-    if (slot.empty) {
-      main.appendChild(el("p", "draft-slot-title", "Empty slot"));
-      main.appendChild(el("p", "draft-slot-meta", "Nothing saved here yet."));
-    } else {
-      main.appendChild(el("p", "draft-slot-title", slot.title));
-      main.appendChild(el("p", "draft-slot-meta", [slot.category, slot.words, slot.image, slot.saved].join("  |  ")));
-    }
-
-    li.appendChild(main);
-
-    var actions = el("div", "draft-slot-actions");
-    var asking = pending && pending.slot === slot.slot ? pending.action : null;
-
-    if (asking) {
-      var sentence = {
-        replace: "This replaces the draft in slot " + slot.slot + " with the story on your screen.",
-        remove: "This permanently deletes the draft in slot " + slot.slot + ".",
-        load: "This replaces what is on your screen with the draft from slot " + slot.slot + ". Save your screen first if you still need it."
-      }[asking];
-      li.appendChild(el("p", "draft-slot-warning", sentence));
-      actions.appendChild(button({ replace: "Yes, replace it", remove: "Yes, delete it", load: "Yes, load it" }[asking],
-        asking === "remove" ? "draft-btn-danger" : "editor-modal-btn-primary",
-        function () { pending = null; run(asking, slot.slot); }));
-      actions.appendChild(button("Cancel", "", function () { pending = null; say(""); draw(); }));
-    } else if (slot.empty) {
-      actions.appendChild(button("Save my story here", "editor-modal-btn-primary", function () { run("save", slot.slot); }));
-    } else {
-      actions.appendChild(button("Load into editor", "editor-modal-btn-primary", function () {
-        if (screenHasStory()) { pending = { slot: slot.slot, action: "load" }; draw(); } else { run("load", slot.slot); }
-      }));
-      actions.appendChild(button("Replace with my story", "", function () {
-        pending = { slot: slot.slot, action: "replace" }; draw();
-      }));
-      actions.appendChild(button("Delete", "", function () {
-        pending = { slot: slot.slot, action: "remove" }; draw();
-      }));
-    }
-    li.appendChild(actions);
-    return li;
-
-  }
-
-  /* ---------- talking to the server ---------- */
-  function run(action, slot) {
-    if (busy) return;
-    var body_ = new URLSearchParams();
-    var call;
-    if (action === "save" || action === "replace") {
-      if (!screenHasStory()) { say("Add a headline or some story text before saving a draft.", true); return; }
-      body_ = currentStory(); body_.append("slot", slot);
-      call = request(URLS.save, { method: "POST", body: body_ });
-    } else if (action === "remove") {
-      body_.append("slot", slot);
-      call = request(URLS.remove, { method: "POST", body: body_ });
-    } else {
-      call = request(URLS.load + "?slot=" + encodeURIComponent(slot));
-    }
-    busy = true; root.classList.add("is-busy"); say("Working...");
-    call.then(function (res) {
-      if (res.json && res.json.drafts) { data = res.json.drafts; draw(); }
-      if (!res.ok) { say(res.json.detail || "Something went wrong. Please try again.", true); return; }
-      if (action === "load") {
-        fillEditor(res.json);
-        close();
-        if (window.editorToast) window.editorToast(res.json.detail);
-        return;
-      }
-      say(res.json.detail || "Done.");
-    }).catch(function () {
-      say("Could not reach the server. Check your connection and try again.", true);
-    }).then(function () { busy = false; root.classList.remove("is-busy"); });
-  }
-
-  function refresh() {
-    say("Loading your drafts...");
-    request(URLS.list).then(function (res) {
-      if (!res.ok) { say(res.json.detail || "Your drafts could not be loaded. Please try again.", true); return; }
-      data = res.json; say(""); draw();
-    }).catch(function () { say("Could not reach the server. Check your connection and try again.", true); });
-  }
-
-  /* ---------- open / close ---------- */
-  function build() {
-    root = el("div", "editor-modal draft-placard");
-    root.hidden = true;
-    root.setAttribute("role", "dialog");
-    root.setAttribute("aria-modal", "true");
-    root.setAttribute("aria-labelledby", "draft-placard-title");
-    var backdrop = el("div", "editor-modal-backdrop");
-    backdrop.addEventListener("click", close);
-    var card = el("div", "editor-modal-card draft-placard-card");
-    var head = el("div", "draft-placard-head");
-    var titles = el("div");
-    var title = el("h2", "editor-modal-title", "Your drafts");
-    title.id = "draft-placard-title";
-    titles.appendChild(title);
-    titles.appendChild(el("p", "editor-modal-intro", "Keep up to " + 5 + " unfinished stories here. Save what is on your screen into a slot or bring a saved draft back into the editor."));
-    head.appendChild(titles);
-    closeBtn = button("Close", "", close);
-    head.appendChild(closeBtn);
-    card.appendChild(head);
-    statusEl = el("p", "draft-placard-status");
-    statusEl.setAttribute("role", "status");
-    statusEl.setAttribute("aria-live", "polite");
-    card.appendChild(statusEl);
-    body = el("div", "draft-placard-body");
-    card.appendChild(body);
-    root.appendChild(backdrop);
-    root.appendChild(card);
-    document.body.appendChild(root);
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !root.hidden) close(); });
-  }
-
-  function open() {
-    if (!root) build();
-    pending = null; data = null; body.textContent = "";
-    root.hidden = false;
-    document.documentElement.classList.add("editor-modal-open");
-    window.requestAnimationFrame(function () { root.classList.add("is-open"); });
-    closeBtn.focus();
-    refresh();
-  }
-
-  function close() {
-    if (!root || root.hidden) return;
-    root.classList.remove("is-open");
-    root.hidden = true;
-    document.documentElement.classList.remove("editor-modal-open");
-    openBtn.focus();
-  }
-
-  openBtn.addEventListener("click", open);
-})();
+/* Add news editor: heavy components. Loaded asynchronously by the light
+
+   loader in add_news.html so the page skeleton paints first.
+
+
+
+   The preview engine below is a direct port of BLOG.views.parse_story_content
+
+   and _linkify_text (see DOCS/NEWS_CONTENT_CONVENTION.MD) so what the author
+
+   sees here is exactly what every reader will get on the published page. */
+
+(function () {
+
+  "use strict";
+
+
+
+  var shell = document.getElementById("editor-shell");
+
+  if (!shell) return;
+
+
+
+  var form = shell.querySelector("[data-editor-form]");
+
+  var headingInput = shell.querySelector("[data-editor-heading]");
+
+  var imageInput = shell.querySelector("[data-editor-image]");
+
+  var imageFileInput = shell.querySelector("[data-editor-image-file]");
+
+  var imageFilenameEl = shell.querySelector("[data-editor-image-filename]");
+
+  var imageClearBtn = shell.querySelector("[data-editor-image-clear]");
+
+  var imageQualityField = shell.querySelector("[data-editor-image-quality-field]");
+
+  var imageInfoInput = shell.querySelector("[data-editor-image-info]");
+
+  var categorySelect = shell.querySelector("[data-editor-category]");
+
+  var contentInput = shell.querySelector("[data-editor-content]");
+
+  var tocModeSelect = shell.querySelector("[data-editor-toc-mode]");
+
+  var output = shell.querySelector("[data-editor-preview-output]");
+
+  var toggleBtn = shell.querySelector("[data-editor-preview-toggle]");
+
+  var publishBtn = shell.querySelector("[data-editor-publish]");
+
+  var uploadBtn = shell.querySelector("[data-editor-upload-btn]");
+
+  var note = shell.querySelector("[data-editor-loading-note]");
+
+  var draftStatus = shell.querySelector("[data-editor-draft-status]");
+
+  var archiveModal = shell.querySelector("[data-archive-modal]");
+
+  var archiveFrame = archiveModal ? archiveModal.querySelector(".archive-picker-frame") : null;
+
+  var archiveRefreshBtn = archiveModal ? archiveModal.querySelector("[data-archive-refresh]") : null;
+
+  var modal = shell.querySelector("[data-editor-modal]");
+
+  var modalCard = modal ? modal.querySelector(".editor-modal-card") : null;
+
+  var modalTitle = modal ? modal.querySelector("[data-editor-modal-title]") : null;
+
+  var modalIntro = modal ? modal.querySelector("[data-editor-modal-intro]") : null;
+
+  var modalList = modal ? modal.querySelector("[data-editor-modal-list]") : null;
+
+  var modalQuestion = modal ? modal.querySelector("[data-editor-modal-question]") : null;
+
+  var modalEditBtn = modal ? modal.querySelector("[data-editor-modal-edit]") : null;
+
+  var modalConfirmBtn = modal ? modal.querySelector("[data-editor-modal-confirm]") : null;
+
+  var guideCopyBtn = shell.querySelector("[data-guide-copy-all]");
+
+  var guideToggleBtn = shell.querySelector("[data-guide-toggle]");
+
+  var guideEl = shell.querySelector("[data-format-guide]");
+
+  var toolbarEl = shell.querySelector("[data-editor-toolbar]");
+
+  var tabButtons = shell.querySelectorAll("[data-editor-tab]");
+
+  var archiveStage = archiveModal ? archiveModal.querySelector(".archive-picker-stage") : null;
+
+  var modalEditTarget = null;
+
+  var modalConfirmWarnings = true;
+
+  var modalConfirmAction = null;
+
+  var modalEditAction = null;
+
+
+
+  /* The newsletter choice for the publish in progress:
+
+       null  = not asked yet for this attempt
+
+       false = publish without the newsletter
+
+       true  = the author asked for it (and confirmed it)  */
+
+  var newsletterChoice = null;
+
+  var newsletterGateWarnings = false;
+
+  var newsletterCounts = {};
+
+  (function readNewsletterCounts() {
+
+    var el = document.getElementById("news-alert-counts");
+
+    if (!el) return;
+
+    try { newsletterCounts = JSON.parse(el.textContent || "{}") || {}; } catch (e) { newsletterCounts = {}; }
+
+  })();
+
+
+
+  var PREVIEW_KEY = "abu-editor-preview";
+
+  var DRAFT_KEY = shell.dataset.draftKey;
+
+  var DRAFT_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+
+  var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+  var pendingPublish = false;
+
+  var MOBILE_QUERY = window.matchMedia ? window.matchMedia("(max-width: 899.98px)") : { matches: false };
+
+  var MODAL_CLOSE_MS = 240;
+
+
+
+  /* Local-only preview of a chosen file. No upload happens here, that
+
+     only happens inside the publish handler further down, via the real
+
+     `image_file` FormData entry the browser already attached to the form. */
+
+  var selectedImageObjectUrl = null;
+
+
+
+  function setDraftStatus(message, isError) {
+
+    if (!draftStatus) return;
+
+    draftStatus.textContent = message;
+
+    draftStatus.classList.toggle("is-error", Boolean(isError));
+
+  }
+
+
+
+  function readDraft() {
+
+    var rawDraft;
+
+    try {
+
+      rawDraft = window.localStorage.getItem(DRAFT_KEY);
+
+    } catch (error) {
+
+      console.error("Could not read the saved story draft.", error);
+
+      setDraftStatus("Autosave is unavailable in this browser.", true);
+
+      return null;
+
+    }
+
+    if (!rawDraft) return null;
+
+
+
+    try {
+
+      var draft = JSON.parse(rawDraft);
+
+      if (!draft || typeof draft !== "object" || typeof draft.savedAt !== "number") {
+
+        throw new Error("Saved story draft has an invalid format.");
+
+      }
+
+      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE) {
+
+        window.localStorage.removeItem(DRAFT_KEY);
+
+        return null;
+
+      }
+
+      return draft;
+
+    } catch (error) {
+
+      console.error("Could not restore the saved story draft.", error);
+
+      try {
+
+        window.localStorage.removeItem(DRAFT_KEY);
+
+      } catch (removeError) {
+
+        console.error("Could not remove the invalid saved story draft.", removeError);
+
+      }
+
+      setDraftStatus("The saved draft could not be restored.", true);
+
+      return null;
+
+    }
+
+  }
+
+
+
+  function restoreDraft() {
+
+    var draft = readDraft();
+
+    if (!draft) return;
+
+
+
+    headingInput.value = typeof draft.heading === "string" ? draft.heading : "";
+
+    imageInput.value = typeof draft.image === "string" ? draft.image : "";
+
+    imageInfoInput.value = typeof draft.imageInfo === "string" ? draft.imageInfo : "";
+
+    contentInput.value = typeof draft.content === "string" ? draft.content : "";
+
+    if (tocModeSelect) {
+
+      if (typeof draft.tocMode === "string") {
+
+        tocModeSelect.value = draft.tocMode;
+
+      } else if (typeof draft.showToc === "boolean") {
+
+        //   A draft saved before the three-level picker existed only stored a
+
+        //   boolean; carry it over as full-open or off.
+
+        tocModeSelect.value = draft.showToc ? "3" : "0";
+
+      }
+
+    }
+
+    if (typeof draft.category === "string") categorySelect.value = draft.category;
+
+    if (typeof draft.imageQuality === "string" && imageQualityField) {
+
+      var qualitySelect = imageQualityField.querySelector("select");
+
+      if (qualitySelect) qualitySelect.value = draft.imageQuality;
+
+    }
+
+    setDraftStatus(
+
+      draft.uploadedImageSelected
+
+        ? "Draft restored. Reselect the uploaded image file."
+
+        : "Draft restored."
+
+    );
+
+  }
+
+
+
+  function saveDraft() {
+
+    try {
+
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
+
+        heading: headingInput.value,
+
+        image: imageInput.value,
+
+        imageInfo: imageInfoInput.value,
+
+        category: categorySelect.value,
+
+        imageQuality: imageQualityField
+
+          ? imageQualityField.querySelector("select").value
+
+          : "",
+
+        content: contentInput.value,
+
+        tocMode: tocModeSelect ? tocModeSelect.value : "0",
+
+        uploadedImageSelected: Boolean(imageFileInput && imageFileInput.files && imageFileInput.files.length),
+
+        savedAt: Date.now()
+
+      }));
+
+      setDraftStatus("Draft saved in this browser.");
+
+    } catch (error) {
+
+      console.error("Could not save the story draft.", error);
+
+      setDraftStatus("Autosave failed. Keep this page open and copy your text.", true);
+
+    }
+
+  }
+
+
+
+  function clearDraft() {
+
+    try {
+
+      window.localStorage.removeItem(DRAFT_KEY);
+
+      setDraftStatus("");
+
+    } catch (error) {
+
+      console.error("Could not clear the published story draft.", error);
+
+      setDraftStatus("Story published, but its local draft could not be cleared.", true);
+
+    }
+
+  }
+
+
+
+  /* ---------- animated dialogs ----------
+
+     `hidden` can not be transitioned, so a dialog opens by clearing it and
+
+     adding .is-open on the next frame, and closes by dropping .is-open and
+
+     setting `hidden` once the fade is done. The page behind is locked from
+
+     scrolling while any dialog is open. */
+
+  function showDialog(el) {
+
+    if (!el) return;
+
+    window.clearTimeout(el._closeTimer);
+
+    el.hidden = false;
+
+    document.documentElement.classList.add("editor-modal-open");
+
+    void el.offsetWidth;
+
+    window.requestAnimationFrame(function () { el.classList.add("is-open"); });
+
+  }
+
+
+
+  function hideDialog(el) {
+
+    if (!el || el.hidden) return;
+
+    el.classList.remove("is-open");
+
+    el._closeTimer = window.setTimeout(function () {
+
+      el.hidden = true;
+
+      var anyOpen = shell.querySelector(".editor-modal:not([hidden])");
+
+      if (!anyOpen) document.documentElement.classList.remove("editor-modal-open");
+
+    }, MODAL_CLOSE_MS);
+
+  }
+
+
+
+  /* ---------- archive picker ----------
+
+     The picker shows the real /archive/ page in a frame. It is same-origin,
+
+     so once it has loaded the site header, footer, splash and floating
+
+     buttons are hidden and the gallery gets a compact, touch friendly layout
+
+     (two columns on a phone). Only the picker is affected, the real archive
+
+     page keeps its own styles. */
+
+  var ARCHIVE_EMBED_CSS = [
+
+    "#splash,.dummy-loading,.site-header,.site-footer,.fab-stack,#newsletter-popup{display:none!important}",
+
+    "html,body{background:var(--paper)!important}",
+
+    "body{padding-top:0!important}",
+
+    ".archive-shell{padding:16px 16px 32px!important}",
+
+    ".archive-hero{padding-bottom:12px!important}",
+
+    ".archive-hero::after,.archive-heading,.archive-header-actions{animation:none!important}",
+
+    ".archive-eyebrow{display:none!important}",
+
+    ".archive-hero h1{font-size:1.4rem!important}",
+
+    ".archive-subtitle{margin-top:4px!important;font-size:0.84rem!important}",
+
+    ".archive-toolbar{position:sticky;top:0;z-index:20;background:var(--paper);padding:10px 0 6px!important}",
+
+    ".archive-tab{padding:11px 14px!important}",
+
+    "@media (max-width:560px){",
+
+    ".archive-shell{padding:12px 12px 28px!important}",
+
+    ".archive-subtitle{display:none!important}",
+
+    ".archive-hero{gap:10px!important}",
+
+    ".archive-header-actions .archive-action-btn{padding:9px 10px!important;font-size:0.8rem!important}",
+
+    ".archive-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}",
+
+    ".archive-card-media{aspect-ratio:1/1!important}",
+
+    ".archive-card-media .archive-tag{top:8px!important;font-size:0.6rem!important;padding:4px 12px 4px 7px!important}",
+
+    ".archive-card-body{padding:9px 9px 10px!important;gap:7px!important}",
+
+    ".archive-card-desc{font-size:0.8rem!important;-webkit-line-clamp:2}",
+
+    ".archive-card-specs,.archive-card-credit{display:none!important}",
+
+    ".archive-card-btn{min-height:38px!important;font-size:0.74rem!important;padding:7px 8px!important}",
+
+    ".archive-card-btn.is-icon{flex:0 0 38px!important}",
+
+    ".archive-card-btn-icon{width:14px!important;height:14px!important}",
+
+    ".archive-pagination{flex-wrap:wrap;justify-content:center}",
+
+    "}"
+
+  ].join("\n");
+
+
+
+  var PICKER_TIMEOUT_MS = 5000;
+
+  var pickerWatchdogTimer = null;
+
+
+
+  function clearPickerWatchdog() {
+
+    if (pickerWatchdogTimer) {
+
+      window.clearTimeout(pickerWatchdogTimer);
+
+      pickerWatchdogTimer = null;
+
+    }
+
+  }
+
+
+
+  function styleArchiveFrame() {
+
+    clearPickerWatchdog();
+
+    if (!archiveFrame) return;
+
+    try {
+
+      var doc = archiveFrame.contentDocument;
+
+      if (doc && doc.querySelector(".archive-shell") && !doc.getElementById("picker-embed-css")) {
+
+        var styleEl = doc.createElement("style");
+
+        styleEl.id = "picker-embed-css";
+
+        styleEl.textContent = ARCHIVE_EMBED_CSS;
+
+        doc.head.appendChild(styleEl);
+
+      }
+
+    } catch (error) {
+
+      console.error("Could not style the archive picker.", error);
+
+    }
+
+    if (archiveStage) archiveStage.classList.add("is-loaded");
+
+    if (archiveRefreshBtn) archiveRefreshBtn.disabled = false;
+
+  }
+
+
+
+  /* Same watchdog the /archive/ page uses: if the picker frame has not
+
+     loaded within 5 seconds (server down, slow connection), stop the
+
+     spinner, re-enable refresh and say what happened instead of leaving
+
+     the frame loading forever. */
+
+  function loadArchiveFrame(force) {
+
+    if (!archiveFrame) return;
+
+    var url = archiveFrame.getAttribute("data-src");
+
+    if (!url) return;
+
+    if (!force && archiveFrame.getAttribute("src")) return;
+
+    clearPickerWatchdog();
+
+    if (archiveStage) archiveStage.classList.remove("is-loaded");
+
+    archiveFrame.setAttribute("src", url);
+
+    pickerWatchdogTimer = window.setTimeout(function () {
+
+      pickerWatchdogTimer = null;
+
+      if (archiveStage) archiveStage.classList.add("is-loaded");
+
+      if (archiveRefreshBtn) archiveRefreshBtn.disabled = false;
+
+      toast("Timeout, please try again.", "error");
+
+    }, PICKER_TIMEOUT_MS);
+
+  }
+
+
+
+  function closeArchivePicker() {
+
+    hideDialog(archiveModal);
+
+  }
+
+
+
+  shell.querySelectorAll("[data-archive-open]").forEach(function (button) {
+
+    button.addEventListener("click", function () {
+
+      if (!archiveModal) return;
+
+      loadArchiveFrame(false);
+
+      showDialog(archiveModal);
+
+      var closeButton = archiveModal.querySelector("[data-archive-close]");
+
+      if (closeButton) closeButton.focus({ preventScroll: true });
+
+    });
+
+  });
+
+  function normalizeImportedNews(data) {
+    var src = (data && typeof data === "object" && data.draft && typeof data.draft === "object") ? data.draft : data;
+    if (!src || typeof src !== "object") return null;
+    var looksLikeNews = "heading" in src || "content" in src || "image_1" in src || "category" in src || "toc_mode" in src;
+    if (!looksLikeNews) return null;
+    return {
+      heading: src.heading != null ? String(src.heading) : "",
+      image_1: src.image_1 != null ? String(src.image_1) : "",
+      image_info: src.image_info != null ? String(src.image_info) : "",
+      category: src.category != null ? String(src.category) : "",
+      content: src.content != null ? String(src.content) : "",
+      toc_mode: src.toc_mode != null ? String(src.toc_mode) : "",
+      image_quality: src.image_quality != null ? String(src.image_quality) : "medium",
+      newsletter: !!src.newsletter
+    };
+  }
+
+  function loadNewsFromFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(String(reader.result || ""));
+        var news = normalizeImportedNews(parsed);
+        if (!news) { toast("That file is not a valid news draft JSON.", "error"); return; }
+        var hasStory = typeof screenHasStory === "function" ? screenHasStory() : !!(value("heading").trim() || value("content").trim() || value("image_1").trim());
+        if (hasStory && !window.confirm("Replace what is in the editor with this file? Save your current work as a draft first if you still need it.")) return;
+        fillEditor(news);
+        if (typeof updateEditorLiveUI === "function") updateEditorLiveUI();
+        if (typeof updateImagePreview === "function") updateImagePreview();
+        toast("News loaded from file.");
+      } catch (e) {
+        toast("Could not read that JSON file.", "error");
+      }
+    };
+    reader.onerror = function () { toast("Could not read that file.", "error"); };
+    reader.readAsText(file);
+  }
+
+  shell.querySelectorAll("[data-load-news-btn]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var actions = button.closest(".editor-actions") || button.closest(".editor-image-actions") || button.parentNode;
+      var input = actions ? actions.querySelector("[data-load-news-input]") : null;
+      if (!input) input = shell.querySelector("[data-load-news-input]");
+      if (input) input.click();
+    });
+  });
+  shell.querySelectorAll("[data-load-news-input]").forEach(function (input) {
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      loadNewsFromFile(file);
+      input.value = "";
+    });
+  });
+
+  if (archiveModal) {
+
+    if (archiveFrame) archiveFrame.addEventListener("load", styleArchiveFrame);
+
+    if (archiveRefreshBtn && archiveFrame) {
+
+      archiveRefreshBtn.addEventListener("click", function () {
+
+        archiveRefreshBtn.disabled = true;
+
+        loadArchiveFrame(true);
+
+      });
+
+    }
+
+    archiveModal.querySelectorAll("[data-archive-close]").forEach(function (button) {
+
+      button.addEventListener("click", closeArchivePicker);
+
+    });
+
+    document.addEventListener("keydown", function (event) {
+
+      if (event.key === "Escape" && !archiveModal.hidden) closeArchivePicker();
+
+    });
+
+  }
+
+
+
+  function toast(message, tone) {
+
+    if (typeof window.AbuToast === "function") {
+
+      window.AbuToast(message, tone);
+
+      return;
+
+    }
+
+    if (window.editorToast) {
+
+      window.editorToast(message, tone);
+
+      return;
+
+    }
+
+    window.alert(message);
+
+  }
+
+
+
+  function extractDetail(rawText, genericMessage) {
+
+    if (!rawText) return genericMessage;
+
+    try {
+
+      var data = JSON.parse(rawText);
+
+      return data && data.detail ? data.detail : genericMessage;
+
+    } catch (e) {
+
+      return genericMessage;
+
+    }
+
+  }
+
+
+
+  /* ---------- shared formatting helpers (port of the server parser) ---------- */
+
+  function escapeHtml(value) {
+
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  }
+
+
+
+  function escapeAttr(value) {
+
+    return escapeHtml(value).replace(/"/g, "&quot;");
+
+  }
+
+
+
+  /* Undo the escaping above. A URL is escaped before it is parsed for
+
+     tagging, so "&" in the author's query string is sitting here as "&amp;";
+
+     the real query string has to be read back before tagOutboundUrl runs, or
+
+     a second "&" would come out as "&amp%3B" and break the link. Mirrors the
+
+     html.unescape in _linkify_text (BLOG/views.py). */
+
+  function unescapeHtml(value) {
+
+    return String(value)
+
+      .replace(/&quot;/g, '"')
+
+      .replace(/&lt;/g, "<")
+
+      .replace(/&gt;/g, ">")
+
+      .replace(/&amp;/g, "&");
+
+  }
+
+
+
+  /* OUTBOUND REFERRAL TAGGING -- mirrors tag_outbound_url in BLOG/views.py.
+
+     A pasted link is stamped with our referral parameters before it becomes
+
+     an anchor, so sites we send readers to see the traffic came from us.
+
+     Only links that leave the site are tagged; our own domain, mailto:/tel:
+
+     and #anchors are left alone, and a link the author already tagged (it
+
+     carries a utm_source) is respected. The campaign story slug is added by
+
+     the server on the published page; the preview omits it since the editor
+
+     has no slug. */
+
+  var REFERRAL_SOURCE = "abureport";
+
+  var REFERRAL_MEDIUM = "referral";
+
+
+
+  function tagOutboundUrl(url) {
+
+    var parsed;
+
+    try { parsed = new URL(url); } catch (error) { return url; }
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return url;
+
+    var host = parsed.hostname.toLowerCase();
+
+    if (host === "localhost" || host === "127.0.0.1") return url;
+
+    var bare = REFERRAL_SOURCE.toLowerCase();
+
+    if (host === bare || host.slice(-(bare.length + 1)) === "." + bare) return url;
+
+    if (parsed.searchParams.has("utm_source")) return url;
+
+    parsed.searchParams.set("utm_source", REFERRAL_SOURCE);
+
+    parsed.searchParams.set("utm_medium", REFERRAL_MEDIUM);
+
+    return parsed.toString();
+
+  }
+
+
+
+  function linkifyText(value) {
+
+    var safe = escapeHtml(value);
+
+    safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+    safe = safe.replace(/__(.+?)__/g, "<em>$1</em>");
+
+    /* Markdown link ([words](url)) and bare URL in one pass, so a URL that
+
+       already sits inside "[words](...)" is never linkified twice -- mirrors
+
+       _linkify_text / _LINK_OR_URL_RE in BLOG/views.py. */
+
+    safe = safe.replace(/\[([^\[\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>'"]+)/g, function (match, label, url, bare) {
+
+      if (url === undefined) { url = bare; label = bare; }
+
+      return '<a href="' + escapeAttr(tagOutboundUrl(unescapeHtml(url))) + '" rel="noopener noreferrer" target="_blank">' + label + "</a>";
+
+    });
+
+    return safe;
+
+  }
+
+
+
+  /* INLINE IMAGE TOKEN: "imgl URL alt text" / "imgr URL alt text" (floated,
+
+     text wraps around it) / "imgc URL alt text" (centered, blocking --
+
+     never floated/wrapped, still kept smaller than the hero image).
+
+     Checked before headings/bold/italic so the URL + alt text are never
+
+     consumed by those markers -- mirrors IMG_TOKEN_RE in BLOG/views.py. */
+
+  var imgTokenRe = /^(imgl|imgr|imgc)\s+(\S+)(?:\s+(.*))?$/;
+
+
+
+  /* INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
+
+     the image token above (keyword, URL, optional trailing text) but
+
+     renders as a downloadable link in the normal flow of the paragraph --
+
+     mirrors FILE_TOKEN_RE / _render_inline_file in BLOG/views.py. */
+
+  var fileTokenRe = /^filel\s+(\S+)(?:\s+(.*))?$/;
+
+
+
+  var IMG_SIDE_CLASSES = {
+
+    imgl: "story-inline-fig-left",
+
+    imgr: "story-inline-fig-right",
+
+    imgc: "story-inline-fig-center"
+
+  };
+
+
+
+  /* INLINE VIDEO TOKEN: "vidl URL caption" / "vidr URL caption" (floated,
+
+     text wraps around it) / "vidc URL caption" (centered, blocking). Same
+
+     shape as the image token above but renders a self-playing <video> whose
+
+     only control is a play/pause button -- mirrors VID_TOKEN_RE /
+
+     _render_inline_video in BLOG/views.py. */
+
+  var vidTokenRe = /^(vidl|vidr|vidc)\s+(\S+)(?:\s+(.*))?$/;
+
+
+
+  var VID_SIDE_CLASSES = {
+
+    vidl: "story-inline-fig-left",
+
+    vidr: "story-inline-fig-right",
+
+    vidc: "story-inline-fig-center"
+
+  };
+
+
+
+  /* BUTTON TOKEN: "btn URL label text". A whole line that starts with `btn`
+
+     becomes one button-style link -- the URL is the destination and the
+
+     trailing text is the label printed on the button. Mirrors BTN_TOKEN_RE /
+
+     _render_inline_button in BLOG/views.py. */
+
+  var btnTokenRe = /^btn\s+(\S+)(?:\s+(.*))?$/;
+
+
+
+  function imageFilenameFromUrl(url) {
+
+    var withoutQuery = url.split(/[?#]/)[0];
+
+    var parts = withoutQuery.split("/");
+
+    return parts[parts.length - 1] || url;
+
+  }
+
+
+
+  /* The description typed after the URL is shown beneath the picture, like
+
+     the banner description. With no description the file name is only used
+
+     for the alt attribute and no caption is printed. Mirrors
+
+     _render_inline_image in BLOG/views.py. */
+
+  function renderInlineImage(direction, url, altText) {
+
+    var caption = (altText || "").trim();
+
+    var alt = caption || imageFilenameFromUrl(url);
+
+    var figClass = IMG_SIDE_CLASSES[direction] || "story-inline-fig-left";
+
+    return '<figure class="story-inline-fig ' + figClass + '">' +
+
+      '<img class="story-inline-img" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">' +
+
+      (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
+
+      "</figure>";
+
+  }
+
+
+
+  function renderInlineFile(url, displayText) {
+
+    var label = (displayText || "").trim() || imageFilenameFromUrl(url);
+
+    return '<a class="story-inline-file" href="' + escapeAttr(tagOutboundUrl(url)) + '" download rel="noopener noreferrer">' +
+
+      '<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>' + escapeHtml(label) + "</a>";
+
+  }
+
+
+
+  /* Mirrors _render_inline_button in BLOG/views.py: one block-level button
+
+     link. With no label the URL itself is printed so the button is never
+
+     blank. */
+
+  function renderInlineButton(url, labelText) {
+
+    var label = (labelText || "").trim() || url;
+
+    return '<p class="story-inline-btn-row"><a class="story-inline-btn" href="' + escapeAttr(tagOutboundUrl(url)) + '" rel="noopener noreferrer" target="_blank">' + escapeHtml(label) + "</a></p>";
+
+  }
+
+
+
+  /* EXTERNAL VIDEO PROVIDERS - mirrors _video_embed_url in BLOG/views.py. A
+
+     YouTube or Vimeo address is a page, not a file, so a <video> can never
+
+     play it; it is shown in an <iframe> with the provider's own player. Any
+
+     other URL stays on the plain <video> path below. */
+
+  var YOUTUBE_ID_RE = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?[^\s#]*?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+
+  var VIMEO_ID_RE = /vimeo\.com\/(?:video\/)?(\d+)/;
+
+
+
+  function videoEmbedUrl(url) {
+
+    var value = url || "";
+
+    var youtube = value.match(YOUTUBE_ID_RE);
+
+    if (youtube) {
+
+      var params = ["rel=0", "playsinline=1", "modestbranding=1", "autoplay=1", "mute=1", "loop=1", "playlist=" + youtube[1]];
+
+      var start = value.match(/[?&](?:t|start)=(\d+)/);
+
+      if (start) params.push("start=" + start[1]);
+
+      return "https://www.youtube.com/embed/" + youtube[1] + "?" + params.join("&");
+
+    }
+
+    var vimeo = value.match(VIMEO_ID_RE);
+
+    if (vimeo) {
+
+      return "https://player.vimeo.com/video/" + vimeo[1] + "?autoplay=1&muted=1&loop=1&playsinline=1&dnt=1";
+
+    }
+
+    return "";
+
+  }
+
+
+
+  /* Mirrors _render_inline_video in BLOG/views.py: the same autoplay/muted/
+
+     loop <video> with no native controls, plus the play/pause and sound
+
+     buttons - except a YouTube/Vimeo URL, which becomes an <iframe> embed
+
+     with the provider's own controls (is-embed, no overlay buttons). */
+
+  function renderInlineVideo(direction, url, captionText) {
+
+    var caption = (captionText || "").trim();
+
+    var figClass = VID_SIDE_CLASSES[direction] || "story-inline-fig-left";
+
+    var aria = caption || "Story video";
+
+    var captionHtml = caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "";
+
+    var embedUrl = videoEmbedUrl(url);
+
+    if (embedUrl) {
+
+      return '<figure class="story-inline-fig story-inline-video is-embed ' + figClass + '">' +
+
+        '<div class="story-inline-video-frame">' +
+
+        '<iframe class="story-inline-video-embed" src="' + escapeAttr(embedUrl) + '" title="' + escapeAttr(aria) + '" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>' +
+
+        '</div>' + captionHtml +
+
+        "</figure>";
+
+    }
+
+    return '<figure class="story-inline-fig story-inline-video ' + figClass + '">' +
+
+      '<div class="story-inline-video-frame">' +
+
+      '<video class="story-inline-video-el" onerror="this.onerror=null;this.src=\'/static/404_video.mp4\';" src="' + escapeAttr(url) + '" muted loop playsinline autoplay preload="metadata" aria-label="' + escapeAttr(aria) + '"></video>' +
+
+      '<button type="button" class="story-inline-video-toggle" data-video-toggle aria-label="Pause video">' +
+
+      '<svg class="story-inline-video-icon story-inline-video-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>' +
+
+      '<svg class="story-inline-video-icon story-inline-video-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>' +
+
+      '</button>' +
+
+      '<button type="button" class="story-inline-video-toggle story-inline-video-sound" data-video-sound aria-label="Unmute video">' +
+
+      '<svg class="story-inline-video-icon story-inline-video-icon-sound-on" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>' +
+
+      '<svg class="story-inline-video-icon story-inline-video-icon-sound-off" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line></svg>' +
+
+      '</button></div>' +
+
+      (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
+
+      "</figure>";
+
+  }
+
+
+
+  function parseStoryContent(content) {
+
+    if (!content) return "";
+
+    var normalized = String(content).replace(/\r\n?/g, "\n").trim();
+
+    var lines = normalized.split("\n").map(function (line) { return line.replace(/\s+$/, ""); });
+
+    var blocks = [];
+
+    var i = 0;
+
+    var headingRe = /^(#+)\s*(.*)$/;
+
+    var bulletRe = /^\*\s+/;
+
+    var orderedRe = /^\d+\.\s+/;
+
+    var starterRe = /^(#+\s+|\*\s+|\d+\.\s+|imgl\s+|imgr\s+|imgc\s+|vidl\s+|vidr\s+|vidc\s+|filel\s+|btn\s+)/;
+
+
+
+    while (i < lines.length) {
+
+      var line = lines[i].trim();
+
+      if (!line) { i += 1; continue; }
+
+
+
+      var imgMatch = line.match(imgTokenRe);
+
+      if (imgMatch) {
+
+        blocks.push(renderInlineImage(imgMatch[1], imgMatch[2], imgMatch[3]));
+
+        i += 1;
+
+        continue;
+
+      }
+
+
+
+      var fileMatch = line.match(fileTokenRe);
+
+      if (fileMatch) {
+
+        blocks.push(renderInlineFile(fileMatch[1], fileMatch[2]));
+
+        i += 1;
+
+        continue;
+
+      }
+
+
+
+      var vidMatch = line.match(vidTokenRe);
+
+      if (vidMatch) {
+
+        blocks.push(renderInlineVideo(vidMatch[1], vidMatch[2], vidMatch[3]));
+
+        i += 1;
+
+        continue;
+
+      }
+
+
+
+      var btnMatch = line.match(btnTokenRe);
+
+      if (btnMatch) {
+
+        blocks.push(renderInlineButton(btnMatch[1], btnMatch[2]));
+
+        i += 1;
+
+        continue;
+
+      }
+
+
+
+      var headingMatch = line.match(headingRe);
+
+      if (headingMatch) {
+
+        var level = Math.min(headingMatch[1].length + 1, 4);
+
+        var headingText = headingMatch[2].trim();
+
+        if (headingText) blocks.push("<h" + level + ">" + linkifyText(headingText) + "</h" + level + ">");
+
+        i += 1;
+
+        continue;
+
+      }
+
+
+
+      if (bulletRe.test(line)) {
+
+        var bullets = [];
+
+        while (i < lines.length) {
+
+          var bulletLine = lines[i].trim();
+
+          if (!bulletLine || !bulletRe.test(bulletLine)) break;
+
+          var bulletItem = bulletLine.slice(2).trim();
+
+          if (bulletItem) bullets.push("<li>" + linkifyText(bulletItem) + "</li>");
+
+          i += 1;
+
+        }
+
+        if (bullets.length) blocks.push("<ul>" + bullets.join("") + "</ul>");
+
+        continue;
+
+      }
+
+
+
+      if (orderedRe.test(line)) {
+
+        var ordered = [];
+
+        while (i < lines.length) {
+
+          var orderedLine = lines[i].trim();
+
+          if (!orderedLine || !orderedRe.test(orderedLine)) break;
+
+          var orderedMatch = orderedLine.match(/^\d+\.\s+(.*)$/);
+
+          if (orderedMatch && orderedMatch[1].trim()) ordered.push("<li>" + linkifyText(orderedMatch[1].trim()) + "</li>");
+
+          i += 1;
+
+        }
+
+        if (ordered.length) blocks.push("<ol>" + ordered.join("") + "</ol>");
+
+        continue;
+
+      }
+
+
+
+      var paragraphLines = [];
+
+      while (i < lines.length) {
+
+        var paragraphLine = lines[i].trim();
+
+        if (!paragraphLine) break;
+
+        if (starterRe.test(paragraphLine)) break;
+
+        paragraphLines.push(paragraphLine);
+
+        i += 1;
+
+        if (i < lines.length && !lines[i].trim()) break;
+
+      }
+
+      var paragraph = paragraphLines.join(" ").trim();
+
+      if (paragraph) blocks.push("<p>" + linkifyText(paragraph) + "</p>");
+
+    }
+
+
+
+    return blocks.join("\n");
+
+  }
+
+
+
+  /* ---------- table of contents (mirrors BLOG.views.enhance_story_body) ----------
+
+     When the author picks any Table of contents mode other than Off, give every
+
+     heading an id and splice the "TABLE OF CONTENT" section in right after the
+
+     first paragraph, exactly as the published page will. The list is the same
+
+     nested #/##/### tree with the same three starting states: level 2 and 3 open
+
+     the outer disclosure, level 3 also opens every branch. Kept off the
+
+     parseStoryContent path so the preview body still mirrors the parser. */
+
+  var TOC_CHEVRON = '<svg class="story-toc-chevron" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" focusable="false"><path d="M4 6.5 8 10.5 12 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+
+
+  function plainHeadingText(inner) {
+
+    var host = document.createElement("div");
+
+    host.innerHTML = inner;
+
+    return (host.textContent || "").trim();
+
+  }
+
+
+
+  function tocSlug(text) {
+
+    var value = String(text || "");
+
+    if (value.normalize) value = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+
+    value = value.replace(/[^\w\s-]/g, "").toLowerCase();
+
+    value = value.replace(/[-\s]+/g, "-");
+
+    return value.replace(/^[-_]+|[-_]+$/g, "");
+
+  }
+
+
+
+  function tocTree(headings) {
+
+    var roots = [];
+
+    var stack = [];
+
+    headings.forEach(function (heading) {
+
+      var node = { level: heading.level, slug: heading.slug, text: heading.text, children: [] };
+
+      while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop();
+
+      (stack.length ? stack[stack.length - 1].children : roots).push(node);
+
+      stack.push(node);
+
+    });
+
+    return roots;
+
+  }
+
+
+
+  function renderTocNodes(nodes, branchesOpen) {
+
+    return nodes.map(function (node) {
+
+      var link = '<a class="story-toc-link" href="#' + node.slug + '">' + escapeHtml(node.text) + "</a>";
+
+      if (node.children.length) {
+
+        var expanded = branchesOpen ? "true" : "false";
+
+        var hidden = branchesOpen ? "" : " hidden";
+
+        return '<li class="story-toc-item story-toc-item--has-children" data-level="' + node.level + '">' +
+
+          '<div class="story-toc-row">' + link +
+
+          '<button type="button" class="story-toc-branch" aria-expanded="' + expanded + '" aria-label="Toggle subsections">' +
+
+          TOC_CHEVRON + "</button></div>" +
+
+          '<ol class="story-toc-children"' + hidden + ">" +
+
+          renderTocNodes(node.children, branchesOpen) + "</ol></li>";
+
+      }
+
+      return '<li class="story-toc-item" data-level="' + node.level + '">' +
+
+        '<div class="story-toc-row">' + link + "</div></li>";
+
+    }).join("");
+
+  }
+
+
+
+  function enhanceStoryBody(htmlBody, tocMode) {
+
+    var mode = parseInt(tocMode, 10) || 0;
+
+    if (!htmlBody || !mode) return htmlBody;
+
+
+
+    var headings = [];
+
+    var seen = {};
+
+    var withIds = htmlBody.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, function (match, level, inner) {
+
+      var plain = plainHeadingText(inner);
+
+      var base = tocSlug(plain) || "part";
+
+      var slug = "section-" + base;
+
+      var suffix = 2;
+
+      while (Object.prototype.hasOwnProperty.call(seen, slug)) {
+
+        slug = "section-" + base + "-" + suffix;
+
+        suffix += 1;
+
+      }
+
+      seen[slug] = true;
+
+      headings.push({ level: parseInt(level, 10), slug: slug, text: plain });
+
+      return "<h" + level + ' id="' + slug + '">' + inner + "</h" + level + ">";
+
+    });
+
+
+
+    if (!headings.length) return withIds;
+
+
+
+    var branchesOpen = mode === 3;
+
+    var shellOpen = (mode === 2 || mode === 3) ? " open" : "";
+
+    var rows = renderTocNodes(tocTree(headings), branchesOpen);
+
+    var toc = '<nav class="story-toc" aria-label="Table of contents" data-story-toc data-toc-mode="' + mode + '">' +
+
+      '<details class="story-toc-shell"' + shellOpen + ">" +
+
+      '<summary class="story-toc-head"><span class="story-toc-title">TABLE OF CONTENT</span>' + TOC_CHEVRON + "</summary>" +
+
+      '<ol class="story-toc-list">' + rows + "</ol></details></nav>";
+
+
+
+    var blocks = withIds.split("\n");
+
+    var insertAt = 0;
+
+    for (var index = 0; index < blocks.length; index += 1) {
+
+      if (blocks[index].indexOf("<p>") === 0) { insertAt = index + 1; break; }
+
+    }
+
+    blocks.splice(insertAt, 0, toc);
+
+    return blocks.join("\n");
+
+  }
+
+
+
+  /* ---------- preview ---------- */
+
+  var debounceTimer = null;
+
+
+
+  function currentCategoryLabel() {
+
+    if (!categorySelect.value || categorySelect.selectedIndex < 0) return "";
+
+    return categorySelect.options[categorySelect.selectedIndex].text;
+
+  }
+
+
+
+  function todayLabel() {
+
+    return new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  }
+
+
+
+  function renderPreview() {
+
+    var heading = headingInput.value.trim();
+
+    var imageUrl = selectedImageObjectUrl || imageInput.value.trim();
+
+    var imageInfo = imageInfoInput.value.trim() || "The image is self explanatory.";
+
+    var categoryLabel = currentCategoryLabel();
+
+    var tocMode = tocModeSelect ? parseInt(tocModeSelect.value, 10) || 0 : 0;
+
+    var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode);
+
+
+
+    var html = '<div class="editor-preview-frame"><article class="story-article no-inner-shell">';
+
+    html += '<header class="story-header">';
+
+    html += '<div class="story-kicker-row"><span class="story-kicker">' + escapeHtml(categoryLabel || "Category") + '</span>';
+
+    html += '<span class="story-separator">&bull;</span><time>' + escapeHtml(todayLabel()) + "</time></div>";
+
+    html += "<h1>" + escapeHtml(heading || "Untitled story") + "</h1>";
+
+    html += "</header>";
+
+
+
+    if (imageUrl) {
+
+      html += '<figure class="story-hero-figure">';
+
+      html += '<img src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(heading || "Story image") + '" loading="eager" onerror="this.onerror=null;this.src=\'/static/404.jpg\';">';
+
+      html += "<figcaption>" + escapeHtml(imageInfo) + "</figcaption>";
+
+      html += "</figure>";
+
+    }
+
+
+
+    html += '<div class="story-body">';
+
+    html += bodyHtml || '<p class="editor-preview-empty">Live Preview Plcaeholder Text</p>';
+
+    html += "</div>";
+
+    html += "</article></div>";
+
+
+
+    /* The preview pane IS the scroll container, so replacing its html would
+
+       otherwise snap it back to the top on every keystroke. Keep the reader's
+
+       place in the preview. */
+
+    var previewScrollTop = output.scrollTop;
+
+    output.innerHTML = html;
+
+    if (previewScrollTop) output.scrollTop = previewScrollTop;
+
+
+
+    /* freshly built <video> elements need their play/pause glyph synced */
+
+    document.dispatchEvent(new CustomEvent("story-video:sync"));
+
+  }
+
+
+
+  function schedulePreview() {
+
+    if (debounceTimer) window.clearTimeout(debounceTimer);
+
+    debounceTimer = window.setTimeout(renderPreview, 120);
+
+  }
+
+
+
+  /* ---------- closeable preview ---------- */
+
+  function applyPreviewState(off) {
+
+    shell.classList.toggle("preview-off", off);
+
+    toggleBtn.classList.toggle("is-off", off);
+
+    toggleBtn.textContent = off ? "Show preview" : "Hide preview";
+
+  }
+
+
+
+  toggleBtn.addEventListener("click", function () {
+
+    var nextOff = !shell.classList.contains("preview-off");
+
+    applyPreviewState(nextOff);
+
+    try { window.localStorage.setItem(PREVIEW_KEY, nextOff ? "off" : "on"); } catch (e) { /* storage unavailable */ }
+
+  });
+
+
+
+  var storedPreview = null;
+
+  try { storedPreview = window.localStorage.getItem(PREVIEW_KEY); } catch (e) { /* ignore */ }
+
+  applyPreviewState(storedPreview === "off");
+
+
+
+  /* ---------- publish ---------- */
+
+  function setPublishPending(pending) {
+
+    pendingPublish = pending;
+
+    publishBtn.disabled = pending;
+
+    publishBtn.classList.toggle("is-pending", pending);
+
+    publishBtn.textContent = pending ? "Publishing..." : "Publish";
+
+  }
+
+
+
+  /* ---------- validation dialog ----------
+
+     Modes, all fed by the server's answer where rules are involved (the
+
+     server is the single source of truth for the writing rules, see
+
+     SERVICE_INTERNAL/story_validation.py):
+
+       blocked  (HTTP 400 + errors)             -> explains what to fix, one button
+
+       warnings (HTTP 409 + needs_confirmation) -> explains, then asks YES / NO
+
+       newsletter (asked here, before the POST) -> asks, then asks again
+
+     "Go back and edit" simply keeps the story unposted. */
+
+  var modalReturnFocus = null;
+
+
+
+  function closeModal() {
+
+    if (!modal) return;
+
+    hideDialog(modal);
+
+    var focusTarget = modalEditTarget || modalReturnFocus;
+
+    if (focusTarget) setView("write");
+
+    if (focusTarget && focusTarget.focus) focusTarget.focus({ preventScroll: true });
+
+    modalEditTarget = null;
+
+    modalReturnFocus = null;
+
+  }
+
+
+
+  function openModal(options) {
+
+    if (!modal) {
+
+      /* the dialog markup is missing: fall back to a plain message, and never auto post */
+
+      toast(options.items.map(function (i) { return i.message; }).join(" "), "error");
+
+      return;
+
+    }
+
+    modalReturnFocus = document.activeElement;
+
+    modalEditTarget = options.editTarget || contentInput;
+
+    modalConfirmWarnings = options.confirmWarnings !== false;
+
+    modalConfirmAction = options.onConfirm || null;
+
+    modalEditAction = options.onEdit || null;
+
+    modalTitle.textContent = options.title;
+
+    modalIntro.textContent = options.intro;
+
+    modalList.innerHTML = "";
+
+    options.items.forEach(function (item) {
+
+      var li = document.createElement("li");
+
+      li.textContent = item.message;
+
+      modalList.appendChild(li);
+
+    });
+
+    modalQuestion.textContent = options.question || (options.askToPost ? "Do you still want to post this story now?" : "");
+
+    modalConfirmBtn.hidden = !options.askToPost;
+
+    modalConfirmBtn.textContent = options.confirmLabel || "Yes, post anyway";
+
+    modalEditBtn.textContent = options.editLabel || (options.askToPost ? "No, let me edit" : "Back to editing");
+
+    showDialog(modal);
+
+    modalEditBtn.focus({ preventScroll: true });
+
+  }
+
+
+
+  if (modal) {
+
+    modal.querySelectorAll("[data-editor-modal-close]").forEach(function (el) {
+
+      el.addEventListener("click", closeModal);
+
+    });
+
+    modalEditBtn.addEventListener("click", function () {
+
+      var action = modalEditAction;
+
+      closeModal();
+
+      if (action) action();
+
+    });
+
+    modalConfirmBtn.addEventListener("click", function () {
+
+      var action = modalConfirmAction;
+
+      var confirmWarnings = modalConfirmWarnings;
+
+      closeModal();
+
+      if (action) { action(); return; }
+
+      startPublish(confirmWarnings);
+
+    });
+
+    document.addEventListener("keydown", function (event) {
+
+      if (event.key === "Escape" && !modal.hidden) closeModal();
+
+    });
+
+  }
+
+
+
+  /* ---------- the newsletter ask ----------
+
+     The newsletter is optional. Every fresh publish attempt stops here
+
+     first: one placard asks whether it should go out, and (only when the
+
+     author says yes) a second placard asks them to confirm, so a stray click
+
+     cannot mail every reader by accident. The answer travels as
+
+     `newsletter=1` on the POST and the server only sends on that flag.
+
+     Both exits of the first placard now ask once more before anything
+
+     happens: "send" confirms the send, "publish without" confirms the post. */
+
+  function newsletterAudience() {
+
+    var category = categorySelect ? categorySelect.value : "";
+
+    var known = Object.prototype.hasOwnProperty.call(newsletterCounts, category);
+
+    var count = known ? newsletterCounts[category] : null;
+
+    if (count === 0) {
+
+      return "No reader has news alerts on for this category right now, so a newsletter would reach nobody.";
+
+    }
+
+    if (count === 1) {
+
+      return "1 reader has news alerts on and would get this story by email.";
+
+    }
+
+    if (typeof count === "number") {
+
+      return count + " readers have news alerts on and would get this story by email.";
+
+    }
+
+    return "Readers who turned news alerts on would get this story by email.";
+
+  }
+
+
+
+  function openNewsletterConfirm() {
+
+    openModal({
+
+      title: "Confirm the newsletter",
+
+      intro: "One more check before it goes out. The newsletter is sent the moment the story is published and cannot be recalled.",
+
+      items: [{ message: newsletterAudience() }],
+
+      question: "Send the newsletter now?",
+
+      askToPost: true,
+
+      confirmLabel: "Yes, send the newsletter",
+
+      editLabel: "Go back",
+
+      onConfirm: function () {
+
+        submitStory(newsletterGateWarnings);
+
+      },
+
+      onEdit: function () {
+
+        newsletterChoice = null;
+
+        openNewsletterAsk();
+
+      }
+
+    });
+
+  }
+
+
+
+  /* Publishing WITHOUT the newsletter is asked about as well: a stray click
+
+     must not post a story either. "Go back" returns to the newsletter ask. */
+
+  function openPublishOnlyConfirm() {
+
+    openModal({
+
+      title: "Confirm publishing",
+
+      intro: "The story will go live now and no newsletter will be sent for it. Readers with news alerts on will not be emailed.",
+
+      items: [{ message: newsletterAudience().replace(/would get this story by email\./, "will not be emailed.").replace(/would reach nobody\./, "would have reached nobody anyway.") }],
+
+      question: "Publish without sending the newsletter?",
+
+      askToPost: true,
+
+      confirmLabel: "Yes, publish without newsletter",
+
+      editLabel: "Go back",
+
+      onConfirm: function () {
+
+        newsletterChoice = false;
+
+        submitStory(newsletterGateWarnings);
+
+      },
+
+      onEdit: function () {
+
+        newsletterChoice = null;
+
+        openNewsletterAsk();
+
+      }
+
+    });
+
+  }
+
+
+
+  function openNewsletterAsk() {
+
+    openModal({
+
+      title: "Send Newsletter with this story?",
+
+      intro: "The newsletter is optional. Decide whether readers are emailed about this story, then confirm before it goes out.",
+
+      items: [{ message: newsletterAudience() }],
+
+      question: "Should the newsletter go out when this story is published?",
+
+      askToPost: true,
+
+      confirmLabel: "Send Newsletter",
+
+      editLabel: "Publish without Sending newsletter",
+
+      onConfirm: function () {
+
+        newsletterChoice = true;
+
+        openNewsletterConfirm();
+
+      },
+
+      onEdit: function () {
+
+        openPublishOnlyConfirm();
+
+      }
+
+    });
+
+  }
+
+
+
+  function startPublish(confirmWarnings) {
+
+    if (!modal) {
+
+      /* No placard markup: never hold the story hostage over the optional
+
+         newsletter. Publish without it. */
+
+      newsletterChoice = false;
+
+      submitStory(confirmWarnings);
+
+      return;
+
+    }
+
+    if (newsletterChoice !== null) {
+
+      submitStory(confirmWarnings);
+
+      return;
+
+    }
+
+    newsletterGateWarnings = confirmWarnings;
+
+    openNewsletterAsk();
+
+  }
+
+
+
+  function submitStory(confirmWarnings) {
+
+    if (pendingPublish) return;
+
+
+
+    setPublishPending(true);
+
+    var data = new FormData(form);
+
+    if (confirmWarnings) data.set("confirm_warnings", "1");
+
+    if (newsletterChoice) data.set("newsletter", "1");
+
+
+
+    fetch(form.dataset.endpoint, {
+
+      method: "POST",
+
+      headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+
+      credentials: "same-origin",
+
+      body: data,
+
+    })
+
+      .then(function (response) {
+
+        var contentType = response.headers.get("Content-Type") || "";
+
+        return response.text().then(function (text) {
+
+          return { ok: response.ok, status: response.status, text: text, isJson: contentType.indexOf("application/json") !== -1 };
+
+        });
+
+      })
+
+      .then(function (result) {
+
+        setPublishPending(false);
+
+        var payload = {};
+
+        try { payload = JSON.parse(result.text || "{}") || {}; } catch (e) { /* ignore */ }
+
+
+
+        /* The session can expire while the editor sits open. The server now
+
+           answers a signed-out publish with 401 JSON instead of a login-page
+
+           redirect. If an older or proxied server still redirects, the fetch
+
+           follows it and we get HTML with a 200 -- never treat that as a
+
+           published story either. */
+
+        if (result.status === 401 || result.status === 403 || (result.ok && !result.isJson)) {
+
+          toast(extractDetail(result.text, "Your session has expired. Refresh the page and sign in again to publish."), "error");
+
+          window.setTimeout(function () { window.location.reload(); }, 1200);
+
+          return;
+
+        }
+
+
+
+        /* advisory notes: tell the author, then let THEM decide */
+
+        if (result.status === 409 && payload.needs_confirmation && payload.warnings && payload.warnings.length) {
+
+          openModal({
+
+            title: "Check these before posting",
+
+            intro: "Some Issue Require Your Attention Before Story Can Be Published. These are suggestions, not errors:",
+
+            items: payload.warnings,
+
+            askToPost: true
+
+          });
+
+          return;
+
+        }
+
+
+
+        /* blocked by a writing rule: say exactly what to correct */
+
+        if (!result.ok && payload.errors && payload.errors.length) {
+
+          /* a fresh attempt after this gets a fresh newsletter decision */
+
+          newsletterChoice = null;
+
+          openModal({
+
+            title: "This story cannot be submitted yet",
+
+            intro: payload.errors.length > 1
+
+              ? "Fix the following " + payload.errors.length + " problems, then publish again:"
+
+              : "Fix the following problem, then publish again:",
+
+            items: payload.errors,
+
+            askToPost: false
+
+          });
+
+          return;
+
+        }
+
+
+
+        if (!result.ok) {
+
+          newsletterChoice = null;
+
+          var detail = extractDetail(result.text, "Could not publish the story.");
+
+          toast(detail, "error");
+
+          if (/already/i.test(detail)) {
+
+            headingInput.classList.add("is-error");
+
+            headingInput.focus();
+
+            headingInput.select();
+
+          }
+
+          return;
+
+        }
+
+
+
+        clearDraft();
+
+        if (selectedImageObjectUrl) { URL.revokeObjectURL(selectedImageObjectUrl); selectedImageObjectUrl = null; }
+
+        var publishedMessage = payload.detail || "Story published.";
+
+        if (payload.newsletter_sent) publishedMessage += " The newsletter is on its way to readers who have news alerts on.";
+
+        newsletterChoice = null;
+
+        toast(publishedMessage);
+
+        if (payload.story_url) {
+
+          window.setTimeout(function () { window.location.href = payload.story_url; }, 700);
+
+        }
+
+      })
+
+      .catch(function () {
+
+        setPublishPending(false);
+
+        toast("Network Error. Refresh Browser", "error");
+
+      });
+
+  }
+
+
+
+  form.addEventListener("submit", function (event) {
+
+    event.preventDefault();
+
+    if (pendingPublish) return;
+
+
+
+    if (!headingInput.value.trim()) {
+
+      toast("You Forgot To Add Heading", "error");
+
+      setView("write");
+
+      headingInput.focus();
+
+      return;
+
+    }
+
+    if (!categorySelect.value) {
+
+      toast("Select a category for the story.", "error");
+
+      setView("write");
+
+      categorySelect.focus();
+
+      return;
+
+    }
+
+    if (!contentInput.value.trim()) {
+
+      toast("The story content cannot be empty.", "error");
+
+      setView("write");
+
+      contentInput.focus();
+
+      return;
+
+    }
+
+
+
+    var hasMainImage = Boolean(
+
+      imageInput.value.trim()
+
+      || (imageFileInput && imageFileInput.files && imageFileInput.files.length)
+
+    );
+
+    if (!hasMainImage) {
+
+      openModal({
+
+        title: "No main image added",
+
+        intro: "This story does not have a main image. Stories with a main image are more engaging and easier to recognize.",
+
+        items: [{ message: "You can add an image URL or upload an image before publishing." }],
+
+        askToPost: true,
+
+        editTarget: imageInput,
+
+        confirmWarnings: false
+
+      });
+
+      return;
+
+    }
+
+
+
+    startPublish(false);
+
+  });
+
+
+
+  /* ---------- insert bar: drop a command at the cursor ----------
+
+     Only commands that act the moment they are typed live here (line-start
+
+     markers and img/file tokens). **bold** and __italic__ are left out
+
+     because they only work once the closing marker is typed.
+
+     A line-start command (data-insert-kind="line", the default) always lands
+
+     at the start of a line, because the parser only recognises those at the
+
+     start of a line. An inline command (data-insert-kind="inline", e.g. the
+
+     Link button) is dropped in place at the cursor instead. If text is
+
+     selected, the marker is put in front of it. */
+
+  function insertAtCursor(text) {
+
+    contentInput.focus();
+
+    var done = false;
+
+    try { done = document.execCommand("insertText", false, text); } catch (e) { done = false; }
+
+    if (!done) {
+
+      var s = contentInput.selectionStart, e2 = contentInput.selectionEnd;
+
+      contentInput.setRangeText(text, s, e2, "end");
+
+      contentInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+    }
+
+  }
+
+
+
+  shell.querySelectorAll("[data-insert]").forEach(function (btn) {
+
+    btn.addEventListener("mousedown", function (event) { event.preventDefault(); });
+
+    btn.addEventListener("click", function () {
+
+      var token = btn.getAttribute("data-insert");
+
+      var value = contentInput.value;
+
+      var start = contentInput.selectionStart;
+
+      var end = contentInput.selectionEnd;
+
+      var atLineStart = start === 0 || value.charAt(start - 1) === "\n";
+
+      var selected = value.slice(start, end);
+
+      var inline = btn.getAttribute("data-insert-kind") === "inline";
+
+
+
+      /* a selection that is already a whole line keeps its text, the marker goes in front */
+
+      var prefix = (!inline && !atLineStart) ? "\n" : "";
+
+      contentInput.focus();
+
+      if (selected) {
+
+        contentInput.setSelectionRange(start, end);
+
+        insertAtCursor(prefix + token + selected);
+
+      } else {
+
+        insertAtCursor(prefix + token);
+
+      }
+
+    });
+
+  });
+
+
+
+  /* ---------- formatting guide: Copy All ---------- */
+
+  function buildGuideText() {
+
+    var guide = shell.querySelector("[data-format-guide]");
+
+    if (!guide) return "";
+
+    var out = ["FORMATTING GUIDE", "Follow the review checks before you publish. The formatting codes are optional but help segment the article for search engines."];
+
+    guide.querySelectorAll("[data-guide-section]").forEach(function (section) {
+
+      out.push("", section.getAttribute("data-guide-section").toUpperCase());
+
+      section.querySelectorAll("[data-guide-item]").forEach(function (item) {
+
+        out.push("- " + item.getAttribute("data-guide-item"));
+
+      });
+
+    });
+
+    return out.join("\n");
+
+  }
+
+
+
+  function fallbackCopy(text) {
+
+    var area = document.createElement("textarea");
+
+    area.value = text;
+
+    area.setAttribute("readonly", "");
+
+    area.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+
+    document.body.appendChild(area);
+
+    area.select();
+
+    var done = false;
+
+    try { done = document.execCommand("copy"); } catch (e) { done = false; }
+
+    area.remove();
+
+    return done;
+
+  }
+
+
+
+  if (guideCopyBtn) {
+
+    var copyResetTimer = null;
+
+    guideCopyBtn.addEventListener("click", function () {
+
+      var text = buildGuideText();
+
+      var copyLabel = guideCopyBtn.getAttribute("data-label") || guideCopyBtn.textContent;
+
+      guideCopyBtn.setAttribute("data-label", copyLabel);
+
+      function showCopied(ok) {
+
+        guideCopyBtn.textContent = ok ? "Copied" : "Copy failed";
+
+        if (copyResetTimer) window.clearTimeout(copyResetTimer);
+
+        copyResetTimer = window.setTimeout(function () {
+
+          guideCopyBtn.textContent = copyLabel;
+
+        }, 1800);
+
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+
+        navigator.clipboard.writeText(text).then(function () { showCopied(true); }, function () { showCopied(fallbackCopy(text)); });
+
+      } else {
+
+        showCopied(fallbackCopy(text));
+
+      }
+
+    });
+
+  }
+
+
+
+  function getCookie(name) {
+
+    var match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
+
+    return match ? decodeURIComponent(match.pop()) : "";
+
+  }
+
+
+
+  function clearSelectedImageFile() {
+
+    if (imageFileInput) imageFileInput.value = "";
+
+    if (selectedImageObjectUrl) {
+
+      URL.revokeObjectURL(selectedImageObjectUrl);
+
+      selectedImageObjectUrl = null;
+
+    }
+
+    imageInput.disabled = false;
+
+    if (imageFilenameEl) { imageFilenameEl.hidden = true; imageFilenameEl.textContent = ""; }
+
+    if (imageClearBtn) imageClearBtn.hidden = true;
+
+    if (imageQualityField) imageQualityField.hidden = true;
+
+  }
+
+
+
+  if (uploadBtn && imageFileInput) {
+
+    uploadBtn.addEventListener("click", function () {
+
+      imageFileInput.click();
+
+    });
+
+
+
+    imageFileInput.addEventListener("change", function () {
+
+      var file = imageFileInput.files && imageFileInput.files[0];
+
+      if (!file) return;
+
+
+
+      if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+
+        toast("Unsupported image type. Use JPEG, PNG, WEBP or GIF.", "error");
+
+        clearSelectedImageFile();
+
+        return;
+
+      }
+
+      if (file.size > MAX_IMAGE_BYTES) {
+
+        toast("Image is too large. Max allowed size is 8MB.", "error");
+
+        clearSelectedImageFile();
+
+        return;
+
+      }
+
+
+
+      if (selectedImageObjectUrl) URL.revokeObjectURL(selectedImageObjectUrl);
+
+      selectedImageObjectUrl = URL.createObjectURL(file);
+
+
+
+      /* the file replaces the pasted URL, so it is disabled (and left out
+
+         of the form submit) while a file is selected */
+
+      imageInput.disabled = true;
+
+      if (imageFilenameEl) { imageFilenameEl.textContent = file.name; imageFilenameEl.hidden = false; }
+
+      if (imageClearBtn) imageClearBtn.hidden = false;
+
+      if (imageQualityField) imageQualityField.hidden = false;
+
+      saveDraft();
+
+      schedulePreview();
+
+    });
+
+  }
+
+
+
+  if (imageClearBtn) {
+
+    imageClearBtn.addEventListener("click", function () {
+
+      clearSelectedImageFile();
+
+      saveDraft();
+
+      schedulePreview();
+
+    });
+
+  }
+
+
+
+  /* ---------- mobile: Write / Preview tabs ----------
+
+     On a phone only one pane shows at a time, so the author never scrolls
+
+     past a long preview to reach the form. Desktop keeps both panes. */
+
+  function setView(view) {
+
+    if (!MOBILE_QUERY.matches || shell.getAttribute("data-view") === view) return;
+
+    shell.setAttribute("data-view", view);
+
+    tabButtons.forEach(function (tab) {
+
+      var active = tab.getAttribute("data-editor-tab") === view;
+
+      tab.classList.toggle("is-active", active);
+
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+
+    });
+
+    if (view === "preview") renderPreview();
+
+    var top = shell.getBoundingClientRect().top + window.pageYOffset;
+
+    if (window.pageYOffset > top) window.scrollTo({ top: top, behavior: "smooth" });
+
+  }
+
+
+
+  tabButtons.forEach(function (tab) {
+
+    tab.addEventListener("click", function () { setView(tab.getAttribute("data-editor-tab")); });
+
+  });
+
+
+
+  /* The site sets `html { scroll-behavior: smooth }`. On the editor that
+
+     fights the browser's own "keep the caret in view" scrolling while the
+
+     author types, so the page looks like it scrolls on its own. Force instant
+
+     scrolling for this tool page; the Write/Preview tab switch still asks for
+
+     smooth explicitly. */
+
+  document.documentElement.style.scrollBehavior = "auto";
+
+
+
+  /* the sticky insert bar sits right under the sticky toolbar */
+
+  function syncToolbarHeight() {
+
+    if (toolbarEl) shell.style.setProperty("--editor-toolbar-h", toolbarEl.offsetHeight + "px");
+
+  }
+
+  syncToolbarHeight();
+
+  if (window.ResizeObserver && toolbarEl) new ResizeObserver(syncToolbarHeight).observe(toolbarEl);
+
+  window.addEventListener("resize", syncToolbarHeight);
+
+
+
+  /* the textarea grows with its text on small screens (page scroll only) */
+
+  function autosizeContent() {
+
+    if (!MOBILE_QUERY.matches) { contentInput.style.height = ""; return; }
+
+    contentInput.style.height = "auto";
+
+    contentInput.style.height = contentInput.scrollHeight + 2 + "px";
+
+  }
+
+  contentInput.addEventListener("input", autosizeContent);
+
+  if (MOBILE_QUERY.addEventListener) MOBILE_QUERY.addEventListener("change", autosizeContent);
+
+
+
+  /* ---------- formatting guide: sits at the top, closed until the author opens it ---------- */
+
+  function setGuideOpen(open) {
+
+    if (!guideEl || !guideToggleBtn) return;
+
+    guideEl.classList.toggle("is-collapsed", !open);
+
+    guideToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+
+    guideToggleBtn.textContent = open ? "Hide guide" : "Read before publishing";
+
+  }
+
+  if (guideToggleBtn) {
+
+    guideToggleBtn.addEventListener("click", function () {
+
+      setGuideOpen(guideEl.classList.contains("is-collapsed"));
+
+    });
+
+    setGuideOpen(false);
+
+  }
+
+
+
+  /* ---------- wire up + reveal ---------- */
+
+  headingInput.addEventListener("input", function () {
+
+    headingInput.classList.remove("is-error");
+
+    saveDraft();
+
+    schedulePreview();
+
+  });
+
+  imageInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
+
+  imageInfoInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
+
+  categorySelect.addEventListener("change", function () { saveDraft(); schedulePreview(); });
+
+  contentInput.addEventListener("input", function () { saveDraft(); schedulePreview(); });
+
+
+
+  /*  Changing the Table of contents level only changes how the list looks, so
+
+      it saves the draft and refreshes the preview immediately. The select shows
+
+      its own value, so there is no separate state word to keep in sync. */
+
+  if (tocModeSelect) {
+
+    tocModeSelect.addEventListener("change", function () {
+
+      saveDraft();
+
+      schedulePreview();
+
+    });
+
+  }
+
+  if (imageQualityField) {
+
+    var imageQualitySelect = imageQualityField.querySelector("select");
+
+    if (imageQualitySelect) imageQualitySelect.addEventListener("change", saveDraft);
+
+  }
+
+
+
+  restoreDraft();
+
+  autosizeContent();
+
+
+
+  renderPreview();
+
+  applyPreviewState(shell.classList.contains("preview-off"));
+
+
+
+  shell.classList.remove("is-loading");
+
+  shell.classList.add("is-ready");
+
+  if (note) note.remove();
+
+  toggleBtn.hidden = false;
+
+  publishBtn.disabled = false;
+
+})();
+
+
+
+
+
+/* ---------------------------------------------------------------------------
+
+   DRAFTS PLACARD
+
+   The "Drafts" button opens a placard that is drawn entirely from the JSON the
+
+   server sends (HOME/views.py, AddNewsDraft*View). Five numbered slots; every
+
+   sentence shown comes from the server or from the plain wording below.
+
+   Replacing, deleting and loading over unsaved text each ask for a second click
+
+   so nothing is lost by accident.
+
+--------------------------------------------------------------------------- */
+
+(function () {
+
+  "use strict";
+
+  var openBtn = document.querySelector("[data-drafts-open]");
+
+  var form = document.getElementById("add-news-form");
+
+  if (!openBtn || !form) return;
+
+
+
+  var URLS = {
+
+    list: "/add-news/draft/list/",
+
+    load: "/add-news/draft/load/",
+
+    save: "/add-news/draft/save/",
+
+    remove: "/add-news/draft/delete/"
+
+  };
+
+  var root = null, body = null, statusEl = null, closeBtn = null;
+
+  var data = null;          /* last JSON from the server */
+
+  var pending = null;       /* {slot, action} waiting for the second click */
+
+  var busy = false;
+
+
+
+  function csrf() {
+
+    var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+
+    if (m) return decodeURIComponent(m[1]);
+
+    var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+
+    return input ? input.value : "";
+
+  }
+
+
+
+  function request(url, options) {
+
+    options = options || {};
+
+    var headers = { "X-Requested-With": "XMLHttpRequest", "X-CSRFToken": csrf() };
+
+    return fetch(url, { method: options.method || "GET", headers: headers, body: options.body, credentials: "same-origin" })
+
+      .then(function (r) {
+
+        return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, json: j }; });
+
+      });
+
+  }
+
+
+
+  function field(name) { return form.querySelector('[name="' + name + '"]'); }
+
+  function value(name) { var el = field(name); return el ? (el.value || "") : ""; }
+
+
+
+  function screenHasStory() {
+
+    return !!(value("heading").trim() || value("content").trim() || value("image_1").trim());
+
+  }
+
+
+
+  function currentStory() {
+
+    var body = new URLSearchParams();
+
+    ["heading", "image_1", "image_info", "category", "content", "toc_mode", "image_quality"].forEach(function (n) {
+
+      body.append(n, value(n));
+
+    });
+
+    var news = field("newsletter");
+
+    if (news && news.checked) body.append("newsletter", "1");
+
+    return body;
+
+  }
+
+
+
+  function setField(name, val, eventName) {
+
+    var el = field(name);
+
+    if (!el || val === undefined || val === null) return;
+
+    el.value = val;
+
+    try { el.dispatchEvent(new Event(eventName || "input", { bubbles: true })); } catch (e) {}
+
+  }
+
+
+
+  function fillEditor(j) {
+
+    setField("heading", j.heading);
+
+    setField("image_1", j.image_1);
+
+    setField("image_info", j.image_info);
+
+    setField("category", j.category, "change");
+
+    setField("content", j.content);
+
+    try { field("content").dispatchEvent(new Event("change", { bubbles: true })); } catch (e) {}
+
+    setField("toc_mode", j.toc_mode, "change");
+
+    setField("image_quality", j.image_quality, "change");
+
+    var news = field("newsletter");
+
+    if (news) news.checked = !!j.newsletter;
+
+  }
+
+
+
+  function say(text, isError) {
+
+    if (!statusEl) return;
+
+    statusEl.textContent = text || "";
+
+    statusEl.className = "draft-placard-status" + (isError ? " is-error" : "");
+
+  }
+
+
+
+  function el(tag, className, text) {
+
+    var node = document.createElement(tag);
+
+    if (className) node.className = className;
+
+    if (text !== undefined) node.textContent = text;
+
+    return node;
+
+  }
+
+
+
+  function button(label, className, onClick) {
+
+    var b = el("button", "editor-modal-btn " + (className || ""), label);
+
+    b.type = "button";
+
+    b.addEventListener("click", onClick);
+
+    return b;
+
+  }
+
+
+
+  /* ---------- drawing ---------- */
+
+  function draw() {
+
+    body.textContent = "";
+
+    if (!data) return;
+
+    body.appendChild(el("p", "draft-placard-summary", data.summary || ""));
+
+    var list = el("ol", "draft-slots");
+
+    data.slots.forEach(function (slot) { list.appendChild(drawSlot(slot)); });
+
+    body.appendChild(list);
+
+  }
+
+
+
+  function iconSvg(paths, label) {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "18");
+    svg.setAttribute("height", "18");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.8");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    paths.forEach(function (p) {
+      var n = document.createElementNS("http://www.w3.org/2000/svg", p.tag || "path");
+      Object.keys(p).forEach(function (k) { if (k !== "tag") n.setAttribute(k, p[k]); });
+      svg.appendChild(n);
+    });
+    return svg;
+  }
+
+  function downloadDraftJson(filename, payload) {
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  async function shareDraft(slot) {
+    if (busy) return;
+    busy = true; root.classList.add("is-busy"); say("Preparing draft for sharing...");
+    try {
+      var res = await request(URLS.load + "?slot=" + encodeURIComponent(slot.slot));
+      if (!res.ok || !res.json) { say((res.json && res.json.detail) || "Could not load draft for sharing.", true); return; }
+      var d = res.json;
+      var shellEl = document.getElementById("editor-shell");
+      var authorName = shellEl ? (shellEl.getAttribute("data-author-name") || "") : "";
+      var authorUsername = shellEl ? (shellEl.getAttribute("data-author-username") || "") : "";
+      var projectName = shellEl ? (shellEl.getAttribute("data-project-name") || "") : "";
+      var exportedAt = new Date().toISOString();
+      var payload = { format: "abureport-news-draft", v: 1, exported_at: exportedAt,
+        draft: { heading: d.heading||"", image_1: d.image_1||"", image_info: d.image_info||"", category: d.category||"", content: d.content||"", toc_mode: d.toc_mode||"", image_quality: d.image_quality||"medium", newsletter: !!d.newsletter },
+        metadata: {
+          author_name: authorName,
+          author_username: authorUsername,
+          file_created_at: exportedAt,
+          source_app: (projectName ? projectName + " add-news editor" : "add-news editor"),
+          source_origin: (typeof location !== "undefined" && location && location.origin) ? location.origin : "",
+          source_path: (typeof location !== "undefined" && location && location.pathname) ? location.pathname : "",
+          draft_slot: slot && slot.slot != null ? String(slot.slot) : "",
+          draft_title: slot && slot.title ? String(slot.title) : (d.heading || ""),
+          draft_category: slot && slot.category ? String(slot.category) : (d.category || ""),
+          draft_words: slot && slot.words ? String(slot.words) : "",
+          draft_saved_at: slot && slot.saved ? String(slot.saved) : "",
+          user_agent: (typeof navigator !== "undefined" && navigator.userAgent) ? navigator.userAgent : "",
+          timezone: (typeof Intl !== "undefined" && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : "",
+          timezone_offset_min: new Date().getTimezoneOffset(),
+          export_format_version: 1
+        } };
+      var safe = (d.heading || "draft").replace(/[^\w\-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "draft";
+      var filename = "draft-slot-" + slot.slot + "-" + safe + ".json";
+      var file = new File([JSON.stringify(payload, null, 2)], filename, { type: "application/json" });
+      if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+        try { await navigator.share({ files: [file], title: "News draft", text: "Draft: " + (d.heading || "Untitled") }); say("Draft shared."); }
+        catch (e) { if (e && e.name !== "AbortError") { downloadDraftJson(filename, payload); say("Draft downloaded."); } else { say(""); } }
+      } else { downloadDraftJson(filename, payload); say("Draft downloaded as JSON."); }
+    } catch (e) { say("Could not share draft. Check your connection and try again.", true); }
+    finally { busy = false; root.classList.remove("is-busy"); }
+  }
+
+  function drawSlot(slot) {
+    var li = el("li", "draft-slot" + (slot.empty ? " is-empty" : ""));
+    li.appendChild(el("span", "draft-slot-tag", "Slot " + slot.slot));
+    var main = el("div", "draft-slot-main");
+    if (slot.empty) {
+      main.appendChild(el("p", "draft-slot-title", "Empty slot"));
+      main.appendChild(el("p", "draft-slot-meta", "Nothing saved here yet."));
+    } else {
+      main.appendChild(el("p", "draft-slot-title", slot.title));
+      main.appendChild(el("p", "draft-slot-meta", [slot.category, slot.words, slot.image, slot.saved].join("  |  ")));
+    }
+    li.appendChild(main);
+    var actions = el("div", "draft-slot-actions");
+    var asking = pending && pending.slot === slot.slot ? pending.action : null;
+    if (asking) {
+      var sentence = { replace: "This replaces the draft in slot " + slot.slot + " with the story on your screen.", remove: "This permanently deletes the draft in slot " + slot.slot + ".", load: "This replaces what is on your screen with the draft from slot " + slot.slot + ". Save your screen first if you still need it." }[asking];
+      li.appendChild(el("p", "draft-slot-warning", sentence));
+      actions.appendChild(button({ replace: "Yes, replace it", remove: "Yes, delete it", load: "Yes, load it" }[asking], asking === "remove" ? "draft-btn-danger" : "editor-modal-btn-primary", function () { pending = null; run(asking, slot.slot); }));
+      actions.appendChild(button("Cancel", "", function () { pending = null; say(""); draw(); }));
+    } else if (slot.empty) {
+      actions.appendChild(button("Save my story here", "editor-modal-btn-primary", function () { run("save", slot.slot); }));
+    } else {
+      actions.appendChild(button("Load into editor", "editor-modal-btn-primary", function () { if (screenHasStory()) { pending = { slot: slot.slot, action: "load" }; draw(); } else { run("load", slot.slot); } }));
+      actions.appendChild(button("Replace with my story", "", function () { pending = { slot: slot.slot, action: "replace" }; draw(); }));
+      var secondary = el("div", "draft-slot-actions-secondary");
+      var shareBtn = el("button", "draft-icon-btn draft-icon-btn--share");
+      shareBtn.type = "button"; shareBtn.title = "Share draft as JSON file";
+      shareBtn.appendChild(iconSvg([{ tag: "circle", cx: "18", cy: "5", r: "3" }, { tag: "circle", cx: "6", cy: "12", r: "3" }, { tag: "circle", cx: "18", cy: "19", r: "3" }, { tag: "line", x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }, { tag: "line", x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" }]));
+      shareBtn.appendChild(document.createTextNode(" Share"));
+      shareBtn.addEventListener("click", function () { shareDraft(slot); });
+      secondary.appendChild(shareBtn);
+      var delBtn = el("button", "draft-icon-btn draft-icon-btn--danger");
+      delBtn.type = "button"; delBtn.title = "Delete draft"; delBtn.setAttribute("aria-label", "Delete draft");
+      delBtn.appendChild(iconSvg([{ tag: "polyline", points: "3 6 5 6 21 6" }, { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }, { d: "M10 11v6" }, { d: "M14 11v6" }, { d: "M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" }]));
+      delBtn.addEventListener("click", function () { pending = { slot: slot.slot, action: "remove" }; draw(); });
+      secondary.appendChild(delBtn);
+      actions.appendChild(secondary);
+    }
+    li.appendChild(actions);
+    return li;
+  }
+
+
+  function run(action, slot) {
+
+    if (busy) return;
+
+    var body_ = new URLSearchParams();
+
+    var call;
+
+    if (action === "save" || action === "replace") {
+
+      if (!screenHasStory()) { say("Add a headline or some story text before saving a draft.", true); return; }
+
+      body_ = currentStory(); body_.append("slot", slot);
+
+      call = request(URLS.save, { method: "POST", body: body_ });
+
+    } else if (action === "remove") {
+
+      body_.append("slot", slot);
+
+      call = request(URLS.remove, { method: "POST", body: body_ });
+
+    } else {
+
+      call = request(URLS.load + "?slot=" + encodeURIComponent(slot));
+
+    }
+
+    busy = true; root.classList.add("is-busy"); say("Working...");
+
+    call.then(function (res) {
+
+      if (res.json && res.json.drafts) { data = res.json.drafts; draw(); }
+
+      if (!res.ok) { say(res.json.detail || "Something went wrong. Please try again.", true); return; }
+
+      if (action === "load") {
+
+        fillEditor(res.json);
+
+        close();
+
+        if (window.editorToast) window.editorToast(res.json.detail);
+
+        return;
+
+      }
+
+      say(res.json.detail || "Done.");
+
+    }).catch(function () {
+
+      say("Could not reach the server. Check your connection and try again.", true);
+
+    }).then(function () { busy = false; root.classList.remove("is-busy"); });
+
+  }
+
+
+
+  function refresh() {
+
+    say("Loading your drafts...");
+
+    request(URLS.list).then(function (res) {
+
+      if (!res.ok) { say(res.json.detail || "Your drafts could not be loaded. Please try again.", true); return; }
+
+      data = res.json; say(""); draw();
+
+    }).catch(function () { say("Could not reach the server. Check your connection and try again.", true); });
+
+  }
+
+
+
+  /* ---------- open / close ---------- */
+
+  function build() {
+
+    root = el("div", "editor-modal draft-placard");
+
+    root.hidden = true;
+
+    root.setAttribute("role", "dialog");
+
+    root.setAttribute("aria-modal", "true");
+
+    root.setAttribute("aria-labelledby", "draft-placard-title");
+
+    var backdrop = el("div", "editor-modal-backdrop");
+
+    backdrop.addEventListener("click", close);
+
+    var card = el("div", "editor-modal-card draft-placard-card");
+
+    var head = el("div", "draft-placard-head");
+
+    var titles = el("div");
+
+    var title = el("h2", "editor-modal-title", "Your drafts");
+
+    title.id = "draft-placard-title";
+
+    titles.appendChild(title);
+
+    titles.appendChild(el("p", "editor-modal-intro", "Keep up to " + 5 + " unfinished stories here. Save what is on your screen into a slot or bring a saved draft back into the editor."));
+
+    head.appendChild(titles);
+
+    closeBtn = button("Close", "", close);
+
+    head.appendChild(closeBtn);
+
+    card.appendChild(head);
+
+    statusEl = el("p", "draft-placard-status");
+
+    statusEl.setAttribute("role", "status");
+
+    statusEl.setAttribute("aria-live", "polite");
+
+    card.appendChild(statusEl);
+
+    body = el("div", "draft-placard-body");
+
+    card.appendChild(body);
+
+    root.appendChild(backdrop);
+
+    root.appendChild(card);
+
+    document.body.appendChild(root);
+
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !root.hidden) close(); });
+
+  }
+
+
+
+  function open() {
+
+    if (!root) build();
+
+    pending = null; data = null; body.textContent = "";
+
+    root.hidden = false;
+
+    document.documentElement.classList.add("editor-modal-open");
+
+    window.requestAnimationFrame(function () { root.classList.add("is-open"); });
+
+    closeBtn.focus();
+
+    refresh();
+
+  }
+
+
+
+  function close() {
+
+    if (!root || root.hidden) return;
+
+    root.classList.remove("is-open");
+
+    root.hidden = true;
+
+    document.documentElement.classList.remove("editor-modal-open");
+
+    openBtn.focus();
+
+  }
+
+
+
+  openBtn.addEventListener("click", open);
+
+})();
+

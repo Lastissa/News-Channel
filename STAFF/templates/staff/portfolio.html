@@ -132,7 +132,7 @@
         {% if sex_label %}
           <div><dt>Sex</dt><dd>{{ sex_label }}</dd></div>
         {% endif %}
-        <div><dt>On the team since</dt><dd>{{ author.date_joined|date:"F Y" }}</dd></div>
+        <div><dt>Author Since</dt><dd>{{ author.date_joined|date:"F Y" }}</dd></div>
         {% if staff_profile.last_promotion %}
           <div><dt>Last promoted</dt><dd>{{ staff_profile.last_promotion|date:"F Y" }}</dd></div>
         {% endif %}
