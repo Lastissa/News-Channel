@@ -243,10 +243,67 @@ html[data-theme="dark"] .analytics-tile-value.is-down { color: #FF8876; }
   width: 34px; height: 34px; border-radius: var(--radius-s);
   background: var(--paginator-bg); color: var(--brand-deep); flex: 0 0 auto;
 }
-/* Section headings are a clear step above body text: larger, heavier, ink. */
+/* Section headings are a clear step above body text: larger, heavier, ink.
+   The heading is also a fold handle, exactly like the panel page: tapping the
+   name opens the section, and the chevron button is the same action. */
 .analytics-card-header h2 {
-  margin: 0; min-width: 0;
+  margin: 0; min-width: 0; flex: 1 1 auto;
   font-size: 1.2rem; font-weight: 800; letter-spacing: -0.01em; color: var(--ink);
+  cursor: pointer;
+}
+.analytics-card-header h2:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Collapse: animates height without measuring it (grid rows 1fr -> 0fr). */
+.analytics-collapse {
+  display: grid; grid-template-rows: 1fr; margin-top: 10px;
+  transition: grid-template-rows .35s var(--panel-ease, ease), margin-top .35s var(--panel-ease, ease);
+}
+.analytics-collapse-inner {
+  min-height: 0; overflow: hidden; padding: 3px; margin: -3px;
+}
+.analytics-card.is-collapsed > .analytics-collapse,
+.analytics-author-master.is-collapsed > .analytics-collapse,
+.analytics-author-detail-panel.is-collapsed > .analytics-collapse,
+.analytics-author-likes-panel.is-collapsed > .analytics-collapse {
+  grid-template-rows: 0fr; margin-top: 0;
+}
+.analytics-card.is-collapsed > .analytics-collapse > .analytics-collapse-inner,
+.analytics-author-master.is-collapsed > .analytics-collapse > .analytics-collapse-inner,
+.analytics-author-detail-panel.is-collapsed > .analytics-collapse > .analytics-collapse-inner,
+.analytics-author-likes-panel.is-collapsed > .analytics-collapse > .analytics-collapse-inner {
+  visibility: hidden; transition: visibility 0s linear .35s;
+}
+
+.analytics-collapse-btn {
+  width: 34px; height: 34px; padding: 0; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--paginator-bg); color: var(--ink); cursor: pointer;
+  transition: background .2s ease, border-color .2s ease;
+}
+.analytics-collapse-btn:hover {
+  border-color: var(--paginator-hover-border, var(--line));
+  background: color-mix(in srgb, var(--brand) 12%, var(--paginator-bg));
+}
+.analytics-collapse-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 45%, transparent); outline-offset: 2px;
+}
+.analytics-collapse-btn .ic { transition: transform .3s var(--panel-ease, ease); }
+.is-collapsed .analytics-collapse-btn .ic { transform: rotate(180deg); }
+
+/* A folded section keeps the title as its only row, with even air above and
+   below, and no orphan rule under an author header. Controls that only make
+   sense once the section is open are put away with it, so the closed page is
+   genuinely a compact index rather than a wall of steppers. */
+.analytics-card.is-collapsed { padding-bottom: 14px; }
+.analytics-card.is-collapsed > .analytics-card-header .analytics-height,
+.analytics-author-likes-panel.is-collapsed .analytics-panel-note { display: none; }
+.analytics-author-master.is-collapsed > .analytics-author-panel-head,
+.analytics-author-detail-panel.is-collapsed > .analytics-author-panel-head,
+.analytics-author-likes-panel.is-collapsed > .analytics-author-panel-head { border-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .analytics-collapse, .analytics-collapse-btn .ic { transition: none; }
 }
 
 /* ---------- Controls ---------- */
@@ -1089,8 +1146,10 @@ html[data-theme="dark"] .analytics-chart-canvas .apexcharts-tooltip {
   border-bottom: 1px solid var(--an-line);
 }
 .analytics-author-panel-head h2 {
-  margin: 0; font-size: var(--an-text-l); font-weight: 700; color: var(--an-ink);
+  margin: 0; flex: 1 1 auto; font-size: var(--an-text-l); font-weight: 700; color: var(--an-ink);
+  cursor: pointer;
 }
+.analytics-author-panel-head h2:hover { text-decoration: underline; text-underline-offset: 3px; }
 .analytics-panel-note {
   margin: 0 0 0 auto; font-size: var(--an-text-xs); color: var(--an-muted);
 }

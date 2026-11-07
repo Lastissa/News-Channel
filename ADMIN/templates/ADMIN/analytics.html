@@ -9,7 +9,7 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
-  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261105-1">
+  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261107-3">
 {% endblock %}
 
 {% block content %}
@@ -21,6 +21,7 @@
   sprite pattern as the PANEL page.
 {% endcomment %}
 <svg class="panel-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <symbol id="i-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
   <symbol id="i-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
@@ -62,25 +63,28 @@
 
   <div class="analytics-grid">
 
-    <section class="analytics-card" aria-labelledby="analytics-overview-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-overview-title"
              data-guide-title="Quick overview"
              data-guide-text="The membership at a glance. The hero is the running size of the membership; the two tiles cover sign-ups and readers. Each step below explains one of them.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
         <h2 id="analytics-overview-title">Quick overview</h2>
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Quick overview" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
-      <div class="analytics-overview-body" id="analytics-overview-body"
-           hx-get="{% url 'control:member_overview' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading overview&hellip;</p>
-      </div>
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <div class="analytics-overview-body" id="analytics-overview-body"
+             hx-get="{% url 'control:member_overview' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading overview&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-growth-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-growth-title"
              data-guide-title="Members over time"
              data-guide-text="A running total, not a per-day count: each point is how many members existed by the end of that bucket. Accounts that joined before the window are the starting baseline, so the line never resets to zero. A start and end date override the Range preset.">
       {% comment %}The running total of members over time: a line that steps up
@@ -89,77 +93,83 @@
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-growth-title">Members over time</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="member-growth" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Members over time" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            hx-get="{% url 'control:member_growth' %}"
-            hx-target="#analytics-growth-body"
-            hx-swap="innerHTML"
-            hx-trigger="change, submit">
-        {% include "ADMIN/partials/analytics_bucket_range.html" %}
-        {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
-      </form>
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              hx-get="{% url 'control:member_growth' %}"
+              hx-target="#analytics-growth-body"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit">
+          {% include "ADMIN/partials/analytics_bucket_range.html" %}
+          {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
+        </form>
 
-      <div class="analytics-chart-body" id="analytics-growth-body"
-           hx-get="{% url 'control:member_growth' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading chart&hellip;</p>
-      </div>
+        <div class="analytics-chart-body" id="analytics-growth-body"
+             hx-get="{% url 'control:member_growth' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading chart&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-trends-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-trends-title"
              data-guide-title="Trends"
              data-guide-text="Event counts per bucket for whichever series you tick. The next two steps cover the controls and what each series means.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-trends-title">Trends</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="member-trends" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Trends" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            hx-get="{% url 'control:analytics_trends' %}"
-            hx-target="#analytics-trends-body"
-            hx-swap="innerHTML"
-            hx-trigger="change, submit"
-            data-guide-title="Trends controls"
-            data-guide-text="Pick a time frame (per hour, 12 hours, day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
-        {% comment %} Marks a real form submission so "every box cleared" is
-           distinguishable from the first load, which shows all series. {% endcomment %}
-        <input type="hidden" name="submitted" value="1">
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              hx-get="{% url 'control:analytics_trends' %}"
+              hx-target="#analytics-trends-body"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit"
+              data-guide-title="Trends controls"
+              data-guide-text="Pick a time frame (per hour, 12 hours, day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
+          {% comment %} Marks a real form submission so "every box cleared" is
+             distinguishable from the first load, which shows all series. {% endcomment %}
+          <input type="hidden" name="submitted" value="1">
 
-        {% include "ADMIN/partials/analytics_bucket_range.html" %}
-        {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
+          {% include "ADMIN/partials/analytics_bucket_range.html" %}
+          {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
 
-        <fieldset class="analytics-series"
-                  data-guide-title="Trends series"
-                  data-guide-text="Users = accounts created in the bucket. Stories = stories published. Likes = likes given. Each is a count inside its bucket, never a running total. Story views live on the Story lytics page.">
-          <legend class="panel-sr">Series to plot</legend>
-          {% for meta in series_meta %}
-          <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
-            <input type="checkbox" name="series" value="{{ meta.key }}" checked>
-            <span class="analytics-series-swatch" aria-hidden="true"></span>
-            <span>{{ meta.name }}</span>
-          </label>
-          {% endfor %}
-        </fieldset>
-      </form>
+          <fieldset class="analytics-series"
+                    data-guide-title="Trends series"
+                    data-guide-text="Users = accounts created in the bucket. Stories = stories published. Likes = likes given. Each is a count inside its bucket, never a running total. Story views live on the Story lytics page.">
+            <legend class="panel-sr">Series to plot</legend>
+            {% for meta in series_meta %}
+            <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
+              <input type="checkbox" name="series" value="{{ meta.key }}" checked>
+              <span class="analytics-series-swatch" aria-hidden="true"></span>
+              <span>{{ meta.name }}</span>
+            </label>
+            {% endfor %}
+          </fieldset>
+        </form>
 
-      <div class="analytics-chart-body" id="analytics-trends-body"
-           hx-get="{% url 'control:analytics_trends' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading chart&hellip;</p>
-      </div>
+        <div class="analytics-chart-body" id="analytics-trends-body"
+             hx-get="{% url 'control:analytics_trends' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading chart&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-members-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-members-title"
              data-guide-title="Members"
              data-guide-text="The read-only directory of every account, with filters and paging. The next two steps cover the filters and the columns.">
       {% comment %}
@@ -172,17 +182,19 @@
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
         <h2 id="analytics-members-title">Members</h2>
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Members" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            id="analytics-members-filters"
-            hx-get="{% url 'control:analytics_members' %}"
-            hx-target="#analytics-members-body"
-            hx-swap="innerHTML"
-            hx-trigger="change"
-            data-guide-title="Members filters"
-            data-guide-text="Combine status, news alerts, category interest, recent activity and account kind. The email box filters as you type; the selects apply on change. The summary line counts what matched.">
-        <div class="analytics-filter-row">
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              id="analytics-members-filters"
+              hx-get="{% url 'control:analytics_members' %}"
+              hx-target="#analytics-members-body"
+              hx-swap="innerHTML"
+              hx-trigger="change"
+              data-guide-title="Members filters"
+              data-guide-text="Combine status, news alerts, category interest, recent activity and account kind. The email box filters as you type; the selects apply on change. The summary line counts what matched.">
+          <div class="analytics-filter-row">
           <label class="analytics-select">
             <span class="analytics-select-label">Status</span>
             <select name="state">
@@ -237,34 +249,35 @@
                    hx-swap="innerHTML"
                    hx-trigger="keyup changed delay:400ms, search">
           </label>
-        </div>
-      </form>
-
-      <div class="analytics-members" id="analytics-members-body"
-           data-page-size="{{ member_page_size }}"
-           data-guide-title="Members table"
-           data-guide-text="One row per matching account: the email is masked, then status (Active or Suspended), the news-alert flag, the categories the account follows, the last story it read and the last time it signed in. Nothing here can change an account."
-           hx-get="{% url 'control:analytics_members' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        {% comment %}Shimmer skeleton. analytics_members.js swaps it in on every
-           filter/pager request and keeps the body's height locked to a full
-           page, so a shorter later page never makes the page underneath jump.{% endcomment %}
-        <div class="analytics-member-skeleton" aria-hidden="true">
-          {% for _ in "123456789012" %}
-          <div class="analytics-member-skeleton-row">
-            <span class="analytics-member-skeleton-avatar"></span>
-            <span class="analytics-member-skeleton-lines">
-              <span class="analytics-member-skeleton-bar"></span>
-              <span class="analytics-member-skeleton-bar is-short"></span>
-            </span>
-            <span class="analytics-member-skeleton-chip"></span>
-            <span class="analytics-member-skeleton-chip"></span>
           </div>
-          {% endfor %}
+        </form>
+
+        <div class="analytics-members" id="analytics-members-body"
+             data-page-size="{{ member_page_size }}"
+             data-guide-title="Members table"
+             data-guide-text="One row per matching account: the email is masked, then status (Active or Suspended), the news-alert flag, the categories the account follows, the last story it read and the last time it signed in. Nothing here can change an account."
+             hx-get="{% url 'control:analytics_members' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          {% comment %}Shimmer skeleton. analytics_members.js swaps it in on every
+             filter/pager request and keeps the body's height locked to a full
+             page, so a shorter later page never makes the page underneath jump.{% endcomment %}
+          <div class="analytics-member-skeleton" aria-hidden="true">
+            {% for _ in "123456789012" %}
+            <div class="analytics-member-skeleton-row">
+              <span class="analytics-member-skeleton-avatar"></span>
+              <span class="analytics-member-skeleton-lines">
+                <span class="analytics-member-skeleton-bar"></span>
+                <span class="analytics-member-skeleton-bar is-short"></span>
+              </span>
+              <span class="analytics-member-skeleton-chip"></span>
+              <span class="analytics-member-skeleton-chip"></span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
-      </div>
+      </div></div>
     </section>
 
   </div>
@@ -278,7 +291,7 @@
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
   <script src="{% static 'control/js/analytics_apex.js' %}" defer></script>
-  <script src="{% static 'control/js/analytics.js' %}" defer></script>
+  <script src="{% static 'control/js/analytics.js' %}?v=20261107-2" defer></script>
   <script src="{% static 'control/js/analytics_members.js' %}" defer></script>
 {% endblock %}
 

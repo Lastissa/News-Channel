@@ -938,6 +938,61 @@
     else if (window.htmx) window.htmx.trigger(form, "submit");
   });
 
+  /* ---------- Collapsible lytics sections ---------- */
+  /* The same fold the panel page uses: every chamber opens as a tidy list of
+     section headers, and a tap on the header or its chevron reveals the card.
+     One helper keeps the card class and the button's aria state in step. The
+     folded markup ships with `is-collapsed`, so a card is closed before this
+     script runs rather than flashing open and then folding. */
+  (function () {
+    var SELECTOR = ".analytics-card, .analytics-author-master, .analytics-author-detail-panel, .analytics-author-likes-panel";
+
+    function cardFor(node) {
+      return node && node.closest ? node.closest(SELECTOR) : null;
+    }
+
+    function setCollapsed(card, collapsed) {
+      if (!card) return;
+      card.classList.toggle("is-collapsed", collapsed);
+      var btn = card.querySelector("[data-collapse]");
+      if (!btn) return;
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      var heading = card.querySelector("h2");
+      var name = heading ? heading.textContent.trim() : "section";
+      btn.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + name);
+      btn.title = collapsed ? "Expand" : "Collapse";
+    }
+
+    function open(nodeOrCard) {
+      var card = cardFor(nodeOrCard);
+      if (card) setCollapsed(card, false);
+      return card;
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll(SELECTOR), function (card) {
+      setCollapsed(card, card.classList.contains("is-collapsed"));
+    });
+
+    document.addEventListener("click", function (event) {
+      var btn = event.target.closest && event.target.closest("[data-collapse]");
+      if (btn) {
+        var card = cardFor(btn);
+        if (card) setCollapsed(card, !card.classList.contains("is-collapsed"));
+        return;
+      }
+      var header = event.target.closest && event.target.closest(".analytics-card-header, .analytics-author-panel-head");
+      if (!header) return;
+      /* Controls in a header keep their own click: the height stepper, an
+         author range, an add link. Only a tap on the heading itself folds. */
+      var ownControl = event.target.closest("button, a, input, select, textarea, label, form, .analytics-height, [role='button']");
+      if (ownControl) return;
+      var target = cardFor(header);
+      if (target) setCollapsed(target, !target.classList.contains("is-collapsed"));
+    });
+
+    window.AnalyticsCollapse = { open: open, set: setCollapsed };
+  })();
+
   /* ---------- Authors: open one author's detail ---------- */
   /* Pressing any author in the list (or in the "Likes, by name" table) fills
      the detail panel beside the list. It is a plain fetch rather than an htmx
@@ -987,6 +1042,7 @@
       currentPages = pages || currentPages || { stories_page: "", likes_page: "" };
       markRow(authorId);
       detailBody.setAttribute("aria-busy", "true");
+      if (window.AnalyticsCollapse) window.AnalyticsCollapse.open(detailPanel);
       scrollPanelIntoView();
 
       var url = detailUrl + "?author=" + encodeURIComponent(authorId) +
@@ -1114,6 +1170,9 @@
     function render() {
       var section = sections[index];
       if (!section) return;
+      /* A guide step that lives inside a folded card opens it first, so the
+         sentence and the figure it explains are on screen together. */
+      if (window.AnalyticsCollapse) window.AnalyticsCollapse.open(section);
       if (stepEl) stepEl.textContent = "Step " + (index + 1) + " of " + sections.length;
       if (headingEl) headingEl.textContent = section.getAttribute("data-guide-title") || "";
       if (bodyEl) bodyEl.textContent = section.getAttribute("data-guide-text") || "";

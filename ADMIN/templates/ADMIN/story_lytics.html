@@ -9,7 +9,7 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
-  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261107-2">
+  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261107-3">
 {% endblock %}
 
 {% block content %}
@@ -20,6 +20,7 @@
   against the fragment endpoints in ADMIN.urls.
 {% endcomment %}
 <svg class="panel-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <symbol id="i-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
   <symbol id="i-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
   <symbol id="i-bar-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
@@ -59,99 +60,108 @@
 
   <div class="analytics-grid" data-analytics-panel="overview">
 
-    <section class="analytics-card" aria-labelledby="analytics-kpis-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-kpis-title"
              data-guide-title="Story totals"
              data-guide-text="Published and reads are counted inside the window you pick; the small chip compares it with the window just before, and appears only when there is something to compare against. Reads per story divides one by the other.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
         <h2 id="analytics-kpis-title">Story totals</h2>
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Story totals" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
-      <div class="analytics-kpis-body" id="analytics-kpis-body"
-           hx-get="{% url 'control:analytics_story_kpis' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading totals&hellip;</p>
-      </div>
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <div class="analytics-kpis-body" id="analytics-kpis-body"
+             hx-get="{% url 'control:analytics_story_kpis' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading totals&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-stories-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-stories-title"
              data-guide-title="Stories per week"
              data-guide-text="How much is published, and when. The next two steps cover the tiles and the bars.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
         <h2 id="analytics-stories-title">Stories per week</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-stories" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Stories per week" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
-      <form class="analytics-controls"
-            hx-get="{% url 'control:analytics_stories' %}"
-            hx-target="#analytics-stories-body"
-            hx-swap="innerHTML"
-            hx-trigger="change">
-        <label class="analytics-select">
-          <span class="analytics-select-label">Period</span>
-          <select name="period">
-            {% for value, label in story_periods %}
-            <option value="{{ value }}"{% if value == default_story_period %} selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-      </form>
-      <div class="analytics-chart-body" id="analytics-stories-body"
-           hx-get="{% url 'control:analytics_stories' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading chart&hellip;</p>
-      </div>
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              hx-get="{% url 'control:analytics_stories' %}"
+              hx-target="#analytics-stories-body"
+              hx-swap="innerHTML"
+              hx-trigger="change">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Period</span>
+            <select name="period">
+              {% for value, label in story_periods %}
+              <option value="{{ value }}"{% if value == default_story_period %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </form>
+        <div class="analytics-chart-body" id="analytics-stories-body"
+             hx-get="{% url 'control:analytics_stories' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading chart&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-reading-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-reading-title"
              data-guide-title="Reading &amp; editorial"
              data-guide-text="What members read in the selected range. Every view is a story-open event inside the range, never the all-time counter. The next steps cover each block.">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-reading"/></svg></span>
         <h2 id="analytics-reading-title">Reading &amp; editorial</h2>
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Reading and editorial" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      {% comment %}One range control, reusing the Trends ranges, drives all three
-         blocks: top-read stories, category published-vs-read, and the
-         never-viewed backlog.{% endcomment %}
-      <form class="analytics-controls"
-            id="analytics-reading-form"
-            hx-get="{% url 'control:analytics_reading' %}"
-            hx-target="#analytics-reading-body"
-            hx-swap="innerHTML"
-            hx-trigger="change"
-            data-guide-title="Reading range"
-            data-guide-text="One range drives the three blocks below, using the same presets as Trends. Change it and the whole card is measured to the new window.">
-        <label class="analytics-select">
-          <span class="analytics-select-label">Range</span>
-          <select name="range">
-            {% for value, label in trend_ranges %}
-            <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-      </form>
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        {% comment %}One range control, reusing the Trends ranges, drives all three
+           blocks: top-read stories, category published-vs-read, and the
+           never-viewed backlog.{% endcomment %}
+        <form class="analytics-controls"
+              id="analytics-reading-form"
+              hx-get="{% url 'control:analytics_reading' %}"
+              hx-target="#analytics-reading-body"
+              hx-swap="innerHTML"
+              hx-trigger="change"
+              data-guide-title="Reading range"
+              data-guide-text="One range drives the three blocks below, using the same presets as Trends. Change it and the whole card is measured to the new window.">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Range</span>
+            <select name="range">
+              {% for value, label in trend_ranges %}
+              <option value="{{ value }}"{% if value == default_trend_range %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </form>
 
-      <div class="analytics-chart-body" id="analytics-reading-body"
-           hx-get="{% url 'control:analytics_reading' %}"
-           hx-include="closest .analytics-card"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading reading&hellip;</p>
-      </div>
+        <div class="analytics-chart-body" id="analytics-reading-body"
+             hx-get="{% url 'control:analytics_reading' %}"
+             hx-include="closest .analytics-card"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading reading&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-daily-activity-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-daily-activity-title"
              data-guide-title="Daily story activity"
              data-guide-text="Every story opened on the chosen day, with that day's own views, likes and comments. The counts reset with the date; they never include another day's activity.">
       {% comment %}Stories that were actually read on one day, with each
@@ -160,19 +170,22 @@
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-reading"/></svg></span>
         <h2 id="analytics-daily-activity-title">Daily story activity</h2>
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Daily story activity" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
-      <div class="analytics-chart-body" id="analytics-daily-activity-body"
-           hx-get="{% url 'control:analytics_daily_story_activity' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading today's stories&hellip;</p>
-      </div>
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <div class="analytics-chart-body" id="analytics-daily-activity-body"
+             hx-get="{% url 'control:analytics_daily_story_activity' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading today's stories&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-category-daily-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-category-daily-title"
              data-guide-title="Stories per day, by category"
              data-guide-text="How much is published in each subject, bucket by bucket. One line per category; tick the subjects you want to compare. The window is a preset, or your own start and end dates when you want exactly two days or exactly a week.">
       {% comment %}The publishing rate of each subject. A line per category, so
@@ -182,45 +195,48 @@
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-category-daily-title">Stories per day, by category</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-category-daily" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Stories per day, by category" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            id="analytics-category-daily-form"
-            hx-get="{% url 'control:analytics_story_category_daily' %}"
-            hx-target="#analytics-category-daily-body"
-            hx-swap="innerHTML"
-            hx-trigger="change, submit"
-            data-guide-title="Category controls"
-            data-guide-text="Pick a time frame, a window and the subjects to draw. A custom start and end date override the window preset.">
-        {% include "ADMIN/partials/analytics_bucket_range.html" %}
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              id="analytics-category-daily-form"
+              hx-get="{% url 'control:analytics_story_category_daily' %}"
+              hx-target="#analytics-category-daily-body"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit"
+              data-guide-title="Category controls"
+              data-guide-text="Pick a time frame, a window and the subjects to draw. A custom start and end date override the window preset.">
+          {% include "ADMIN/partials/analytics_bucket_range.html" %}
 
-        <fieldset class="analytics-series"
-                  data-guide-title="Subjects to draw"
-                  data-guide-text="One line per subject. The subjects that have published most are ticked to begin with; untick one to take it off the chart.">
-          <legend class="panel-sr">Categories to plot</legend>
-          {% for category in categories %}
-          <label class="analytics-series-option" style="--series-color: {{ category.color }}">
-            <input type="checkbox" name="category" value="{{ category.name }}"{% if category.name in default_categories %} checked{% endif %}>
-            <span class="analytics-series-swatch" aria-hidden="true"></span>
-            <span>{{ category.label }}</span>
-          </label>
-          {% endfor %}
-        </fieldset>
-      </form>
+          <fieldset class="analytics-series"
+                    data-guide-title="Subjects to draw"
+                    data-guide-text="One line per subject. The subjects that have published most are ticked to begin with; untick one to take it off the chart.">
+            <legend class="panel-sr">Categories to plot</legend>
+            {% for category in categories %}
+            <label class="analytics-series-option" style="--series-color: {{ category.color }}">
+              <input type="checkbox" name="category" value="{{ category.name }}"{% if category.name in default_categories %} checked{% endif %}>
+              <span class="analytics-series-swatch" aria-hidden="true"></span>
+              <span>{{ category.label }}</span>
+            </label>
+            {% endfor %}
+          </fieldset>
+        </form>
 
-      <div class="analytics-chart-body" id="analytics-category-daily-body"
-           hx-get="{% url 'control:analytics_story_category_daily' %}"
-           hx-include="#analytics-category-daily-form"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading chart&hellip;</p>
-      </div>
+        <div class="analytics-chart-body" id="analytics-category-daily-body"
+             hx-get="{% url 'control:analytics_story_category_daily' %}"
+             hx-include="#analytics-category-daily-form"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading chart&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-category-compare-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-category-compare-title"
              data-guide-title="Category, head to head"
              data-guide-text="Two subjects against each other over one window: how many stories each published, how many likes and how many comments those stories drew, how many times they were opened, and the difference between them.">
       {% comment %}The head-to-head: two subjects, four numbers each, and the
@@ -229,17 +245,19 @@
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span>
         <h2 id="analytics-category-compare-title">Category, head to head</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-category-compare" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Category, head to head" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            id="analytics-category-compare-form"
-            hx-get="{% url 'control:analytics_category_compare' %}"
-            hx-target="#analytics-category-compare-body"
-            hx-swap="innerHTML"
-            hx-trigger="change, submit"
-            data-guide-title="Comparison controls"
-            data-guide-text="Pick the two subjects and the window they are measured over.">
-        <div class="analytics-filter-row">
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              id="analytics-category-compare-form"
+              hx-get="{% url 'control:analytics_category_compare' %}"
+              hx-target="#analytics-category-compare-body"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit"
+              data-guide-title="Comparison controls"
+              data-guide-text="Pick the two subjects and the window they are measured over.">
+          <div class="analytics-filter-row">
           <label class="analytics-select">
             <span class="analytics-select-label">Subject A</span>
             <select name="a">
@@ -277,23 +295,24 @@
             <input type="date" name="end">
           </label>
 
-          <button type="submit" class="analytics-apply">Apply</button>
-        </div>
-      </form>
+            <button type="submit" class="analytics-apply">Apply</button>
+          </div>
+        </form>
 
-      <div class="analytics-chart-body" id="analytics-category-compare-body"
-           hx-get="{% url 'control:analytics_category_compare' %}"
-           hx-include="#analytics-category-compare-form"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading comparison&hellip;</p>
-      </div>
+        <div class="analytics-chart-body" id="analytics-category-compare-body"
+             hx-get="{% url 'control:analytics_category_compare' %}"
+             hx-include="#analytics-category-compare-form"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading comparison&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-category-perf-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-category-perf-title"
              data-guide-title="Category performance"
              data-guide-text="One subject's published story count, views, likes and comments over time. Pick a category, then choose the time frame and the signals to plot. Events are counted from the stories filed under that subject in the chosen window.">
       {% comment %}The category twin of Story performance: pick one subject and
@@ -305,17 +324,19 @@
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-category-perf-title">Category performance</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="category-performance" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Category performance" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            id="analytics-category-perf-form"
-            hx-get="{% url 'control:analytics_category_performance' %}"
-            hx-target="#analytics-category-perf-body"
-            hx-swap="innerHTML"
-            hx-trigger="change, submit">
-        <input type="hidden" name="submitted" value="1">
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              id="analytics-category-perf-form"
+              hx-get="{% url 'control:analytics_category_performance' %}"
+              hx-target="#analytics-category-perf-body"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit">
+          <input type="hidden" name="submitted" value="1">
 
-        <div class="analytics-filter-row">
+          <div class="analytics-filter-row">
           <label class="analytics-select">
             <span class="analytics-select-label">Category</span>
             <select name="category">
@@ -339,22 +360,23 @@
             <span>{{ meta.name }}</span>
           </label>
           {% endfor %}
-        </fieldset>
-      </form>
+          </fieldset>
+        </form>
 
-      <div class="analytics-chart-body" id="analytics-category-perf-body"
-           hx-get="{% url 'control:analytics_category_performance' %}"
-           hx-include="#analytics-category-perf-form"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading category performance&hellip;</p>
-      </div>
+        <div class="analytics-chart-body" id="analytics-category-perf-body"
+             hx-get="{% url 'control:analytics_category_performance' %}"
+             hx-include="#analytics-category-perf-form"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading category performance&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-story-trends-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-story-trends-title"
              data-guide-title="Publishing vs reading"
              data-guide-text="How much is published against how often stories are opened, per bucket. Only the story series appear here. Tick a series to show or hide it; a custom start and end date override the range preset.">
       {% comment %}The same Trends chart the Member lytics page uses, but the
@@ -365,45 +387,48 @@
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-story-trends-title">Publishing vs reading</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-trends" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Publishing vs reading" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            id="analytics-story-trends-form"
-            hx-get="{% url 'control:analytics_trends' %}"
-            hx-target="#analytics-story-trends-body"
-            hx-swap="innerHTML"
-            hx-trigger="change, submit"
-            data-guide-title="Trend controls"
-            data-guide-text="Pick a time frame (per hour, 12 hours, day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
-        <input type="hidden" name="submitted" value="1">
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              id="analytics-story-trends-form"
+              hx-get="{% url 'control:analytics_trends' %}"
+              hx-target="#analytics-story-trends-body"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit"
+              data-guide-title="Trend controls"
+              data-guide-text="Pick a time frame (per hour, 12 hours, day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
+          <input type="hidden" name="submitted" value="1">
 
-        {% include "ADMIN/partials/analytics_bucket_range.html" %}
+          {% include "ADMIN/partials/analytics_bucket_range.html" %}
 
-        <fieldset class="analytics-series">
-          <legend class="panel-sr">Series to plot</legend>
-          {% for meta in series_meta %}
-          <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
-            <input type="checkbox" name="series" value="{{ meta.key }}" checked>
-            <span class="analytics-series-swatch" aria-hidden="true"></span>
-            <span>{{ meta.name }}</span>
-          </label>
-          {% endfor %}
-        </fieldset>
-      </form>
+          <fieldset class="analytics-series">
+            <legend class="panel-sr">Series to plot</legend>
+            {% for meta in series_meta %}
+            <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
+              <input type="checkbox" name="series" value="{{ meta.key }}" checked>
+              <span class="analytics-series-swatch" aria-hidden="true"></span>
+              <span>{{ meta.name }}</span>
+            </label>
+            {% endfor %}
+          </fieldset>
+        </form>
 
-      <div class="analytics-chart-body" id="analytics-story-trends-body"
-           hx-get="{% url 'control:analytics_trends' %}"
-           hx-include="#analytics-story-trends-form"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading chart&hellip;</p>
-      </div>
+        <div class="analytics-chart-body" id="analytics-story-trends-body"
+             hx-get="{% url 'control:analytics_trends' %}"
+             hx-include="#analytics-story-trends-form"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading chart&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
     <hr class="analytics-divider">
 
-    <section class="analytics-card" aria-labelledby="analytics-perf-title"
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-perf-title"
              data-guide-title="Story performance"
              data-guide-text="One story's views, likes and comments over time. Search by title, pick a match, then choose the time frame and the signals to plot.">
       {% comment %}Pick one story, then overlay its views, likes and comments
@@ -413,72 +438,78 @@
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-perf-title">Story performance</h2>
         {% include "ADMIN/partials/analytics_height_control.html" with height_id="story-performance" height_default=400 %}
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Story performance" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
 
-      <form class="analytics-controls"
-            id="analytics-story-perf-form"
-            hx-get="{% url 'control:analytics_story_performance' %}"
-            hx-target="#analytics-story-perf-body"
-            hx-swap="innerHTML"
-            hx-trigger="change, submit">
-        <input type="hidden" name="submitted" value="1">
-        <input type="hidden" name="story" value="">
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <form class="analytics-controls"
+              id="analytics-story-perf-form"
+              hx-get="{% url 'control:analytics_story_performance' %}"
+              hx-target="#analytics-story-perf-body"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit">
+          <input type="hidden" name="submitted" value="1">
+          <input type="hidden" name="story" value="">
 
-        <label class="analytics-select analytics-select--search analytics-story-picker"
-               data-guide-title="Find a story"
-               data-guide-text="Search by title; matching stories appear as you type (published or not). Press a match to load its chart.">
-          <span class="analytics-select-label">Find a story</span>
-          <input type="search" name="story_q" placeholder="Search story title" autocomplete="off"
-                 hx-get="{% url 'control:analytics_story_search' %}"
-                 hx-target="#analytics-story-results"
-                 hx-swap="innerHTML"
-                 hx-trigger="keyup changed delay:300ms, search">
-        </label>
-        <span class="analytics-story-chosen" data-story-chosen>No story chosen yet.</span>
-
-        <div class="analytics-story-results" id="analytics-story-results"></div>
-
-        {% include "ADMIN/partials/analytics_bucket_range.html" with default_range="1y" %}
-
-        <fieldset class="analytics-series"
-                  data-guide-title="Signals to plot"
-                  data-guide-text="Views, likes and comments for the chosen story, each counted from its own events inside the bucket. Tick the ones you want overlaid on the chart.">
-          <legend class="panel-sr">Series to plot</legend>
-          {% for meta in story_performance_series %}
-          <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
-            <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_story_performance_series %} checked{% endif %}>
-            <span class="analytics-series-swatch" aria-hidden="true"></span>
-            <span>{{ meta.name }}</span>
+          <label class="analytics-select analytics-select--search analytics-story-picker"
+                 data-guide-title="Find a story"
+                 data-guide-text="Search by title; matching stories appear as you type (published or not). Press a match to load its chart.">
+            <span class="analytics-select-label">Find a story</span>
+            <input type="search" name="story_q" placeholder="Search story title" autocomplete="off"
+                   hx-get="{% url 'control:analytics_story_search' %}"
+                   hx-target="#analytics-story-results"
+                   hx-swap="innerHTML"
+                   hx-trigger="keyup changed delay:300ms, search">
           </label>
-          {% endfor %}
-        </fieldset>
-      </form>
+          <span class="analytics-story-chosen" data-story-chosen>No story chosen yet.</span>
 
-      <div class="analytics-chart-body" id="analytics-story-perf-body"
-           hx-get="{% url 'control:analytics_story_performance' %}"
-           hx-include="#analytics-story-perf-form"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Pick a story to chart&hellip;</p>
-      </div>
+          <div class="analytics-story-results" id="analytics-story-results"></div>
+
+          {% include "ADMIN/partials/analytics_bucket_range.html" with default_range="1y" %}
+
+          <fieldset class="analytics-series"
+                    data-guide-title="Signals to plot"
+                    data-guide-text="Views, likes and comments for the chosen story, each counted from its own events inside the bucket. Tick the ones you want overlaid on the chart.">
+            <legend class="panel-sr">Series to plot</legend>
+            {% for meta in story_performance_series %}
+            <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
+              <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_story_performance_series %} checked{% endif %}>
+              <span class="analytics-series-swatch" aria-hidden="true"></span>
+              <span>{{ meta.name }}</span>
+            </label>
+            {% endfor %}
+          </fieldset>
+        </form>
+
+        <div class="analytics-chart-body" id="analytics-story-perf-body"
+             hx-get="{% url 'control:analytics_story_performance' %}"
+             hx-include="#analytics-story-perf-form"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Pick a story to chart&hellip;</p>
+        </div>
+      </div></div>
     </section>
 
   </div>
 
   <div class="analytics-grid" data-analytics-panel="uncategorized" style="display:none">
-    <section class="analytics-card" aria-labelledby="analytics-uncat-title">
+    <section class="analytics-card is-collapsed" aria-labelledby="analytics-uncat-title">
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></span>
         <h2 id="analytics-uncat-title">No category</h2>
+        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand No category" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       </header>
-      <div class="analytics-chart-body" id="analytics-uncategorized-body"
-           hx-get="{% url 'control:analytics_uncategorized_stories' %}"
-           hx-trigger="load"
-           hx-swap="innerHTML"
-           aria-live="polite" aria-busy="true">
-        <p class="analytics-loading">Loading stories&hellip;</p>
-      </div>
+      <div class="analytics-collapse"><div class="analytics-collapse-inner">
+        <div class="analytics-chart-body" id="analytics-uncategorized-body"
+             hx-get="{% url 'control:analytics_uncategorized_stories' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             aria-live="polite" aria-busy="true">
+          <p class="analytics-loading">Loading stories&hellip;</p>
+        </div>
+      </div></div>
     </section>
   </div>
 
@@ -491,7 +522,7 @@
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
   <script src="{% static 'control/js/analytics_apex.js' %}" defer></script>
-  <script src="{% static 'control/js/analytics.js' %}?v=20261107-1" defer></script>
+  <script src="{% static 'control/js/analytics.js' %}?v=20261107-2" defer></script>
   <script>
     document.addEventListener('click', function(e){
       var btn = e.target.closest('[data-analytics-tab]');
