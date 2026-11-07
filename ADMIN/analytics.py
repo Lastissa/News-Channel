@@ -1117,6 +1117,66 @@ def category_comparison(
 
 
 #   -------------------------------------------------------------------------
+#   CATEGORY PERFORMANCE -- one category's views / likes / comments over time
+#   -------------------------------------------------------------------------
+#   The category twin of the per-story performance chart: the reader picks one
+#   subject and overlays its three signals on the same bucket / range controls.
+#   Events are counted from their own tables, so the numbers mean the same as
+#   they do in every other chart on the page.
+
+def category_performance(
+    category_name, bucket, selected_range, series_keys, start_iso=None, end_iso=None
+):
+    """Line chart data for one category: views, likes and comments over time."""
+    names = category_names()
+    if category_name not in names:
+        category_name = names[0] if names else NO_CATEGORY_KEY
+
+    known = [name for name in names if name != NO_CATEGORY_KEY]
+    if category_name == NO_CATEGORY_KEY:
+        stories = Blog.objects.exclude(category__in=known)
+    else:
+        stories = Blog.objects.filter(category=category_name)
+
+    frame = _trend_frame(bucket, selected_range, start_iso, end_iso)
+    story_ids = stories.values("pk")
+
+    def count_events(model, field):
+        queryset = model.objects.filter(blog_id__in=story_ids)
+        return _frame_counts(frame, _windowed_values(queryset, field, frame))
+
+    sources = {
+        "views": lambda: count_events(StoryView, "created_at"),
+        "likes": lambda: count_events(BlogLike, "created_at"),
+        "comments": lambda: count_events(Comment, "date_created"),
+    }
+
+    series = []
+    for meta in STORY_PERFORMANCE_SERIES:
+        if meta["key"] not in series_keys:
+            continue
+        series.append({**meta, "values": sources[meta["key"]]()})
+
+    published = stories.filter(date_created__gte=frame["start"])
+    if frame["end_exclusive"] is not None:
+        published = published.filter(date_created__lt=frame["end_exclusive"])
+
+    label = NO_CATEGORY_LABEL if category_name == NO_CATEGORY_KEY else category_name
+    return {
+        "type": "line",
+        "labels": frame["labels"],
+        "series": series,
+        "category": {
+            "key": category_name,
+            "label": label,
+            "stories": published.count(),
+        },
+        "bucket": bucket,
+        "range": selected_range,
+    }
+
+
+#   -------------------------------------------------------------------------
 #   STORY KPI STRIP -- the totals above the Story lytics cards
 #   -------------------------------------------------------------------------
 #   Published and reads are counted over one window (a preset range or a custom
@@ -1830,6 +1890,58 @@ def author_likes(selected_range, page_number=1, since=None):
         "items": items,
         "range": selected_range,
         "since": since,
+    }
+
+
+def author_performance(author_id, bucket, selected_range, series_keys, start_iso=None, end_iso=None):
+    """Line chart data for one author's whole body of work over time.
+
+    The same views / likes / comments chart as Story performance, but the
+    events are counted across every story the author has written rather than a
+    single chosen story. The author's own rows are used, so a story that later
+    changes hands does not carry its old reads into the new author's chart.
+    """
+    author = Auth.objects.filter(pk=author_id).first()
+    if author is None:
+        return {
+            "type": "line",
+            "labels": [],
+            "series": [],
+            "author": None,
+            "bucket": bucket,
+            "range": selected_range,
+        }
+
+    frame = _trend_frame(bucket, selected_range, start_iso, end_iso)
+    story_ids = Blog.objects.filter(author_id=author_id).values("pk")
+
+    def count_events(model, field):
+        queryset = model.objects.filter(blog_id__in=story_ids)
+        return _frame_counts(frame, _windowed_values(queryset, field, frame))
+
+    sources = {
+        "views": lambda: count_events(StoryView, "created_at"),
+        "likes": lambda: count_events(BlogLike, "created_at"),
+        "comments": lambda: count_events(Comment, "date_created"),
+    }
+
+    series = []
+    for meta in STORY_PERFORMANCE_SERIES:
+        if meta["key"] not in series_keys:
+            continue
+        series.append({**meta, "values": sources[meta["key"]]()})
+
+    return {
+        "type": "line",
+        "labels": frame["labels"],
+        "series": series,
+        "author": {
+            "id": author_id,
+            "name": _author_names([author]).get(author_id) or _mask_email(author.email) or "Unknown",
+            "stories": Blog.objects.filter(author_id=author_id).count(),
+        },
+        "bucket": bucket,
+        "range": selected_range,
     }
 
 

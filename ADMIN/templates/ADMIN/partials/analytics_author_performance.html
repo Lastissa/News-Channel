@@ -1,0 +1,24 @@
+{% comment %}
+  htmx fragment: the "Performance over time" chart in one author's detail.
+
+  The author's whole portfolio -- every story they wrote -- counted from the
+  event tables and bucketed over the chart's own time frame. Only ever returned
+  to an htmx GET against control:analytics_author_performance.
+{% endcomment %}
+{% if chart.author %}
+<p class="analytics-chart-note"
+   data-guide-title="Author performance chart"
+   data-guide-text="This author's views, likes and comments per bucket, counted across every story they wrote. The toggles above choose which signals are drawn.">
+  <strong>{{ chart.author.name }}</strong>
+  &middot; {{ chart.author.stories }} stor{{ chart.author.stories|pluralize:"y,ies" }} in total
+</p>
+<div class="analytics-chart" data-chart data-chart-kind="line">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Views, likes and comments over time for {{ chart.author.name }}"></div>
+  {{ chart|json_script:"analytics-author-performance-data" }}
+</div>
+{% else %}
+<p class="analytics-chart-empty"
+   data-guide-title="Author performance chart"
+   data-guide-text="This author has no stories yet, so there is nothing to chart.">No stories yet to chart for this author.</p>
+{% endif %}

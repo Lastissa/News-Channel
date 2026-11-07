@@ -2055,6 +2055,121 @@ class AnalyticsStoryPerformanceTests(TestCase):
         self.assertIn("Performance story", body)
 
 
+class AnalyticsCategoryPerformanceTests(TestCase):
+    """The Category performance card: one category's views, likes and comments
+    over time, with the same bucket / range controls as Story performance."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="cat-perf-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="cat-perf-writer@example.com")
+        self.member = Auth.objects.create_user(email="cat-perf-member@example.com")
+
+        Category.objects.get_or_create(name="NEWS")
+        Category.objects.get_or_create(name="SPORT")
+
+        self.url = reverse("control:analytics_category_performance")
+        self.news_story = self.make_story("News story", "NEWS")
+        self.sport_story = self.make_story("Sport story", "SPORT")
+
+    def make_story(self, heading, category, age_days=0):
+        story = Blog.objects.create(
+            author=self.writer, heading=heading, category=category,
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+        Blog.objects.filter(pk=story.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days)
+        )
+        return story
+
+    def add_view(self, story, age_days=0):
+        view = StoryView.objects.create(blog=story)
+        StoryView.objects.filter(pk=view.pk).update(
+            created_at=timezone.now() - timedelta(days=age_days)
+        )
+
+    def add_like(self, story, age_days=0):
+        like = BlogLike.objects.create(blog=story, user=self.member)
+        BlogLike.objects.filter(pk=like.pk).update(
+            created_at=timezone.now() - timedelta(days=age_days)
+        )
+
+    def add_comment(self, story, age_days=0):
+        comment = Comment.objects.create(blog=story, author=self.member, content="Good read.")
+        Comment.objects.filter(pk=comment.pk).update(
+            date_created=timezone.now() - timedelta(days=age_days)
+        )
+
+    #   ------------------------------------------------------------ access
+    def test_the_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    #   ------------------------------------------------------------ chart
+    def test_the_chart_counts_only_the_chosen_category(self):
+        self.add_view(self.news_story)
+        self.add_view(self.news_story)
+        self.add_like(self.news_story)
+        self.add_comment(self.news_story)
+
+        #   The other subject's events must not leak into this chart.
+        self.add_view(self.sport_story)
+        self.add_like(self.sport_story)
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"category": "NEWS", "bucket": "day", "range": "30d"},
+            ),
+            "analytics-category-performance-data",
+        )
+        totals = {series["key"]: sum(series["values"]) for series in chart["series"]}
+        self.assertEqual(totals, {"views": 2, "likes": 1, "comments": 1})
+        self.assertEqual(chart["category"]["label"], "NEWS")
+
+    def test_only_the_chosen_series_are_drawn(self):
+        self.add_view(self.news_story)
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"submitted": "1", "category": "NEWS", "series": ["views"]},
+            ),
+            "analytics-category-performance-data",
+        )
+        self.assertEqual([series["key"] for series in chart["series"]], ["views"])
+
+    def test_the_chart_reports_the_stories_published_in_the_window(self):
+        self.make_story("Old news", "NEWS", age_days=50)
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"category": "NEWS", "bucket": "day", "range": "30d"},
+            ),
+            "analytics-category-performance-data",
+        )
+        #   The news story from setUp is inside thirty days; the old one is not.
+        self.assertEqual(chart["category"]["stories"], 1)
+
+    def test_the_story_lytics_shell_links_the_card(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("Category performance", body)
+        self.assertIn(self.url, body)
+
+
 class AnalyticsChamberPlaceholderTests(TestCase):
     """The partner analytics page is a placeholder for now, the panel sidebar
     links to every chamber, and the Author chamber is a real shell (it replaced
@@ -2150,6 +2265,7 @@ class AuthorLyticsTests(TestCase):
         self.kpis_url = reverse("control:analytics_author_kpis")
         self.likes_url = reverse("control:analytics_author_likes")
         self.detail_url = reverse("control:analytics_author_detail")
+        self.performance_url = reverse("control:analytics_author_performance")
 
     def make_story(self, heading, author=None, age_days=0):
         story = Blog.objects.create(
@@ -2184,7 +2300,14 @@ class AuthorLyticsTests(TestCase):
 
     #   ------------------------------------------------------------ access
     def test_every_endpoint_is_admin_only(self):
-        for url in [self.shell_url, self.table_url, self.kpis_url, self.likes_url, self.detail_url]:
+        for url in [
+            self.shell_url,
+            self.table_url,
+            self.kpis_url,
+            self.likes_url,
+            self.detail_url,
+            self.performance_url,
+        ]:
             with self.subTest(url=url):
                 self.client.force_login(self.writer)
                 self.assertEqual(self.client.get(url).status_code, 302 if url == self.shell_url else 403)
@@ -2420,6 +2543,74 @@ class AuthorLyticsTests(TestCase):
         response = self.client.get(self.detail_url, {"author": "abc", "range": "30d"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("data-author-detail-hint", response.content.decode())
+
+    #   ------------------------------------------------------------ performance chart
+    def test_the_detail_includes_the_performance_chart(self):
+        self.make_story("Charted story")
+
+        self.client.force_login(self.admin)
+        body = self.client.get(
+            self.detail_url, {"author": self.writer.pk, "range": "30d"}
+        ).content.decode()
+
+        self.assertIn("Performance over time", body)
+        self.assertIn("analytics-author-performance-body", body)
+        self.assertIn("analytics-author-performance-data", body)
+        self.assertIn(self.performance_url, body)
+
+    def test_the_author_performance_chart_counts_the_whole_portfolio(self):
+        first = self.make_story("First story")
+        second = self.make_story("Second story")
+        other = self.make_story("Someone else's story", author=self.other_writer)
+
+        self.add_view(first)
+        self.add_view(second)
+        self.add_like(first, self.member)
+        self.add_comment(second)
+
+        #   The other author's events must not leak into this author's chart.
+        self.add_view(other)
+        self.add_like(other, self.member)
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.performance_url,
+                {"author": self.writer.pk, "bucket": "day", "range": "30d"},
+            ),
+            "analytics-author-performance-data",
+        )
+        totals = {series["key"]: sum(series["values"]) for series in chart["series"]}
+        self.assertEqual(totals, {"views": 2, "likes": 1, "comments": 1})
+        self.assertEqual(chart["author"]["id"], self.writer.pk)
+        self.assertEqual(chart["author"]["stories"], 2)
+
+    def test_the_author_performance_chart_honours_the_series_toggles(self):
+        self.add_view(self.make_story("Series story"))
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.performance_url,
+                {
+                    "submitted": "1",
+                    "author": self.writer.pk,
+                    "series": ["likes", "comments"],
+                },
+            ),
+            "analytics-author-performance-data",
+        )
+        self.assertEqual([series["key"] for series in chart["series"]], ["likes", "comments"])
+
+    def test_the_author_performance_chart_degrades_for_an_unknown_author(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(
+            self.performance_url, {"author": 999999, "range": "30d"}
+        ).content.decode()
+        self.assertIn("No stories yet", body)
+        self.assertNotIn("analytics-author-performance-data", body)
 
 
 class AuthorLyticsInsightsTests(TestCase):

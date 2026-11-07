@@ -868,6 +868,11 @@
       );
     }
 
+    /* Exposed for panels that insert a bucket/range control with fetch rather
+       than an htmx swap (the author detail), so their first paint gets the
+       same day/hour menu filtering as every other chart. */
+    window.AnalyticsBucketRange = { sync: syncAll };
+
     /* The bucket select is the trigger, so the swap has to happen before the
        form's own change handler serialises it. This listener is registered in
        the capture phase on the document, which runs before the event reaches
@@ -1006,6 +1011,10 @@
           /* The newly-swapped markup is a fresh DOM subtree: hand it to the
              guide so its step count and the height control pick it up. */
           if (window.htmx) window.htmx.process(detailBody);
+          /* The detail was inserted with fetch, not an htmx swap, so ask the
+             chart renderer to pick up any payload that arrived with it. */
+          if (window.AnalyticsCharts) window.AnalyticsCharts.render();
+          if (window.AnalyticsBucketRange) window.AnalyticsBucketRange.sync();
         })
         .catch(function (err) {
           if (err && err.name === "AbortError") return;

@@ -72,9 +72,11 @@ from ADMIN.analytics import (
     author_directory_rows,
     author_kpis,
     author_likes,
+    author_performance,
     category_comparison,
     category_names,
     category_palette,
+    category_performance,
     category_story_counts,
     member_category_filter_choices,
     member_directory_queryset,
@@ -972,6 +974,53 @@ class AnalyticsCategoryCompareView(View):
         )
 
 
+class AnalyticsCategoryPerformanceView(View):
+    """htmx fragment: one category's views / likes / comments over time.
+
+    The category twin of Story performance. The chosen name is snapped to the
+    live category list, so a hand typed querystring can only chart a subject
+    that exists. No category chosen falls back to the busiest one, which keeps
+    the first paint useful instead of showing an empty prompt.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        names = category_names()
+        palette = category_palette(names)
+        defaults = _default_chart_categories(limit=1)
+
+        category_name = (request.GET.get("category") or "").strip()
+        if category_name not in palette:
+            category_name = defaults[0] if defaults else (names[0] if names else "")
+
+        bucket = (request.GET.get("bucket") or DEFAULT_TREND_BUCKET).strip()
+        selected_range = (request.GET.get("range") or DEFAULT_TREND_RANGE).strip()
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+
+        if "submitted" in request.GET:
+            series_keys = set(request.GET.getlist("series"))
+        else:
+            series_keys = set(DEFAULT_STORY_PERFORMANCE_SERIES)
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_category_performance.html",
+            {
+                "chart": category_performance(
+                    category_name,
+                    bucket,
+                    selected_range,
+                    series_keys,
+                    start_iso,
+                    end_iso,
+                )
+            },
+        )
+
+
 class AnalyticsMembersGrowthView(View):
     """htmx fragment: the "Members over time" running-total line chart.
 
@@ -1366,10 +1415,75 @@ class AnalyticsAuthorDetailView(View):
             if author_id
             else None
         )
+        #   Ship the first performance chart with the detail rather than asking
+        #   htmx to fetch it after a fetch-inserted fragment: the chart is then
+        #   painted by the same render pass as the rest of the panel, and only
+        #   later control changes need another request.
+        performance_chart = (
+            author_performance(
+                author_id,
+                DEFAULT_TREND_BUCKET,
+                selected_range,
+                set(DEFAULT_STORY_PERFORMANCE_SERIES),
+            )
+            if detail
+            else None
+        )
         return render(
             request,
             "ADMIN/partials/analytics_author_detail.html",
-            {"detail": detail, "range": selected_range, "since": since},
+            {
+                "detail": detail,
+                "range": selected_range,
+                "since": since,
+                "performance_chart": performance_chart,
+                "trend_buckets": TREND_BUCKET_CHOICES,
+                "default_trend_bucket": DEFAULT_TREND_BUCKET,
+                "trend_ranges": TREND_RANGE_CHOICES,
+                "trend_sub_ranges": TREND_SUB_RANGE_CHOICES,
+                "default_trend_range": selected_range,
+                "story_performance_series": STORY_PERFORMANCE_SERIES,
+                "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
+            },
+        )
+
+
+class AnalyticsAuthorPerformanceView(View):
+    """htmx fragment: one author's views / likes / comments over time.
+
+    Read only and admin only. The events are counted across every story the
+    author wrote, so the chart reflects the whole portfolio while the stories
+    table below still breaks the same window down per story.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        raw_id = (request.GET.get("author") or "").strip()
+        author_id = int(raw_id) if raw_id.isdigit() else None
+        bucket = (request.GET.get("bucket") or DEFAULT_TREND_BUCKET).strip()
+        selected_range = (request.GET.get("range") or AUTHOR_DEFAULT_RANGE).strip()
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+        if "submitted" in request.GET:
+            series_keys = set(request.GET.getlist("series"))
+        else:
+            series_keys = set(DEFAULT_STORY_PERFORMANCE_SERIES)
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_author_performance.html",
+            {
+                "chart": author_performance(
+                    author_id,
+                    bucket,
+                    selected_range,
+                    series_keys,
+                    start_iso,
+                    end_iso,
+                )
+            },
         )
 
 

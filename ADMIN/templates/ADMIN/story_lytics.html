@@ -272,6 +272,66 @@
 
     <hr class="analytics-divider">
 
+    <section class="analytics-card" aria-labelledby="analytics-category-perf-title"
+             data-guide-title="Category performance"
+             data-guide-text="One subject's views, likes and comments over time. Pick a category, then choose the time frame and the signals to plot. The events are counted from the stories filed under that subject in the chosen window.">
+      {% comment %}The category twin of Story performance: pick one subject and
+         overlay its views, likes and comments on the same bucket / range
+         controls. Kept next to the head-to-head comparison so an editor can
+         compare two subjects and then inspect one of them over time.{% endcomment %}
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
+        <h2 id="analytics-category-perf-title">Category performance</h2>
+        {% include "ADMIN/partials/analytics_height_control.html" with height_id="category-performance" height_default=400 %}
+      </header>
+
+      <form class="analytics-controls"
+            id="analytics-category-perf-form"
+            hx-get="{% url 'control:analytics_category_performance' %}"
+            hx-target="#analytics-category-perf-body"
+            hx-swap="innerHTML"
+            hx-trigger="change, submit">
+        <input type="hidden" name="submitted" value="1">
+
+        <div class="analytics-filter-row">
+          <label class="analytics-select">
+            <span class="analytics-select-label">Category</span>
+            <select name="category">
+              {% for category in categories %}
+              <option value="{{ category.name }}"{% if category.name == default_categories.0 %} selected{% endif %}>{{ category.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+
+        {% include "ADMIN/partials/analytics_bucket_range.html" %}
+
+        <fieldset class="analytics-series"
+                  data-guide-title="Signals to plot"
+                  data-guide-text="Views, likes and comments for the chosen category, each counted from its own events inside the bucket.">
+          <legend class="panel-sr">Series to plot</legend>
+          {% for meta in story_performance_series %}
+          <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
+            <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_story_performance_series %} checked{% endif %}>
+            <span class="analytics-series-swatch" aria-hidden="true"></span>
+            <span>{{ meta.name }}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+      </form>
+
+      <div class="analytics-chart-body" id="analytics-category-perf-body"
+           hx-get="{% url 'control:analytics_category_performance' %}"
+           hx-include="#analytics-category-perf-form"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading category performance&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
+
     <section class="analytics-card" aria-labelledby="analytics-story-trends-title"
              data-guide-title="Publishing vs reading"
              data-guide-text="How much is published against how often stories are opened, per bucket. Only the story series appear here. Tick a series to show or hide it; a custom start and end date override the range preset.">
@@ -409,7 +469,7 @@
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
   <script src="{% static 'control/js/analytics_apex.js' %}" defer></script>
-  <script src="{% static 'control/js/analytics.js' %}" defer></script>
+  <script src="{% static 'control/js/analytics.js' %}?v=20261107-1" defer></script>
   <script>
     document.addEventListener('click', function(e){
       var btn = e.target.closest('[data-analytics-tab]');

@@ -1,0 +1,24 @@
+{% comment %}
+  htmx fragment: the "Category performance" chart on Story lytics.
+
+  One category's views / likes / comments, bucketed over the picker's time
+  frame. Only ever returned to an htmx GET against
+  control:analytics_category_performance.
+{% endcomment %}
+{% if chart.category %}
+<p class="analytics-chart-note"
+   data-guide-title="Category performance chart"
+   data-guide-text="The chosen category's views, likes and comments per bucket. The toggles above choose which signals are drawn; this line names the category being charted and how many of its stories were published inside the window.">
+  <strong>{{ chart.category.label }}</strong>
+  &middot; {{ chart.category.stories }} stor{{ chart.category.stories|pluralize:"y,ies" }} published in this window
+</p>
+<div class="analytics-chart" data-chart data-chart-kind="line">
+  <div class="analytics-chart-canvas" data-chart-canvas role="img"
+       aria-label="Views, likes and comments over time for {{ chart.category.label }}"></div>
+  {{ chart|json_script:"analytics-category-performance-data" }}
+</div>
+{% else %}
+<p class="analytics-chart-empty"
+   data-guide-title="Category performance chart"
+   data-guide-text="Choose a category above; its views, likes and comments are then charted over the chosen time frame.">Choose a category above to chart its views, likes and comments over time.</p>
+{% endif %}
