@@ -22,6 +22,7 @@ from BLOG.models import Blog, Category, get_category_choices, refresh_category_c
 from HOME.models import ReadingHistory, CategorySubscription, CategorySubscription
 from Partner.models import AdvertImage
 from SERVICE_INTERNAL import email_batch
+from SERVICE_INTERNAL.cache_keys import HOME_PAGE_HTML_CACHE_KEY
 from SERVICE_INTERNAL.config import About, custom_context_processors
 from SERVICE_INTERNAL.email_single import (
     _try_send_new_comment_email,
@@ -153,11 +154,13 @@ class HomeHeadingSemanticsTests(QuietTestCase):
         response = self.client.get(reverse("home:home"))
         self.assertContains(response, "Cached headline")
         self.assertIsNotNone(cache.get("home_page_blogs_v2"))
+        self.assertIsNotNone(cache.get(HOME_PAGE_HTML_CACHE_KEY))
 
         with self.captureOnCommitCallbacks(execute=True):
             make_story(self.author, heading="Uploaded headline")
 
         self.assertIsNone(cache.get("home_page_blogs_v2"))
+        self.assertIsNone(cache.get(HOME_PAGE_HTML_CACHE_KEY))
         response = self.client.get(reverse("home:home"))
         self.assertContains(response, "Uploaded headline")
 
@@ -166,8 +169,35 @@ class HomeHeadingSemanticsTests(QuietTestCase):
             story.save(update_fields=["heading"])
 
         self.assertIsNone(cache.get("home_page_blogs_v2"))
+        self.assertIsNone(cache.get(HOME_PAGE_HTML_CACHE_KEY))
         response = self.client.get(reverse("home:home"))
         self.assertContains(response, "Updated headline")
+
+    def test_anonymous_html_cache_stores_a_csrf_placeholder_only(self):
+        make_story(self.author, heading="Cached CSRF headline")
+
+        first = self.client.get(reverse("home:home"))
+        cached_html = cache.get(HOME_PAGE_HTML_CACHE_KEY)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertIsInstance(cached_html, str)
+        self.assertIn("__ABUREPORT_CSRF_TOKEN__", cached_html)
+        self.assertNotIn("__ABUREPORT_CSRF_TOKEN__", first.content.decode())
+        self.assertIn('name="csrfmiddlewaretoken"', first.content.decode())
+
+        second = self.client.get(reverse("home:home"))
+        self.assertEqual(second.status_code, 200)
+        self.assertNotIn("__ABUREPORT_CSRF_TOKEN__", second.content.decode())
+        self.assertIn('name="csrfmiddlewaretoken"', second.content.decode())
+
+    def test_signed_in_reader_bypasses_the_anonymous_html_cache(self):
+        make_story(self.author, heading="Member headline")
+        self.client.force_login(self.author)
+
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(cache.get(HOME_PAGE_HTML_CACHE_KEY))
 
     def test_home_story_query_only_prefetches_staff_full_name(self):
         make_story(self.author)

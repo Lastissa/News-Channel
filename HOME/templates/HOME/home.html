@@ -2,6 +2,20 @@
 {% load static %}
 {% load format_copy_btn archive_extras home_extras %}
 
+{% block preload %}
+{% comment %}Discovery of the LCP image before stylesheets/scripts. The srcset
+   and sizes match the real hero <img> below so the browser does not download
+   a second candidate.{% endcomment %}
+{% if featured_posts and featured_posts.0.image_1 %}
+{% with hero_preload=featured_posts.0.image_1|cloudinary_image:"f_auto/q_auto/w_1280" hero_preload_srcset=featured_posts.0.image_1|cloudinary_srcset:"640,960,1280,1600" %}
+<link rel="preload" as="image" href="{{ hero_preload }}"{% if hero_preload_srcset %} imagesrcset="{{ hero_preload_srcset }}" imagesizes="(max-width: 899px) 100vw, 70vw"{% endif %} fetchpriority="high">
+{% endwith %}
+{% endif %}
+{% if teaser_items and teaser_items.0.image %}
+<link rel="preload" as="image" href="{{ teaser_items.0.image }}">
+{% endif %}
+{% endblock preload %}
+
 {% block title %}
 {% spaceless %}
 {% if is_filtered %}
@@ -50,10 +64,12 @@
   {% if featured_posts %}
   <div class="hero-track">
     {% for post in featured_posts %}
-        <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|cloudinary_proxy|default:placeholder|css_url }}');" data-index="{{ forloop.counter0 }}">
-      {% comment %}Real, crawlable <img> with alt text (the slide's CSS background stays as the fallback layer if it fails to load); removes it on error so the background shows through.{% endcomment %}
+        <article class="hero-slide {% if forloop.first %}is-active{% endif %}" style="--slide-image: url('{{ post.image_1|cloudinary_image:"f_auto/q_auto/w_1280"|default:placeholder|css_url }}');" data-index="{{ forloop.counter0 }}">
+      {% comment %}Real, crawlable <img> with alt text (the slide's CSS background stays as the fallback layer if it fails to load); removes it on error so the background shows through. Cloudinary delivers an auto-format, auto-quality image and the browser picks a width from srcset.{% endcomment %}
       {% if post.image_1 %}
-      <img class="hero-slide-img" src="{{ post.image_1|cloudinary_proxy }}" alt="{{ post.heading }}" loading="{% if forloop.first %}eager{% else %}lazy{% endif %}" decoding="async" onload="if(!this.getAttribute('width')){this.width=this.naturalWidth;this.height=this.naturalHeight;}" onerror="this.remove();">
+      {% with hero_src=post.image_1|cloudinary_image:"f_auto/q_auto/w_1280" hero_srcset=post.image_1|cloudinary_srcset:"640,960,1280,1600" %}
+      <img class="hero-slide-img" src="{{ hero_src }}"{% if hero_srcset %} srcset="{{ hero_srcset }}" sizes="(max-width: 899px) 100vw, 70vw"{% endif %} alt="{{ post.heading }}" loading="{% if forloop.first %}eager{% else %}lazy{% endif %}" decoding="async"{% if forloop.first %} fetchpriority="high"{% endif %} onload="if(!this.getAttribute('width')){this.width=this.naturalWidth;this.height=this.naturalHeight;}" onerror="this.remove();">
+      {% endwith %}
       {% endif %}
       <div class="hero-scrim"></div>
       {# whole slide (image included) opens the story; headline link below stays the accessible one #}
@@ -229,15 +245,7 @@
 {% block extra_head %}
 {{ block.super }}
 <meta name="yandex-verification" content="1093315bd8192b90" />
-<link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261013-1">
-{% comment %} Slow-connection: fetch the first on-screen images before paint so
-the hero/teaser never pop in after the page reveals. {% endcomment %}
-{% if featured_posts and featured_posts.0.image_1 %}
-<link rel="preload" as="image" href="{{ featured_posts.0.image_1|cloudinary_proxy }}" fetchpriority="high">
-{% endif %}
-{% if teaser_items and teaser_items.0.image %}
-<link rel="preload" as="image" href="{{ teaser_items.0.image }}">
-{% endif %}
+{% include "includes/continue_popup_critical.html" %}
 {% endblock extra_head %}
 
 {% block newsletter_popup %}
@@ -252,5 +260,5 @@ the hero/teaser never pop in after the page reveals. {% endcomment %}
 {{ block.super }}
 <script src="{% static 'home/js/continue-popup.js' %}?v=20261012-1" defer></script>
 <script src="{% static 'home/js/headline-ticker.js' %}" defer></script>
-<script src="{% static 'home/js/most-viewed.js' %}" defer></script>
+<script src="{% static 'home/js/most-viewed.js' %}?v=20261107-1" defer></script>
 {% endblock %}

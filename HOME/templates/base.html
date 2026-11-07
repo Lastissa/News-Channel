@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block preload %}{% endblock %}
     {% include "includes/splash_head.html" %}
+    {% include "includes/critical_css.html" %}
     {% comment %} {% csrf_token %} {% endcomment %}
     <title>{% block title %}{{ project_name }} | {{ project_cachphrase }}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
@@ -62,22 +64,10 @@
             }
         })();
     </script>
-    {% comment %}
-      GOOGLE ADSENSE: site-wide, production only. Own block so a page can opt
-      out by overriding it empty -- internal surfaces (admin panel, profile,
-      auth, staff editors) do exactly that, so no ad request is ever made from
-      them. The {% if not debug %} guard keeps it off localhost/dev entirely.
-    {% endcomment %}
-    {% block adsense %}
-    {% if not debug %}
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5391303565722259"
-         crossorigin="anonymous"></script>
-    {% endif %}
-    {% endblock %}
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
-    <link id="base-css" rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261106-1" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261106-1"></noscript>
+    <link id="base-css" rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261107-1" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261107-1"></noscript>
     {% block extra_head %}
     {% block og_image %}
     <!--Default is the oficial site logo-->
@@ -123,5 +113,18 @@
     <script src="{% static 'home/js/interactions.js' %}?v=20261019-5" defer></script>
     <script src="{% static 'home/js/auth-gate.js' %}?v=20261016-1" defer></script>
     {% block extra_scripts %}{% endblock %}
+    {% comment %}
+      GOOGLE ADSENSE: site-wide, production only, loaded at the end of the
+      body so it cannot compete with the first paint. Own block so a page can
+      opt out by overriding it empty -- internal surfaces (admin panel,
+      profile, auth, staff editors) do exactly that, so no ad request is ever
+      made from them. The {% if not debug %} guard keeps it off localhost/dev.
+    {% endcomment %}
+    {% block adsense %}
+    {% if not debug %}
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5391303565722259"
+         crossorigin="anonymous"></script>
+    {% endif %}
+    {% endblock %}
 </body>
 </html>

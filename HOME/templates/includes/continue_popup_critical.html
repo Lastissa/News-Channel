@@ -1,0 +1,17 @@
+{% load static %}
+{% comment %} The popup is hidden for at least six seconds. Inline only its hidden
+   and positioning state so first paint never waits for the full sheet; the
+   complete stylesheet loads without blocking and is in place long before the
+   popup opens. Used by the home page and signed-in story pages. {% endcomment %}
+<style id="continue-popup-critical">
+.continue-popup{position:fixed;inset:0;z-index:1400;display:none}
+.continue-popup.is-visible{display:block}
+.continue-popup-backdrop{position:absolute;inset:0;background:rgba(14,27,44,.55);opacity:0}
+.continue-popup-sheet{position:absolute;top:var(--continue-sheet-mobile-top,24px);left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;background:var(--surface,#fff);border-radius:18px 18px 0 0;opacity:0;transform:translateY(120px)}
+.continue-popup.is-open .continue-popup-backdrop{opacity:1}
+.continue-popup.is-open .continue-popup-sheet{opacity:1;transform:none}
+html.continue-popup-locked,html.continue-popup-locked body{overflow:hidden}
+@media(max-width:767px){.continue-popup-sheet{top:calc(100vh - var(--continue-sheet-mobile-height,60vh));height:var(--continue-sheet-mobile-height,60vh);max-height:var(--continue-sheet-mobile-height,60vh);bottom:auto}}
+</style>
+<link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261107-1" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261107-1"></noscript>

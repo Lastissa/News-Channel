@@ -3,7 +3,9 @@
   <div class="footer-newsletter">
     <div class="footer-newsletter-inner">
       <div class="brand footer-brand">
-        <img src="{% static "logo.jpg" %}" alt="{{ project_name }} logo" width="32" height="32" loading="lazy">
+        <img src="{% static 'home/icons/logo-72.png' %}"
+             srcset="{% static 'home/icons/logo-72.png' %} 1x, {% static 'home/icons/logo-144.png' %} 2x"
+             alt="{{ project_name }} logo" width="32" height="32" loading="lazy" decoding="async">
         <span class="brand-word">{{ project_name }}</span>
       </div>
       <p class="footer-tagline">{{ project_cachphrase }}</p>

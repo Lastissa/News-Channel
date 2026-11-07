@@ -10,7 +10,9 @@
 {% for story in continue_items %}
 <a class="continue-popup-rail-card" href="{% url 'blog:story_detail' story.slug %}" data-continue-story>
   <span class="continue-popup-rail-thumb">
-    <img src="{{ story.image_1|cloudinary_proxy|default:continue_placeholder }}" alt="{{ story.heading }}" loading="lazy">
+    {% with rail_src=story.image_1|cloudinary_image:"f_auto/q_auto/w_320" rail_srcset=story.image_1|cloudinary_srcset:"160,320,480" %}
+    <img src="{{ rail_src|default:continue_placeholder }}"{% if rail_srcset %} srcset="{{ rail_srcset }}" sizes="160px"{% endif %} alt="{{ story.heading }}" loading="lazy" decoding="async">
+    {% endwith %}
   </span>
   <span class="continue-popup-rail-text">
     <span class="continue-popup-rail-title">{{ story.heading }}</span>

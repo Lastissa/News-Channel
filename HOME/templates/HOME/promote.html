@@ -13,7 +13,7 @@
   {{ block.super }}
   {% url 'home:home' as breadcrumb_home_url %}
   {% breadcrumb_schema "Home" breadcrumb_home_url "Promote your business" %}
-  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}">
+  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}?v=20261107-1">
 {% endblock %}
 
 {% block content %}

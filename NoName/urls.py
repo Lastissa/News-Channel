@@ -8,6 +8,7 @@ from django.views.generic import RedirectView
 
 from HOME.views import BingIndexNowView, YandexIndexNow, FavicoView, ManifestView, RobotsTxtView, LlmsTxtView, RssFeedView, AtomFeedView, UnsubscribeView
 from SERVICE_INTERNAL.abstract import get_client_ip, info_logger
+from _.views import CSPReportView
 
 from HOME.sitemap_views import (
     SitemapIndexView,
@@ -66,6 +67,7 @@ urlpatterns = [
     path('yandex_1093315bd8192b90.html', YandexIndexNow.as_view()),
     path('28499029458943a79b9877afdefa8212.txt', BingIndexNowView.as_view()),
     path('unsubscribe/', UnsubscribeView.as_view()),
+    path('csp-report/', CSPReportView.as_view(), name='csp_report'),
     path('sy/', include("_.urls")),
     path('_admin/', admin.site.urls),
     path('control/', include("ADMIN.urls")),

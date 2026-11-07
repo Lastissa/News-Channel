@@ -15,7 +15,11 @@ from django.dispatch import receiver
 from django.core.cache import cache
 
 from SERVICE_INTERNAL.abstract import invalidate_cache
-from SERVICE_INTERNAL.cache_keys import HOME_BLOGS_CACHE_KEY, STORY_FEED_CACHE_KEY
+from SERVICE_INTERNAL.cache_keys import (
+    HOME_BLOGS_CACHE_KEY,
+    HOME_PAGE_HTML_CACHE_KEY,
+    STORY_FEED_CACHE_KEY,
+)
 
 from .models import Blog, Category, refresh_category_cache
 
@@ -26,11 +30,16 @@ def category_changed(sender, **kwargs):
     #   robust=True: a failing cache backend is logged instead of turning an
     #   already committed admin change into a 500
     transaction.on_commit(refresh_category_cache, robust=True)
+    #   category names appear on every story card and in the homepage nav.
+    transaction.on_commit(lambda: invalidate_cache(HOME_PAGE_HTML_CACHE_KEY), robust=True)
 
 
 @receiver(post_save, sender=Blog, dispatch_uid="blog.story.saved.invalidate_home_cache")
 @receiver(post_delete, sender=Blog, dispatch_uid="blog.story.deleted.invalidate_home_cache")
 def story_changed(sender, **kwargs):
     transaction.on_commit(lambda: invalidate_cache(HOME_BLOGS_CACHE_KEY), robust=True)
+    #   the rendered homepage embeds the story headline, so it is cleared at
+    #   the same moment. A publish is visible on the next request.
+    transaction.on_commit(lambda: invalidate_cache(HOME_PAGE_HTML_CACHE_KEY), robust=True)
     #   the RSS / Atom feeds list the same stories, so they are cleared with the home page
     transaction.on_commit(lambda: invalidate_cache(STORY_FEED_CACHE_KEY), robust=True)

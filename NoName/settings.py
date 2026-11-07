@@ -21,6 +21,29 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+#   HTTPS / SECURITY HEADERS. The site is served through a proxy (Cloudflare
+#   in front of Render), so Django has to trust its X-Forwarded-Proto before
+#   it can know a request is secure. HSTS is only sent on secure requests and
+#   is disabled in DEBUG. CSP is report-only for now: the AdSense tag and the
+#   inline splash/theme scripts must keep working while Google reviews them.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SECURE_HSTS_SECONDS = 0 if DEBUG else 60 * 60 * 24 * 365
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+
+#   CSP REPORTING: report-only violations are posted to /csp-report/, which
+#   logs them and emails new ones to this address. Deduplication and an hourly
+#   cap keep one noisy page from flooding the inbox.
+CSP_REPORT_ENABLED = os.getenv(
+    "CSP_REPORT_ENABLED", "False" if DEBUG else "True"
+).upper() == "TRUE"
+CSP_REPORT_EMAIL = os.getenv("CSP_REPORT_EMAIL", "lastissa11@gmail.com")
+CSP_REPORT_MAX_BYTES = 16 * 1024
+CSP_REPORT_DEDUPE_SECONDS = 6 * 60 * 60
+CSP_REPORT_MAX_EMAILS_PER_HOUR = 20
+
 ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')
 
 #   TEMPORARY IP DIAGNOSTIC -- COMMENTED OUT (14 Oct 2026).
@@ -54,6 +77,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    '_.middleware.SecurityHeadersMiddleware',
     '_.middleware.MaintenanceModeMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

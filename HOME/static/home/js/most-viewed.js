@@ -37,7 +37,7 @@
     return (
       '<li class="trending-item">' +
         // '<span class="trending-rank">' + "-" + "</span>" +
-        '<a class="trending-media" href="' + url + '" tabindex="-1">' +
+        '<a class="trending-media" href="' + url + '" tabindex="-1" aria-label="' + escapeHtml(post.heading) + '">' +
           '<img src="' + escapeHtml(post.image || fallbackImage) + '" alt="" loading="lazy" decoding="async" ' +
           'onerror="this.onerror=null;this.src=\'' + fallbackImage + '\';">' +
         "</a>" +

@@ -40,7 +40,7 @@
   <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261105-2">
   <link rel="stylesheet" href="{% static 'blog/css/story-ads.css' %}?v=20261023-2">
   {% if request.user.is_authenticated %}
-  <link rel="stylesheet" href="{% static 'home/css/continue-popup.css' %}?v=20261013-1">
+  {% include "includes/continue_popup_critical.html" %}
   {% endif %}
 {% endblock %}
 

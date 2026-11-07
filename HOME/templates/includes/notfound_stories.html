@@ -7,7 +7,9 @@
     {% for post in suggested_stories %}
     <article class="nf-card" style="--i: {{ forloop.counter0 }};">
       <a class="nf-card-media" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true">
-        <img src="{{ post.image_1|cloudinary_proxy|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}" alt="{{ post.heading }}" loading="lazy">
+        {% with card_src=post.image_1|cloudinary_image:"f_auto/q_auto/w_640" card_srcset=post.image_1|cloudinary_srcset:"320,480,640" %}
+        <img src="{{ card_src|default:'https://placehold.co/640x400/1F2A37/F6F3ED?text=%20' }}"{% if card_srcset %} srcset="{{ card_srcset }}" sizes="(max-width: 639px) 100vw, 33vw"{% endif %} alt="{{ post.heading }}" loading="lazy" decoding="async">
+        {% endwith %}
       </a>
       <div class="nf-card-body">
         <div class="nf-card-meta">

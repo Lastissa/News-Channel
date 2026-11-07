@@ -4,8 +4,10 @@
 <header class="site-header" id="site-header">
   <div class="header-bar">
     <a href="{% url 'home:home' %}" class="brand">
-      <!--i left this one as jpg istead cos it need a bg-->
-      <img src="{% static "logo.jpg" %}" alt="{{ project_name }} logo" class="brand-mark" width="36" height="36" loading="eager">
+      <!-- Optimized 1x/2x assets generated from the 1080px source; the logo is displayed at 36px in the header. -->
+      <img src="{% static 'home/icons/logo-72.png' %}"
+           srcset="{% static 'home/icons/logo-72.png' %} 1x, {% static 'home/icons/logo-144.png' %} 2x"
+           alt="{{ project_name }} logo" class="brand-mark" width="36" height="36" loading="eager" decoding="async">
       <span class="brand-word">{{ project_name }}</span>
     </a>
   

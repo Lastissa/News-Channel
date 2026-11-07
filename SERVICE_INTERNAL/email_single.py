@@ -486,3 +486,51 @@ def _try_send_archive_upload_alert_email(uploader, item, recipient=None):
         msg=f"EMAIL: archive upload alert sent to {recipient} for item={getattr(item, 'pk', '?')} by {uploader_email}"
     )
 
+
+def _try_send_csp_report_email(report, recipient=None):
+    """Email one normalized CSP violation report to the configured owner.
+
+    Called by ``_.views.CSPReportView`` after deduplication and rate limiting,
+    so this function only builds and sends. ``recipient`` defaults to
+    ``settings.CSP_REPORT_EMAIL``.
+    """
+    recipient = recipient or getattr(settings, "CSP_REPORT_EMAIL", "")
+    if not recipient:
+        return
+
+    labels = (
+        ("document_uri", "Document"),
+        ("violated_directive", "Directive"),
+        ("blocked_uri", "Blocked URL"),
+        ("source_file", "Source file"),
+        ("line_number", "Line"),
+        ("column_number", "Column"),
+        ("script_sample", "Script sample"),
+        ("disposition", "Disposition"),
+        ("status_code", "Status"),
+    )
+    rows = "".join(
+        f"<li><strong>{escape(label)}:</strong> <code>{escape(str(report.get(key) or ''))}</code></li>"
+        for key, label in labels
+        if report.get(key)
+    )
+    directive = report.get("violated_directive") or "unknown directive"
+    main_content = (
+        f"<p>A browser reported a Content Security Policy violation on "
+        f"{escape(About.domain)}.</p>"
+        f"<ul>{rows}</ul>"
+        "<p>These reports are deduplicated for a few hours and capped per hour, "
+        "so this message is the first time this violation was seen recently.</p>"
+    )
+    html_message = _build_email_html(
+        title="CSP violation report",
+        main_content=main_content,
+        end_note=f"{About.project_name} security",
+        unsubscribe_query=None,
+    )
+    _dispatch_email(
+        recipient,
+        subject=f"CSP violation on {About.project_name}: {directive}",
+        html_message=html_message,
+    )
+

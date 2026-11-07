@@ -60,7 +60,9 @@
         {% for post in latest_posts %}
         <li class="about-news-item">
           <a class="about-news-thumb" href="{% url 'blog:story_detail' post.slug %}" tabindex="-1" aria-hidden="true">
-            <img src="{{ post.image_1|cloudinary_proxy|default:story_placeholder }}" alt="{{ post.heading }}" loading="lazy" decoding="async">
+            {% with card_src=post.image_1|cloudinary_image:"f_auto/q_auto/w_320" card_srcset=post.image_1|cloudinary_srcset:"160,320,480" %}
+            <img src="{{ card_src|default:story_placeholder }}"{% if card_srcset %} srcset="{{ card_srcset }}" sizes="80px"{% endif %} alt="{{ post.heading }}" loading="lazy" decoding="async">
+            {% endwith %}
           </a>
           <div class="about-news-body">
             <a class="about-news-link" href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a>

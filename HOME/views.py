@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+import re
 from datetime import timedelta
 from urllib.parse import urlencode
 from xml.sax.saxutils import quoteattr
@@ -8,12 +9,14 @@ from xml.sax.saxutils import quoteattr
 from django.contrib import messages
 from django.contrib.auth import get_user_model, logout as auth_logout
 from django.contrib.sessions.models import Session
+from django.core.cache import cache
 from django.core.exceptions import BadRequest, ValidationError
 from django.core.paginator import Paginator, EmptyPage, Page
 from django.core.validators import URLValidator
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Prefetch
 from django.http import Http404, HttpResponse, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
@@ -38,6 +41,8 @@ from SERVICE_INTERNAL.config import About, StaffConfig, custom_context_processor
 from SERVICE_INTERNAL.cache_keys import (
     HOME_BLOGS_CACHE_KEY,
     HOME_BLOGS_CACHE_TTL,
+    HOME_PAGE_HTML_CACHE_KEY,
+    HOME_PAGE_HTML_CACHE_TTL,
     STORY_FEED_CACHE_KEY,
     STORY_FEED_CACHE_TTL,
 )
@@ -66,6 +71,16 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 25  #   THE AMOUNT OF NEWs  TO FIRDT LOAD excluding the feratured + THE PAGINATION AS WELL
 FEATURED_COUNT = 5  #   FEATUREAD
+
+#   The anonymous page-1 HTML cache stores one placeholder instead of a CSRF
+#   token. get_token() returns a freshly masked token on every call, so the
+#   rendered token cannot be found again by re-calling it; match the hidden
+#   input itself instead. Every form on the home page uses this input shape.
+_CSRF_INPUT_RE = re.compile(
+    r'(name=["\']csrfmiddlewaretoken["\']\s+value=["\'])[^"\']*(["\'])',
+    re.IGNORECASE,
+)
+_CSRF_PLACEHOLDER = "__ABUREPORT_CSRF_TOKEN__"
 #   A banner link is later placed inside CSS (url('...')) on the home page. These
 #   characters are never part of a normal picture link, so they are refused at
 #   the door; the css_url template filter is the second lock.
@@ -841,6 +856,32 @@ class HomeView(View):
 
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
 
+        #   ANONYMOUS PAGE-1 HTML CACHE: the finished page is stored as bytes
+        #   so repeat visits skip template rendering and the per-request
+        #   context work. Signed-in readers, paginated/filtered URLs and any
+        #   request carrying a session bypass it: their navbar, bookmarks and
+        #   messages are personal. The cache key is cleared by the Blog,
+        #   Category, StaffProfile and SiteSettings signals, so a new story is
+        #   visible on the next request.
+        cache_html = (
+            page_number == 1
+            and not request.user.is_authenticated
+            and not request.session.session_key
+            and not request.GET
+        )
+        if cache_html:
+            cached_html = cache.get(HOME_PAGE_HTML_CACHE_KEY)
+            if cached_html:
+                #   The footer newsletter form carries a CSRF token. The
+                #   cached copy stores a placeholder; every reader gets a fresh
+                #   token tied to their own cookie, and get_token() makes the
+                #   CSRF middleware set that cookie on this response.
+                token = get_token(request)
+                return HttpResponse(
+                    cached_html.replace(_CSRF_PLACEHOLDER, str(token)),
+                    content_type="text/html; charset=utf-8",
+                )
+
         #   PAGE 1 is served from the cache: the hero head and the first grid
         #   page live under one key (see _home_first_page) so the vast majority
         #   of readers, who never leave page 1, never touch the story table.
@@ -890,7 +931,15 @@ class HomeView(View):
             **_page_context(page, request.user),
             **_continue_popup_context(request.user),
         }
-        return render(request, "HOME/home.html", context)
+        response = render(request, "HOME/home.html", context)
+        if cache_html and response.status_code == 200:
+            html = response.content.decode(response.charset or "utf-8")
+            #   The template's own {% csrf_token %} already generated a token
+            #   and marked the response for a CSRF cookie. Replace the rendered
+            #   value with a placeholder; each cache hit gets a fresh token.
+            html = _CSRF_INPUT_RE.sub(rf"\1{_CSRF_PLACEHOLDER}\2", html)
+            cache.set(HOME_PAGE_HTML_CACHE_KEY, html, HOME_PAGE_HTML_CACHE_TTL)
+        return response
 
 
 class LoadMoreView(View):
@@ -1290,6 +1339,9 @@ class AddNewsView(View):
         #   (BLOG.signals already clears the same key on every Blog save; this
         #   is the explicit belt-and-braces for the publish path.)
         invalidate_cache(HOME_BLOGS_CACHE_KEY)
+        #   The rendered anonymous homepage is a second cache layer; clear it
+        #   here as well so the publish path never waits for a signal callback.
+        invalidate_cache(HOME_PAGE_HTML_CACHE_KEY)
         #   NEW NEWS ALERT, NOW OPT IN: the author is asked twice in the editor
         #   (see add-news-editor.js) and only an explicit `newsletter=1` on the
         #   POST sends it. Email every user who has news alerts on and follows
@@ -2972,13 +3024,15 @@ class MostViewedView(View):
     HOME/static/home/js/most-viewed.js)."""
 
     def get(self, request):
+        from ARCHIVE.templatetags.archive_extras import cloudinary_image
+
         posts = cache_or_run("most-viewed-popular-stories", lambda: Blog.objects.select_related("author__staffprofile").order_by("-views", "-date_created")[:MOST_VIEWED_COUNT], timeout=30)
-        
+
         results = [
             {
                 "heading": post.heading,
                 "url": reverse("blog:story_detail", args=[post.slug]),
-                "image": post.image_1 or "",
+                "image": cloudinary_image(post.image_1, "f_auto/q_auto/w_320") if post.image_1 else "",
                 "views": post.views,
                 "category": post.get_category_display(),
             }

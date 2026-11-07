@@ -597,8 +597,22 @@ html.auth-gate-locked { overflow: hidden; }
 .hero-arrow { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; }
 .hero-arrow:hover { background: var(--amber); color: #0E1B2C; border-color: var(--amber); }
 .hero-dots { display: flex; align-items: center; gap: 8px; }
-.hero-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.4); border: none; padding: 0; transition: background 0.2s ease, width 0.25s ease; }
-.hero-dot.is-active { background: var(--amber); width: 26px; }
+/* The button is the 24px hit target; the painted dot is a pseudo-element. */
+.hero-dot {
+  position: relative;
+  width: 24px; height: 24px;
+  padding: 0; border: none; border-radius: 999px; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: width 0.25s ease;
+}
+.hero-dot::before {
+  content: ""; width: 8px; height: 8px; border-radius: 999px;
+  background: rgba(255,255,255,0.4);
+  transition: background 0.2s ease, width 0.25s ease;
+}
+.hero-dot.is-active { width: 34px; }
+.hero-dot.is-active::before { background: var(--amber); width: 26px; }
+.hero-dot:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 @media (min-width: 900px) {
   .hero-content { padding: 40px 60px 110px; }
@@ -2781,8 +2795,12 @@ html.nav-locked { overflow: hidden; }
   .search-form input { padding: 12px 14px; }
 
   .hero-arrow { width: 44px; height: 44px; }
-  .hero-dot { width: 12px; height: 12px; position: relative; }
-  .hero-dot::after { content: ""; position: absolute; inset: -9px; }
+  .hero-controls { gap: 8px; }
+  .hero-dots { gap: 4px; }
+  .hero-dot { width: 36px; height: 44px; }
+  .hero-dot.is-active { width: 44px; }
+  .hero-dot::before { width: 12px; height: 12px; }
+  .hero-dot.is-active::before { width: 26px; }
   .hero-bookmark { top: 14px; right: 14px; }
   .hero-bookmark .bookmark-chip { width: 44px; height: 44px; }
 
