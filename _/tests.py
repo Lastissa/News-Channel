@@ -91,6 +91,48 @@ class CSPReportTests(TestCase):
         self.assertEqual(report["script_sample"], "alert(1)")
 
     @patch("SERVICE_INTERNAL.email_single._try_send_csp_report_email")
+    def test_same_site_frame_report_is_ignored(self, send_email):
+        payload = {
+            "csp-report": {
+                **LEGACY_REPORT["csp-report"],
+                "document-uri": "https://www.abureport.com.ng/story/example/",
+                "violated-directive": "frame-src",
+                "blocked-uri": "https://abureport.com.ng/auth/gate/",
+            }
+        }
+
+        with patch("_.views.logger.warning") as warning:
+            response = self.client.post(
+                reverse("csp_report"),
+                data=json.dumps(payload),
+                content_type="application/csp-report",
+            )
+
+        self.assertEqual(response.status_code, 204)
+        send_email.assert_not_called()
+        warning.assert_not_called()
+
+    @patch("SERVICE_INTERNAL.email_single._try_send_csp_report_email")
+    def test_cross_site_frame_report_is_emailed(self, send_email):
+        payload = {
+            "csp-report": {
+                **LEGACY_REPORT["csp-report"],
+                "document-uri": "https://abureport.com.ng/story/example/",
+                "violated-directive": "frame-src",
+                "blocked-uri": "https://videos.example.com/embed/",
+            }
+        }
+
+        response = self.client.post(
+            reverse("csp_report"),
+            data=json.dumps(payload),
+            content_type="application/csp-report",
+        )
+
+        self.assertEqual(response.status_code, 204)
+        send_email.assert_called_once()
+
+    @patch("SERVICE_INTERNAL.email_single._try_send_csp_report_email")
     def test_duplicate_report_is_deduplicated(self, send_email):
         for _ in range(2):
             response = self.client.post(

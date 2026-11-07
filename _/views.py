@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 import hashlib
 import json
 import logging, hmac
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,40 @@ def _normalize_csp_report(report):
     }
 
 
+def _site_host(value):
+    """Hostname without the optional ``www.`` prefix, for same-site checks."""
+    host = (urlparse(value).hostname or "").lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def _is_same_site_frame_report(report):
+    """True when a frame/child-src report is about our own site.
+
+    ``frame-src 'self'`` already allows same-origin iframes, so these reports
+    are noise (and would otherwise fill the inbox every time an internal
+    iframe, such as the auth gate or archive picker, loads). The same check
+    also treats ``www.example.com`` and ``example.com`` as one site.
+    """
+    directive = (report.get("violated_directive") or "").lower()
+    if not directive.startswith(("frame-src", "child-src")):
+        return False
+
+    blocked = (report.get("blocked_uri") or "").strip()
+    document = (report.get("document_uri") or "").strip()
+
+    if blocked.lower() in {"self", "'self'"}:
+        return True
+    if blocked and not urlparse(blocked).netloc and not blocked.startswith(
+        ("data:", "blob:")
+    ):
+        #   Relative iframe URLs are same-origin by definition.
+        return True
+
+    blocked_host = _site_host(blocked)
+    document_host = _site_host(document)
+    return bool(blocked_host and document_host and blocked_host == document_host)
+
+
 @method_decorator(csrf_exempt, name="dispatch")
 class CSPReportView(View):
     """Receives browser CSP reports and emails new violations.
@@ -199,6 +234,12 @@ class CSPReportView(View):
         from SERVICE_INTERNAL.email_single import _try_send_csp_report_email
 
         for report in reports:
+            #   Same-site iframes are explicitly allowed by ``frame-src 'self'``.
+            #   Some browsers still send a report for them; keep that noise out
+            #   of the log and inbox.
+            if _is_same_site_frame_report(report):
+                continue
+
             digest = hashlib.sha256(
                 json.dumps(report, sort_keys=True).encode("utf-8")
             ).hexdigest()
