@@ -8,7 +8,7 @@ from unittest import mock
 
 import json
 import re
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from urllib.parse import urlencode
 
 from django.core.cache import cache
@@ -20,6 +20,7 @@ from django.utils import timezone
 from ADMIN.analytics import (
     NO_CATEGORY_KEY,
     _week_start,
+    daily_story_activity,
     member_new_today,
     member_overview,
 )
@@ -1291,6 +1292,134 @@ class AnalyticsReadingTests(TestCase):
         self.assertNotIn("Like rate", body)
 
 
+class AnalyticsDailyStoryActivityTests(TestCase):
+    """The Daily story activity card: stories opened on one day, with that
+    day's own views, likes and comments."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+        self.admin = Auth.objects.create_admin(email="daily-admin@example.com")
+        self.writer = Auth.objects.create_staff(email="daily-writer@example.com")
+        self.member = Auth.objects.create_user(email="daily-member@example.com")
+        self.other_member = Auth.objects.create_user(email="daily-member-2@example.com")
+        self.today = timezone.localdate()
+        self.url = reverse("control:analytics_daily_story_activity")
+
+    def make_story(self, heading, category="NEWS"):
+        return Blog.objects.create(
+            author=self.writer, heading=heading, category=category,
+            content="Body.", image_1="https://example.com/a.jpg",
+        )
+
+    def stamp(self, day, hour=12):
+        return timezone.make_aware(datetime.combine(day, time(hour=hour)))
+
+    def add_view(self, story, day):
+        view = StoryView.objects.create(blog=story)
+        StoryView.objects.filter(pk=view.pk).update(created_at=self.stamp(day))
+
+    def add_like(self, story, day, user=None):
+        like = BlogLike.objects.create(blog=story, user=user or self.member)
+        BlogLike.objects.filter(pk=like.pk).update(created_at=self.stamp(day))
+
+    def add_comment(self, story, day):
+        comment = Comment.objects.create(
+            blog=story, author=self.member, content="Good read."
+        )
+        Comment.objects.filter(pk=comment.pk).update(date_created=self.stamp(day))
+
+    #   ------------------------------------------------------------ access
+    def test_the_endpoint_is_admin_only(self):
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.writer)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.logout()
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_the_story_lytics_shell_links_the_card(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("control:story_lytics")).content.decode()
+        self.assertIn("analytics-daily-activity-body", body)
+        self.assertIn("analytics/story/daily-activity/", body)
+
+    #   ------------------------------------------------------------ the roster
+    def test_only_stories_viewed_that_day_are_listed(self):
+        busy = self.make_story("Daily busy")
+        quiet = self.make_story("Daily quiet")
+        yesterday_story = self.make_story("Daily yesterday")
+        never_viewed = self.make_story("Daily never viewed")
+        reacted_not_viewed = self.make_story("Daily reacted not viewed")
+
+        for _ in range(3):
+            self.add_view(busy, self.today)
+        self.add_view(quiet, self.today)
+        self.add_view(yesterday_story, self.today - timedelta(days=1))
+        self.add_like(reacted_not_viewed, self.today)
+        self.add_comment(reacted_not_viewed, self.today)
+
+        self.client.force_login(self.admin)
+        activity = daily_story_activity(self.today.isoformat())
+        self.assertEqual(
+            [story["heading"] for story in activity["stories"]],
+            ["Daily busy", "Daily quiet"],
+        )
+        self.assertEqual(activity["story_count"], 2)
+        self.assertEqual(activity["views"], 4)
+
+        body = self.client.get(self.url).content.decode()
+        self.assertIn("Daily busy", body)
+        self.assertIn("Daily quiet", body)
+        self.assertNotIn(yesterday_story.heading, body)
+        self.assertNotIn(never_viewed.heading, body)
+        self.assertNotIn(reacted_not_viewed.heading, body)
+
+    def test_likes_and_comments_are_counted_for_that_day_only(self):
+        story = self.make_story("Daily signals")
+        self.add_view(story, self.today)
+        self.add_view(story, self.today - timedelta(days=1))
+
+        self.add_like(story, self.today, self.member)
+        self.add_like(story, self.today - timedelta(days=1), self.other_member)
+        self.add_comment(story, self.today)
+        self.add_comment(story, self.today - timedelta(days=1))
+
+        activity = daily_story_activity(self.today.isoformat())
+        row = activity["stories"][0]
+        self.assertEqual(row["views"], 1)
+        self.assertEqual(row["likes"], 1)
+        self.assertEqual(row["comments"], 1)
+        self.assertEqual(activity["views"], 1)
+        self.assertEqual(activity["likes"], 1)
+        self.assertEqual(activity["comments"], 1)
+
+    def test_the_date_box_loads_another_day(self):
+        yesterday = self.today - timedelta(days=1)
+        story = self.make_story("Daily yesterday story")
+        self.add_view(story, yesterday)
+        self.add_like(story, yesterday)
+        self.add_comment(story, yesterday)
+
+        self.client.force_login(self.admin)
+        default = self.client.get(self.url).content.decode()
+        self.assertNotIn("Daily yesterday story", default)
+
+        body = self.client.get(self.url, {"day": yesterday.isoformat()}).content.decode()
+        self.assertIn("Daily yesterday story", body)
+        self.assertIn('value="%s"' % yesterday.isoformat(), body)
+        self.assertIn("1 view", body)
+        self.assertIn("1 like", body)
+        self.assertIn("1 comment", body)
+
+    def test_a_future_or_malformed_day_falls_before_today(self):
+        future = self.today + timedelta(days=3)
+        self.assertEqual(daily_story_activity(future.isoformat())["day"], self.today)
+        self.assertTrue(daily_story_activity("banana")["is_today"])
+
+
 class AnalyticsCategoryDailyTests(TestCase):
     """The "Stories per day, by category" chart
     (control:analytics_story_category_daily).
@@ -2133,7 +2262,13 @@ class AnalyticsCategoryPerformanceTests(TestCase):
             "analytics-category-performance-data",
         )
         totals = {series["key"]: sum(series["values"]) for series in chart["series"]}
-        self.assertEqual(totals, {"views": 2, "likes": 1, "comments": 1})
+        self.assertEqual(
+            [series["key"] for series in chart["series"]],
+            ["stories", "views", "likes", "comments"],
+        )
+        self.assertEqual(
+            totals, {"stories": 1, "views": 2, "likes": 1, "comments": 1}
+        )
         self.assertEqual(chart["category"]["label"], "NEWS")
 
     def test_only_the_chosen_series_are_drawn(self):
@@ -2162,6 +2297,22 @@ class AnalyticsCategoryPerformanceTests(TestCase):
         )
         #   The news story from setUp is inside thirty days; the old one is not.
         self.assertEqual(chart["category"]["stories"], 1)
+
+    def test_the_stories_series_counts_published_stories_per_bucket(self):
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.url,
+                {"category": "NEWS", "bucket": "day", "range": "30d"},
+            ),
+            "analytics-category-performance-data",
+        )
+        stories = next(
+            series for series in chart["series"] if series["key"] == "stories"
+        )
+        self.assertEqual(len(stories["values"]), len(chart["labels"]))
+        self.assertEqual(sum(stories["values"]), 1)
 
     def test_the_story_lytics_shell_links_the_card(self):
         self.client.force_login(self.admin)

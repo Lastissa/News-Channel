@@ -45,6 +45,8 @@ from ADMIN.models import SiteSettings
 from ADMIN.analytics import (
     AUTHOR_DEFAULT_RANGE,
     AUTHOR_RANGE_CHOICES,
+    CATEGORY_PERFORMANCE_SERIES,
+    DEFAULT_CATEGORY_PERFORMANCE_SERIES,
     DEFAULT_STORY_PERFORMANCE_SERIES,
     DEFAULT_STORY_PERIOD,
     DEFAULT_TREND_BUCKET,
@@ -78,6 +80,7 @@ from ADMIN.analytics import (
     category_palette,
     category_performance,
     category_story_counts,
+    daily_story_activity,
     member_category_filter_choices,
     member_directory_queryset,
     member_new_today,
@@ -1003,7 +1006,7 @@ class AnalyticsCategoryPerformanceView(View):
         if "submitted" in request.GET:
             series_keys = set(request.GET.getlist("series"))
         else:
-            series_keys = set(DEFAULT_STORY_PERFORMANCE_SERIES)
+            series_keys = set(DEFAULT_CATEGORY_PERFORMANCE_SERIES)
 
         return render(
             request,
@@ -1229,6 +1232,26 @@ class AnalyticsReadingView(View):
             request,
             "ADMIN/partials/analytics_reading.html",
             reading_editorial(selected_range, cooled_since),
+        )
+
+
+class AnalyticsDailyStoryActivityView(View):
+    """htmx fragment: stories opened on one day, with that day's signals.
+
+    Read only and admin only. The optional `day` querystring is parsed and
+    clamped inside daily_story_activity(), so a malformed or future date
+    quietly falls back to today instead of widening the roster.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        day_iso = (request.GET.get("day") or "").strip()
+        return render(
+            request,
+            "ADMIN/partials/analytics_daily_story_activity.html",
+            {"activity": daily_story_activity(day_iso)},
         )
 
 
@@ -1538,6 +1561,8 @@ class StoryLyticsView(View):
                 "story_kpi_ranges": STORY_KPI_RANGE_CHOICES,
                 "story_performance_series": STORY_PERFORMANCE_SERIES,
                 "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
+                "category_performance_series": CATEGORY_PERFORMANCE_SERIES,
+                "default_category_performance_series": DEFAULT_CATEGORY_PERFORMANCE_SERIES,
                 #   The per-category charts work from the live category list.
                 "categories": [
                     {

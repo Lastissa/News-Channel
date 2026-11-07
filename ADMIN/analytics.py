@@ -121,6 +121,15 @@ STORY_PERFORMANCE_SERIES = [
 ]
 DEFAULT_STORY_PERFORMANCE_SERIES = ["views", "likes", "comments"]
 
+#   Category performance adds the number of stories published in the category
+#   to the three reader signals. It is deliberately separate from
+#   STORY_PERFORMANCE_SERIES: a single story cannot "publish" a story count,
+#   so the per-story chart keeps its three signals unchanged.
+CATEGORY_PERFORMANCE_SERIES = [
+    {"key": "stories", "name": "Stories", "color": "#d97706"},
+] + STORY_PERFORMANCE_SERIES
+DEFAULT_CATEGORY_PERFORMANCE_SERIES = ["stories", "views", "likes", "comments"]
+
 #   Dropdown options, in the order the shell renders them. Kept beside the
 #   period dictionaries above so a value can never appear in a menu that the
 #   aggregation helper does not understand.
@@ -903,6 +912,93 @@ def reading_editorial(selected_range, cooled_since=None):
 
 
 #   -------------------------------------------------------------------------
+#   DAILY STORY ACTIVITY -- one day's reads, likes and comments per story
+#   -------------------------------------------------------------------------
+#   A compact, day-scoped table rather than a chart: every story that was
+#   opened on the chosen local day, with each signal counted ONLY inside that
+#   day. Yesterday's views never leak into today's row, so moving the date box
+#   really does give the roster for that day.
+
+def _grouped_event_counts(model, field, start, end, blog_ids=None):
+    """{blog_id: event count} for rows inside [start, end), in one query."""
+    queryset = model.objects.filter(**{f"{field}__gte": start, f"{field}__lt": end})
+    if blog_ids is not None:
+        queryset = queryset.filter(blog_id__in=blog_ids)
+    rows = _safe_rows(
+        queryset.values("blog_id").annotate(n=Count("id")).order_by()
+    )
+    return {row["blog_id"]: row["n"] for row in rows}
+
+
+def daily_story_activity(day_iso=None):
+    """Stories opened on one local day, with that day's views / likes / comments.
+
+    A story is listed only when it was opened at least once inside the day, and
+    every count beside it is for that day alone. A future date is clamped to
+    today so a hand typed querystring cannot ask for a day that has not
+    happened yet.
+    """
+    today = timezone.localdate()
+    day = parse_date((day_iso or "").strip()) or today
+    if day > today:
+        day = today
+
+    window = _custom_window(day.isoformat(), day.isoformat())
+    if window is None:
+        #   Defensive only: a valid date always makes a valid one-day window.
+        start = timezone.make_aware(datetime.combine(day, time.min))
+        end = start + timedelta(days=1)
+    else:
+        start, end = window
+
+    view_counts = _grouped_event_counts(StoryView, "created_at", start, end)
+    stories = []
+    if view_counts:
+        ids = list(view_counts)
+        like_counts = _grouped_event_counts(
+            BlogLike, "created_at", start, end, blog_ids=ids
+        )
+        comment_counts = _grouped_event_counts(
+            Comment, "date_created", start, end, blog_ids=ids
+        )
+        blogs = Blog.objects.in_bulk(ids)
+
+        for story_id, views in view_counts.items():
+            story = blogs.get(story_id)
+            if story is None:      #   deleted between the two reads
+                continue
+            stories.append(
+                {
+                    "heading": story.heading,
+                    "slug": story.slug,
+                    "category": story.category,
+                    "views": views,
+                    "likes": like_counts.get(story_id, 0),
+                    "comments": comment_counts.get(story_id, 0),
+                }
+            )
+
+    stories.sort(
+        key=lambda story: (
+            -story["views"],
+            -story["likes"],
+            -story["comments"],
+            (story["heading"] or "").lower(),
+        )
+    )
+    return {
+        "day": day,
+        "today": today,
+        "is_today": day == today,
+        "stories": stories,
+        "story_count": len(stories),
+        "views": sum(story["views"] for story in stories),
+        "likes": sum(story["likes"] for story in stories),
+        "comments": sum(story["comments"] for story in stories),
+    }
+
+
+#   -------------------------------------------------------------------------
 #   STORIES PER DAY, BY CATEGORY -- the publishing rate of each subject
 #   -------------------------------------------------------------------------
 #   One line per category, each counting the stories published in that
@@ -1127,7 +1223,7 @@ def category_comparison(
 def category_performance(
     category_name, bucket, selected_range, series_keys, start_iso=None, end_iso=None
 ):
-    """Line chart data for one category: views, likes and comments over time."""
+    """Line chart data for one category: stories published, views, likes, comments."""
     names = category_names()
     if category_name not in names:
         category_name = names[0] if names else NO_CATEGORY_KEY
@@ -1140,26 +1236,24 @@ def category_performance(
 
     frame = _trend_frame(bucket, selected_range, start_iso, end_iso)
     story_ids = stories.values("pk")
+    published = _windowed_values(stories, "date_created", frame)
 
     def count_events(model, field):
         queryset = model.objects.filter(blog_id__in=story_ids)
         return _frame_counts(frame, _windowed_values(queryset, field, frame))
 
     sources = {
+        "stories": lambda: _frame_counts(frame, published),
         "views": lambda: count_events(StoryView, "created_at"),
         "likes": lambda: count_events(BlogLike, "created_at"),
         "comments": lambda: count_events(Comment, "date_created"),
     }
 
     series = []
-    for meta in STORY_PERFORMANCE_SERIES:
+    for meta in CATEGORY_PERFORMANCE_SERIES:
         if meta["key"] not in series_keys:
             continue
         series.append({**meta, "values": sources[meta["key"]]()})
-
-    published = stories.filter(date_created__gte=frame["start"])
-    if frame["end_exclusive"] is not None:
-        published = published.filter(date_created__lt=frame["end_exclusive"])
 
     label = NO_CATEGORY_LABEL if category_name == NO_CATEGORY_KEY else category_name
     return {
@@ -1169,7 +1263,7 @@ def category_performance(
         "category": {
             "key": category_name,
             "label": label,
-            "stories": published.count(),
+            "stories": len(published),
         },
         "bucket": bucket,
         "range": selected_range,

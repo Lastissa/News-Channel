@@ -9,7 +9,7 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
-  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261105-1">
+  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261107-2">
 {% endblock %}
 
 {% block content %}
@@ -151,6 +151,27 @@
 
     <hr class="analytics-divider">
 
+    <section class="analytics-card" aria-labelledby="analytics-daily-activity-title"
+             data-guide-title="Daily story activity"
+             data-guide-text="Every story opened on the chosen day, with that day's own views, likes and comments. The counts reset with the date; they never include another day's activity.">
+      {% comment %}Stories that were actually read on one day, with each
+         signal counted inside that same day. The date picker lives in the
+         fragment so the heading and table always describe the day on screen.{% endcomment %}
+      <header class="analytics-card-header">
+        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-reading"/></svg></span>
+        <h2 id="analytics-daily-activity-title">Daily story activity</h2>
+      </header>
+      <div class="analytics-chart-body" id="analytics-daily-activity-body"
+           hx-get="{% url 'control:analytics_daily_story_activity' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           aria-live="polite" aria-busy="true">
+        <p class="analytics-loading">Loading today's stories&hellip;</p>
+      </div>
+    </section>
+
+    <hr class="analytics-divider">
+
     <section class="analytics-card" aria-labelledby="analytics-category-daily-title"
              data-guide-title="Stories per day, by category"
              data-guide-text="How much is published in each subject, bucket by bucket. One line per category; tick the subjects you want to compare. The window is a preset, or your own start and end dates when you want exactly two days or exactly a week.">
@@ -274,11 +295,12 @@
 
     <section class="analytics-card" aria-labelledby="analytics-category-perf-title"
              data-guide-title="Category performance"
-             data-guide-text="One subject's views, likes and comments over time. Pick a category, then choose the time frame and the signals to plot. The events are counted from the stories filed under that subject in the chosen window.">
+             data-guide-text="One subject's published story count, views, likes and comments over time. Pick a category, then choose the time frame and the signals to plot. Events are counted from the stories filed under that subject in the chosen window.">
       {% comment %}The category twin of Story performance: pick one subject and
-         overlay its views, likes and comments on the same bucket / range
-         controls. Kept next to the head-to-head comparison so an editor can
-         compare two subjects and then inspect one of them over time.{% endcomment %}
+         overlay its published story count, views, likes and comments on the
+         same bucket / range controls. Kept next to the head-to-head comparison
+         so an editor can compare two subjects and then inspect one of them
+         over time.{% endcomment %}
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-category-perf-title">Category performance</h2>
@@ -308,11 +330,11 @@
 
         <fieldset class="analytics-series"
                   data-guide-title="Signals to plot"
-                  data-guide-text="Views, likes and comments for the chosen category, each counted from its own events inside the bucket.">
+                  data-guide-text="Stories published in the chosen category, plus its views, likes and comments, each counted from its own events inside the bucket.">
           <legend class="panel-sr">Series to plot</legend>
-          {% for meta in story_performance_series %}
+          {% for meta in category_performance_series %}
           <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
-            <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_story_performance_series %} checked{% endif %}>
+            <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_category_performance_series %} checked{% endif %}>
             <span class="analytics-series-swatch" aria-hidden="true"></span>
             <span>{{ meta.name }}</span>
           </label>

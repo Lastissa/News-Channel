@@ -42,6 +42,7 @@ urlpatterns = [
     path("panel/analytics/author/likes/", views.AnalyticsAuthorLikesView.as_view(), name="analytics_author_likes"),
     path("panel/analytics/story/", views.StoryLyticsView.as_view(), name="story_lytics"),
     path("panel/analytics/story/uncategorized/", views.AnalyticsUncategorizedStoriesView.as_view(), name="analytics_uncategorized_stories"),
+    path("panel/analytics/story/daily-activity/", views.AnalyticsDailyStoryActivityView.as_view(), name="analytics_daily_story_activity"),
     path("panel/analytics/partner/", views.PartnerLyticsView.as_view(), name="partner_lytics"),
     path("panel/gallery/", views.PanelStaffGalleryView.as_view(), name="panel_gallery"),
     path("panel/sessions/", views.PanelSessionsView.as_view(), name="panel_sessions"),

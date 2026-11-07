@@ -1,0 +1,60 @@
+{% comment %}
+  htmx fragment: the "Daily story activity" card on Story lytics.
+
+  One local day at a time. A story appears only when it was opened that day,
+  and every number beside it (views, likes, comments) is counted inside that
+  same day, never from the all-time counters. Moving the date box asks this
+  endpoint for another day and swaps the table in place.
+{% endcomment %}
+<div class="analytics-daily" data-daily-root>
+  <div class="analytics-daily-head">
+    <p class="analytics-reading-range">
+      {{ activity.day|date:"M j, Y" }}{% if activity.is_today %} &middot; today{% endif %}
+    </p>
+    <label class="analytics-reading-cooled">
+      <span class="analytics-reading-cooled-label">Day</span>
+      <input type="date" name="day" value="{{ activity.day|date:'Y-m-d' }}"
+             max="{{ activity.today|date:'Y-m-d' }}"
+             hx-get="{% url 'control:analytics_daily_story_activity' %}"
+             hx-target="#analytics-daily-activity-body"
+             hx-swap="innerHTML"
+             hx-trigger="change">
+    </label>
+  </div>
+
+  {% if activity.stories %}
+  <p class="analytics-reading-note">
+    <strong>{{ activity.story_count }}</strong> stor{{ activity.story_count|pluralize:"y,ies" }} viewed
+    &middot; {{ activity.views }} view{{ activity.views|pluralize }}
+    &middot; {{ activity.likes }} like{{ activity.likes|pluralize }}
+    &middot; {{ activity.comments }} comment{{ activity.comments|pluralize }}
+  </p>
+  <div class="analytics-reading-scroll analytics-daily-scroll">
+    <table class="analytics-reading-table">
+      <thead>
+        <tr>
+          <th scope="col">Story</th>
+          <th scope="col">Views</th>
+          <th scope="col">Likes</th>
+          <th scope="col">Comments</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for story in activity.stories %}
+        <tr>
+          <td>
+            <a class="analytics-reading-story" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
+            <span class="analytics-reading-cat">{{ story.category }}</span>
+          </td>
+          <td class="analytics-reading-num">{{ story.views }}</td>
+          <td class="analytics-reading-num">{{ story.likes }}</td>
+          <td class="analytics-reading-num">{{ story.comments }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="analytics-reading-empty">No story was viewed on {{ activity.day|date:"M j, Y" }}.</p>
+  {% endif %}
+</div>

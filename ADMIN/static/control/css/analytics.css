@@ -783,6 +783,19 @@ html[data-theme="dark"] .analytics-reading-cooled input[type="date"] { backgroun
   outline: 2px solid var(--an-focus); outline-offset: 2px;
 }
 
+/* Daily story activity: the day label and its picker sit on one line, and the
+   roster scrolls vertically once a busy day runs past the card. */
+.analytics-daily-head {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px 12px; margin-bottom: 6px;
+}
+.analytics-daily-head .analytics-reading-range { margin: 0; }
+.analytics-daily-scroll { max-height: 440px; overflow-y: auto; }
+.analytics-daily-scroll thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--paper);
+}
+html[data-theme="dark"] .analytics-daily-scroll thead th { background: var(--paper-dim); }
+
 @media (max-width: 640px) {
   .analytics-shell { padding: 0 12px 44px; }
   .analytics-topbar { gap: 10px; }
