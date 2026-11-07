@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.core.exceptions import RequestDataTooBig
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, JsonResponse
 from django.views import View
@@ -168,7 +169,11 @@ class CSPReportView(View):
         if content_length > max_bytes:
             return HttpResponse(status=413)
 
-        body = request.body
+        try:
+            body = request.body
+        except RequestDataTooBig:
+            #   Chunked uploads can arrive without a Content-Length header.
+            return HttpResponse(status=413)
         if len(body) > max_bytes:
             return HttpResponse(status=413)
 

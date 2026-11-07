@@ -515,6 +515,7 @@ def _try_send_csp_report_email(report, recipient=None):
         if report.get(key)
     )
     directive = report.get("violated_directive") or "unknown directive"
+    directive = str(directive).replace("\r", " ").replace("\n", " ")[:120]
     main_content = (
         f"<p>A browser reported a Content Security Policy violation on "
         f"{escape(About.domain)}.</p>"
