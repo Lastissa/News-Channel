@@ -2151,6 +2151,11 @@ class HomeScreenHeadTests(QuietTestCase):
         self.assertIn('rel="apple-touch-icon"', body)
         self.assertIn('<meta name="theme-color" content="#0E1B2C">', body)
 
+    def test_twitter_site_meta_uses_the_normalised_handle(self):
+        body = self.client.get("/").content.decode()
+
+        self.assertIn('<meta name="twitter:site" content="@ABUSUAD01">', body)
+
 
 class ImageLinkSafetyTests(QuietTestCase):
     """A banner link ends up inside CSS on the home page, so it is checked twice:

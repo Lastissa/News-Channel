@@ -92,7 +92,10 @@ def custom_context_processors(request):
         site_settings = None
 
     facebook = (site_settings.facebook_handle if site_settings else default_social) #or About.facebook
-    tweeter = (site_settings.twitter_handle if site_settings else default_social) #or About.tweeter
+    #   The panel value wins; otherwise fall back to the project-level handle.
+    #   Without this, a blank SiteSettings row rendered the 404 placeholder
+    #   instead of the real X account.
+    tweeter = (site_settings.twitter_handle if site_settings else "") or About.tweeter
     partnership_email = (site_settings.promotion_email if site_settings else default_social) #or About.email
     tech_expert_email = (site_settings.tech_expert_email if site_settings else default_social)
     support_email = (site_settings.support_email if site_settings else default_social)
@@ -102,7 +105,11 @@ def custom_context_processors(request):
     #   SEO: every social link that actually has a value, used for the sitewide
     #   JSON-LD "sameAs" list so an empty handle never renders as a blank entry.
     social_links = [url for url in (facebook, tweeter, whatsapp, About.instagram, About.linkedin) if url]
-    twitter_username = tweeter.rstrip("/").split("/")[-1] if tweeter else default_social
+    #   Normalise a profile URL (or a bare / @handle) to just the username,
+    #   which is what twitter:site and twitter:creator expect.
+    twitter_username = ""
+    if tweeter and tweeter != default_social:
+        twitter_username = tweeter.rstrip("/").split("/")[-1].lstrip("@")
 
     context = {
         "project_name": About.project_name,
