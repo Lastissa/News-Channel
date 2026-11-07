@@ -22,7 +22,7 @@ if not DEBUG:
 CSRF_COOKIE_SECURE = True
 
 #   HTTPS / SECURITY HEADERS. The site is served through a proxy (Cloudflare
-#   in front of Render), so Django has to trust its X-Forwarded-Proto before
+#   in front of Render), so Django has to trust a request with its header containing X-Forwarded-Proto before
 #   it can know a request is secure. HSTS is only sent on secure requests and
 #   is disabled in DEBUG. CSP is report-only for now: the AdSense tag and the
 #   inline splash/theme scripts must keep working while Google reviews them.
@@ -36,9 +36,7 @@ SECURE_HSTS_PRELOAD = not DEBUG
 #   CSP REPORTING: report-only violations are posted to /csp-report/, which
 #   logs them and emails new ones to this address. Deduplication and an hourly
 #   cap keep one noisy page from flooding the inbox.
-CSP_REPORT_ENABLED = os.getenv(
-    "CSP_REPORT_ENABLED", "False" if DEBUG else "True"
-).upper() == "TRUE"
+CSP_REPORT_ENABLED = os.getenv("CSP_REPORT_ENABLED", "False" if DEBUG else "True").upper() == "TRUE"
 CSP_REPORT_EMAIL = os.getenv("CSP_REPORT_EMAIL", "lastissa11@gmail.com")
 CSP_REPORT_MAX_BYTES = 16 * 1024
 CSP_REPORT_DEDUPE_SECONDS = 6 * 60 * 60
@@ -165,7 +163,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 SESSION_COOKIE_AGE = 7 * 24 * 60 * 60 # 7 days for regular user
 ADMIN_MAX_AGE_TOO = 24 * 60 * 60 # 1 day max for admins for security reason
+
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
@@ -198,8 +198,7 @@ else:
         }
     }
     
-    
-CSRF_TRUSTED_ORIGINS
+
 
 CLOUDINARY_CLOUD_NAME = os.getenv('cloud_name')
 CLOUDINARY_API_KEY = os.getenv('cloudinary_api_key')
@@ -208,7 +207,7 @@ CLOUDINARY_API_SECRET = os.getenv('cloudinary_api_secret')
 #IMAGE UPLOADS (avatars + news images, see SERVICE_INTERNAL/images.py)
 IMAGE_UPLOAD_MAX_MB = int(os.getenv('image_upload_max_mb', 5))
 #   NON-IMAGE FILE uploads to the /archive/ gallery (see
-#   SERVICE_INTERNAL.images.upload_archive_file). Two ceilings, never one:
+#   SERVICE_INTERNAL.images.upload_archive_file). Two ceilings:
 #   videos (mp4/mov) get ARCHIVE_VIDEO_UPLOAD_MAX_MB (default 5 -- kept
 #   small so a single clip can never burn a big slice of hosting bandwidth),
 #   and every other file kind is kept much smaller with

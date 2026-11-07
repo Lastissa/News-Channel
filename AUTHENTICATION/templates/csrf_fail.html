@@ -12,8 +12,9 @@
       <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 1 21h22L12 2zm0 4.5 7.5 13h-15L12 6.5zM11 10v5h2v-5h-2zm0 6.5V19h2v-2.5h-2z"/></svg>
     </div>
     <p class="legal-eyebrow">Security check</p>
-    <h1>That action couldn't be completed</h1>
-    <p class="legal-intro">Your request was blocked by a security check, usually because the page was open a while before you submitted it, or you went back to a cached copy of the page.</p>
+    <h1>Who Are You</h1>
+    <h2>CSRF: You suppose don understand</h2>
+    {% comment %} <p class="legal-intro">Your request was blocked by a security check, usually because the page was open a while before you submitted it, or you went back to a cached copy of the page.</p>
     <p class="legal-intro">Or You Double Force tap a button already in the process of gettin you what you need, <b>common cases - (1) during login / signup</b></p>
 
     <h2>What you can do</h2>
@@ -30,6 +31,7 @@
       <a href="javascript:history.back()" class="csrf-fail-btn csrf-fail-btn-ghost">Go back</a>
       <a href="{% url 'home:home' %}" class="csrf-fail-btn">Return home</a>
     </div>
-  </div>
-</section>
+    {% endcomment %}
+    </div>
+</section> 
 {% endblock content %}
