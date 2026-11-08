@@ -2346,19 +2346,22 @@ ins.adsbygoogle,
 }
 
 @media (min-width: 640px) {
+  /* Desktop keeps the prompt as a single compact card docked to the right,
+     not a full-width sheet. Only the narrow layout should span the viewport. */
   .newsletter-popup {
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: auto;
+    right: 20px;
+    bottom: 20px;
     padding: 0;
-    justify-content: stretch;
+    justify-content: flex-end;
   }
   .newsletter-popup-card {
-    max-width: 100%;
-    border-radius: 0;
-    border-top: 4px double red;
-    padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    width: min(440px, calc(100vw - 40px));
+    max-width: 440px;
+    border-radius: var(--radius-l);
+    padding: 22px 22px 20px;
   }
+  .newsletter-popup-body { overflow: visible; }
   .newsletter-popup-form { flex-direction: row; flex-wrap: wrap; }
   .newsletter-popup-form input { flex: 1 1 auto; min-width: 0; }
   .newsletter-popup-actions { flex: 0 0 auto; }
@@ -2854,6 +2857,12 @@ html.nav-locked { overflow: hidden; }
   .social-row a { width: 44px; height: 44px; }
   .footer-col .footer-contact-socials a { width: 44px; height: 44px; }
   .footer-auth-link { min-height: 44px; }
+}
+
+/* The docked desktop prompt is a card, not a sheet: it shows all of its copy
+   at once, so the phone height cap above must not leave an inner scrollbar. */
+@media (min-width: 640px) {
+  .newsletter-popup-card { max-height: none; }
 }
 
 /* ---- Landscape phones: the fixed 45vh hero would be crushed, so let it

@@ -9,7 +9,7 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
-  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261107-3">
+  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261108-1">
 {% endblock %}
 
 {% block content %}
@@ -133,9 +133,9 @@
   <section class="analytics-author-likes-panel is-collapsed" aria-labelledby="analytics-author-likes-title">
     <header class="analytics-author-panel-head">
       <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg></span>
-      <h2 id="analytics-author-likes-title">Likes, by name</h2>
+      <h2 id="analytics-author-likes-title">Likes- by name</h2>
       <p class="analytics-panel-note">Every like comes from a signed-in reader, so each row carries a name. Newest first.</p>
-      <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Likes, by name" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Likes- by name" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
     </header>
 
     <div class="analytics-collapse"><div class="analytics-collapse-inner">
@@ -159,7 +159,7 @@
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
   <script src="{% static 'control/js/analytics_apex.js' %}" defer></script>
-  <script src="{% static 'control/js/analytics.js' %}?v=20261107-2" defer></script>
+  <script src="{% static 'control/js/analytics.js' %}?v=20261108-1" defer></script>
 {% endblock %}
 
 {% block footer %}{% endblock %}

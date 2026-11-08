@@ -2520,9 +2520,9 @@ class AuthorLyticsTests(TestCase):
         response = self.client.get(self.table_url, {"range": "nonsense"})
         self.assertEqual(response.status_code, 200)
         body = response.content.decode()
-        #   The list labels the window in words ("30 days ago" for the default),
+        #   The list labels the window in words ("7 days ago" for the default),
         #   and the author who published in it is listed.
-        self.assertIn("30 days ago", body)
+        self.assertIn("7 days ago", body)
         self.assertIn("Ada Writer", body)
 
     #   ------------------------------------------------------------ KPIs

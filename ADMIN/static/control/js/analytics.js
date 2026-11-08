@@ -1012,6 +1012,11 @@
     var listBody = document.getElementById("analytics-authors-body");
     var currentAuthor = "";
     var currentPages = { stories_page: "", likes_page: "" };
+    var loadToken = 0;
+
+    /* Shortest time the shimmer stays on screen, in ms, so a fast local answer
+       still reads as a load rather than a flicker. */
+    var MIN_SKELETON_MS = 220;
 
     function currentRange() {
       if (!authorsForm) return "";
@@ -1036,14 +1041,45 @@
       detailPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
+    /* A profile, a strip of figures and two placeholder blocks: enough of the
+       detail's shape that the panel keeps its height while the fetch lands. */
+    function buildAuthorSkeleton() {
+      var stat = '<span class="an-skeleton analytics-author-skel-stat"></span>';
+      var stats = "";
+      for (var i = 0; i < 5; i += 1) stats += stat;
+      return (
+        '<div class="analytics-author-skel" aria-hidden="true">' +
+          '<div class="analytics-author-skel-profile">' +
+            '<span class="an-skeleton analytics-author-skel-avatar"></span>' +
+            '<span class="analytics-author-skel-id">' +
+              '<span class="an-skeleton analytics-author-skel-line is-name"></span>' +
+              '<span class="an-skeleton analytics-author-skel-line is-meta"></span>' +
+              '<span class="an-skeleton analytics-author-skel-line is-sub"></span>' +
+            '</span>' +
+          '</div>' +
+          '<div class="analytics-author-skel-stats">' + stats + '</div>' +
+          '<span class="an-skeleton analytics-author-skel-line is-note"></span>' +
+          '<span class="an-skeleton analytics-author-skel-block"></span>' +
+          '<span class="an-skeleton analytics-author-skel-line is-title"></span>' +
+          '<span class="an-skeleton analytics-author-skel-block is-short"></span>' +
+        '</div>'
+      );
+    }
+
     function loadAuthor(authorId, pages) {
       if (!authorId || !detailUrl) return;
       currentAuthor = authorId;
       currentPages = pages || currentPages || { stories_page: "", likes_page: "" };
+      var token = ++loadToken;
+      var startedAt = Date.now();
       markRow(authorId);
       detailBody.setAttribute("aria-busy", "true");
       if (window.AnalyticsCollapse) window.AnalyticsCollapse.open(detailPanel);
       scrollPanelIntoView();
+      /* Swap the idle hint for the shimmer in the same frame the panel opens,
+         so the press is acknowledged instantly instead of leaving a dimmed
+         sentence behind until the response arrives. */
+      detailBody.innerHTML = buildAuthorSkeleton();
 
       var url = detailUrl + "?author=" + encodeURIComponent(authorId) +
         "&range=" + encodeURIComponent(currentRange());
@@ -1062,18 +1098,24 @@
       })
         .then(function (response) { return response.text(); })
         .then(function (html) {
-          detailBody.innerHTML = html;
-          detailBody.setAttribute("aria-busy", "false");
-          /* The newly-swapped markup is a fresh DOM subtree: hand it to the
-             guide so its step count and the height control pick it up. */
-          if (window.htmx) window.htmx.process(detailBody);
-          /* The detail was inserted with fetch, not an htmx swap, so ask the
-             chart renderer to pick up any payload that arrived with it. */
-          if (window.AnalyticsCharts) window.AnalyticsCharts.render();
-          if (window.AnalyticsBucketRange) window.AnalyticsBucketRange.sync();
+          if (token !== loadToken) return;
+          var wait = Math.max(0, MIN_SKELETON_MS - (Date.now() - startedAt));
+          window.setTimeout(function () {
+            if (token !== loadToken) return;
+            detailBody.innerHTML = html;
+            detailBody.setAttribute("aria-busy", "false");
+            /* The newly-swapped markup is a fresh DOM subtree: hand it to the
+               guide so its step count and the height control pick it up. */
+            if (window.htmx) window.htmx.process(detailBody);
+            /* The detail was inserted with fetch, not an htmx swap, so ask the
+               chart renderer to pick up any payload that arrived with it. */
+            if (window.AnalyticsCharts) window.AnalyticsCharts.render();
+            if (window.AnalyticsBucketRange) window.AnalyticsBucketRange.sync();
+          }, wait);
         })
         .catch(function (err) {
           if (err && err.name === "AbortError") return;
+          if (token !== loadToken) return;
           detailBody.setAttribute("aria-busy", "false");
           detailBody.innerHTML = '<p class="analytics-reading-empty">Couldn\'t load this author. Try again.</p>';
         });

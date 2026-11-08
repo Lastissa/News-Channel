@@ -1239,7 +1239,28 @@ html[data-theme="dark"] .analytics-since input[type="date"] { background: var(--
   margin: 0; padding: 26px 6px; max-width: 40ch;
   color: var(--an-muted); font-size: var(--an-text-m); line-height: 1.5;
 }
-.analytics-author-detail[aria-busy="true"] { opacity: 0.6; transition: opacity var(--an-dur-micro); }
+
+/* The shimmer that stands in while one author's detail is fetched. Shaped
+   like the real panel -- profile, figures, two blocks -- so the panel keeps
+   its size and the wait reads as loading rather than a dimmed sentence. */
+.analytics-author-skel { display: grid; gap: 14px; }
+.analytics-author-skel-profile { display: flex; align-items: center; gap: 14px; }
+.analytics-author-skel-avatar { width: 54px; height: 54px; border-radius: 50%; flex: 0 0 auto; }
+.analytics-author-skel-id { flex: 1 1 auto; min-width: 0; display: grid; gap: 8px; }
+.analytics-author-skel-line { display: block; height: 10px; border-radius: 999px; }
+.analytics-author-skel-line.is-name { width: min(46%, 220px); height: 16px; }
+.analytics-author-skel-line.is-meta { width: min(62%, 300px); }
+.analytics-author-skel-line.is-sub { width: min(78%, 380px); height: 8px; }
+.analytics-author-skel-line.is-note { width: min(52%, 260px); height: 8px; margin-top: 2px; }
+.analytics-author-skel-line.is-title { width: min(34%, 180px); height: 12px; margin-top: 6px; }
+.analytics-author-skel-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 10px; padding: 12px 0;
+  border-top: 1px solid var(--an-line); border-bottom: 1px solid var(--an-line);
+}
+.analytics-author-skel-stat { height: 40px; border-radius: var(--an-radius); }
+.analytics-author-skel-block { display: block; height: 96px; border-radius: var(--an-radius-m); }
+.analytics-author-skel-block.is-short { height: 72px; }
 
 .analytics-author-profile { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .analytics-author-profile-id { min-width: 0; }

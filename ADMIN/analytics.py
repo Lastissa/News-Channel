@@ -1620,7 +1620,7 @@ AUTHOR_RANGE_CHOICES = [
     ("90d", "Last 3 months"),
     ("1y", "Last 12 months"),
 ]
-AUTHOR_DEFAULT_RANGE = "30d"
+AUTHOR_DEFAULT_RANGE = "7d"
 AUTHOR_RANGES = dict(TREND_RANGES)
 
 #   Every list on the page is paged rather than cut off, so a busy instance
