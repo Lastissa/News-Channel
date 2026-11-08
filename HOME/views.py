@@ -1639,13 +1639,13 @@ class NewsletterSubscribeView(View):
                 existing.send_newsletter = True
                 existing.save(update_fields=["send_newsletter"])
                 _try_send_newsletter_subscribe_email(email)
-                return _response({"detail": "News alerts are back on for this email."}, status=200)
+                return _response({"detail": "News alerts are back on for you."}, status=200)
             return _response({"detail": "You are already a member. News alerts are on."}, status=200)
 
         user_model.objects.create_user(email=email, password=self.STARTER_PASSWORD, send_newsletter=True)
         info_logger( msg = f"NEWSLETTER SIGNUP: {email} subscribed, account created")
         _try_send_newsletter_subscribe_email(email)
-        return _response({"detail": "Welcome. Your news alerts are on."}, status=201)
+        return _response({"detail": "Welcome & Thank You."}, status=201)
 
 
 class AboutView(View):

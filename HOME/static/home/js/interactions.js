@@ -54,6 +54,21 @@
   var toastHost = null;         /* up toasts: top-right stack with icon/close */
   var bottomToastHost = null;   /* quiet toasts: bottom pill that fades out */
 
+  /* Keep each stack short: a burst of messages must never cover the page.
+     The newest two stay; older ones are removed immediately. */
+  var MAX_TOASTS = 2;
+
+  function trimToastStack(host, selector) {
+    if (!host) return;
+    var nodes = host.querySelectorAll(selector);
+    var allowed = MAX_TOASTS - 1; /* leave room for the toast about to be added */
+    for (var i = 0; i < nodes.length - allowed; i++) {
+      var node = nodes[i];
+      window.clearTimeout(node._dismissTimer);
+      if (node.parentNode) node.parentNode.removeChild(node);
+    }
+  }
+
   function dismissToast(node) {
     if (!node || node.dataset.dismissed === "true") return;
     node.dataset.dismissed = "true";
@@ -75,6 +90,7 @@
       toastHost.setAttribute("aria-label", "Notifications");
       document.body.appendChild(toastHost);
     }
+    trimToastStack(toastHost, ".site-toast:not(.is-leaving)");
 
     var node = document.createElement("div");
     var isError = tone === "error";
@@ -153,6 +169,7 @@
       bottomToastHost.setAttribute("aria-label", "Notifications");
       document.body.appendChild(bottomToastHost);
     }
+    trimToastStack(bottomToastHost, ".site-bottomtoast");
 
     var isError = tone === "error";
     var isPersistentNotice = placement === "top";

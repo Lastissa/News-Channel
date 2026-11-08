@@ -226,7 +226,8 @@ class RegisterView(View):
 
         try:
             user = get_user_model().objects.create_user(email=email, password=password)
-        except Exception:
+        except Exception as e:
+            info_logger(msg=f"AUTH REGISTER: failed attempt to create account for {email} with error {e}")
             if is_ajax:
                 return _response({"detail": "Email Taken OR Email Not Allowed"}, status=400)
             return render(request, "auth/register.html", _auth_context(request, error="Email Taken OR Email Not Allowed"), status=400)

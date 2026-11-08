@@ -1957,19 +1957,40 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 }
 
 /* ---------- Auth forms ---------- */
+/* Auth-page notices reuse the quiet bottom-toast pill, but pinned to the
+   top-centre so they never cover the submit button. The env() inset keeps
+   the pill clear of notches and dynamic islands. */
 #auth-toast {
-  position: fixed; top: calc(var(--header-h) + 12px); right: 16px; z-index: 3001;
-  opacity: 0; pointer-events: none; padding: 12px 16px; margin: 0;
-  width: min(420px, calc(100vw - 32px)); border-radius: 12px;
-  background: var(--toast-bg); color: var(--toast-fg); box-shadow: var(--shadow-raised);
-  font-size: 0.9rem; font-weight: 500; text-align: left;
-  transition: opacity 0.18s ease, transform 0.18s ease; transform: translateY(-6px);
-  border: 1px solid var(--line); border-left: 4px solid var(--danger);
+  position: fixed;
+  z-index: 10000;
+  top: calc(var(--header-h) + 12px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  width: max-content;
+  max-width: min(440px, calc(100vw - 32px));
+  margin: 0;
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--toast-bg);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+  transition: opacity 220ms ease, transform 220ms ease;
 }
 #auth-toast.is-visible {
-  opacity: 1; transform: translateY(0);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
-#auth-toast[data-tone="success"] { border-left-color: var(--success); }
+#auth-toast[data-tone="success"] { background: var(--toast-fg); }
+@media (prefers-reduced-motion: reduce) {
+  #auth-toast { transition: none; }
+}
 
 .auth-shell {
   width: min(1200px, calc(100% - 32px)); margin: 24px auto 0; padding: 0 0 48px;
@@ -2882,7 +2903,7 @@ a:focus:not(:focus-visible) {
 /* --- 3. Solid toast surface --- */
 .site-toast {
   border: 1px solid var(--line);
-  border-left: 5px solid var(--toast-accent);
+  border-left: 2px solid var(--toast-accent);
   border-radius: 16px;
   background: var(--toast-bg);
   box-shadow:

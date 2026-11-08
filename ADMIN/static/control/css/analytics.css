@@ -1095,7 +1095,7 @@ html[data-theme="dark"] .analytics-chart-canvas .apexcharts-tooltip {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--an-gap-s) var(--an-gap-l);
   padding: var(--an-pad-card);
   border: 1px solid var(--an-line);
-  border-left: 3px solid var(--an-accent);
+  /* border-left: 3px solid var(--an-accent); */
   border-radius: var(--an-radius-m);
   background: var(--an-surface);
   box-shadow: var(--an-shadow-1);

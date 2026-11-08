@@ -65,7 +65,7 @@
       var form = document.querySelector('[data-auth-form]');
       if (!form) return;
 
-      function showAuthToast(message) {
+      function showAuthToast(message, tone) {
         var host = document.getElementById('auth-toast');
         if (!host) {
           host = document.createElement('div');
@@ -75,6 +75,7 @@
           document.body.appendChild(host);
         }
         host.textContent = message;
+        host.dataset.tone = tone || 'error';
         host.classList.add('is-visible');
         window.clearTimeout(host._timer);
         host._timer = window.setTimeout(function () {
@@ -161,7 +162,7 @@
           .then(function (result) {
             var payload = {};
             try { payload = JSON.parse(result.text || '{}') || {}; } catch (e) { /* non JSON body */ }
-            showAuthToast(payload.detail || (result.ok ? 'Account created.' : 'Could not create the account.'));
+            showAuthToast(payload.detail || (result.ok ? 'Account created.' : 'Could not create the account.'), result.ok ? 'success' : 'error');
             if (!result.ok) {
               setSubmitBusy(false);
               return;

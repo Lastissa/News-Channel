@@ -14,11 +14,9 @@ class AuthManager(BaseUserManager):
         user = self.model(email=email.upper(), **extra_fields)
         if password:
             user.set_password(password)
-            user.save(update_fields=['password'])
             info_logger(logger=logger, msg=f"ACCOUNT CREATION: user ({email.upper()}) created account with password set")
         else:
             user.set_unusable_password()
-            # user.save(update_fields=['password'])
             info_logger(logger=logger, msg=f"ACCOUNT CREATION: user ({email.upper()}) created account with NO password set")
         user.save(using=self._db)
         return user

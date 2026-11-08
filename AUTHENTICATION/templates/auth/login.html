@@ -59,10 +59,6 @@
       if (!form) return;
 
       function showAuthToast(message, tone) {
-        if (typeof window.AbuToast === 'function') {
-          window.AbuToast(message, tone || 'error');
-          return;
-        }
         var host = document.getElementById('auth-toast');
         if (!host) {
           host = document.createElement('div');
@@ -83,7 +79,6 @@
       var serverError = form.dataset.serverError;
       if (serverError) {
         bottomtoast(serverError);
-        /*showAuthToast(serverError);*/
       }
 
       document.querySelectorAll('.password-toggle').forEach(function (toggle) {
