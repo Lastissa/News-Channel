@@ -321,10 +321,98 @@
     return '<img class="story-inline-img ' + sideClass + '" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">';
   }
 
+  function fileExtensionFromUrl(url) {
+    var name = imageFilenameFromUrl(url);
+    if (name.indexOf(".") === -1) {
+      var match = String(url || "").match(/[?&]filename=([^&#]+)/i);
+      if (match) {
+        try { name = decodeURIComponent(match[1].replace(/\+/g, " ")); }
+        catch (err) { name = match[1]; }
+      }
+    }
+    var dot = name.lastIndexOf(".");
+    return dot > -1 ? name.slice(dot + 1).toLowerCase() : "";
+  }
+
+  var FILE_PREVIEW_DOCUMENT_EXTENSIONS = ["pdf", "txt", "csv", "json", "rtf", "xml", "md", "log"];
+  var FILE_PREVIEW_AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac"];
+  var FILE_PREVIEW_VIDEO_EXTENSIONS = ["mp4", "mov", "webm", "mkv", "avi", "m4v"];
+  var FILE_PREVIEW_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"];
+
+  function filePreviewKind(url) {
+    var ext = fileExtensionFromUrl(url);
+    if (FILE_PREVIEW_IMAGE_EXTENSIONS.indexOf(ext) !== -1) return "image";
+    if (FILE_PREVIEW_AUDIO_EXTENSIONS.indexOf(ext) !== -1) return "audio";
+    if (FILE_PREVIEW_VIDEO_EXTENSIONS.indexOf(ext) !== -1) return "video";
+    if (FILE_PREVIEW_DOCUMENT_EXTENSIONS.indexOf(ext) !== -1) return "document";
+    return "";
+  }
+
+  function isSafePreviewUrl(url) {
+    var value = String(url || "").trim();
+    if (!value) return false;
+    if (value.indexOf("\\") !== -1) return false;
+    if (/^https?:\/\//i.test(value)) return true;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+    if (value.indexOf("//") === 0) return false;
+    if (value.charAt(0) === "?" || value.charAt(0) === "#") return false;
+    return true;
+  }
+
+  function filePreviewSrc(url) {
+    var value = String(url || "");
+    try {
+      var parsed = new URL(value, window.location.href);
+      var pathName = parsed.pathname.split("/").pop();
+      if (parsed.searchParams.has("filename") && pathName.indexOf(".") !== -1) {
+        parsed.searchParams.delete("filename");
+        return parsed.href;
+      }
+    } catch (err) { /* keep the original */ }
+    return value;
+  }
+
+  var FILE_SHEET_SVG = '<svg viewBox="0 0 64 80" width="52" height="65" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h36l16 16v58a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M42 2v16h16"/></svg>';
+
+  function renderFilePreview(url, label) {
+    var previewUrl = filePreviewSrc(url);
+    var kind = isSafePreviewUrl(previewUrl) ? filePreviewKind(url) : "";
+    var safeUrl = escapeAttr(previewUrl);
+    if (kind === "image") {
+      return '<div class="story-inline-file-preview is-image">' +
+        '<img class="story-inline-file-preview-image" src="' + safeUrl + '" alt="' + escapeAttr(label) + '" loading="lazy">' +
+        "</div>";
+    }
+    if (kind === "audio") {
+      return '<div class="story-inline-file-preview is-audio">' +
+        '<audio class="story-inline-file-preview-audio" controls preload="metadata" src="' + safeUrl + '"></audio>' +
+        "</div>";
+    }
+    if (kind === "video") {
+      return '<div class="story-inline-file-preview is-video">' +
+        '<video class="story-inline-file-preview-video" controls playsinline preload="metadata" src="' + safeUrl + '"></video>' +
+        "</div>";
+    }
+    if (kind === "document") {
+      return '<div class="story-inline-file-preview is-document">' +
+        '<iframe class="story-inline-file-preview-frame" src="' + safeUrl + '" title="' + escapeAttr("Preview: " + label) + '" loading="lazy"></iframe>' +
+        '<p class="story-inline-file-preview-note">If the preview does not load, use Download.</p>' +
+        "</div>";
+    }
+    var extension = (fileExtensionFromUrl(url) || "file").toUpperCase();
+    return '<div class="story-inline-file-preview is-unavailable">' +
+      '<span class="story-inline-file-preview-sheet" aria-hidden="true">' + FILE_SHEET_SVG + "</span>" +
+      '<span class="story-inline-file-preview-ext">' + escapeHtml(extension) + "</span>" +
+      '<span class="story-inline-file-preview-message">Preview not available in the browser. Download to open.</span>' +
+      "</div>";
+  }
+
   function renderInlineFile(url, displayText) {
     var label = (displayText || "").trim() || imageFilenameFromUrl(url);
-    return '<a class="story-inline-file" href="' + escapeAttr(tagOutboundUrl(url)) + '" download rel="noopener noreferrer">' +
-      '<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>' + escapeHtml(label) + "</a>";
+    return '<div class="story-inline-file-block">' + renderFilePreview(url, label) +
+      '<a class="story-inline-file" href="' + escapeAttr(tagOutboundUrl(url)) + '" download rel="noopener noreferrer">' +
+      '<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>' + escapeHtml(label) + "</a>" +
+      "</div>";
   }
 
   /* Mirrors _render_inline_button in BLOG/views.py: one block-level button

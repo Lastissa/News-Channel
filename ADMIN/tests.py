@@ -520,10 +520,12 @@ class AnalyticsPageTests(TestCase):
     def test_shell_carries_the_controls_but_no_chart_data(self):
         self.client.force_login(self.admin)
         body = self.client.get(self.page_url).content.decode()
-        self.assertIn("analytics-trends-body", body)
         self.assertIn("analytics-growth-body", body)
-        self.assertIn("analytics/trends/", body)
         self.assertIn("analytics/members-growth/", body)
+        #   Trends was removed from Member lytics: it duplicated the story
+        #   chamber's event chart and told an admin nothing about people.
+        self.assertNotIn("analytics-trends-body", body)
+        self.assertNotIn("analytics/trends/", body)
         #   prove the figures come over htmx: no baked-in payload in the shell
         self.assertNotIn("analytics-trends-data", body)
         self.assertNotIn("analytics-members-growth-data", body)
@@ -537,7 +539,7 @@ class AnalyticsPageTests(TestCase):
         body = self.client.get(self.page_url).content.decode()
         self.assertIn("data-guide-open", body)
         self.assertIn("data-guide-body", body)
-        for title in ["Quick overview", "Members over time", "Trends", "Members"]:
+        for title in ["Quick overview", "Members over time", "Members"]:
             with self.subTest(title=title):
                 self.assertIn('data-guide-title="%s"' % title, body)
 
@@ -1395,6 +1397,17 @@ class AnalyticsDailyStoryActivityTests(TestCase):
         self.assertEqual(activity["views"], 1)
         self.assertEqual(activity["likes"], 1)
         self.assertEqual(activity["comments"], 1)
+
+    def test_each_row_shows_the_publish_date_before_the_category(self):
+        posted = self.stamp(self.today - timedelta(days=5))
+        story = self.make_story("Daily dated story", category="NEWS")
+        Blog.objects.filter(pk=story.pk).update(date_created=posted)
+        self.add_view(story, self.today)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(self.url).content.decode()
+        label = "%s %d, %d" % (posted.strftime("%b"), posted.day, posted.year)
+        self.assertIn(label + " &middot; NEWS", body)
 
     def test_the_date_box_loads_another_day(self):
         yesterday = self.today - timedelta(days=1)

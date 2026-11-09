@@ -1468,6 +1468,58 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   background: var(--ink); color: var(--paper); border-color: var(--ink); transform: translateY(-1px);
 }
 .story-inline-file-icon { font-size: 1.05em; line-height: 1; }
+
+/*  filel preview card: the file itself sits above the download link. A PDF,
+    text file, picture, track or clip is shown in the browser first, so the
+    reader knows what the download contains. Types the browser cannot open
+    (Office documents, archives) get a file-sheet cover naming the extension.
+    Both the story page and the Add/Edit News live preview render this same
+    markup, so the author sees exactly what the reader will. */
+.story-inline-file-block {
+  margin: 8px 0 22px; max-width: 100%;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--paper-dim); overflow: hidden;
+}
+.story-inline-file-preview { background: var(--paper); }
+.story-inline-file-preview-frame {
+  display: block; width: 100%; height: clamp(280px, 62vh, 560px);
+  border: 0; background: var(--paper);
+}
+.story-inline-file-preview-image {
+  display: block; width: 100%; max-height: min(68vh, 560px);
+  object-fit: contain; background: var(--paper);
+}
+.story-inline-file-preview-audio {
+  display: block; width: 100%; padding: 16px 14px; box-sizing: border-box;
+}
+.story-inline-file-preview-video {
+  display: block; width: 100%; max-height: min(68vh, 560px);
+  object-fit: contain; background: #000;
+}
+.story-body .story-inline-file-preview-note,
+.story-inline-file-preview-note {
+  margin: 0; padding: 8px 12px; text-align: left;
+  border-top: 1px solid var(--line);
+  color: var(--slate); font-size: 0.78rem; background: var(--paper);
+}
+.story-inline-file-preview.is-unavailable {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; min-height: 180px; padding: 28px 18px; text-align: center;
+  background: radial-gradient(120% 120% at 50% 0%, var(--surface) 0%, var(--paper-dim) 100%);
+}
+.story-inline-file-preview-sheet { display: block; color: var(--slate); line-height: 0; }
+.story-inline-file-preview-ext {
+  font-size: 0.82rem; font-weight: 800; letter-spacing: 0.08em; color: var(--ink);
+}
+.story-inline-file-preview-message { font-size: 0.78rem; color: var(--slate); }
+.story-inline-file-block > .story-inline-file,
+.story-body .story-inline-file-block > .story-inline-file {
+  margin: 10px 12px 12px;
+}
+@media (max-width: 640px) {
+  .story-inline-file-preview-frame { height: 52vh; min-height: 260px; }
+  .story-inline-file-preview.is-unavailable { min-height: 150px; padding: 20px 14px; }
+}
 /*  btn: a block-level button link ("btn URL label" on its own line -- see
     DOCS/NEWS_CONTENT_CONVENTION.MD). Filled with the theme's ink/paper pair
     (dark on light, light on dark) so it stays high-contrast in both themes;

@@ -162,7 +162,7 @@ Rule:
 
 ### 8) INLINE FILES
 
-Any line that starts with filel should be treated as an inline, downloadable file link.
+Any line that starts with filel should be treated as an inline file preview with a downloadable link underneath.
 
 Example:
 
@@ -172,8 +172,9 @@ Rule:
 - The first word on the line is the keyword: filel.
 - The second word is the file URL.
 - Everything after the URL, on the same line, is the link text shown to the reader.
-- Unlike imgl/imgr, a filel link is never floated -- it sits inside the normal paragraph flow, as a plain download link (imgc is not floated either, but it still blocks onto its own line the way a picture does; filel never does that).
-- Clicking it downloads the file instead of navigating the reader away from the story.
+- The file is previewed at the top of the card before the download link: a PDF or text file opens in the browser's reader, a picture shows as an image, and audio/video get a player. Types the browser cannot open (Office documents, archives) show a file-type cover instead. The Add/Edit News live preview shows the same card, so the author sees what readers will see.
+- Unlike imgl/imgr, a filel link is never floated -- it sits inside the normal paragraph flow, as a preview card with a plain download link (imgc is not floated either, but it still blocks onto its own line the way a picture does; filel never does that).
+- Clicking the download link downloads the file instead of navigating the reader away from the story.
 - If no link text is given after the URL, the parser falls back to the filename taken from the URL. Example: filel https://a.com/report.pdf produces the visible text "report.pdf".
 - This token is parsed before headings, bold, and italic, so a file URL or its link text is never partially consumed by #, **, or __.
 - Do not introduce an alternate syntax for inline files.

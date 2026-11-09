@@ -88,7 +88,7 @@
              data-guide-title="Members over time"
              data-guide-text="A running total, not a per-day count: each point is how many members existed by the end of that bucket. Accounts that joined before the window are the starting baseline, so the line never resets to zero. A start and end date override the Range preset.">
       {% comment %}The running total of members over time: a line that steps up
-         as accounts are created. Bucket / range / custom dates mirror Trends.{% endcomment %}
+         as accounts are created. Bucket / range / custom dates control the window.{% endcomment %}
       <header class="analytics-card-header">
         <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
         <h2 id="analytics-growth-title">Members over time</h2>
@@ -108,57 +108,6 @@
 
         <div class="analytics-chart-body" id="analytics-growth-body"
              hx-get="{% url 'control:member_growth' %}"
-             hx-trigger="load"
-             hx-swap="innerHTML"
-             aria-live="polite" aria-busy="true">
-          <p class="analytics-loading">Loading chart&hellip;</p>
-        </div>
-      </div></div>
-    </section>
-
-    <hr class="analytics-divider">
-
-    <section class="analytics-card is-collapsed" aria-labelledby="analytics-trends-title"
-             data-guide-title="Trends"
-             data-guide-text="Event counts per bucket for whichever series you tick. The next two steps cover the controls and what each series means.">
-      <header class="analytics-card-header">
-        <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>
-        <h2 id="analytics-trends-title">Trends</h2>
-        {% include "ADMIN/partials/analytics_height_control.html" with height_id="member-trends" height_default=400 %}
-        <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Trends" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
-      </header>
-
-      <div class="analytics-collapse"><div class="analytics-collapse-inner">
-        <form class="analytics-controls"
-              hx-get="{% url 'control:analytics_trends' %}"
-              hx-target="#analytics-trends-body"
-              hx-swap="innerHTML"
-              hx-trigger="change, submit"
-              data-guide-title="Trends controls"
-              data-guide-text="Pick a time frame (per hour, 12 hours, day, 2 days, week or calendar month) and a preset range, or set your own start and end dates. The custom dates override the preset.">
-          {% comment %} Marks a real form submission so "every box cleared" is
-             distinguishable from the first load, which shows all series. {% endcomment %}
-          <input type="hidden" name="submitted" value="1">
-
-          {% include "ADMIN/partials/analytics_bucket_range.html" %}
-          {% comment %} <p class="analytics-date-hint">A start and end date override the Range preset.</p> {% endcomment %}
-
-          <fieldset class="analytics-series"
-                    data-guide-title="Trends series"
-                    data-guide-text="Users = accounts created in the bucket. Stories = stories published. Likes = likes given. Each is a count inside its bucket, never a running total. Story views live on the Story lytics page.">
-            <legend class="panel-sr">Series to plot</legend>
-            {% for meta in series_meta %}
-            <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
-              <input type="checkbox" name="series" value="{{ meta.key }}" checked>
-              <span class="analytics-series-swatch" aria-hidden="true"></span>
-              <span>{{ meta.name }}</span>
-            </label>
-            {% endfor %}
-          </fieldset>
-        </form>
-
-        <div class="analytics-chart-body" id="analytics-trends-body"
-             hx-get="{% url 'control:analytics_trends' %}"
              hx-trigger="load"
              hx-swap="innerHTML"
              aria-live="polite" aria-busy="true">

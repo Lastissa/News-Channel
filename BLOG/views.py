@@ -366,9 +366,33 @@ def _video_embed_url(url):
 
 #   INLINE FILE ATTACHMENT TOKEN: "filel URL display text". Same shape as
 #   the image token above (keyword, URL, optional trailing text) but
-#   renders as a downloadable link in the normal flow of the paragraph
-#   instead of a floated picture -- see _render_inline_file below.
+#   renders as a preview card with a downloadable link underneath, in the
+#   normal flow of the paragraph instead of a floated picture -- see
+#   _render_inline_file below.
 FILE_TOKEN_RE = re.compile(r"^filel\s+(\S+)(?:\s+(.*))?$")
+
+#   WHAT THE BROWSER CAN PREVIEW FOR A filel ATTACHMENT. Kept in step with
+#   ARCHIVE.views.PREVIEW_*: a document opens in the browser's reader, audio
+#   and video in a player, a picture in an <img>. Anything else gets a
+#   file-type cover instead of trying to force a download inside an iframe.
+FILE_PREVIEW_DOCUMENT_EXTENSIONS = {
+    "pdf", "txt", "csv", "json", "rtf", "xml", "md", "log",
+}
+FILE_PREVIEW_AUDIO_EXTENSIONS = {
+    "mp3", "wav", "ogg", "m4a", "aac", "flac",
+}
+FILE_PREVIEW_VIDEO_EXTENSIONS = {
+    "mp4", "mov", "webm", "mkv", "avi", "m4v",
+}
+FILE_PREVIEW_IMAGE_EXTENSIONS = {
+    "jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg",
+}
+_FILE_SHEET_SVG = (
+    '<svg viewBox="0 0 64 80" width="52" height="65" fill="none" '
+    'stroke="currentColor" stroke-width="2" stroke-linejoin="round" '
+    'aria-hidden="true"><path d="M6 2h36l16 16v58a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/>'
+    '<path d="M42 2v16h16"/></svg>'
+)
 
 #   BUTTON BLOCK TOKEN: "btn URL label text". A whole line that starts with
 #   `btn` becomes one button-style link. The URL is the destination and the
@@ -420,6 +444,146 @@ def _image_filename_from_url(url):
     """Fallback alt text when a writer omits it: the filename from the URL."""
     name = urlparse(url).path.rsplit("/", 1)[-1]
     return name or url
+
+
+def _file_extension_from_url(url):
+    """Lower-case extension for a filel URL, or "" when it has none.
+
+    The path is preferred. A download URL that hides the name in a
+    `?filename=` query parameter still yields the right extension, so the
+    preview matches the file the reader is being offered.
+    """
+    try:
+        parsed = urlparse(url or "")
+    except ValueError:
+        return ""
+    name = (parsed.path or "").rsplit("/", 1)[-1]
+    if "." not in name:
+        name = (parse_qs(parsed.query).get("filename") or [""])[0] or name
+    if "." not in name or name.endswith("."):
+        return ""
+    return name.rsplit(".", 1)[-1].lower()
+
+
+def _file_preview_kind(url):
+    """How a filel attachment can be previewed: image, audio, video,
+    document, or "" when the browser has no way of showing it."""
+    extension = _file_extension_from_url(url)
+    if extension in FILE_PREVIEW_IMAGE_EXTENSIONS:
+        return "image"
+    if extension in FILE_PREVIEW_AUDIO_EXTENSIONS:
+        return "audio"
+    if extension in FILE_PREVIEW_VIDEO_EXTENSIONS:
+        return "video"
+    if extension in FILE_PREVIEW_DOCUMENT_EXTENSIONS:
+        return "document"
+    return ""
+
+
+def _safe_preview_url(url):
+    """True for an http(s) or site-relative URL, so an author-supplied
+    `filel javascript:...` can never become an iframe/player src."""
+    value = url or ""
+    if "\\" in value:
+        return False
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
+    if parsed.scheme in ("http", "https"):
+        return True
+    return not parsed.scheme and not parsed.netloc and bool(parsed.path)
+
+
+def _file_preview_src(url):
+    """The URL the preview should load. A forced-download `filename=`
+    parameter is dropped (otherwise the iframe would download instead of
+    showing the file), and our own Cloudinary assets go through the
+    same-origin proxy exactly like other media in the project."""
+    try:
+        parsed = urlparse(url or "")
+        query = parse_qs(parsed.query, keep_blank_values=True)
+        path_name = (parsed.path or "").rsplit("/", 1)[-1]
+        #   A URL whose path already names the file (Cloudinary's
+        #   /.../report.pdf?filename=report.pdf) only carries `filename` to
+        #   force a download, so drop it. A generic endpoint such as
+        #   /download?filename=report.pdf may need that parameter to find the
+        #   file at all; keeping it gives the browser a chance to show it.
+        if "filename" in query and "." in path_name:
+            query.pop("filename", None)
+            url = urlunparse(
+                (
+                    parsed.scheme,
+                    parsed.netloc,
+                    parsed.path,
+                    parsed.params,
+                    urlencode(query, doseq=True),
+                    parsed.fragment,
+                )
+            )
+    except ValueError:
+        pass
+
+    from ARCHIVE.templatetags.archive_extras import cloudinary_proxy
+
+    return cloudinary_proxy(url)
+
+
+def _file_preview_html(url, label):
+    """The preview that sits above a filel download link.
+
+    A browser-previewable file gets its real content; an Office document,
+    archive, or unknown type gets a file-sheet cover naming its extension,
+    because putting those in an iframe would start a download instead of a
+    preview. The download link below is always the same anchor as before.
+    """
+    preview_url = _file_preview_src(url)
+    kind = _file_preview_kind(url) if _safe_preview_url(preview_url) else ""
+    safe_url = html.escape(preview_url, quote=True)
+    safe_label = html.escape(label, quote=True)
+
+    if kind == "image":
+        return (
+            '<div class="story-inline-file-preview is-image">'
+            f'<img class="story-inline-file-preview-image" src="{safe_url}" '
+            f'alt="{safe_label}" loading="lazy">'
+            "</div>"
+        )
+    if kind == "audio":
+        return (
+            '<div class="story-inline-file-preview is-audio">'
+            f'<audio class="story-inline-file-preview-audio" controls '
+            f'preload="metadata" src="{safe_url}"></audio>'
+            "</div>"
+        )
+    if kind == "video":
+        return (
+            '<div class="story-inline-file-preview is-video">'
+            f'<video class="story-inline-file-preview-video" controls '
+            f'playsinline preload="metadata" src="{safe_url}"></video>'
+            "</div>"
+        )
+    if kind == "document":
+        return (
+            '<div class="story-inline-file-preview is-document">'
+            f'<iframe class="story-inline-file-preview-frame" src="{safe_url}" '
+            f'title="Preview: {safe_label}" loading="lazy"></iframe>'
+            '<p class="story-inline-file-preview-note">'
+            "If the preview does not load, use Download."
+            "</p>"
+            "</div>"
+        )
+
+    extension = _file_extension_from_url(url).upper() or "FILE"
+    return (
+        '<div class="story-inline-file-preview is-unavailable">'
+        f'<span class="story-inline-file-preview-sheet" aria-hidden="true">{_FILE_SHEET_SVG}</span>'
+        f'<span class="story-inline-file-preview-ext">{html.escape(extension)}</span>'
+        '<span class="story-inline-file-preview-message">'
+        "Preview not available in the browser. Download to open."
+        "</span>"
+        "</div>"
+    )
 
 
 def _archive_dimensions_for_url(url):
@@ -493,9 +657,13 @@ def _render_inline_image(direction, url, alt_text):
 
 
 def _render_inline_file(url, display_text, campaign=""):
-    """Build the inline downloadable link for a "filel URL text" token. This
-    sits in the normal flow of the paragraph (unlike imgl/imgr, it is never
-    floated -- a file has no picture to wrap text around), but clicking it
+    """Build the preview card and download link for a "filel URL text" token.
+
+    The preview sits at the top of the card, so a reader can see a PDF,
+    picture, track or clip before downloading it; the download link is the
+    same pill as before and stays directly underneath. This sits in the
+    normal flow of the paragraph (unlike imgl/imgr, it is never floated --
+    a file has no picture to wrap text around), but clicking the link
     downloads the file instead of navigating the reader away from the
     story. The `download` attribute only actually forces a download for a
     same-origin URL in most browsers, which is exactly what the
@@ -509,8 +677,11 @@ def _render_inline_file(url, display_text, campaign=""):
     safe_label = html.escape(label, quote=True)
     rel = _anchor_rel(url)
     return (
+        '<div class="story-inline-file-block">'
+        f"{_file_preview_html(url, label)}"
         f'<a class="story-inline-file" href="{safe_url}" download rel="{rel}">'
-        f'<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>{safe_label}</a>'
+        f'<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>{safe_label}</a>'
+        "</div>"
     )
 
 

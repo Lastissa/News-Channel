@@ -829,9 +829,6 @@ class AnalyticsView(View):
                 "trend_ranges": TREND_RANGE_CHOICES,
                 "trend_sub_ranges": TREND_SUB_RANGE_CHOICES,
                 "default_trend_range": DEFAULT_TREND_RANGE,
-                #   Member lytics is about people: the story-open series lives
-                #   on the Story lytics page, so it is not offered here.
-                "series_meta": MEMBER_TREND_SERIES,
                 "story_performance_series": STORY_PERFORMANCE_SERIES,
                 "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
                 "member_state_choices": MEMBER_STATE_CHOICES,

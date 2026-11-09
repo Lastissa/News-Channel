@@ -206,6 +206,62 @@ __Please note:__ deadlines are strict.
             html,
         )
 
+    def test_a_file_token_shows_a_preview_above_the_download_link(self):
+        html = parse_story_content(
+            "filel https://example.edu/report.pdf Annual report\n\n"
+            "filel https://example.edu/clip.mp4 Rally clip\n\n"
+            "filel https://example.edu/photo.jpg Photo\n\n"
+            "filel https://example.edu/slides.pptx Slides\n"
+        )
+
+        self.assertEqual(html.count('class="story-inline-file-block"'), 4)
+        self.assertIn(
+            'class="story-inline-file-preview-frame" src="https://example.edu/report.pdf"',
+            html,
+        )
+        self.assertIn('class="story-inline-file-preview-video"', html)
+        self.assertIn('class="story-inline-file-preview-image"', html)
+        self.assertIn(">PPTX</span>", html)
+        #   In each card the preview is above its own download link.
+        preview_at = html.index("https://example.edu/report.pdf")
+        link_at = html.index(
+            'class="story-inline-file" href="https://example.edu/report.pdf'
+        )
+        self.assertLess(preview_at, link_at)
+
+    def test_an_unsafe_file_url_never_becomes_a_preview_source(self):
+        html = parse_story_content("filel javascript:alert(1) Bad file")
+
+        self.assertNotIn("<iframe", html)
+        self.assertIn("story-inline-file-preview is-unavailable", html)
+
+    def test_a_forced_download_filename_is_dropped_from_the_preview_only(self):
+        html = parse_story_content(
+            "filel https://example.edu/report.pdf?filename=report.pdf Annual report"
+        )
+
+        self.assertIn(
+            'class="story-inline-file-preview-frame" '
+            'src="https://example.edu/report.pdf"',
+            html,
+        )
+        self.assertIn(
+            'class="story-inline-file" '
+            'href="https://example.edu/report.pdf?filename=report.pdf',
+            html,
+        )
+
+    def test_a_generic_download_endpoint_keeps_filename_in_the_preview(self):
+        html = parse_story_content(
+            "filel https://example.edu/download?filename=report.pdf Annual report"
+        )
+
+        self.assertIn(
+            'class="story-inline-file-preview-frame" '
+            'src="https://example.edu/download?filename=report.pdf"',
+            html,
+        )
+
     def test_external_inline_media_is_nofollow_but_archive_media_is_not(self):
         html = parse_story_content(
             "imgc https://cdn.example.com/photo.jpg External photo\n\n"

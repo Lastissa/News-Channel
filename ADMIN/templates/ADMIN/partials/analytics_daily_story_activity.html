@@ -44,7 +44,7 @@
         <tr>
           <td>
             <a class="analytics-reading-story" href="{% url 'blog:story_detail' story.slug %}">{{ story.heading }}</a>
-            <span class="analytics-reading-cat">{{ story.category }}</span>
+            <span class="analytics-reading-cat">{{ story.posted|date:"M j, Y" }} &middot; {{ story.category }}</span>
           </td>
           <td class="analytics-reading-num">{{ story.views }}</td>
           <td class="analytics-reading-num">{{ story.likes }}</td>

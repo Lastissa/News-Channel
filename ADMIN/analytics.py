@@ -981,6 +981,7 @@ def daily_story_activity(day_iso=None):
                     "heading": story.heading,
                     "slug": story.slug,
                     "category": story.category,
+                    "posted": timezone.localtime(story.date_created),
                     "views": views,
                     "likes": like_counts.get(story_id, 0),
                     "comments": comment_counts.get(story_id, 0),

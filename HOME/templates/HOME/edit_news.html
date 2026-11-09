@@ -67,7 +67,7 @@
          data-view="write"
          data-published="{{ blog.date_created|date:'j M Y' }}"
          data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261107-1"
-         data-heavy-js="{% static 'home/js/edit-news-editor.js' %}?v=20261019-1">
+         data-heavy-js="{% static 'home/js/edit-news-editor.js' %}?v=20261109-1">
   <div class="editor-toolbar" data-editor-toolbar>
     <div class="editor-toolbar-main">
       <h1>edit news</h1>
@@ -88,7 +88,7 @@
     </div>
   </div>
 
-  <p class="prompt">Clcik <a href="{% url "home:author_handbook" %}" target="_blank" rel="noopener noreferrer">HERE</a> for detailed guide.</p>
+  <p class="prompt">Click <a href="{% url "home:author_handbook" %}" target="_blank" rel="noopener noreferrer">HERE</a> for detailed guide.</p>
 
   <p class="editor-grace-note" role="note"><strong>5 minute rule:</strong> an edit made within 5 minutes of publishing is saved, but it does not change the story's last modified time. After 5 minutes, any content or category change refreshes it.</p>
 
@@ -166,7 +166,7 @@
                     <div class="fg-row" data-guide-item="vidl URL description = video on the left, text wraps around it (plays automatically, sound off at first, with play/pause and sound buttons; YouTube/Vimeo pages become an iframe embed)"><dt><code>vidl</code> URL description</dt><dd>Video on the left, text wraps around it (plays automatically, sound off at first, with play/pause and sound buttons; YouTube/Vimeo pages become an iframe embed)</dd></div>
                     <div class="fg-row" data-guide-item="vidr URL description = video on the right, text wraps around it (plays automatically, sound off at first, with play/pause and sound buttons; YouTube/Vimeo pages become an iframe embed)"><dt><code>vidr</code> URL description</dt><dd>Video on the right, text wraps around it (plays automatically, sound off at first, with play/pause and sound buttons; YouTube/Vimeo pages become an iframe embed)</dd></div>
                     <div class="fg-row" data-guide-item="vidc URL description = video in the centre on its own line (plays automatically, sound off at first, with play/pause and sound buttons; YouTube/Vimeo pages become an iframe embed)"><dt><code>vidc</code> URL description</dt><dd>Video in the centre on its own line (plays automatically, sound off at first, with play/pause and sound buttons; YouTube/Vimeo pages become an iframe embed)</dd></div>
-                    <div class="fg-row" data-guide-item="filel URL link text = download link for a file"><dt><code>filel</code> URL link text</dt><dd>Download link for a file</dd></div>
+                    <div class="fg-row" data-guide-item="filel URL link text = preview and download link for a file"><dt><code>filel</code> URL link text</dt><dd>Preview and download link for a file</dd></div>
                   </dl>
                   <p class="fg-note" data-guide-item="The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.">The description you type after an image or video URL is shown beneath it as a caption. Without one, no caption is shown.</p>
                 </section>
@@ -261,7 +261,7 @@
               <button type="button" class="editor-insert-btn" data-insert="imgl " data-insert-kind="line" title="Image on the left">imgl</button>
               <button type="button" class="editor-insert-btn" data-insert="imgr " data-insert-kind="line" title="Image on the right">imgr</button>
               <button type="button" class="editor-insert-btn" data-insert="imgc " data-insert-kind="line" title="Centered image">imgc</button>
-              <button type="button" class="editor-insert-btn" data-insert="filel " data-insert-kind="line" title="Downloadable file">filel</button>
+              <button type="button" class="editor-insert-btn" data-insert="filel " data-insert-kind="line" title="Preview and download file">filel</button>
             </div>
             <div class="editor-insert-group">
               <button type="button" class="editor-insert-btn" data-insert="vidl " data-insert-kind="line" title="Video on the left">vidl</button>
