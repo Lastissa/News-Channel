@@ -1,0 +1,70 @@
+{% comment %}
+  htmx fragment: two authors, one head-to-head board.
+
+  Returned by control:analytics_author_compare with the pair already shaped by
+  ADMIN.analytics.author_compare. Every value uses the comparison form's window
+  and the same event tables as the author detail, so its windowed rows stay
+  internally consistent while all-time rows are labelled. A missing pick, an
+  unknown account or the same author twice renders the message in `message`
+  instead of a board.
+{% endcomment %}
+{% if message %}
+<p class="analytics-author-detail-hint analytics-compare-hint">{{ message }}</p>
+{% else %}
+<div class="analytics-compare"
+     data-guide-title="Head to head"
+     data-guide-text="Two authors over the window you choose. Each row is one measure, the two values sit on the outside, and the meter in the middle fills toward whichever author leads it. The score at the top counts the measures each author won.">
+
+  <div class="analytics-compare-board">
+    <div class="analytics-compare-side is-a{% if winner == 'a' %} is-winner{% endif %}">
+      <span class="analytics-member-avatar analytics-member-avatar--lg{% if not author_a.profile_img %} analytics-member-avatar--initial{% endif %}">
+        {% if author_a.profile_img %}<img src="{{ author_a.profile_img }}" alt="">{% else %}{{ author_a.initial }}{% endif %}
+      </span>
+      <div class="analytics-compare-identity">
+        <p class="analytics-compare-name">{{ author_a.name }}</p>
+        <p class="analytics-compare-meta">
+          {{ author_a.email_masked }}{% if author_a.role %} &middot; {{ author_a.role }}{% endif %}{% if not author_a.is_active %} &middot; suspended{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="analytics-compare-score" role="group"
+         aria-label="{{ author_a.name }} won {{ score_a }} measures, {{ author_b.name }} won {{ score_b }}">
+      <span class="analytics-compare-score-line">
+        <strong>{{ score_a }}</strong><span>&ndash;</span><strong>{{ score_b }}</strong>
+      </span>
+      <small>metrics won</small>
+    </div>
+
+    <div class="analytics-compare-side is-b{% if winner == 'b' %} is-winner{% endif %}">
+      <span class="analytics-member-avatar analytics-member-avatar--lg{% if not author_b.profile_img %} analytics-member-avatar--initial{% endif %}">
+        {% if author_b.profile_img %}<img src="{{ author_b.profile_img }}" alt="">{% else %}{{ author_b.initial }}{% endif %}
+      </span>
+      <div class="analytics-compare-identity">
+        <p class="analytics-compare-name">{{ author_b.name }}</p>
+        <p class="analytics-compare-meta">
+          {{ author_b.email_masked }}{% if author_b.role %} &middot; {{ author_b.role }}{% endif %}{% if not author_b.is_active %} &middot; suspended{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <p class="analytics-compare-window">Windowed figures cover {{ range_label }} ({{ relative_label }}); all-time rows are labelled.</p>
+
+  <ol class="analytics-compare-rows" aria-label="Head to head metrics">
+    {% for metric in metrics %}
+    <li class="analytics-compare-row{% if metric.better == 'a' %} is-a-win{% elif metric.better == 'b' %} is-b-win{% endif %}">
+      <span class="analytics-compare-value is-a">{{ metric.display_a }}</span>
+      <span class="analytics-compare-mid">
+        <span class="analytics-compare-meter" aria-hidden="true">
+          <span class="analytics-compare-meter-half is-a"><span style="width: {{ metric.bar_a }}%"></span></span>
+          <span class="analytics-compare-meter-half is-b"><span style="width: {{ metric.bar_b }}%"></span></span>
+        </span>
+        <span class="analytics-compare-label">{{ metric.label }}</span>
+      </span>
+      <span class="analytics-compare-value is-b">{{ metric.display_b }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}

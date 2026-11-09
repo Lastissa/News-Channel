@@ -9,7 +9,7 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
   <link rel="stylesheet" href="{% static 'control/css/analytics-tokens.css' %}">
-  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261108-1">
+  <link rel="stylesheet" href="{% static 'control/css/analytics.css' %}?v=20261109-1">
 {% endblock %}
 
 {% block content %}
@@ -130,6 +130,82 @@
 
   </div>
 
+  <section class="analytics-author-compare-panel is-collapsed" aria-labelledby="analytics-author-compare-title">
+    <header class="analytics-author-panel-head">
+      <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+      <h2 id="analytics-author-compare-title">Compare authors</h2>
+      <p class="analytics-panel-note">Head to head over a window you choose.</p>
+      <button type="button" class="analytics-collapse-btn" data-collapse aria-expanded="false" aria-label="Expand Compare authors" title="Expand"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+    </header>
+
+    <div class="analytics-collapse"><div class="analytics-collapse-inner">
+      <div class="analytics-author-compare">
+        {% comment %} Two pickers and their own window. The comparison is
+        independent of the Authors panel, so a custom start/end pair can be
+        chosen here without changing the leaderboard beside it. Only a complete
+        pair overrides the preset; a half-filled pair falls back to the range. {% endcomment %}
+        <form class="analytics-compare-form"
+              id="analytics-author-compare-form"
+              hx-get="{% url 'control:analytics_author_compare' %}"
+              hx-target="#analytics-author-compare-body"
+              hx-swap="innerHTML"
+              hx-trigger="submit, change">
+
+          <div class="analytics-compare-window-row" role="group" aria-label="Comparison window">
+            <label class="analytics-select">
+              <span class="analytics-select-label">Preset</span>
+              <select name="range">
+                {% for value, label in author_ranges %}
+                <option value="{{ value }}"{% if value == default_author_range %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="analytics-select">
+              <span class="analytics-select-label">From</span>
+              <input type="date" name="start" aria-label="Comparison start date">
+            </label>
+            <label class="analytics-select">
+              <span class="analytics-select-label">To</span>
+              <input type="date" name="end" aria-label="Comparison end date">
+            </label>
+          </div>
+          <p class="analytics-compare-window-hint">Set both dates to use a custom window. A complete custom window overrides the range above.</p>
+
+          <div class="analytics-compare-pickers">
+            <label class="analytics-select">
+              <span class="analytics-select-label">Author A</span>
+              <select name="a">
+                <option value="">Pick an author&hellip;</option>
+                {% for author in author_choices %}
+                <option value="{{ author.id }}">{{ author.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <span class="analytics-compare-vs" aria-hidden="true">VS</span>
+
+            <label class="analytics-select">
+              <span class="analytics-select-label">Author B</span>
+              <select name="b">
+                <option value="">Pick an author&hellip;</option>
+                {% for author in author_choices %}
+                <option value="{{ author.id }}">{{ author.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <button type="submit" class="analytics-apply">Compare</button>
+          </div>
+        </form>
+
+        <div class="analytics-compare-body" id="analytics-author-compare-body"
+             aria-live="polite" aria-busy="false">
+          <p class="analytics-author-detail-hint">Pick two authors to see them side by side.</p>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
   <section class="analytics-author-likes-panel is-collapsed" aria-labelledby="analytics-author-likes-title">
     <header class="analytics-author-panel-head">
       <span class="analytics-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg></span>
@@ -159,7 +235,7 @@
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
   <script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
   <script src="{% static 'control/js/analytics_apex.js' %}" defer></script>
-  <script src="{% static 'control/js/analytics.js' %}?v=20261108-1" defer></script>
+  <script src="{% static 'control/js/analytics.js' %}?v=20261109-1" defer></script>
 {% endblock %}
 
 {% block footer %}{% endblock %}

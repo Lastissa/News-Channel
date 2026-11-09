@@ -121,6 +121,15 @@ STORY_PERFORMANCE_SERIES = [
 ]
 DEFAULT_STORY_PERFORMANCE_SERIES = ["views", "likes", "comments"]
 
+#   Author performance adds the number of stories the author published in each
+#   bucket to the three reader signals, so the chart shows output as well as
+#   response. A single story cannot "publish" a story count, so the per-story
+#   chart above keeps its three signals unchanged.
+AUTHOR_PERFORMANCE_SERIES = [
+    {"key": "stories", "name": "Stories", "color": "#d97706"},
+] + STORY_PERFORMANCE_SERIES
+DEFAULT_AUTHOR_PERFORMANCE_SERIES = ["stories", "views", "likes", "comments"]
+
 #   Category performance adds the number of stories published in the category
 #   to the three reader signals. It is deliberately separate from
 #   STORY_PERFORMANCE_SERIES: a single story cannot "publish" a story count,
@@ -1708,6 +1717,35 @@ def _author_window(selected_range, since=None):
     return start, now, f"Since {_month_day(start)}", _relative_label(start)
 
 
+def _custom_window_labels(start, end_exclusive):
+    """A human label and span for a custom start/end comparison window."""
+    last = timezone.localtime(end_exclusive - timedelta(microseconds=1))
+    if start.year == last.year:
+        label = f"{start:%b} {start.day} - {last:%b} {last.day}, {last.year}"
+    else:
+        label = f"{_month_day(start)} - {_month_day(last)}"
+    days = max((end_exclusive - start).days, 1)
+    return label, f"{days}-day window"
+
+
+def _compare_window(selected_range, since=None, start_iso=None, end_iso=None):
+    """The compare board's window: custom dates first, then the shared presets.
+
+    Unlike the author list, the comparison form owns its own start and end
+    fields. A complete, valid pair wins; otherwise it falls back to the same
+    range/since rules as every other author figure, so a half-filled date pair
+    never leaves the board blank.
+    """
+    custom = _custom_window(start_iso, end_iso)
+    if custom is not None:
+        start, end_exclusive = custom
+        label, span = _custom_window_labels(start, end_exclusive)
+        return start, end_exclusive, label, span
+
+    start, _now, label, relative = _author_window(selected_range, since)
+    return start, None, label, relative
+
+
 def _author_event_counts(model, field, start, end=None):
     """Views / likes / comments per author, in one grouped query per table.
 
@@ -1725,16 +1763,20 @@ def _author_event_counts(model, field, start, end=None):
     return {row["blog__author_id"]: row["n"] for row in rows}
 
 
-def _story_event_counts(model, field, start, blog_ids):
+def _story_event_counts(model, field, start, blog_ids, end=None):
     """Views / likes / comments per story, across one author's own stories.
 
     The same shape as _author_event_counts, grouped by story instead of author,
     used by the per-author detail so each story can carry its own windowed
-    figures without a query per story.
+    figures without a query per story. `end` is exclusive and optional, which
+    lets the comparison board honour a custom end date without changing the
+    open-ended detail queries.
     """
     if not blog_ids:
         return {}
     queryset = model.objects.filter(**{f"{field}__gte": start, "blog_id__in": blog_ids})
+    if end is not None:
+        queryset = queryset.filter(**{f"{field}__lt": end})
     rows = _safe_rows(queryset.values("blog_id").annotate(n=Count("id")).order_by())
     return {row["blog_id"]: row["n"] for row in rows}
 
@@ -1990,9 +2032,11 @@ def author_likes(selected_range, page_number=1, since=None):
 def author_performance(author_id, bucket, selected_range, series_keys, start_iso=None, end_iso=None):
     """Line chart data for one author's whole body of work over time.
 
-    The same views / likes / comments chart as Story performance, but the
-    events are counted across every story the author has written rather than a
-    single chosen story. The author's own rows are used, so a story that later
+    The same stories / views / likes / comments chart as Story performance, but
+    the events are counted across every story the author has written rather
+    than a single chosen story. The stories line is the author's own output in
+    each bucket (Blog.date_created), while views / likes / comments come from
+    the event tables. The author's own rows are used, so a story that later
     changes hands does not carry its old reads into the new author's chart.
     """
     author = Auth.objects.filter(pk=author_id).first()
@@ -2014,13 +2058,17 @@ def author_performance(author_id, bucket, selected_range, series_keys, start_iso
         return _frame_counts(frame, _windowed_values(queryset, field, frame))
 
     sources = {
+        "stories": lambda: _frame_counts(
+            frame,
+            _windowed_values(Blog.objects.filter(author_id=author_id), "date_created", frame),
+        ),
         "views": lambda: count_events(StoryView, "created_at"),
         "likes": lambda: count_events(BlogLike, "created_at"),
         "comments": lambda: count_events(Comment, "date_created"),
     }
 
     series = []
-    for meta in STORY_PERFORMANCE_SERIES:
+    for meta in AUTHOR_PERFORMANCE_SERIES:
         if meta["key"] not in series_keys:
             continue
         series.append({**meta, "values": sources[meta["key"]]()})
@@ -2169,3 +2217,190 @@ def author_detail(author_id, selected_range, since=None, story_page=1, like_page
             stories_paginator.get_elided_page_range(stories_page.number, on_each_side=1, on_ends=1)
         ),
     }
+
+
+#   -------------------------------------------------------------------------
+#   AUTHOR COMPARISON -- two authors, one head-to-head board
+#   -------------------------------------------------------------------------
+#   The comparison form's window and the same event tables as the author detail,
+#   put side by side in the order a football stats board reads: one row per
+#   measure, the two values on the outside, and a shared meter in the middle.
+#   Every row carries a winner marker so the board can highlight who led it.
+COMPARE_METRICS = [
+    ("published", "Stories published", "count"),
+    ("stories_total", "Stories all time", "count"),
+    ("reads", "Reads", "count"),
+    ("likes", "Likes", "count"),
+    ("comments", "Comments", "count"),
+    ("readers", "Signed-in readers", "count"),
+    ("followers", "Followers (all time)", "count"),
+    ("engagement", "Likes per 100 reads", "percent"),
+    ("reads_per_story", "Reads per story", "count"),
+    ("total_views", "All-time views", "count"),
+    ("total_likes", "All-time likes", "count"),
+]
+
+
+def _compare_number(value, unit):
+    """Format a comparison value without leaking a `.0` onto a whole number."""
+    if unit == "percent":
+        return f"{value:g}%"
+    if isinstance(value, float):
+        return f"{value:g}"
+    return f"{value:,}"
+
+
+def _compare_author_stats(author, start, end=None):
+    """One author's windowed and all-time figures for the head-to-head board.
+
+    Shaped like the matching fields in author_detail, but without the paginated
+    lists and insights: the comparison only needs the numbers that fit on the
+    board. One grouped query per signal still covers every story the author
+    wrote, so two authors cost a handful of event queries, not one per story.
+    `end` is exclusive, so a custom end date closes every windowed figure while
+    the all-time rows stay all-time.
+    """
+    stories = Blog.objects.filter(author_id=author.pk)
+    story_ids = list(stories.values_list("pk", flat=True))
+    viewed = _story_event_counts(StoryView, "created_at", start, story_ids, end)
+    liked = _story_event_counts(BlogLike, "created_at", start, story_ids, end)
+    commented = _story_event_counts(Comment, "date_created", start, story_ids, end)
+
+    reads = sum(viewed.values())
+    likes = sum(liked.values())
+    comments = sum(commented.values())
+    published_query = stories.filter(date_created__gte=start)
+    if end is not None:
+        published_query = published_query.filter(date_created__lt=end)
+    published = published_query.count()
+    totals = stories.aggregate(views=Sum("views"), likes=Sum("likes"))
+    profile = StaffProfile.objects.filter(auth_id=author.pk).first()
+
+    if story_ids:
+        readers_query = StoryView.objects.filter(
+            created_at__gte=start, user__isnull=False, blog_id__in=story_ids
+        )
+        if end is not None:
+            readers_query = readers_query.filter(created_at__lt=end)
+        readers = readers_query.values("user_id").distinct().count()
+    else:
+        readers = 0
+
+    return {
+        "id": author.pk,
+        "name": _author_names([author]).get(author.pk) or _mask_email(author.email) or "Unknown",
+        "email_masked": _mask_email(author.email),
+        "profile_img": author.profile_img or "",
+        "initial": (author.email or "?")[:1].upper(),
+        "is_active": author.is_active,
+        "role": profile.get_role_display() if profile else "",
+        "published": published,
+        "stories_total": len(story_ids),
+        "reads": reads,
+        "likes": likes,
+        "comments": comments,
+        "readers": readers,
+        "followers": AuthorFollow.objects.filter(author_id=author.pk).count(),
+        "engagement": round(likes * 100 / reads, 1) if reads else 0,
+        "reads_per_story": round(reads / published, 1) if published else 0,
+        "total_views": totals["views"] or 0,
+        "total_likes": totals["likes"] or 0,
+    }
+
+
+def author_compare(
+    author_a_id, author_b_id, selected_range, since=None, start_iso=None, end_iso=None
+):
+    """Two authors side by side over the same window, football-stats style.
+
+    Returns an empty board with a plain-language `message` whenever the pair
+    cannot be compared -- a missing pick, an account that no longer exists, or
+    the same author twice -- so the fragment can show a hint instead of an
+    error. A valid pair gets one row per metric, each carrying the two values,
+    the meter widths and which side won it.
+
+    The window is the compare form's own: a complete custom start/end pair wins,
+    otherwise the shared preset (and legacy `since`) rules apply.
+    """
+    start, end_exclusive, range_label, relative_label = _compare_window(
+        selected_range, since, start_iso, end_iso
+    )
+    context = {
+        "author_a": None,
+        "author_b": None,
+        "metrics": [],
+        "score_a": 0,
+        "score_b": 0,
+        "winner": "tie",
+        "message": "",
+        "range": selected_range,
+        "range_label": range_label,
+        "relative_label": relative_label,
+    }
+
+    if not author_a_id or not author_b_id:
+        context["message"] = "Pick two authors to see them side by side."
+        return context
+    if author_a_id == author_b_id:
+        context["message"] = "Pick two different authors to compare."
+        return context
+
+    author_a = Auth.objects.filter(pk=author_a_id).first()
+    author_b = Auth.objects.filter(pk=author_b_id).first()
+    if author_a is None or author_b is None:
+        context["message"] = "One of those authors no longer exists."
+        return context
+
+    stats_a = _compare_author_stats(author_a, start, end_exclusive)
+    stats_b = _compare_author_stats(author_b, start, end_exclusive)
+
+    metrics = []
+    for key, label, unit in COMPARE_METRICS:
+        value_a = stats_a[key]
+        value_b = stats_b[key]
+        top = max(value_a, value_b, 0)
+        metrics.append(
+            {
+                "key": key,
+                "label": label,
+                "unit": unit,
+                "a": value_a,
+                "b": value_b,
+                "display_a": _compare_number(value_a, unit),
+                "display_b": _compare_number(value_b, unit),
+                "bar_a": round(value_a * 100 / top) if top else 0,
+                "bar_b": round(value_b * 100 / top) if top else 0,
+                "better": "a" if value_a > value_b else "b" if value_b > value_a else "tie",
+            }
+        )
+
+    score_a = sum(1 for metric in metrics if metric["better"] == "a")
+    score_b = sum(1 for metric in metrics if metric["better"] == "b")
+    context.update(
+        {
+            "author_a": stats_a,
+            "author_b": stats_b,
+            "metrics": metrics,
+            "score_a": score_a,
+            "score_b": score_b,
+            "winner": "a" if score_a > score_b else "b" if score_b > score_a else "tie",
+        }
+    )
+    return context
+
+
+def author_choices():
+    """Every author with at least one story, for the comparison pickers.
+
+    Kept separate from the paged leaderboard so the two dropdowns always carry
+    the full roster, not just the page currently on screen. Names follow the
+    same rule as everywhere else: the staff full name, then the masked email.
+    """
+    authors = list(Auth.objects.filter(blogs__isnull=False).distinct())
+    names = _author_names(authors)
+    rows = [
+        {"id": author.pk, "name": names.get(author.pk) or _mask_email(author.email) or "Unknown"}
+        for author in authors
+    ]
+    rows.sort(key=lambda row: row["name"].casefold())
+    return rows

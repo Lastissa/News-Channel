@@ -44,8 +44,10 @@ from Partner.models import AdvertImage, Announcement
 from ADMIN.models import SiteSettings
 from ADMIN.analytics import (
     AUTHOR_DEFAULT_RANGE,
+    AUTHOR_PERFORMANCE_SERIES,
     AUTHOR_RANGE_CHOICES,
     CATEGORY_PERFORMANCE_SERIES,
+    DEFAULT_AUTHOR_PERFORMANCE_SERIES,
     DEFAULT_CATEGORY_PERFORMANCE_SERIES,
     DEFAULT_STORY_PERFORMANCE_SERIES,
     DEFAULT_STORY_PERIOD,
@@ -70,6 +72,8 @@ from ADMIN.analytics import (
     TREND_RANGE_CHOICES,
     TREND_RANGES,
     TREND_SUB_RANGE_CHOICES,
+    author_choices,
+    author_compare,
     author_detail,
     author_directory_rows,
     author_kpis,
@@ -1361,6 +1365,7 @@ class AuthorLyticsView(View):
             {
                 "author_ranges": AUTHOR_RANGE_CHOICES,
                 "default_author_range": AUTHOR_DEFAULT_RANGE,
+                "author_choices": author_choices(),
                 "active_chamber": "author",
             },
         )
@@ -1447,7 +1452,7 @@ class AnalyticsAuthorDetailView(View):
                 author_id,
                 DEFAULT_TREND_BUCKET,
                 selected_range,
-                set(DEFAULT_STORY_PERFORMANCE_SERIES),
+                set(DEFAULT_AUTHOR_PERFORMANCE_SERIES),
             )
             if detail
             else None
@@ -1465,8 +1470,8 @@ class AnalyticsAuthorDetailView(View):
                 "trend_ranges": TREND_RANGE_CHOICES,
                 "trend_sub_ranges": TREND_SUB_RANGE_CHOICES,
                 "default_trend_range": selected_range,
-                "story_performance_series": STORY_PERFORMANCE_SERIES,
-                "default_story_performance_series": DEFAULT_STORY_PERFORMANCE_SERIES,
+                "author_performance_series": AUTHOR_PERFORMANCE_SERIES,
+                "default_author_performance_series": DEFAULT_AUTHOR_PERFORMANCE_SERIES,
             },
         )
 
@@ -1492,7 +1497,7 @@ class AnalyticsAuthorPerformanceView(View):
         if "submitted" in request.GET:
             series_keys = set(request.GET.getlist("series"))
         else:
-            series_keys = set(DEFAULT_STORY_PERFORMANCE_SERIES)
+            series_keys = set(DEFAULT_AUTHOR_PERFORMANCE_SERIES)
 
         return render(
             request,
@@ -1507,6 +1512,41 @@ class AnalyticsAuthorPerformanceView(View):
                     end_iso,
                 )
             },
+        )
+
+
+class AnalyticsAuthorCompareView(View):
+    """htmx fragment: two authors side by side over one window.
+
+    Read only and admin only. Both ids are optional: a missing pick, an
+    unknown account or the same author twice renders a hint instead of a
+    board, so a half-filled form never 500s. The fragment owns its window
+    controls -- a complete start/end pair overrides the preset range.
+    """
+
+    def get(self, request):
+        if not admin_only(request.user):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        selected_range, since = _author_window_args(request)
+        start_iso = (request.GET.get("start") or "").strip()
+        end_iso = (request.GET.get("end") or "").strip()
+
+        def author_id(name):
+            raw = (request.GET.get(name) or "").strip()
+            return int(raw) if raw.isdigit() else None
+
+        return render(
+            request,
+            "ADMIN/partials/analytics_author_compare.html",
+            author_compare(
+                author_id("a"),
+                author_id("b"),
+                selected_range,
+                since,
+                start_iso,
+                end_iso,
+            ),
         )
 
 

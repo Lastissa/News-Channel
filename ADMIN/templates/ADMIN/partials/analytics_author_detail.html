@@ -28,6 +28,9 @@
       &middot; {{ detail.followers }} follower{{ detail.followers|pluralize }}
     </p>
   </div>
+  <button type="button" class="analytics-compare-start"
+          data-compare-author="{{ detail.id }}"
+          aria-label="Compare {{ detail.name }} with another author">Compare</button>
 </header>
 
 <ul class="analytics-author-stats">
@@ -158,7 +161,7 @@
 <section class="analytics-author-block" aria-labelledby="analytics-author-performance">
   <h3 id="analytics-author-performance" class="analytics-author-block-title">
     Performance over time
-    <span class="analytics-insight-scope">views, likes and comments across every story</span>
+    <span class="analytics-insight-scope">stories, views, likes and comments across every story</span>
   </h3>
 
   <form class="analytics-controls"
@@ -174,11 +177,11 @@
 
     <fieldset class="analytics-series"
               data-guide-title="Signals to plot"
-              data-guide-text="Views, likes and comments across this author's stories, each counted from its own events inside the bucket.">
+              data-guide-text="Stories published, views, likes and comments across this author's stories, each counted from its own events inside the bucket.">
       <legend class="panel-sr">Series to plot</legend>
-      {% for meta in story_performance_series %}
+      {% for meta in author_performance_series %}
       <label class="analytics-series-option" style="--series-color: {{ meta.color }}">
-        <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_story_performance_series %} checked{% endif %}>
+        <input type="checkbox" name="series" value="{{ meta.key }}"{% if meta.key in default_author_performance_series %} checked{% endif %}>
         <span class="analytics-series-swatch" aria-hidden="true"></span>
         <span>{{ meta.name }}</span>
       </label>

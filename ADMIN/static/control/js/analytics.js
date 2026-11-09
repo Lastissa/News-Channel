@@ -945,7 +945,7 @@
      folded markup ships with `is-collapsed`, so a card is closed before this
      script runs rather than flashing open and then folding. */
   (function () {
-    var SELECTOR = ".analytics-card, .analytics-author-master, .analytics-author-detail-panel, .analytics-author-likes-panel";
+    var SELECTOR = ".analytics-card, .analytics-author-master, .analytics-author-detail-panel, .analytics-author-compare-panel, .analytics-author-likes-panel";
 
     function cardFor(node) {
       return node && node.closest ? node.closest(SELECTOR) : null;
@@ -1157,6 +1157,51 @@
         if (focused) loadAuthor(focused.getAttribute("data-author-row"), { stories_page: "", likes_page: "" });
       });
     }
+  })();
+
+  /* ---------- Authors: jump from a profile into the comparison board ---------- */
+  /* The Compare button lives in the detail fragment, so the board is opened and
+     primed with that author's id. If the second picker already holds a
+     different author, the comparison is requested immediately; otherwise the
+     focus moves to the empty picker so the next choice is one tap away. */
+  (function () {
+    var form = document.getElementById("analytics-author-compare-form");
+    if (!form) return;
+    var panel = form.closest(".analytics-author-compare-panel");
+    var selectA = form.querySelector('select[name="a"]');
+    var selectB = form.querySelector('select[name="b"]');
+    var rangeSelect = form.querySelector('select[name="range"]');
+    var startInput = form.querySelector('input[name="start"]');
+    var endInput = form.querySelector('input[name="end"]');
+
+    if (rangeSelect && startInput && endInput) {
+      /* Choosing a preset clears any custom dates left in the fields, so the
+         range the reader just picked is the window that runs. Capture runs
+         before htmx's change handler, so the request already carries blanks. */
+      form.addEventListener("change", function (event) {
+        if (event.target !== rangeSelect) return;
+        startInput.value = "";
+        endInput.value = "";
+      }, true);
+    }
+
+    document.addEventListener("click", function (event) {
+      var trigger = event.target.closest && event.target.closest("[data-compare-author]");
+      if (!trigger) return;
+      var authorId = trigger.getAttribute("data-compare-author") || "";
+      if (selectA) selectA.value = authorId;
+      if (window.AnalyticsCollapse) window.AnalyticsCollapse.open(panel);
+      if (panel && panel.scrollIntoView) {
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      var other = selectB ? selectB.value : "";
+      if (selectB && other && other !== authorId) {
+        if (form.requestSubmit) form.requestSubmit();
+        else if (window.htmx) window.htmx.trigger(form, "submit");
+      } else if (selectB) {
+        selectB.focus();
+      }
+    });
   })();
 
   /* ---------- "How this works" guide ---------- */

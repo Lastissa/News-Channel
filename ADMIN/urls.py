@@ -38,6 +38,7 @@ urlpatterns = [
     path("panel/analytics/author/kpis/", views.AnalyticsAuthorKpisView.as_view(), name="analytics_author_kpis"),
     path("panel/analytics/author/table/", views.AnalyticsAuthorsView.as_view(), name="analytics_authors"),
     path("panel/analytics/author/detail/", views.AnalyticsAuthorDetailView.as_view(), name="analytics_author_detail"),
+    path("panel/analytics/author/compare/", views.AnalyticsAuthorCompareView.as_view(), name="analytics_author_compare"),
     path("panel/analytics/author/performance/", views.AnalyticsAuthorPerformanceView.as_view(), name="analytics_author_performance"),
     path("panel/analytics/author/likes/", views.AnalyticsAuthorLikesView.as_view(), name="analytics_author_likes"),
     path("panel/analytics/story/", views.StoryLyticsView.as_view(), name="story_lytics"),

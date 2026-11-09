@@ -56,17 +56,32 @@ REFERRAL_SOURCE = "abureport"
 REFERRAL_MEDIUM = "referral"
 
 
+def _internal_hosts():
+    """Every host name that belongs to this deployment: the short brand
+    token used in tests, the live domain, and whatever ALLOWED_HOSTS names
+    (with the `www.` spelling folded back to its bare host)."""
+    hosts = {REFERRAL_SOURCE.lower(), "abureport.com", "abureport.com.ng"}
+    for value in getattr(settings, "ALLOWED_HOSTS", []) or []:
+        host = (value or "").strip().lower().split(":", 1)[0].strip(".")
+        if not host or host == "*":
+            continue
+        hosts.add(host)
+        if host.startswith("www."):
+            hosts.add(host[4:])
+    return hosts
+
+
 def _is_internal_host(host):
-    """True when `host` is our own site (abureport or any subdomain,
-    plus localhost while developing), so a link that stays on the site is
-    never handed our own referral parameters."""
-    host = (host or "").split(":", 1)[0].lower()
+    """True when `host` is our own site (abureport, abureport.com.ng or any
+    subdomain of either, plus localhost while developing), so a link that
+    stays on the site is never handed our own referral parameters and is
+    never marked nofollow."""
+    host = (host or "").split(":", 1)[0].lower().strip(".")
     if not host:
         return True
     if host in ("localhost", "127.0.0.1"):
         return True
-    bare = REFERRAL_SOURCE.lower()
-    return host == bare or host.endswith(f".{bare}")
+    return any(host == internal or host.endswith(f".{internal}") for internal in _internal_hosts())
 
 
 def tag_outbound_url(url, campaign=""):
@@ -94,6 +109,37 @@ def tag_outbound_url(url, campaign=""):
     return urlunparse(
         (parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment)
     )
+
+
+def _is_external_url(url):
+    """True when `url` points outside abureport (or has no host at all, e.g.
+    an /archive/ path or a #anchor, which are internal)."""
+    try:
+        parsed = urlparse(url or "")
+    except ValueError:
+        return False
+    return bool(parsed.netloc) and not _is_internal_host(parsed.netloc)
+
+
+def _anchor_rel(url):
+    """The `rel` value for a story link.
+
+    A link that leaves abureport is `nofollow`: the site must not lend its
+    search reputation to a destination it does not own. Internal links stay
+    followed, and every new-tab link still gets `noopener noreferrer`."""
+    if _is_external_url(url):
+        return "nofollow noopener noreferrer"
+    return "noopener noreferrer"
+
+
+def _media_rel_attr(url):
+    """` rel="nofollow"` for an external inline image/video URL, otherwise "".
+
+    Pictures and videos are not anchors, so search engines do not treat their
+    URLs as followed links -- the attribute is carried anyway so every
+    author-supplied external URL in the story body is visibly marked the same
+    way, and internal /archive/ media stays untouched."""
+    return ' rel="nofollow"' if _is_external_url(url) else ""
 
 
 #   MARKDOWN-STYLE LINK: "[label](https://url)". Lets the author show a short
@@ -362,8 +408,10 @@ def _linkify_text(value, campaign=""):
         #   tagging step sees the real query string, then escape the result
         #   for the attribute. Without this a second "&" would come back out
         #   as "&amp%3B" and break the link.
-        tagged = html.escape(tag_outbound_url(html.unescape(url), campaign), quote=True)
-        return f'<a href="{tagged}" rel="noopener noreferrer" target="_blank">{label}</a>'
+        raw_url = html.unescape(url)
+        tagged = html.escape(tag_outbound_url(raw_url, campaign), quote=True)
+        rel = _anchor_rel(raw_url)
+        return f'<a href="{tagged}" rel="{rel}" target="_blank">{label}</a>'
 
     return _LINK_OR_URL_RE.sub(_anchor, safe_text)
 
@@ -435,9 +483,10 @@ def _render_inline_image(direction, url, alt_text):
         onload_attr = ' onload="if(!this.getAttribute(\'width\')){this.width=this.naturalWidth;this.height=this.naturalHeight;}"'
 
     caption_html = f"<figcaption>{html.escape(caption)}</figcaption>" if caption else ""
+    rel_attr = _media_rel_attr(url)
     return (
         f'<figure class="story-inline-fig {fig_class}">'
-        f'<img class="story-inline-img" src="{safe_url}" alt="{safe_alt}"'
+        f'<img class="story-inline-img" src="{safe_url}" alt="{safe_alt}"{rel_attr}'
         f'{size_attrs} loading="lazy"{onload_attr}>'
         f"{caption_html}</figure>"
     )
@@ -458,8 +507,9 @@ def _render_inline_file(url, display_text, campaign=""):
     label = (display_text or "").strip() or _image_filename_from_url(url)
     safe_url = html.escape(tag_outbound_url(url, campaign), quote=True)
     safe_label = html.escape(label, quote=True)
+    rel = _anchor_rel(url)
     return (
-        f'<a class="story-inline-file" href="{safe_url}" download rel="noopener noreferrer">'
+        f'<a class="story-inline-file" href="{safe_url}" download rel="{rel}">'
         f'<span class="story-inline-file-icon" aria-hidden="true"><svg xmlns="http://w3.org" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg></span>{safe_label}</a>'
     )
 
@@ -477,9 +527,10 @@ def _render_inline_button(url, label_text, campaign=""):
     label = (label_text or "").strip() or url
     safe_url = html.escape(tag_outbound_url(url, campaign), quote=True)
     safe_label = html.escape(label, quote=False)
+    rel = _anchor_rel(url)
     return (
         f'<p class="story-inline-btn-row">'
-        f'<a class="story-inline-btn" href="{safe_url}" rel="noopener noreferrer" target="_blank">{safe_label}</a>'
+        f'<a class="story-inline-btn" href="{safe_url}" rel="{rel}" target="_blank">{safe_label}</a>'
         f'</p>'
     )
 
@@ -512,6 +563,7 @@ def _render_inline_video(direction, url, caption_text):
     fig_class = VID_FIG_CLASSES.get(direction, "story-inline-fig-left")
     safe_aria = html.escape(caption or "Story video", quote=True)
     caption_html = f"<figcaption>{html.escape(caption)}</figcaption>" if caption else ""
+    rel_attr = _media_rel_attr(url)
 
     embed_url = _video_embed_url(url)
     if embed_url:
@@ -520,7 +572,7 @@ def _render_inline_video(direction, url, caption_text):
         return (
             f'<figure class="story-inline-fig story-inline-video is-embed{vertical_class} {fig_class}">'
             f'<div class="story-inline-video-frame">'
-            f'<iframe class="story-inline-video-embed" src="{safe_embed}" '
+            f'<iframe class="story-inline-video-embed" src="{safe_embed}"{rel_attr} '
             f'title="{safe_aria}" loading="lazy" '
             f'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" '
             f'allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>'
@@ -532,7 +584,7 @@ def _render_inline_video(direction, url, caption_text):
     return (
         f'<figure class="story-inline-fig story-inline-video {fig_class}">'
         f'<div class="story-inline-video-frame">'
-        f'<video class="story-inline-video-el" src="{safe_url}" muted loop playsinline '
+        f'<video class="story-inline-video-el" src="{safe_url}"{rel_attr} muted loop playsinline '
         f'autoplay preload="metadata" aria-label="{safe_aria}" '
         f'onerror="this.onerror=null;this.src=\'/static/404_video.mp4\';"></video>'
         f'<button type="button" class="story-inline-video-toggle" data-video-toggle '

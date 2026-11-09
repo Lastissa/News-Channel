@@ -180,7 +180,7 @@ __Please note:__ deadlines are strict.
         self.assertIn(
             '<a href="https://example.edu/admission/guide'
             '?utm_source=abureport&amp;utm_medium=referral'
-            '&amp;utm_campaign=admissions-update" rel="noopener noreferrer" target="_blank">admission guide</a>',
+            '&amp;utm_campaign=admissions-update" rel="nofollow noopener noreferrer" target="_blank">admission guide</a>',
             html,
         )
         #   a btn line becomes one block-level button carrying the trailing text
@@ -189,6 +189,49 @@ __Please note:__ deadlines are strict.
         self.assertIn(">Start your application</a>", html)
         #   a bare URL still linkifies
         self.assertIn('<a href="https://example.edu/portal', html)
+
+    def test_outbound_story_links_are_nofollow_but_abureport_links_are_not(self):
+        html = parse_story_content(
+            "Read [the guide](https://example.edu/guide).\n\n"
+            "Also https://www.abureport.com.ng/story/local\n\n"
+            "btn https://example.edu/apply Apply\n\n"
+            "filel https://example.edu/form.pdf Download\n"
+        )
+
+        #   markdown link + button + file: every destination outside abureport
+        self.assertEqual(html.count('rel="nofollow noopener noreferrer"'), 3)
+        #   our own site keeps its ordinary new-tab rel and stays followed
+        self.assertIn(
+            'href="https://www.abureport.com.ng/story/local" rel="noopener noreferrer"',
+            html,
+        )
+
+    def test_external_inline_media_is_nofollow_but_archive_media_is_not(self):
+        html = parse_story_content(
+            "imgc https://cdn.example.com/photo.jpg External photo\n\n"
+            "imgc /archive/cdn/image/upload/v1/abureport/archive/photo.jpg Our photo\n\n"
+            "vidc https://cdn.example.com/clip.mp4 External clip\n\n"
+            "vidc /archive/cdn/video/upload/v1/abureport/archive/clip.mp4 Our clip\n"
+        )
+
+        #   the two external media tags carry nofollow; the two archive ones do not
+        self.assertEqual(html.count(' rel="nofollow"'), 2)
+        self.assertIn(
+            'src="https://cdn.example.com/photo.jpg" alt="External photo" rel="nofollow"',
+            html,
+        )
+        self.assertIn(
+            'src="https://cdn.example.com/clip.mp4" rel="nofollow"',
+            html,
+        )
+        self.assertNotIn(
+            'src="/archive/cdn/image/upload/v1/abureport/archive/photo.jpg" alt="Our photo" rel="nofollow"',
+            html,
+        )
+        self.assertNotIn(
+            'src="/archive/cdn/video/upload/v1/abureport/archive/clip.mp4" rel="nofollow"',
+            html,
+        )
 
     def test_a_markdown_link_url_is_only_linked_once(self):
         html = parse_story_content("[Guide](https://example.edu/guide)")
@@ -255,6 +298,19 @@ __Please note:__ deadlines are strict.
         self.assertEqual(
             tag_outbound_url("https://www.abureport/story/x", "slug"),
             "https://www.abureport/story/x",
+        )
+        #   The live domain and its subdomains are ours too.
+        self.assertEqual(
+            tag_outbound_url("https://abureport.com/story/x", "slug"),
+            "https://abureport.com/story/x",
+        )
+        self.assertEqual(
+            tag_outbound_url("https://abureport.com.ng/story/x", "slug"),
+            "https://abureport.com.ng/story/x",
+        )
+        self.assertEqual(
+            tag_outbound_url("https://www.abureport.com.ng/story/x", "slug"),
+            "https://www.abureport.com.ng/story/x",
         )
         #   Non-http schemes are not links we can tag.
         self.assertEqual(tag_outbound_url("mailto:tips@example.com", "slug"), "mailto:tips@example.com")
@@ -1121,6 +1177,15 @@ class StoryAuthorEntityTests(TestCase):
         self.assertTrue(article["dateModified"])
         self.assertGreater(article["wordCount"], 0)
         self.assertEqual(article["mainEntityOfPage"]["@id"], article["url"])
+
+    def test_author_social_links_are_not_nofollowed(self):
+        response = self.client.get(reverse("blog:story_detail", args=[self.story.slug]))
+
+        self.assertContains(
+            response,
+            'href="https://x.com/entityauthor" target="_blank" '
+            'rel="noopener noreferrer"',
+        )
 
 
 class Bug1ViewCountUnitExplorationTest(TestCase):

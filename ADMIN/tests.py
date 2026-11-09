@@ -2416,6 +2416,7 @@ class AuthorLyticsTests(TestCase):
         self.kpis_url = reverse("control:analytics_author_kpis")
         self.likes_url = reverse("control:analytics_author_likes")
         self.detail_url = reverse("control:analytics_author_detail")
+        self.compare_url = reverse("control:analytics_author_compare")
         self.performance_url = reverse("control:analytics_author_performance")
 
     def make_story(self, heading, author=None, age_days=0):
@@ -2457,6 +2458,7 @@ class AuthorLyticsTests(TestCase):
             self.kpis_url,
             self.likes_url,
             self.detail_url,
+            self.compare_url,
             self.performance_url,
         ]:
             with self.subTest(url=url):
@@ -2475,7 +2477,13 @@ class AuthorLyticsTests(TestCase):
         self.assertIn("analytics-author-kpis-body", body)
         self.assertIn("analytics-authors-body", body)
         self.assertIn("analytics-author-detail-body", body)
+        self.assertIn("analytics-author-compare-body", body)
         self.assertIn("analytics-author-likes-body", body)
+        #   The comparison owns its window controls, so custom dating is
+        #   reachable without changing the leaderboard beside it.
+        self.assertIn("analytics-compare-window-row", body)
+        self.assertIn('name="start"', body)
+        self.assertIn('name="end"', body)
         #   The layout is a master and a detail side by side, not a stack.
         self.assertIn("analytics-author-split", body)
         self.assertNotIn("analytics-placeholder", body)
@@ -2733,9 +2741,32 @@ class AuthorLyticsTests(TestCase):
             "analytics-author-performance-data",
         )
         totals = {series["key"]: sum(series["values"]) for series in chart["series"]}
-        self.assertEqual(totals, {"views": 2, "likes": 1, "comments": 1})
+        self.assertEqual(totals, {"stories": 2, "views": 2, "likes": 1, "comments": 1})
         self.assertEqual(chart["author"]["id"], self.writer.pk)
         self.assertEqual(chart["author"]["stories"], 2)
+
+    def test_the_author_performance_chart_includes_published_stories(self):
+        self.make_story("Fresh story")
+        self.make_story("Stale story", age_days=40)
+
+        self.client.force_login(self.admin)
+        chart = _chart_data(
+            self,
+            self.client.get(
+                self.performance_url,
+                {
+                    "submitted": "1",
+                    "author": self.writer.pk,
+                    "bucket": "day",
+                    "range": "30d",
+                    "series": ["stories"],
+                },
+            ),
+            "analytics-author-performance-data",
+        )
+
+        self.assertEqual([series["key"] for series in chart["series"]], ["stories"])
+        self.assertEqual(sum(chart["series"][0]["values"]), 1)
 
     def test_the_author_performance_chart_honours_the_series_toggles(self):
         self.add_view(self.make_story("Series story"))
@@ -2762,6 +2793,117 @@ class AuthorLyticsTests(TestCase):
         ).content.decode()
         self.assertIn("No stories yet", body)
         self.assertNotIn("analytics-author-performance-data", body)
+
+    #   ------------------------------------------------------------ comparison
+    def test_the_compare_board_scores_two_authors_side_by_side(self):
+        first = self.make_story("First compare story")
+        second = self.make_story("Second compare story")
+        rival = self.make_story("Rival story", author=self.other_writer)
+
+        for _ in range(3):
+            self.add_view(first)
+        self.add_view(second)
+        self.add_like(first, self.member)
+        self.add_like(first, self.other_member)
+        self.add_comment(second)
+
+        self.add_view(rival)
+        self.add_like(rival, self.member)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(
+            self.compare_url,
+            {"a": self.writer.pk, "b": self.other_writer.pk, "range": "30d"},
+        ).content.decode()
+
+        self.assertIn("analytics-compare-board", body)
+        self.assertIn("Ada Writer", body)
+        self.assertIn("A***D@EXAMPLE.COM", body)
+        self.assertIn("metrics won", body)
+        #   Both the windowed output row and the reader-response rows are drawn.
+        for label in ("Stories published", "Stories all time", "Reads", "Likes", "Comments", "Likes per 100 reads"):
+            with self.subTest(label=label):
+                self.assertIn(label, body)
+        #   Ada published twice and read four times; the rival published and
+        #   was read once, so Ada's values lead those rows.
+        self.assertIn("analytics-compare-row is-a-win", body)
+
+    def test_the_compare_board_needs_two_different_authors(self):
+        self.client.force_login(self.admin)
+
+        missing = self.client.get(
+            self.compare_url, {"a": self.writer.pk, "range": "30d"}
+        ).content.decode()
+        self.assertIn("Pick two authors to see them side by side.", missing)
+
+        same = self.client.get(
+            self.compare_url,
+            {"a": self.writer.pk, "b": self.writer.pk, "range": "30d"},
+        ).content.decode()
+        self.assertIn("Pick two different authors to compare.", same)
+
+        unknown = self.client.get(
+            self.compare_url,
+            {"a": self.writer.pk, "b": 999999, "range": "30d"},
+        ).content.decode()
+        self.assertIn("One of those authors no longer exists.", unknown)
+
+    def test_the_compare_board_uses_the_same_window_as_the_detail(self):
+        story = self.make_story("Windowed compare story")
+        self.add_view(story)
+
+        self.client.force_login(self.admin)
+        body = self.client.get(
+            self.compare_url,
+            {"a": self.writer.pk, "b": self.other_writer.pk, "range": "30d"},
+        ).content.decode()
+
+        self.assertIn("Windowed figures cover Last 30 days", body)
+        self.assertIn("30 days ago", body)
+
+    def test_the_compare_board_accepts_a_custom_start_and_end(self):
+        story = self.make_story("Archived compare story", age_days=30)
+        self.add_view(story, age_days=10)  # inside the custom window
+        self.add_view(story, age_days=1)  # after the custom end, so excluded
+
+        self.client.force_login(self.admin)
+        start = (timezone.localdate() - timedelta(days=15)).isoformat()
+        end = (timezone.localdate() - timedelta(days=5)).isoformat()
+        body = self.client.get(
+            self.compare_url,
+            {
+                "a": self.writer.pk,
+                "b": self.other_writer.pk,
+                "range": "7d",
+                "start": start,
+                "end": end,
+            },
+        ).content.decode()
+
+        self.assertIn("analytics-compare-board", body)
+        self.assertIn("11-day window", body)
+        rows = re.findall(r'<li class="analytics-compare-row[^"]*">(.*?)</li>', body, re.S)
+        reads_row = next(row for row in rows if 'analytics-compare-label">Reads<' in row)
+        self.assertIn('analytics-compare-value is-a">1<', reads_row)
+
+    def test_an_incomplete_custom_compare_window_falls_back_to_the_preset(self):
+        self.make_story("Present compare story")
+
+        self.client.force_login(self.admin)
+        start = (timezone.localdate() - timedelta(days=2)).isoformat()
+        body = self.client.get(
+            self.compare_url,
+            {
+                "a": self.writer.pk,
+                "b": self.other_writer.pk,
+                "range": "30d",
+                "start": start,
+            },
+        ).content.decode()
+
+        self.assertIn("Windowed figures cover Last 30 days", body)
+        self.assertIn("30 days ago", body)
+        self.assertNotIn("day window", body)
 
 
 class AuthorLyticsInsightsTests(TestCase):
