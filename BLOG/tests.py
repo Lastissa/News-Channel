@@ -565,6 +565,49 @@ __Please note:__ deadlines are strict.
         landscape = parse_story_content("vidc https://vimeo.com/123456789")
         self.assertNotIn("is-vertical", landscape)
 
+    def test_contact_tokens_use_the_current_panel_values(self):
+        settings_row = SiteSettings.get_solo()
+        settings_row.support_email = "support@example.com"
+        settings_row.customer_support_mobile = "+234 800 123 4567"
+        settings_row.save()
+        cache.clear()
+
+        html = parse_story_content(
+            "Email {{ support_email }} or call {{ customer_support_mobile }}."
+        )
+        self.assertIn('href="mailto:support@example.com"', html)
+        self.assertIn("support@example.com</a>", html)
+        self.assertIn('href="tel:+234%20800%20123%204567"', html)
+        self.assertIn("+234 800 123 4567</a>", html)
+
+        #   Changing the settings updates an already-published story; the
+        #   story row keeps only the token and never the stale address.
+        settings_row.support_email = "new-support@example.com"
+        settings_row.customer_support_mobile = "+234 900 765 4321"
+        settings_row.save()
+        cache.clear()
+        html = parse_story_content(
+            "Email {{ support_email }} or call {{ customer_support_mobile }}."
+        )
+        self.assertIn("new-support@example.com", html)
+        self.assertIn("+234 900 765 4321", html)
+        self.assertNotIn(">support@example.com</a>", html)
+        self.assertNotIn("+234 800 123 4567", html)
+
+    def test_contact_tokens_fall_back_when_panel_values_are_blank(self):
+        settings_row = SiteSettings.get_solo()
+        settings_row.support_email = ""
+        settings_row.customer_support_mobile = ""
+        settings_row.save()
+        cache.clear()
+
+        html = parse_story_content(
+            "Email {{ support_email }} or call {{ customer_support_mobile }}."
+        )
+        self.assertNotIn("{{", html)
+        self.assertIn("customer care", html)
+        self.assertIn("customer care number", html)
+
 
 class StoryAdsViewTests(TestCase):
     def setUp(self):
@@ -593,8 +636,61 @@ class StoryAdsViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Cache-Control"], "no-store")
         ad = response.json()["ad"]
-        self.assertEqual(set(ad), {"id", "image", "heading", "body", "url"})
+        self.assertEqual(set(ad), {"id", "image", "heading", "body", "url", "landing_url"})
         self.assertTrue(ad["heading"].startswith("advert-"))
+        self.assertEqual(ad["landing_url"], "")
+
+    def test_published_landing_page_becomes_the_popup_link(self):
+        from Partner.models import AdvertLandingPage
+
+        advert = self._advert("campus-rooms")
+        landing_author = Auth.objects.create_user(
+            email="landing-editor@example.com", is_staff=True, is_admin=True
+        )
+        AdvertLandingPage.objects.create(
+            advert=advert,
+            author=landing_author,
+            html_public_id="abureport/advert-landing/advert_1.html",
+            is_published=True,
+        )
+        cache.clear()
+
+        ad = self.client.get(reverse("blog:story_ads")).json()["ad"]
+
+        self.assertEqual(
+            ad["landing_url"],
+            reverse(
+                "partner:advert_landing",
+                kwargs={"slug": "campus-rooms", "pk": advert.pk},
+            ),
+        )
+
+    def test_untrusted_or_unpublished_landing_page_is_not_a_popup_link(self):
+        from Partner.models import AdvertLandingPage
+
+        advert = self._advert("campus-rooms")
+        landing_author = Auth.objects.create_user(
+            email="landing-editor@example.com", is_staff=True, is_admin=True
+        )
+        landing = AdvertLandingPage.objects.create(
+            advert=advert,
+            author=landing_author,
+            html_public_id="abureport/advert-landing/advert_1.html",
+            is_published=False,
+        )
+        cache.clear()
+
+        ad = self.client.get(reverse("blog:story_ads")).json()["ad"]
+        self.assertEqual(ad["landing_url"], "")
+
+        landing.is_published = True
+        landing.save(update_fields=["is_published"])
+        landing_author.is_admin = False
+        landing_author.save(update_fields=["is_admin"])
+        cache.clear()
+
+        ad = self.client.get(reverse("blog:story_ads")).json()["ad"]
+        self.assertEqual(ad["landing_url"], "")
 
     def test_endpoint_never_returns_expired_or_inactive_adverts(self):
         self._advert("live")

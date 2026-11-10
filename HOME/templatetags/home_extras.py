@@ -1,5 +1,6 @@
 """Template helpers for the home page (HOME/templates/HOME/home.html and its
-story card partial). Pure string helpers, no database access.
+story card partial). The excerpt filter resolves the dynamic contact tokens
+against the cached SiteSettings row; the other helpers are pure string work.
 
     {% load home_extras %}
     {{ post.content|story_excerpt:24 }}     clean first paragraph, N words
@@ -41,6 +42,17 @@ _TAGS = re.compile(r"<[^>]+>")
 
 def _first_paragraph(text):
     """First line of real prose: skips blanks, directives and bare URLs."""
+    if text:
+        #   Cards must show the CURRENT contact value, not the stored
+        #   {{ support_email }}/{{ customer_support_mobile }} placeholder.
+        from SERVICE_INTERNAL.contact_tokens import (
+            CONTACT_TOKEN_RE,
+            contact_values,
+            replace_contact_tokens,
+        )
+
+        if CONTACT_TOKEN_RE.search(text):
+            text = replace_contact_tokens(text, *contact_values(), link=False)
     for raw in (text or "").splitlines():
         line = raw.strip()
         if not line or _DIRECTIVE.match(line):

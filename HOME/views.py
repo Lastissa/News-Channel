@@ -725,19 +725,41 @@ def _teaser_items():
     least one exists the old placeholder slides are shown so the carousel is
     never empty. The template and hero-teaser.js only read those four keys.
 
-    A live advert always carries a link now (the panel refuses to save one
-    without it), so an empty `url` only ever means "this row predates that
-    rule" and the slide is simply not clickable. The placeholder slides are
-    the "advertise with us" call to action, so their click has to go
-    somewhere useful: the partnership mailbox when one is configured in the
-    panel, otherwise a tiny endpoint that tells the admins it still needs
-    setting up and shows the visitor "coming soon" (AdvertInquiryView). It
-    must never fall back to "/" -- clicking an advert and landing on the home
-    page looks broken."""
+    `url` is the advert's landing page when one is published and its writer is
+    still an active admin, otherwise the advertiser link saved on the advert.
+    The landing page is the click target, not a second field, so the existing
+    carousel template needs no changes. The placeholder slides are the
+    "advertise with us" call to action, so their click has to go somewhere
+    useful: the partnership mailbox when one is configured in the panel,
+    otherwise a tiny endpoint that tells the admins it still needs setting up
+    and shows the visitor "coming soon" (AdvertInquiryView). It must never fall
+    back to "/" -- clicking an advert and landing on the home page looks
+    broken."""
+    from Partner.landing import advert_landing_url
     from Partner.models import AdvertImage
-    live = AdvertImage.objects.filter(expiry_date__gte=timezone.now(), is_active=True).order_by("-date_created")
+
+    live = (
+        AdvertImage.objects.select_related("landing_page__author")
+        .filter(expiry_date__gte=timezone.now(), is_active=True)
+        .order_by("-date_created")
+    )
     if live:
-        return [{"heading": row.heading, "body": row.body, "image": row.image_url, "url": row.url or ""} for row in live]
+        rows = []
+        for row in live:
+            landing = getattr(row, "landing_page", None)
+            rows.append(
+                {
+                    "heading": row.heading,
+                    "body": row.body,
+                    "image": row.image_url,
+                    "url": (
+                        advert_landing_url(row)
+                        if landing and landing.is_deliverable
+                        else (row.url or "")
+                    ),
+                }
+            )
+        return rows
 
     from django.templatetags.static import static
 
@@ -1702,22 +1724,30 @@ class PromoteAdsView(View):
     def get(self, request):
         from django.templatetags.static import static
 
+        from Partner.landing import advert_landing_url
         from Partner.models import AdvertImage
 
         live = (
-            AdvertImage.objects.filter(expiry_date__gte=timezone.now(), is_active=True)
+            AdvertImage.objects.select_related("landing_page__author")
+            .filter(expiry_date__gte=timezone.now(), is_active=True)
             .order_by("-date_created")[:12]
         )
-        items = [
-            {
-                "heading": row.heading,
-                "body": row.body,
-                "image": row.image_url,
-                "url": row.url or "",
-                "is_example": False,
-            }
-            for row in live
-        ]
+        items = []
+        for row in live:
+            landing = getattr(row, "landing_page", None)
+            items.append(
+                {
+                    "heading": row.heading,
+                    "body": row.body,
+                    "image": row.image_url,
+                    "url": (
+                        advert_landing_url(row)
+                        if landing and landing.is_deliverable
+                        else (row.url or "")
+                    ),
+                    "is_example": False,
+                }
+            )
         if not items:
             items = [
                 {"heading": "", "body": "", "image": static(f"partner/ad_demo_{number}.jpg"), "url": "", "is_example": True}

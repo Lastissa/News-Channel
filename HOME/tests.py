@@ -20,7 +20,7 @@ from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, Category, get_category_choices, refresh_category_cache
 from HOME.models import ReadingHistory, CategorySubscription, CategorySubscription
-from Partner.models import AdvertImage
+from Partner.models import AdvertImage, AdvertLandingPage
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.cache_keys import HOME_PAGE_HTML_CACHE_KEY
 from SERVICE_INTERNAL.config import About, custom_context_processors
@@ -272,7 +272,7 @@ class AddNewsValidationTests(QuietTestCase):
         self.assertContains(response, "data-archive-refresh")
         self.assertContains(response, "data-editor-modal-confirm")
         self.assertContains(response, static("home/js/add-news-editor.js"))
-        self.assertContains(response, static("home/js/add-news-editor.js") + "?v=20261109-1")
+        self.assertContains(response, static("home/js/add-news-editor.js") + "?v=20261110-1")
         self.assertContains(response, "Image and file archive")
         self.assertContains(response, "Do not begin the content with a")
         self.assertContains(response, "position: sticky")
@@ -766,6 +766,37 @@ class HomeAdvertTeaserTests(QuietTestCase):
 
         self.assertEqual(self._placeholder_url(), reverse("home:advert_inquiry"))
 
+    def test_live_advert_with_a_published_landing_page_opens_that_page(self):
+        from HOME.views import _teaser_items
+
+        admin = Auth.objects.create_user(
+            email="teaser-landing-admin@example.com", is_staff=True, is_admin=True
+        )
+        advert = AdvertImage.objects.create(
+            author=admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading="Campus hostel rooms",
+            body="Book a room.",
+            image_url="https://cdn.example.com/ads/hostel.jpg",
+            url="https://hostel.example.com",
+        )
+        AdvertLandingPage.objects.create(
+            advert=advert,
+            author=admin,
+            html_public_id="abureport/advert-landing/advert_teaser.html",
+            is_published=True,
+        )
+
+        item = _teaser_items()[0]
+
+        self.assertEqual(
+            item["url"],
+            reverse(
+                "partner:advert_landing",
+                kwargs={"slug": "campus-hostel-rooms", "pk": advert.pk},
+            ),
+        )
+
 
 class AdSurfaceLabellingTests(QuietTestCase):
     """Segment 6 (ad & traffic policy hygiene): the paid/promotional surfaces on
@@ -852,6 +883,37 @@ class PromotePageViewTests(QuietTestCase):
         self.assertContains(response, "Campus hostel rooms")
         self.assertContains(response, "https://cdn.example.com/ads/hostel.jpg")
         self.assertContains(response, "https://hostel.example.com")
+
+    def test_ads_feed_uses_a_deliverable_landing_page(self):
+        admin = Auth.objects.create_user(
+            email="promote-landing-admin@example.com",
+            is_staff=True,
+            is_admin=True,
+        )
+        advert = AdvertImage.objects.create(
+            author=admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading="Campus hostel rooms",
+            body="Book a room before the semester starts.",
+            image_url="https://cdn.example.com/ads/hostel.jpg",
+            url="https://hostel.example.com",
+            is_active=True,
+        )
+        AdvertLandingPage.objects.create(
+            advert=advert,
+            author=admin,
+            html_public_id="abureport/advert-landing/advert_promote.html",
+            is_published=True,
+        )
+
+        response = self.client.get(reverse("home:promote_ads"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="/ads/campus-hostel-rooms-{advert.pk}/"',
+        )
+        self.assertNotContains(response, 'href="https://hostel.example.com"')
 
     def test_ads_feed_skips_expired_and_inactive_adverts(self):
         AdvertImage.objects.create(
@@ -1541,14 +1603,14 @@ class StoryUpdatedNoticeTests(QuietTestCase):
         response = self.story()
         notices = list(response.context["messages"])
         self.assertEqual(len(notices), 1)
-        self.assertEqual(str(notices[0]), "This post was last updated 3 days after its initial publication.")
+        self.assertEqual(str(notices[0]), "Last updated 3 days after its initial publication.")
         self.assertIn("story-edited", notices[0].tags)
         self.assertContains(response, 'class="django-message story-edited info"')
 
     def test_edited_story_shows_the_notice_with_weeks(self, _ping):
         Blog.objects.filter(pk=self.blog.pk).update(last_edited=self.blog.date_created + timedelta(days=15))
         notices = list(self.story().context["messages"])
-        self.assertEqual(str(notices[0]), "This post was last updated 2 weeks after its initial publication.")
+        self.assertEqual(str(notices[0]), "Last updated 2 weeks after its initial publication.")
 
     def test_notice_shows_on_every_open_not_just_the_first(self, _ping):
         Blog.objects.filter(pk=self.blog.pk).update(last_edited=self.blog.date_created + timedelta(days=2))

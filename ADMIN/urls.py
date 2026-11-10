@@ -61,4 +61,7 @@ urlpatterns = [
     path("panel/image-adverts/", views.PanelImageAdvertCreateView.as_view(), name="panel_image_advert_create"),
     path("panel/image-adverts/<int:item_id>/update/", views.PanelImageAdvertUpdateView.as_view(), name="panel_image_advert_update"),
     path("panel/image-adverts/<int:item_id>/delete/", views.PanelImageAdvertDeleteView.as_view(), name="panel_image_advert_delete"),
+    path("panel/image-adverts/<int:item_id>/landing/", views.PanelImageAdvertLandingView.as_view(), name="panel_image_advert_landing"),
+    path("panel/image-adverts/<int:item_id>/landing/preview/", views.PanelImageAdvertLandingPreviewView.as_view(), name="panel_image_advert_landing_preview"),
+    path("panel/image-adverts/<int:item_id>/landing/delete/", views.PanelImageAdvertLandingDeleteView.as_view(), name="panel_image_advert_landing_delete"),
 ]

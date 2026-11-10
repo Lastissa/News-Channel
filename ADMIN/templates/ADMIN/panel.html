@@ -7,7 +7,7 @@
 
 {% block extra_head %}
   {{ block.super }}
-  <link rel="stylesheet" href="{% static 'control/css/panel.css' %}">
+  <link rel="stylesheet" href="{% static 'control/css/panel.css' %}?v=20261110-2">
 {% endblock %}
 
 {% block content %}
@@ -22,6 +22,7 @@
   <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></symbol>
   <symbol id="i-text" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></symbol>
   <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
   <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></symbol>
@@ -211,12 +212,105 @@
             <h3 class="ta-subhead"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg><span class="panel-sr">Currently added</span></h3>
             <div class="ta-list" data-ad-list
                  data-update-endpoint="{% url 'control:panel_image_advert_update' 0 %}"
-                 data-delete-endpoint="{% url 'control:panel_image_advert_delete' 0 %}"></div>
+                 data-delete-endpoint="{% url 'control:panel_image_advert_delete' 0 %}"
+                 data-landing-endpoint="{% url 'control:panel_image_advert_landing' 0 %}"
+                 data-landing-preview-endpoint="{% url 'control:panel_image_advert_landing_preview' 0 %}"
+                 data-landing-delete-endpoint="{% url 'control:panel_image_advert_landing_delete' 0 %}"></div>
           </div>
         </div>
         {{ image_advert_items|json_script:"ad-initial" }}
       </div></div>
     </section>
+
+    <div class="ad-landing-modal" data-ad-landing-modal hidden>
+      <div class="ad-landing-dialog" role="dialog" aria-modal="true" aria-labelledby="ad-landing-title">
+        <header class="ad-landing-header">
+          <div class="ad-landing-heading">
+            <h2 id="ad-landing-title">Advert landing page</h2>
+            <p class="ad-landing-sub" data-ad-landing-sub></p>
+          </div>
+          <div class="ad-landing-header-actions">
+            <a class="ad-landing-view" data-ad-landing-view href="#" target="_blank" rel="noopener" hidden>Open page</a>
+            <button type="button" class="panel-icon-btn" data-ad-landing-close aria-label="Close landing page editor" title="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+          </div>
+        </header>
+
+        <form class="ad-landing-form" data-ad-landing-form data-landing-view="code"
+              data-endpoint-template="{% url 'control:panel_image_advert_landing' 0 %}"
+              data-preview-endpoint-template="{% url 'control:panel_image_advert_landing_preview' 0 %}"
+              data-delete-endpoint-template="{% url 'control:panel_image_advert_landing_delete' 0 %}">
+          <div class="ad-landing-tabs" role="tablist" aria-label="Landing page editor view">
+            <button type="button" class="ad-landing-tab is-active" id="ad-landing-tab-code" role="tab" aria-selected="true" aria-controls="ad-landing-panel-code" data-ad-landing-tab="code">Code</button>
+            <button type="button" class="ad-landing-tab" id="ad-landing-tab-preview" role="tab" aria-selected="false" aria-controls="ad-landing-panel-preview" tabindex="-1" data-ad-landing-tab="preview">Preview</button>
+          </div>
+          <div class="ad-landing-editor" id="ad-landing-panel-code" role="tabpanel" aria-labelledby="ad-landing-tab-code">
+            <p class="ad-landing-note">Write the complete document, including <code>&lt;!doctype html&gt;</code>, <code>&lt;head&gt;</code> and <code>&lt;body&gt;</code>. Use the tokens below where advert data should appear. Saving overwrites the current Cloudinary file; the public page never includes the site header, footer or nav.</p>
+            <div class="ad-landing-fields">
+              <div class="ad-landing-field">
+                <label for="ad-landing-meta-title">Metadata title <small>empty = advert heading</small></label>
+                <input id="ad-landing-meta-title" type="text" name="meta_title" maxlength="120" autocomplete="off" data-ad-landing-meta-title>
+              </div>
+              <div class="ad-landing-field">
+                <label for="ad-landing-og-image">OG image URL <small>empty = advert picture</small></label>
+                <input id="ad-landing-og-image" type="url" name="og_image" maxlength="500" placeholder="https://..." data-ad-landing-og-image>
+              </div>
+              <div class="ad-landing-field ad-landing-field-wide">
+                <label for="ad-landing-meta-description">Metadata description <small>empty = advert text</small></label>
+                <textarea id="ad-landing-meta-description" name="meta_description" rows="2" maxlength="320" data-ad-landing-meta-description></textarea>
+              </div>
+              <div class="ad-landing-field">
+                <label for="ad-landing-robots">Robots</label>
+                <select id="ad-landing-robots" name="robots" data-ad-landing-robots>
+                  {% for value, label in landing_robots_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="ad-landing-publish">
+                <input type="checkbox" name="is_published" value="1" checked data-ad-landing-published>
+                <span><strong>Published</strong><small>When off, advert clicks use the advertiser link and the page returns 404.</small></span>
+              </label>
+            </div>
+
+            <p class="ad-landing-error" data-ad-landing-error hidden></p>
+
+            <div class="ad-landing-code-head">
+              <label for="ad-landing-html">HTML document</label>
+              <span class="ad-landing-code-meta"><span data-ad-landing-size>0 B</span><span data-ad-landing-lines>0 lines</span></span>
+            </div>
+            <textarea id="ad-landing-html" class="ad-landing-code" name="html" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" data-ad-landing-html></textarea>
+
+            <details class="ad-landing-tokens">
+              <summary>Available tokens</summary>
+              <ul class="ad-landing-token-list">
+                {% for name, description in landing_tokens %}
+                  <li><code>{% templatetag openvariable %} {{ name }} {% templatetag closevariable %}</code><span>{{ description }}</span></li>
+                {% endfor %}
+              </ul>
+            </details>
+          </div>
+
+          <section class="ad-landing-preview" id="ad-landing-panel-preview" role="tabpanel" aria-labelledby="ad-landing-tab-preview" aria-label="Landing page preview">
+            <div class="ad-landing-preview-head">
+              <span>Preview</span>
+              <button type="button" class="ad-landing-review" data-ad-landing-preview><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg>Review page</button>
+            </div>
+            <div class="ad-landing-preview-stage">
+              <iframe class="ad-landing-frame" data-ad-landing-frame title="Landing page preview" sandbox="allow-scripts allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+              <p class="ad-landing-preview-empty" data-ad-landing-preview-empty>Press Review page to render the HTML before saving.</p>
+            </div>
+          </section>
+
+          <footer class="ad-landing-footer">
+            <span class="ad-landing-status" data-ad-landing-status></span>
+            <div class="ad-landing-actions">
+              <button type="button" class="ad-landing-danger" data-ad-landing-delete hidden><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg>Delete page</button>
+              <button type="submit" class="panel-primary-btn ad-landing-save" data-ad-landing-save><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Save &amp; overwrite</button>
+            </div>
+          </footer>
+        </form>
+      </div>
+    </div>
 
     <section class="panel-card is-collapsed" id="panel-mass-email" aria-label="Send mass email">
       <header class="panel-card-header">
@@ -417,7 +511,7 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-  <script src="{% static 'control/js/panel.js' %}" defer></script>
+  <script src="{% static 'control/js/panel.js' %}?v=20261110-2" defer></script>
 {% endblock %}
 
 {% block footer %}{% endblock %}

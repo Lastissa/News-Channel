@@ -507,3 +507,149 @@ html { scroll-behavior: smooth; }
   .panel-card, .panel-collapse, .panel-collapse-btn .ic, .panel-nav-link::after,
   .ta-item, .panel-row, .panel-recipient-search, .panel-recipient-pill, .ad-drop-preview, .panel-tip { animation: none; transition: none; }
 }
+
+/* ---------- Image advert landing-page editor ---------- */
+.ta-landing-status {
+  display: inline-flex; align-items: center; padding: 1px 7px;
+  border: 1px solid currentColor; border-radius: 999px;
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.ta-landing-live { color: var(--success); }
+.ta-landing-draft { color: #b45309; }
+.ta-landing-blocked { color: var(--danger); }
+.panel-icon-btn.is-landing-live { color: var(--success); border-color: color-mix(in srgb, var(--success) 38%, var(--line)); }
+
+body.ad-landing-open { overflow: hidden; }
+
+.ad-landing-modal {
+  position: fixed; inset: 0; z-index: 5000;
+  display: flex; align-items: stretch; justify-content: center;
+  padding: clamp(8px, 1.6vw, 20px);
+  background: rgba(8, 15, 25, .68);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  overflow: auto;
+}
+.ad-landing-modal[hidden] { display: none; }
+.ad-landing-dialog {
+  width: 100%; max-width: 1680px;
+  height: calc(100dvh - clamp(16px, 3.2vw, 40px));
+  min-height: 0; display: flex; flex-direction: column;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius-m);
+  box-shadow: var(--shadow-raised); overflow: hidden;
+  animation: panelIn .2s var(--panel-ease) both;
+}
+.ad-landing-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 14px 20px; border-bottom: 1px solid var(--line); flex: 0 0 auto;
+}
+.ad-landing-heading { min-width: 0; }
+.ad-landing-heading h2 { margin: 0; font-size: 1.06rem; line-height: 1.25; }
+.ad-landing-sub { margin: 3px 0 0; color: var(--ink); opacity: .72; font-size: 0.78rem; overflow-wrap: anywhere; }
+.ad-landing-header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.ad-landing-view {
+  padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--ink); font-size: 0.76rem; font-weight: 700; text-decoration: none;
+  background: var(--paper-dim);
+}
+.ad-landing-view:hover { border-color: var(--ink); }
+
+.ad-landing-form {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.ad-landing-tabs { display: none; }
+.ad-landing-editor { grid-column: 1; grid-row: 1; min-height: 0; overflow: auto; padding: 16px 20px; }
+.ad-landing-preview {
+  grid-column: 2; grid-row: 1; min-height: 0; display: flex; flex-direction: column;
+  border-left: 1px solid var(--line); background: var(--paper-dim);
+}
+.ad-landing-note { margin: 0 0 14px; color: var(--ink); opacity: .78; font-size: 0.8rem; line-height: 1.55; }
+.ad-landing-note code { padding: 1px 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-size: .92em; }
+.ad-landing-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ad-landing-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ad-landing-field-wide { grid-column: 1 / -1; }
+.ad-landing-field label,
+.ad-landing-code-head label { font-size: 0.78rem; font-weight: 700; }
+.ad-landing-field label small { color: var(--ink); opacity: .62; font-weight: 500; }
+.ad-landing-field input,
+.ad-landing-field textarea,
+.ad-landing-field select {
+  width: 100%; min-width: 0; padding: 9px 11px;
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  font: inherit; font-size: 0.84rem;
+}
+.ad-landing-field textarea { resize: vertical; }
+.ad-landing-field input:focus,
+.ad-landing-field textarea:focus,
+.ad-landing-field select:focus { outline: 2px solid color-mix(in srgb, var(--ink) 22%, transparent); outline-offset: 1px; }
+.ad-landing-publish { display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--paper); cursor: pointer; }
+.ad-landing-publish input { flex: 0 0 auto; margin-top: 2px; }
+.ad-landing-publish span { display: flex; flex-direction: column; gap: 1px; font-size: 0.8rem; }
+.ad-landing-publish small { color: var(--ink); opacity: .66; font-size: 0.72rem; line-height: 1.35; }
+.ad-landing-error { margin: 12px 0 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line)); border-radius: var(--radius-s); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); font-size: 0.78rem; font-weight: 600; }
+.ad-landing-code-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 6px; }
+.ad-landing-code-meta { display: flex; gap: 10px; color: var(--ink); opacity: .62; font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+.ad-landing-code {
+  display: block; width: 100%; min-height: 290px; resize: vertical;
+  padding: 13px 14px; background: #0d1626; color: #dbe6f6;
+  border: 1px solid #26364f; border-radius: var(--radius-s);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.79rem; line-height: 1.55; tab-size: 2;
+  white-space: pre; overflow: auto;
+}
+.ad-landing-code:focus { outline: 2px solid #6f9ee8; outline-offset: 1px; }
+.ad-landing-tokens { margin-top: 13px; font-size: 0.78rem; }
+.ad-landing-tokens summary { cursor: pointer; font-weight: 700; }
+.ad-landing-token-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; margin: 9px 0 0; padding: 0; list-style: none; }
+.ad-landing-token-list li { display: flex; flex-direction: column; gap: 1px; }
+.ad-landing-token-list code { font-size: 0.74rem; color: #7c4a00; }
+.ad-landing-token-list span { color: var(--ink); opacity: .68; font-size: 0.72rem; line-height: 1.35; }
+
+.ad-landing-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface); flex: 0 0 auto; font-size: 0.8rem; font-weight: 700; }
+.ad-landing-review { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--paper); color: var(--ink); font: inherit; font-size: 0.74rem; font-weight: 700; cursor: pointer; }
+.ad-landing-review:hover:not(:disabled) { border-color: var(--ink); }
+.ad-landing-review:disabled { opacity: .55; cursor: wait; }
+.ad-landing-preview-stage { position: relative; flex: 1 1 auto; min-height: 0; }
+.ad-landing-frame { display: block; width: 100%; height: 100%; min-height: 0; border: 0; background: #fff; }
+.ad-landing-preview-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 24px; text-align: center; color: var(--ink); opacity: .62; font-size: 0.82rem; }
+.ad-landing-preview-empty[hidden] { display: none; }
+
+.ad-landing-footer { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 20px; border-top: 1px solid var(--line); background: var(--surface); flex: 0 0 auto; }
+.ad-landing-status { color: var(--ink); opacity: .74; font-size: 0.76rem; font-weight: 600; overflow-wrap: anywhere; }
+.ad-landing-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.ad-landing-danger { display: inline-flex; align-items: center; gap: 5px; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--line)); border-radius: var(--radius-s); background: transparent; color: var(--danger); font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+.ad-landing-danger:hover { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.ad-landing-save { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (max-width: 900px) {
+  .ad-landing-dialog { height: calc(100dvh - 16px); border-radius: var(--radius-s); }
+  .ad-landing-header { padding: 11px 13px; }
+  .ad-landing-form { display: flex; flex-direction: column; overflow: hidden; }
+  /* Phone/tablet: one pane at a time. The metadata + code editor and the
+     rendered page used to stack, which left the preview far below the fold.
+     This is the same Write/Preview pattern the Add News editor uses. */
+  .ad-landing-tabs {
+    display: flex; flex: 0 0 auto; gap: 6px; padding: 9px 13px;
+    border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+  .ad-landing-tab {
+    flex: 1 1 0; min-width: 0; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--paper); color: var(--ink);
+    font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+  }
+  .ad-landing-tab.is-active { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+  .ad-landing-tab:focus-visible { outline: 2px solid #6f9ee8; outline-offset: 2px; }
+  .ad-landing-form[data-landing-view="code"] .ad-landing-preview { display: none; }
+  .ad-landing-form[data-landing-view="preview"] .ad-landing-editor { display: none; }
+  .ad-landing-editor { flex: 1 1 auto; overflow: auto; padding: 13px; }
+  .ad-landing-fields { grid-template-columns: 1fr; }
+  .ad-landing-field-wide { grid-column: auto; }
+  .ad-landing-preview { border-left: 0; border-top: 1px solid var(--line); min-height: 0; flex: 1 1 auto; }
+  .ad-landing-preview-stage { min-height: 0; }
+  .ad-landing-footer { position: relative; flex-wrap: wrap; padding: 10px 13px; }
+  .ad-landing-actions { width: 100%; justify-content: flex-end; }
+}

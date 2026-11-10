@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from Partner.models import AdvertImage, Announcement
+from Partner.models import AdvertImage, AdvertLandingPage, Announcement
 from SERVICE_INTERNAL.images import destroy_archive_asset
 
 
@@ -24,5 +24,18 @@ class AdvertImageAdmin(admin.ModelAdmin):
             destroy_archive_asset(public_id)
 
 
+class AdvertLandingPageAdmin(admin.ModelAdmin):
+    """The panel is the normal editor; this exists so every project model is
+    registered and a superuser can inspect/recover a row from _admin/. The
+    Cloudinary id is read-only because editing it would orphan the HTML file;
+    the post_delete signal handles removal when a row is deleted here."""
+
+    list_display = ("advert", "is_published", "robots", "author", "date_updated")
+    list_filter = ("is_published", "robots")
+    search_fields = ("advert__heading", "meta_title", "author__email")
+    readonly_fields = ("html_public_id", "html_bytes", "date_created", "date_updated")
+
+
 admin.site.register([Announcement])
 admin.site.register(AdvertImage, AdvertImageAdmin)
+admin.site.register(AdvertLandingPage, AdvertLandingPageAdmin)

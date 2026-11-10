@@ -72,9 +72,11 @@
          id="editor-shell"
          data-view="write"
          data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261107-1"
-         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261109-1"
+         data-heavy-js="{% static 'home/js/add-news-editor.js' %}?v=20261110-1"
          data-draft-key="abureport-add-news-draft-{{ request.user.pk }}"
          data-project-name="{{ project_name|escapejs }}"
+         data-support-email="{{ support_email|default:'' }}"
+         data-customer-support-mobile="{{ customer_support_mobile|default:'' }}"
          data-author-name="{{ request.user.get_full_name|default:request.user.email|escapejs }}"
          data-author-username="{{ request.user.username|escapejs }}">
   <div class="editor-toolbar" data-editor-toolbar>
@@ -412,6 +414,8 @@
             <div class="editor-insert-group">
               <button type="button" class="editor-insert-btn" data-insert="[words](https://)" data-insert-kind="inline" title="Word as a link">Link</button>
               <button type="button" class="editor-insert-btn" data-insert="btn " data-insert-kind="line" title="Button on its own line">btn</button>
+              <button type="button" class="editor-insert-btn" data-insert="{% templatetag openvariable %} support_email {% templatetag closevariable %}" data-insert-kind="inline" title="Current support email from PANEL; updates automatically if changed">Support email</button>
+              <button type="button" class="editor-insert-btn" data-insert="{% templatetag openvariable %} customer_support_mobile {% templatetag closevariable %}" data-insert-kind="inline" title="Current customer care number from PANEL; updates automatically if changed">Customer care</button>
             </div>
             <div class="editor-insert-group">
               <button type="button" class="editor-insert-btn" data-insert="imgl " data-insert-kind="line" title="Image on the left">imgl</button>

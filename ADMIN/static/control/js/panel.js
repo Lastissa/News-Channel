@@ -1053,7 +1053,11 @@
     var total = document.querySelector("[data-ad-total]");
     var updateTemplate = list.dataset.updateEndpoint || "";
     var deleteTemplate = list.dataset.deleteEndpoint || "";
+    var landingTemplate = list.dataset.landingEndpoint || "";
+    var landingPreviewTemplate = list.dataset.landingPreviewEndpoint || "";
+    var landingDeleteTemplate = list.dataset.landingDeleteEndpoint || "";
     var STATUS_LABEL = { live: "Live", paused: "Paused", expired: "Expired" };
+    var LANDING_LABEL = { live: "Landing live", draft: "Landing draft", blocked: "Landing blocked" };
     var items = [];
     try { items = JSON.parse(initial ? initial.textContent : "[]") || []; } catch (e) { items = []; }
 
@@ -1095,6 +1099,9 @@
       main.appendChild(title);
       var sub = el("span", "ta-meta");
       sub.appendChild(el("span", "ta-status ta-status-" + item.status, STATUS_LABEL[item.status] || item.status));
+      if (LANDING_LABEL[item.landing_status]) {
+        sub.appendChild(el("span", "ta-landing-status ta-landing-" + item.landing_status, LANDING_LABEL[item.landing_status]));
+      }
       sub.appendChild(icon("clock"));
       sub.appendChild(el("span", "", item.expiry_label));
       if (item.url) { var linked = icon("link"); linked.setAttribute("aria-label", "Has a link"); sub.appendChild(linked); }
@@ -1102,10 +1109,14 @@
       main.appendChild(sub);
 
       var actions = el("span", "ta-actions");
+      var landing = iconButton("panel-icon-btn", "code", "Landing page");
+      landing.dataset.adLanding = "";
+      if (item.landing_status === "live") landing.classList.add("is-landing-live");
       var edit = iconButton("panel-icon-btn", "edit", "Edit");
       edit.dataset.adEdit = "";
       var del = iconButton("panel-icon-btn panel-icon-danger", "trash", "Delete");
       del.dataset.adDelete = "";
+      actions.appendChild(landing);
       actions.appendChild(edit);
       actions.appendChild(del);
 
@@ -1257,6 +1268,11 @@
         if (original) editor.replaceWith(buildRow(original));
         return;
       }
+      if (event.target.closest("[data-ad-landing]") && row) {
+        var landingItem = items[indexOfId(row.dataset.id)];
+        if (landingItem) openLanding(landingItem);
+        return;
+      }
       var delBtn = event.target.closest("[data-ad-delete]");
       if (delBtn && row) {
         if (delBtn.disabled) return;
@@ -1302,6 +1318,346 @@
 
     syncCompose();
     render();
+
+    /* ---------- image advert landing-page editor ---------- */
+    var landingModal = document.querySelector("[data-ad-landing-modal]");
+    var landingForm = landingModal ? landingModal.querySelector("[data-ad-landing-form]") : null;
+    var landingSub = landingModal ? landingModal.querySelector("[data-ad-landing-sub]") : null;
+    var landingError = landingModal ? landingModal.querySelector("[data-ad-landing-error]") : null;
+    var landingStatus = landingModal ? landingModal.querySelector("[data-ad-landing-status]") : null;
+    var landingView = landingModal ? landingModal.querySelector("[data-ad-landing-view]") : null;
+    var landingDelete = landingModal ? landingModal.querySelector("[data-ad-landing-delete]") : null;
+    var landingSave = landingModal ? landingModal.querySelector("[data-ad-landing-save]") : null;
+    var landingPreviewBtn = landingModal ? landingModal.querySelector("[data-ad-landing-preview]") : null;
+    var landingFrame = landingModal ? landingModal.querySelector("[data-ad-landing-frame]") : null;
+    var landingPreviewEmpty = landingModal ? landingModal.querySelector("[data-ad-landing-preview-empty]") : null;
+    var landingHtml = landingModal ? landingModal.querySelector("[data-ad-landing-html]") : null;
+    var landingSize = landingModal ? landingModal.querySelector("[data-ad-landing-size]") : null;
+    var landingLines = landingModal ? landingModal.querySelector("[data-ad-landing-lines]") : null;
+    var landingMetaTitle = landingModal ? landingModal.querySelector("[data-ad-landing-meta-title]") : null;
+    var landingMetaDescription = landingModal ? landingModal.querySelector("[data-ad-landing-meta-description]") : null;
+    var landingOgImage = landingModal ? landingModal.querySelector("[data-ad-landing-og-image]") : null;
+    var landingRobots = landingModal ? landingModal.querySelector("[data-ad-landing-robots]") : null;
+    var landingPublished = landingModal ? landingModal.querySelector("[data-ad-landing-published]") : null;
+    var landingTabs = landingModal ? landingModal.querySelectorAll("[data-ad-landing-tab]") : [];
+    var landingMobileQuery = window.matchMedia ? window.matchMedia("(max-width: 900px)") : { matches: false };
+    var currentLandingId = null;
+
+    function landingEndpoint(template, id) {
+      return template.replace("/0/", "/" + id + "/");
+    }
+
+    function readPanelResponse(response) {
+      return response.text().then(function (text) {
+        var data = {};
+        try { data = JSON.parse(text || "{}"); } catch (e) { data = {}; }
+        return { ok: response.ok, status: response.status, text: text, data: data };
+      });
+    }
+
+    function setLandingError(message) {
+      if (!landingError) return;
+      landingError.textContent = message || "";
+      landingError.hidden = !message;
+    }
+
+    function landingByteLength(text) {
+      if (window.TextEncoder) return new TextEncoder().encode(text).length;
+      return text.length;
+    }
+
+    function syncLandingCodeMeta() {
+      if (!landingHtml) return;
+      var text = landingHtml.value || "";
+      var bytes = landingByteLength(text);
+      if (landingSize) {
+        landingSize.textContent = bytes < 1024
+          ? bytes + " B"
+          : (bytes < 1048576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1048576).toFixed(2) + " MB");
+      }
+      if (landingLines) {
+        landingLines.textContent = (text ? text.split("\n").length : 0) + " lines";
+      }
+    }
+
+    function setLandingStatus(item) {
+      var status = item.landing_status || "none";
+      var messages = {
+        live: "Published. Advert clicks open this page.",
+        draft: "Draft. Advert clicks use the advertiser link until it is published.",
+        blocked: "Blocked. The last editor is no longer an active admin, so the page will not run.",
+        none: "No landing page saved yet. Advert clicks use the advertiser link."
+      };
+      if (landingStatus) landingStatus.textContent = messages[status] || messages.none;
+      if (landingView) {
+        if (item.landing_url) {
+          landingView.href = item.landing_url;
+          landingView.hidden = false;
+        } else {
+          landingView.hidden = true;
+          landingView.removeAttribute("href");
+        }
+      }
+      if (landingDelete) landingDelete.hidden = !item.landing_path;
+    }
+
+    function setLandingPlaceholders(item) {
+      if (landingMetaTitle) landingMetaTitle.placeholder = item.heading ? "Defaults to: " + item.heading : "Defaults to the advert heading";
+      if (landingMetaDescription) landingMetaDescription.placeholder = item.body ? "Defaults to: " + item.body : "Defaults to the advert text";
+      if (landingOgImage) landingOgImage.placeholder = item.image ? "Defaults to: " + item.image : "Defaults to the advert picture";
+    }
+
+    /* On a phone/tablet the editor and preview are two panes, not a long
+       stacked page. Keep the same Code/Preview tab behavior as Add News. */
+    function setLandingView(view, options) {
+      if (!landingForm) return;
+      view = view === "preview" ? "preview" : "code";
+      landingForm.setAttribute("data-landing-view", view);
+      landingTabs.forEach(function (tab) {
+        var active = tab.getAttribute("data-ad-landing-tab") === view;
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+        tab.tabIndex = active ? 0 : -1;
+      });
+      if (view === "preview" && (!options || options.render !== false)) {
+        requestLandingPreview();
+      }
+    }
+
+    function fillLandingPayload(payload) {
+      var landing = payload.landing || {};
+      if (landingMetaTitle) landingMetaTitle.value = landing.meta_title || "";
+      if (landingMetaDescription) landingMetaDescription.value = landing.meta_description || "";
+      if (landingOgImage) landingOgImage.value = landing.og_image || "";
+      if (landingRobots) landingRobots.value = landing.robots || "noindex, nofollow";
+      if (landingPublished) {
+        landingPublished.checked = payload.item && payload.item.landing_path
+          ? !!landing.is_published
+          : true;
+      }
+      if (landingHtml) landingHtml.value = payload.html || payload.template || "";
+      if (payload.fetch_error) {
+        setLandingError("Could not load the saved Cloudinary HTML: " + payload.fetch_error + " The editor is blank so a save cannot overwrite it by accident.");
+      }
+      syncLandingCodeMeta();
+    }
+
+    function closeLanding() {
+      if (!landingModal || landingModal.hidden) return;
+      landingModal.hidden = true;
+      landingModal.classList.remove("is-open");
+      document.body.classList.remove("ad-landing-open");
+      setLandingView("code", { render: false });
+      if (landingFrame) landingFrame.removeAttribute("srcdoc");
+      if (landingPreviewEmpty) {
+        landingPreviewEmpty.hidden = false;
+        landingPreviewEmpty.textContent = "Press Review page to render the HTML before saving.";
+      }
+      currentLandingId = null;
+    }
+
+    function openLanding(item) {
+      if (!landingModal || !landingForm) return;
+      if (!landingTemplate || !landingPreviewTemplate || !landingDeleteTemplate) {
+        toast("Landing page editor is not configured.", "error");
+        return;
+      }
+      currentLandingId = String(item.id);
+      setLandingError("");
+      landingForm.reset();
+      setLandingView("code", { render: false });
+      if (landingHtml) landingHtml.value = "";
+      setLandingPlaceholders(item);
+      setLandingStatus(item);
+      syncLandingCodeMeta();
+      if (landingSub) {
+        var bits = ["Advert #" + item.id, item.heading || "No heading"];
+        bits.push(item.landing_path || "no landing page yet");
+        landingSub.textContent = bits.join(" • ");
+      }
+      if (landingPreviewEmpty) {
+        landingPreviewEmpty.hidden = false;
+        landingPreviewEmpty.textContent = "Loading the saved page...";
+      }
+      if (landingFrame) landingFrame.removeAttribute("srcdoc");
+      if (landingSave) landingSave.disabled = true;
+      landingModal.hidden = false;
+      landingModal.classList.add("is-open");
+      document.body.classList.add("ad-landing-open");
+      window.setTimeout(function () {
+        if (landingMetaTitle) landingMetaTitle.focus();
+      }, 30);
+
+      fetch(landingEndpoint(landingTemplate, item.id), {
+        credentials: "same-origin",
+        headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+      }).then(readPanelResponse).then(function (result) {
+        if (!result.ok) {
+          setLandingError(extractDetail(result.text, "Could not load this landing page."));
+          if (landingPreviewEmpty) landingPreviewEmpty.textContent = "The editor could not load this page.";
+          return;
+        }
+        fillLandingPayload(result.data);
+        if (result.data.fetch_error) {
+          //   The editor is intentionally blank here. Keep Save disabled so a
+          //   click cannot replace the stored Cloudinary page with nothing;
+          //   typing/pasting the replacement re-enables it.
+          if (landingSave) landingSave.disabled = true;
+          if (landingPreviewEmpty) {
+            landingPreviewEmpty.textContent = "The saved Cloudinary HTML could not be loaded.";
+          }
+          return;
+        }
+        if (landingSave) landingSave.disabled = false;
+        if (!landingMobileQuery.matches || landingForm.getAttribute("data-landing-view") === "preview") {
+          window.setTimeout(requestLandingPreview, 60);
+        } else if (landingPreviewEmpty) {
+          landingPreviewEmpty.textContent = "Switch to Preview to render the HTML.";
+        }
+      }).catch(function () {
+        setLandingError("Connection issue. The landing page editor could not load.");
+        if (landingPreviewEmpty) landingPreviewEmpty.textContent = "The editor could not load this page.";
+        toast("Connection issue. Nothing was loaded.", "error");
+      });
+    }
+
+    function requestLandingPreview() {
+      if (!currentLandingId || !landingPreviewTemplate) return;
+      if (!landingHtml || !landingHtml.value.trim()) {
+        setLandingError("Paste the landing page HTML first.");
+        return;
+      }
+      setLandingError("");
+      if (landingPreviewBtn) landingPreviewBtn.disabled = true;
+      if (landingPreviewEmpty) {
+        landingPreviewEmpty.hidden = false;
+        landingPreviewEmpty.textContent = "Rendering preview...";
+      }
+      var data = new FormData(landingForm);
+      data.set("is_published", landingPublished && landingPublished.checked ? "1" : "0");
+      postForm(landingEndpoint(landingPreviewTemplate, currentLandingId), data).then(function (result) {
+        if (landingPreviewBtn) landingPreviewBtn.disabled = false;
+        var payload = {};
+        try { payload = JSON.parse(result.text || "{}"); } catch (e) { payload = {}; }
+        if (!result.ok) {
+          if (landingPreviewEmpty) {
+            landingPreviewEmpty.hidden = false;
+            landingPreviewEmpty.textContent = "Preview failed. " + extractDetail(result.text, "");
+          }
+          toast(extractDetail(result.text, "Could not render the preview."), "error");
+          return;
+        }
+        if (landingFrame) landingFrame.srcdoc = payload.html || "";
+        if (landingPreviewEmpty) landingPreviewEmpty.hidden = true;
+      }).catch(function () {
+        if (landingPreviewBtn) landingPreviewBtn.disabled = false;
+        if (landingPreviewEmpty) {
+          landingPreviewEmpty.hidden = false;
+          landingPreviewEmpty.textContent = "Connection issue. The preview could not render.";
+        }
+        toast("Connection issue. The preview could not render.", "error");
+      });
+    }
+
+    if (landingModal && landingForm) {
+      landingForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!currentLandingId || !landingTemplate) return;
+        if (landingSave && landingSave.disabled) return;
+        if (!landingHtml || !landingHtml.value.trim()) {
+          setLandingError("Paste the landing page HTML first.");
+          return;
+        }
+        setLandingError("");
+        if (landingSave) { landingSave.disabled = true; landingSave.setAttribute("aria-busy", "true"); }
+        var data = new FormData(landingForm);
+        data.set("is_published", landingPublished && landingPublished.checked ? "1" : "0");
+        postForm(landingEndpoint(landingTemplate, currentLandingId), data).then(function (result) {
+          if (landingSave) { landingSave.disabled = false; landingSave.setAttribute("aria-busy", "false"); }
+          var payload = {};
+          try { payload = JSON.parse(result.text || "{}"); } catch (e) { payload = {}; }
+          if (!result.ok) {
+            setLandingError(extractDetail(result.text, "Could not save the landing page."));
+            toast(extractDetail(result.text, "Could not save the landing page."), "error");
+            return;
+          }
+          if (payload.item) {
+            var at = indexOfId(currentLandingId);
+            if (at !== -1) items[at] = payload.item;
+            render();
+            setLandingStatus(payload.item);
+            setLandingPlaceholders(payload.item);
+          }
+          toast(extractDetail(result.text, "Landing page saved."));
+        }).catch(function () {
+          if (landingSave) { landingSave.disabled = false; landingSave.setAttribute("aria-busy", "false"); }
+          setLandingError("Connection issue. Nothing was saved.");
+          toast("Connection issue. Nothing was saved.", "error");
+        });
+      });
+
+      landingForm.addEventListener("click", function (event) {
+        var tab = event.target.closest("[data-ad-landing-tab]");
+        if (tab) { setLandingView(tab.getAttribute("data-ad-landing-tab")); return; }
+        if (event.target.closest("[data-ad-landing-preview]")) requestLandingPreview();
+      });
+
+      if (landingDelete) {
+        landingDelete.addEventListener("click", function () {
+          if (!currentLandingId || !landingDeleteTemplate || landingDelete.disabled) return;
+          if (!window.confirm("Delete this landing page? The Cloudinary HTML file is removed and advert clicks fall back to the advertiser link.")) return;
+          landingDelete.disabled = true;
+          postForm(landingEndpoint(landingDeleteTemplate, currentLandingId), new FormData()).then(function (result) {
+            landingDelete.disabled = false;
+            var payload = {};
+            try { payload = JSON.parse(result.text || "{}"); } catch (e) { payload = {}; }
+            if (!result.ok) {
+              setLandingError(extractDetail(result.text, "Could not delete the landing page."));
+              toast(extractDetail(result.text, "Could not delete the landing page."), "error");
+              return;
+            }
+            if (payload.item) {
+              var at = indexOfId(currentLandingId);
+              if (at !== -1) items[at] = payload.item;
+              render();
+            }
+            closeLanding();
+            toast(extractDetail(result.text, "Landing page deleted."));
+          }).catch(function () {
+            landingDelete.disabled = false;
+            setLandingError("Connection issue. Nothing was deleted.");
+            toast("Connection issue. Nothing was deleted.", "error");
+          });
+        });
+      }
+
+      landingModal.addEventListener("click", function (event) {
+        if (event.target === landingModal) closeLanding();
+        if (event.target.closest("[data-ad-landing-close]")) closeLanding();
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && landingModal && !landingModal.hidden) closeLanding();
+      });
+
+      if (landingHtml) {
+        landingHtml.addEventListener("input", function () {
+          syncLandingCodeMeta();
+          setLandingError("");
+          if (landingSave && landingHtml.value.trim()) landingSave.disabled = false;
+        });
+        landingHtml.addEventListener("keydown", function (event) {
+          if (event.key !== "Tab") return;
+          event.preventDefault();
+          var start = landingHtml.selectionStart;
+          var end = landingHtml.selectionEnd;
+          var value = landingHtml.value;
+          landingHtml.value = value.slice(0, start) + "  " + value.slice(end);
+          landingHtml.selectionStart = landingHtml.selectionEnd = start + 2;
+          syncLandingCodeMeta();
+        });
+      }
+    }
   })();
 
   /* ---------- mass email composer ---------- */

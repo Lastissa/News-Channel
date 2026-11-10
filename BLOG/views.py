@@ -23,6 +23,7 @@ from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from ARCHIVE.models import ArchiveImage
 from SERVICE_INTERNAL.abstract import cache_or_run, error_logger, get_cache, get_client_ip, info_logger, is_bot_request, is_rate_limited, set_cache
+from SERVICE_INTERNAL.contact_tokens import CONTACT_TOKEN_RE, contact_values, replace_contact_tokens
 from SERVICE_INTERNAL.email_single import (
     _build_email_html,
     _dispatch_email,
@@ -422,6 +423,19 @@ def _linkify_text(value, campaign=""):
     safe_text = html.escape(value, quote=False)
     safe_text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", safe_text)
     safe_text = re.sub(r"__(.+?)__", r"<em>\1</em>", safe_text)
+
+    #   CONTACT TOKENS: resolve after escaping and emphasis so the stored
+    #   placeholder becomes a safe mailto/tel anchor at render time. The
+    #   values come from PANEL, never from the story row, so changing them
+    #   updates every story that used the token.
+    if CONTACT_TOKEN_RE.search(safe_text):
+        support_email, customer_support_mobile = contact_values()
+        safe_text = replace_contact_tokens(
+            safe_text,
+            support_email,
+            customer_support_mobile,
+            link=True,
+        )
 
     def _anchor(match):
         label, url = match.group(1), match.group(2)
@@ -1080,6 +1094,10 @@ def _clean_content_block(block):
     imgl/imgr/imgc/vidl/vidr/vidc/filel/btn token, a [words](url) address, or
     a leftover #/*/**/__ marker, into what a reader (or a search engine's
     snippet/the page's own <head> tags) sees."""
+    has_contact_token = bool(CONTACT_TOKEN_RE.search(block))
+    support_email = customer_support_mobile = ""
+    if has_contact_token:
+        support_email, customer_support_mobile = contact_values()
     lines = []
     for line in block.splitlines():
         line = line.strip()
@@ -1109,7 +1127,11 @@ def _clean_content_block(block):
                         line = MARKDOWN_LINK_RE.sub(r"\1", line)
                         line = line.replace("**", "").replace("__", "")
         if line:
-            lines.append(line)
+            #   Excerpt/ticker surfaces get the CURRENT contact value, never
+            #   the stored placeholder (and never a stale address).
+            lines.append(replace_contact_tokens(
+                line, support_email, customer_support_mobile, link=False
+            ))
     return " ".join(lines).strip()
 
 
@@ -1425,7 +1447,7 @@ class StoryDetailView(View):
 #   database being hit on every popup of every reader.
 STORY_ADS_POOL_SIZE = 3
 STORY_ADS_CACHE_TTL = 120  # seconds
-STORY_ADS_CACHE_KEY = "story_ads_pool_v1"
+STORY_ADS_CACHE_KEY = "story_ads_pool_v2"
 
 
 def _load_story_ads_pool():
@@ -1435,28 +1457,32 @@ def _load_story_ads_pool():
     treats a falsy value as "not cached", so an empty list would send every
     request back to the database while no advert is live. {"ads": []} is
     truthy, so "nothing live" is cached for the same two minutes."""
+    from Partner.landing import advert_landing_url
     from Partner.models import AdvertImage
 
     live = (
-        AdvertImage.objects.filter(
+        AdvertImage.objects.select_related("landing_page__author")
+        .filter(
             is_active=True,
             expiry_date__gte=timezone.now(),
         )
         .exclude(image_url="")
         .order_by("?")[:STORY_ADS_POOL_SIZE]
     )
-    return {
-        "ads": [
+    ads = []
+    for row in live:
+        landing = getattr(row, "landing_page", None)
+        ads.append(
             {
                 "id": row.pk,
                 "image": row.image_url,
                 "heading": row.heading or "",
                 "body": row.body or "",
                 "url": row.url or "",
+                "landing_url": advert_landing_url(row) if landing and landing.is_deliverable else "",
             }
-            for row in live
-        ]
-    }
+        )
+    return {"ads": ads}
 
 
 class StoryAdsView(View):

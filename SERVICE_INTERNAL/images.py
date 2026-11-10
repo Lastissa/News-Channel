@@ -21,11 +21,14 @@ not calling `upload_news_image` any earlier, not something this file
 has to know about.
 """
 
+import io
+
 import cloudinary
 import cloudinary.uploader
 import cloudinary.utils
 from cloudinary.exceptions import Error as CloudinaryError
 from django.conf import settings
+import requests
 
 from SERVICE_INTERNAL.abstract import error_logger, info_logger
 
@@ -208,6 +211,134 @@ def upload_advert_image(file, public_id: str | None = None) -> dict:
     _validate_image_file(file)
     result = _run_upload(file, folder="abureport/adverts", preset=_ADVERT_IMAGE_PRESET, tag="advert", public_id=public_id)
     return {"secure_url": result.get("secure_url") or result.get("url"), "public_id": result.get("public_id", "")}
+
+
+#   ADVERT LANDING PAGES
+#   ------------------------------------------------------------
+#   The full HTML document for an advert's off-grid landing page. Unlike the
+#   picture uploads above this is a raw asset, not an image, and it is stored
+#   as `type="authenticated"` so the public Cloudinary URL cannot be guessed
+#   and used to bypass the Django author/trust check. The public id is pinned
+#   to the advert id, so every save overwrites the same Cloudinary object in
+#   place (no version pile-up), and the DB row keeps only that id + metadata.
+
+ADVERT_LANDING_MAX_BYTES = int(
+    getattr(settings, "ADVERT_LANDING_MAX_BYTES", 0)
+    or getattr(settings, "ADVERT_LANDING_MAX_MB", 2) * 1024 * 1024
+)
+_ADVERT_LANDING_FOLDER = "abureport/advert-landing"
+
+
+def _advert_landing_public_id(advert_id) -> str:
+    return f"{_ADVERT_LANDING_FOLDER}/advert_{advert_id}"
+
+
+def upload_advert_landing_html(html_text: str, advert_id) -> dict:
+    """Upload (or overwrite) one advert's landing-page HTML.
+
+    Returns `public_id` (this is what the caller stores on the row), `bytes`,
+    and Cloudinary's URL. `format="html"` makes Cloudinary append `.html` to
+    the returned public id; keep that exact string for fetch/delete. Passing
+    the base id again on the next save overwrites the same object."""
+    if not isinstance(html_text, str) or not html_text.strip():
+        raise ImageUploadError("Paste the landing page HTML first.")
+
+    payload = html_text.encode("utf-8")
+    if len(payload) > ADVERT_LANDING_MAX_BYTES:
+        raise ImageUploadError(
+            f"Landing page HTML is too large. Max allowed size is "
+            f"{ADVERT_LANDING_MAX_BYTES // (1024 * 1024)}MB."
+        )
+
+    stream = io.BytesIO(payload)
+    stream.name = f"advert_{advert_id}.html"
+
+    try:
+        result = cloudinary.uploader.upload(
+            stream,
+            resource_type="raw",
+            type="authenticated",
+            public_id=_advert_landing_public_id(advert_id),
+            format="html",
+            overwrite=True,
+            invalidate=True,
+            tags=["advert-landing"],
+        )
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY UPLOAD FAILED (advert-landing): {exc}")
+        raise ImageUploadError("Could not save the landing page right now. Please try again.") from exc
+
+    public_id = result.get("public_id", "")
+    if not public_id:
+        error_logger(msg=f"CLOUDINARY UPLOAD (advert-landing) RETURNED NO PUBLIC ID: {result}")
+        raise ImageUploadError("Cloudinary did not return the landing page id.")
+
+    info_logger(msg=f"CLOUDINARY UPLOAD OK (advert-landing): {public_id}")
+    return {
+        "public_id": public_id,
+        "bytes": result.get("bytes") or len(payload),
+        "secure_url": result.get("secure_url") or result.get("url") or "",
+    }
+
+
+def fetch_advert_landing_html(public_id: str) -> str:
+    """Read the authenticated raw HTML back through a signed Cloudinary URL.
+
+    The app never redirects a reader to the Cloudinary URL: the page is fetched
+    server-side so token replacement and the author/trust check always happen
+    first, and so Cloudinary cannot decide to serve it as a download."""
+    if not public_id:
+        raise ImageUploadError("This landing page has no HTML file.")
+
+    try:
+        delivery_url, _ = cloudinary.utils.cloudinary_url(
+            public_id,
+            resource_type="raw",
+            type="authenticated",
+            sign_url=True,
+            secure=True,
+        )
+    except Exception as exc:
+        error_logger(msg=f"CLOUDINARY LANDING URL FAILED ({public_id}): {exc}")
+        raise ImageUploadError("Could not open the landing page file.") from exc
+
+    try:
+        response = requests.get(delivery_url, timeout=(5, 20))
+    except requests.RequestException as exc:
+        error_logger(msg=f"CLOUDINARY LANDING FETCH FAILED ({public_id}): {exc}")
+        raise ImageUploadError("Could not open the landing page file.") from exc
+
+    if response.status_code == 404:
+        raise ImageUploadError("The landing page file no longer exists.")
+    if response.status_code >= 400:
+        error_logger(msg=f"CLOUDINARY LANDING FETCH HTTP {response.status_code} ({public_id})")
+        raise ImageUploadError("Could not open the landing page file.")
+
+    html_text = response.content.decode("utf-8", errors="replace")
+    if not html_text.strip():
+        raise ImageUploadError("The landing page file is empty.")
+    return html_text
+
+
+def destroy_advert_landing_html(public_id: str) -> bool:
+    """Remove the HTML object entirely. True when Cloudinary confirms it is
+    gone (or already absent)."""
+    if not public_id:
+        return False
+    try:
+        result = cloudinary.uploader.destroy(
+            public_id,
+            resource_type="raw",
+            type="authenticated",
+            invalidate=True,
+        )
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY LANDING DESTROY FAILED ({public_id}): {exc}")
+        return False
+    if isinstance(result, dict) and result.get("result") in {"ok", "not found"}:
+        return True
+    error_logger(msg=f"CLOUDINARY LANDING DESTROY UNCONFIRMED ({public_id}): {result}")
+    return False
 
 
 #   NON-IMAGE FILE UPLOAD SECTION (Archive "Add file")

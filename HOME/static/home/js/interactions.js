@@ -53,6 +53,7 @@
 
   var toastHost = null;         /* up toasts: top-right stack with icon/close */
   var bottomToastHost = null;   /* quiet toasts: bottom pill that fades out */
+  var topToastHost = null;      /* same quiet pill, pinned to the top edge */
 
   /* Keep each stack short: a burst of messages must never cover the page.
      The newest two stay; older ones are removed immediately. */
@@ -160,16 +161,19 @@
        toast("Copied.")          -> top-right, icon/close/progress
        bottomToast("Copied.")    -> bottom pill, small padding, fades out  */
   function bottomToast(message, tone, placement) {
-    if (!bottomToastHost) {
-      bottomToastHost = document.createElement("div");
-      bottomToastHost.className = "site-bottomtoast-stack";
-      bottomToastHost.setAttribute("aria-live", "polite");
-      bottomToastHost.setAttribute("aria-relevant", "additions");
-      bottomToastHost.setAttribute("role", "region");
-      bottomToastHost.setAttribute("aria-label", "Notifications");
-      document.body.appendChild(bottomToastHost);
+    var isTop = placement === "top";
+    var host = isTop ? topToastHost : bottomToastHost;
+    if (!host) {
+      host = document.createElement("div");
+      host.className = "site-bottomtoast-stack" + (isTop ? " site-bottomtoast-stack--top" : "");
+      host.setAttribute("aria-live", "polite");
+      host.setAttribute("aria-relevant", "additions");
+      host.setAttribute("role", "region");
+      host.setAttribute("aria-label", "Notifications");
+      document.body.appendChild(host);
+      if (isTop) topToastHost = host; else bottomToastHost = host;
     }
-    trimToastStack(bottomToastHost, ".site-bottomtoast");
+    trimToastStack(host, ".site-bottomtoast");
 
     var isError = tone === "error";
     var isPersistentNotice = placement === "top";
@@ -179,7 +183,7 @@
     node.className = "site-bottomtoast" + (isError ? " site-bottomtoast--error" : "") + " is-entering";
     node.setAttribute("role", isError ? "alert" : "status");
     node.textContent = message;
-    bottomToastHost.appendChild(node);
+    host.appendChild(node);
     requestAnimationFrame(function () {
       node.classList.remove("is-entering");
       node.classList.add("is-visible");
@@ -214,7 +218,7 @@
       if (!text) return;
       var classes = node.className ? node.className.split(" ") : [];
       var tone = classes.indexOf("error") !== -1 || classes.indexOf("danger") !== -1 ? "error" : "success";
-      bottomToast(text, tone, classes.indexOf("story-edited") !== -1 ? "bottom" : "top");
+      bottomToast(text, tone, classes.indexOf("story-edited") !== -1 ? "top" : "bottom");
     });
   });
 

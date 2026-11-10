@@ -29,7 +29,15 @@ from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
-from SERVICE_INTERNAL.images import ImageUploadError, destroy_archive_asset, upload_advert_image
+from SERVICE_INTERNAL.images import (
+    ADVERT_LANDING_MAX_BYTES,
+    ImageUploadError,
+    destroy_advert_landing_html,
+    destroy_archive_asset,
+    fetch_advert_landing_html,
+    upload_advert_image,
+    upload_advert_landing_html,
+)
 from SERVICE_INTERNAL.permissions import admin_only
 from SERVICE_INTERNAL.passwords import first_password_error
 from SERVICE_INTERNAL.sessions import (
@@ -40,7 +48,17 @@ from SERVICE_INTERNAL.sessions import (
     is_session_expired,
     live_sessions_for,
 )
-from Partner.models import AdvertImage, Announcement
+from Partner.landing import (
+    ADVERT_LANDING_TOKENS,
+    DEFAULT_ADVERT_LANDING_TEMPLATE,
+    ROBOTS_DEFAULT,
+    add_advert_landing_author_header,
+    advert_landing_slug,
+    advert_landing_url,
+    render_advert_landing_document,
+    strip_advert_landing_author_header,
+)
+from Partner.models import AdvertImage, AdvertLandingPage, Announcement
 from ADMIN.models import SiteSettings
 from ADMIN.analytics import (
     AUTHOR_DEFAULT_RANGE,
@@ -794,6 +812,8 @@ class PanelView(View):
                 "category_rows": _category_rows(),
                 "announcement_items": _announcement_items(),
                 "image_advert_items": _image_advert_items(),
+                "landing_tokens": ADVERT_LANDING_TOKENS,
+                "landing_robots_choices": AdvertLandingPage.ROBOTS_CHOICES,
                 "gallery_items": staff_directory_rows(list(gallery_page.object_list)),
                 "gallery_total": gallery_paginator.count,
                 "gallery_has_next": gallery_page.has_next(),
@@ -2296,6 +2316,17 @@ heading + body under it. These three endpoints let an admin add, edit
 IMAGE_ADVERT_LIST_LIMIT = 100   #   newest rows shown in PANEL
 
 
+def _image_advert_landing_status(row):
+    landing = getattr(row, "landing_page", None)
+    if landing is None or not landing.html_public_id:
+        return "none"
+    if not landing.author_is_trusted:
+        return "blocked"
+    if not landing.is_published:
+        return "draft"
+    return "live"
+
+
 def _image_advert_item(row):
     expiry = timezone.localtime(row.expiry_date)
     if not row.is_active:
@@ -2304,6 +2335,9 @@ def _image_advert_item(row):
         status = "expired"
     else:
         status = "live"
+    landing = getattr(row, "landing_page", None)
+    landing_status = _image_advert_landing_status(row)
+    landing_path = advert_landing_url(row) if landing else ""
     return {
         "id": row.id,
         "heading": row.heading,
@@ -2315,11 +2349,24 @@ def _image_advert_item(row):
         "is_active": row.is_active,
         "status": status,
         "added_by": _mask_email(row.author.email) if row.author_id else "",
+        "landing_status": landing_status,
+        "landing_url": landing_path if landing_status == "live" else "",
+        "landing_path": landing_path,
+        "landing_slug": advert_landing_slug(row) if landing else "",
+        "landing_author": (landing.author_label if landing else ""),
+        "landing_updated": (
+            timezone.localtime(landing.date_updated).strftime("%d %b %Y, %H:%M")
+            if landing
+            else ""
+        ),
     }
 
 
 def _image_advert_items():
-    rows = AdvertImage.objects.select_related("author").order_by("-date_created")[:IMAGE_ADVERT_LIST_LIMIT]
+    rows = (
+        AdvertImage.objects.select_related("author", "landing_page__author")
+        .order_by("-date_created")[:IMAGE_ADVERT_LIST_LIMIT]
+    )
     return [_image_advert_item(row) for row in rows]
 
 
@@ -2431,3 +2478,233 @@ class PanelImageAdvertDeleteView(View):
             destroy_archive_asset(public_id)
         info_logger(msg=f"PANEL: image advert {item_id} deleted by {request.user.email}")
         return JsonResponse({"detail": "Advert deleted."}, status=200)
+
+
+"""
+------------------------------------------------------------
+#   IMAGE ADVERT LANDING PAGE
+------------------------------------------------------------
+The landing page is a complete HTML document stored in Cloudinary (raw,
+authenticated). PANEL edits it in a full-width modal: GET loads the current
+file (without its internal author header), POST saves/overwrites it, POST
+preview renders the unsaved text through the same token replacer the public
+view uses, and POST delete removes the row + Cloudinary object.
+
+The public view in Partner.views re-reads this row on every request and refuses
+to run the file unless its last writer is still an active admin/superuser.
+"""
+
+
+def _active_admin_required(request):
+    if not admin_only(request.user) or not getattr(request.user, "is_active", False):
+        return JsonResponse({"detail": "Admin access is required."}, status=403)
+    return None
+
+
+def _clean_advert_landing(post):
+    """Validate the editor fields. Returns (values, error)."""
+    html_text = strip_advert_landing_author_header((post.get("html") or "").strip())
+    if not html_text:
+        return None, "Paste the landing page HTML first."
+    if len(html_text.encode("utf-8")) > ADVERT_LANDING_MAX_BYTES:
+        return None, (
+            f"Landing page HTML is too large. Max allowed size is "
+            f"{ADVERT_LANDING_MAX_BYTES // (1024 * 1024)}MB."
+        )
+
+    meta_title = " ".join((post.get("meta_title") or "").split())
+    if len(meta_title) > 120:
+        return None, "The metadata title can be at most 120 characters."
+
+    meta_description = " ".join((post.get("meta_description") or "").split())
+    if len(meta_description) > 320:
+        return None, "The metadata description can be at most 320 characters."
+
+    og_image = (post.get("og_image") or "").strip()
+    if og_image:
+        try:
+            URLValidator(schemes=["http", "https"])(og_image)
+        except ValidationError:
+            return None, "Enter a valid OG image URL, or leave it empty to use the advert picture."
+
+    robots = (post.get("robots") or ROBOTS_DEFAULT).strip() or ROBOTS_DEFAULT
+    valid_robots = {value for value, _label in AdvertLandingPage.ROBOTS_CHOICES}
+    if robots not in valid_robots:
+        return None, "Choose a valid robots setting."
+
+    return {
+        "html": html_text,
+        "meta_title": meta_title,
+        "meta_description": meta_description,
+        "og_image": og_image,
+        "robots": robots,
+        "is_published": (post.get("is_published") or "").lower() in ("1", "true", "on", "yes"),
+    }, None
+
+
+def _landing_response_payload(row):
+    landing = getattr(row, "landing_page", None)
+    return {
+        "item": _image_advert_item(row),
+        "html": "",
+        "template": "",
+        "fetch_error": "",
+        "landing": {
+            "meta_title": landing.meta_title if landing else "",
+            "meta_description": landing.meta_description if landing else "",
+            "og_image": landing.og_image if landing else "",
+            "robots": landing.robots if landing else ROBOTS_DEFAULT,
+            "is_published": bool(landing.is_published) if landing else False,
+        },
+        "tokens": [
+            {"name": name, "description": description}
+            for name, description in ADVERT_LANDING_TOKENS
+        ],
+        "robots_choices": [
+            {"value": value, "label": label}
+            for value, label in AdvertLandingPage.ROBOTS_CHOICES
+        ],
+    }
+
+
+class PanelImageAdvertLandingView(View):
+    def get(self, request, item_id):
+        denied = _active_admin_required(request)
+        if denied:
+            return denied
+        row = (
+            AdvertImage.objects.select_related("author", "landing_page__author")
+            .filter(pk=item_id)
+            .first()
+        )
+        if row is None:
+            return JsonResponse({"detail": "That advert no longer exists."}, status=404)
+
+        payload = _landing_response_payload(row)
+        landing = getattr(row, "landing_page", None)
+        if landing is None or not landing.html_public_id:
+            payload["template"] = DEFAULT_ADVERT_LANDING_TEMPLATE
+            return JsonResponse(payload, status=200)
+
+        try:
+            payload["html"] = strip_advert_landing_author_header(
+                fetch_advert_landing_html(landing.html_public_id)
+            )
+        except ImageUploadError as exc:
+            payload["fetch_error"] = str(exc)
+
+        return JsonResponse(payload, status=200)
+
+    def post(self, request, item_id):
+        denied = _panel_write_guard(request)
+        if denied:
+            return denied
+        if not getattr(request.user, "is_active", False):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+
+        row = (
+            AdvertImage.objects.select_related("author", "landing_page__author")
+            .filter(pk=item_id)
+            .first()
+        )
+        if row is None:
+            return JsonResponse({"detail": "That advert no longer exists."}, status=404)
+
+        values, error = _clean_advert_landing(request.POST)
+        if error:
+            return JsonResponse({"detail": error}, status=400)
+
+        landing = getattr(row, "landing_page", None)
+        previous_public_id = landing.html_public_id if landing else ""
+
+        try:
+            uploaded = upload_advert_landing_html(
+                add_advert_landing_author_header(values["html"], row, request.user),
+                row.pk,
+            )
+        except ImageUploadError as exc:
+            return JsonResponse({"detail": str(exc)}, status=400)
+
+        try:
+            if landing is None:
+                landing = AdvertLandingPage(advert=row)
+            landing.meta_title = values["meta_title"]
+            landing.meta_description = values["meta_description"]
+            landing.og_image = values["og_image"]
+            landing.robots = values["robots"]
+            landing.is_published = values["is_published"]
+            landing.html_public_id = uploaded["public_id"]
+            landing.html_bytes = uploaded["bytes"]
+            landing.author = request.user
+            landing.save()
+        except Exception:
+            if not previous_public_id:
+                destroy_advert_landing_html(uploaded["public_id"])
+            raise
+
+        row = (
+            AdvertImage.objects.select_related("author", "landing_page__author")
+            .get(pk=row.pk)
+        )
+        if values["is_published"]:
+            detail = "Landing page saved and published."
+        else:
+            detail = "Landing page saved as a draft. Advert clicks use the advertiser link until it is published."
+        info_logger(msg=f"PANEL: landing page for image advert {item_id} saved by {request.user.email}")
+        return JsonResponse({"detail": detail, "item": _image_advert_item(row)}, status=200)
+
+
+class PanelImageAdvertLandingPreviewView(View):
+    def post(self, request, item_id):
+        denied = _active_admin_required(request)
+        if denied:
+            return denied
+        remaining_seconds, limited = is_rate_limited(request, 10, 30, scope="advert-landing-preview")
+        if limited:
+            return JsonResponse(
+                {"detail": f"Too many previews. Wait {remaining_seconds} seconds."},
+                status=429,
+            )
+        row = AdvertImage.objects.select_related("author").filter(pk=item_id).first()
+        if row is None:
+            return JsonResponse({"detail": "That advert no longer exists."}, status=404)
+
+        values, error = _clean_advert_landing(request.POST)
+        if error:
+            return JsonResponse({"detail": error}, status=400)
+
+        rendered = render_advert_landing_document(
+            advert=row,
+            request=request,
+            html_text=values["html"],
+            meta_title=values["meta_title"],
+            meta_description=values["meta_description"],
+            og_image=values["og_image"],
+            robots=values["robots"],
+        )
+        return JsonResponse({"detail": "Preview ready.", "html": rendered}, status=200)
+
+
+class PanelImageAdvertLandingDeleteView(View):
+    def post(self, request, item_id):
+        denied = _panel_write_guard(request)
+        if denied:
+            return denied
+        if not getattr(request.user, "is_active", False):
+            return JsonResponse({"detail": "Admin access is required."}, status=403)
+        row = AdvertImage.objects.filter(pk=item_id).first()
+        if row is None:
+            return JsonResponse({"detail": "That advert no longer exists."}, status=404)
+        landing = getattr(row, "landing_page", None)
+        if landing is None:
+            return JsonResponse({"detail": "This advert has no landing page."}, status=404)
+        landing.delete()
+        row = (
+            AdvertImage.objects.select_related("author", "landing_page__author")
+            .get(pk=row.pk)
+        )
+        info_logger(msg=f"PANEL: landing page for image advert {item_id} deleted by {request.user.email}")
+        return JsonResponse(
+            {"detail": "Landing page deleted. Advert clicks now use the advertiser link.", "item": _image_advert_item(row)},
+            status=200,
+        )

@@ -206,6 +206,13 @@ CLOUDINARY_API_SECRET = os.getenv('cloudinary_api_secret')
 
 #IMAGE UPLOADS (avatars + news images, see SERVICE_INTERNAL/images.py)
 IMAGE_UPLOAD_MAX_MB = int(os.getenv('image_upload_max_mb', 5))
+#   Advert landing pages are full HTML documents stored as Cloudinary raw
+#   assets. They are code, so keep the ceiling small. ADVERT_LANDING_MAX_BYTES
+#   wins when set; otherwise the friendlier MB value is used.
+ADVERT_LANDING_MAX_MB = int(os.getenv('advert_landing_max_mb', 2))
+ADVERT_LANDING_MAX_BYTES = int(
+    os.getenv('advert_landing_max_bytes', ADVERT_LANDING_MAX_MB * 1024 * 1024)
+)
 #   NON-IMAGE FILE uploads to the /archive/ gallery (see
 #   SERVICE_INTERNAL.images.upload_archive_file). Two ceilings:
 #   videos (mp4/mov) get ARCHIVE_VIDEO_UPLOAD_MAX_MB (default 5 -- kept

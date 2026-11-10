@@ -100,12 +100,13 @@
       popup.setAttribute("aria-label", "Ads");
       popup.style.setProperty("--story-ad-show", showMs + "ms");
 
-      /* one link around picture + label + heading + text. An advert saved
-         without a link still shows, it just is not clickable. */
-      var link = document.createElement(ad.url ? "a" : "div");
+      /* one link around picture + label + heading + text. A landing page takes
+         priority; the advertiser link is the fallback. */
+      var target = ad.landing_url || ad.url;
+      var link = document.createElement(target ? "a" : "div");
       link.className = "story-ad-link";
-      if (ad.url) {
-        link.href = ad.url;
+      if (target) {
+        link.href = target;
         link.target = "_blank";
         link.rel = "noopener noreferrer nofollow sponsored";
       }

@@ -2003,6 +2003,20 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
 .site-bottomtoast--error {
   background: var(--danger);
 }
+/* The same quiet pill, but pinned to the top edge. Used for the "last
+   updated" notice when a reader opens a story that was edited. */
+.site-bottomtoast-stack--top {
+  /* Below the sticky site header, not on top of it: the "last updated"
+     notice is quiet, and it must not hide the story's own navigation. */
+  top: calc(var(--header-h) + 12px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+}
+.site-bottomtoast-stack--top .site-bottomtoast {
+  transform: translateY(-8px);
+}
+.site-bottomtoast-stack--top .site-bottomtoast.is-visible {
+  transform: translateY(0);
+}
 @media (prefers-reduced-motion: reduce) {
   .site-bottomtoast { transition: none; }
   .site-bottomtoast-stack { transform: none; }
@@ -2291,6 +2305,7 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 2;
   width: 30px;
   height: 30px;
   display: inline-flex;
@@ -2301,6 +2316,8 @@ a.story-kicker:hover, a.story-kicker:focus-visible { opacity: 0.82; color: var(-
   background: var(--paper-dim);
   color: red;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .newsletter-popup-close svg { width: 14px; height: 14px; }
 .newsletter-popup-close:hover { color: var(--ink); }
@@ -2893,7 +2910,14 @@ html.nav-locked { overflow: hidden; }
   .comment-toolbar .comment-delete-btn { height: 44px; min-width: 44px; }
   .comment-toolbar .comment-like-btn { padding: 0 14px; }
 
-  .newsletter-popup-card { max-height: min(38vh, 290px); padding: 12px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  /* Phone: a true bottom sheet that goes all the way to the device edge.
+     Its content is short enough to fit, so it must never scroll inside. */
+  .newsletter-popup-card {
+    max-height: none;
+    overflow: visible;
+    padding: 12px 12px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+  .newsletter-popup-body { overflow: visible; }
   .newsletter-popup-close { width: 36px; height: 36px; }
   .newsletter-popup-form input { padding: 10px 12px; font-size: 0.86rem; }
   .newsletter-popup-submit,

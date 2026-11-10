@@ -14,6 +14,9 @@
   var shell = document.getElementById("editor-shell");
   if (!shell) return;
 
+  var supportEmail = (shell.getAttribute("data-support-email") || "").trim();
+  var customerSupportMobile = (shell.getAttribute("data-customer-support-mobile") || "").trim();
+
   var form = shell.querySelector("[data-editor-form]");
   var headingInput = shell.querySelector("[data-editor-heading]");
   var imageInput = shell.querySelector("[data-editor-image]");
@@ -257,10 +260,28 @@
     return parsed.toString();
   }
 
+  function contactAnchor(kind) {
+    var isEmail = kind === "support_email";
+    var value = isEmail ? supportEmail : customerSupportMobile;
+    if (!value) return escapeHtml(isEmail ? "customer care" : "customer care number");
+    var href = isEmail
+      ? "mailto:" + encodeURIComponent(value).replace(/%40/g, "@")
+      : "tel:" + encodeURIComponent(value).replace(/%2B/gi, "+");
+    return '<a href="' + escapeAttr(href) + '" rel="noopener noreferrer">' + escapeHtml(value) + "</a>";
+  }
+
+  function resolveContactTokens(value) {
+    return value.replace(/\{\{\s*(support_email|customer_support_mobile)\s*\}\}/gi, function (_match, key) {
+      return contactAnchor(key.toLowerCase());
+    });
+  }
+
   function linkifyText(value) {
     var safe = escapeHtml(value);
     safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     safe = safe.replace(/__(.+?)__/g, "<em>$1</em>");
+    /* Contact tokens show the value saved in PANEL right now. */
+    safe = resolveContactTokens(safe);
     /* Markdown link ([words](url)) and bare URL in one pass, so a URL that
        already sits inside "[words](...)" is never linkified twice -- mirrors
        _linkify_text / _LINK_OR_URL_RE in BLOG/views.py. */

@@ -224,6 +224,29 @@ Rule:
   when the link should stand out as a button a reader can tap.
 - Do not introduce an alternate syntax for buttons.
 
+### 11) CURRENT CONTACT DETAILS
+
+Use the editor's **Support email** and **Customer care** buttons when a story
+needs the site's contact details. They insert a token, not the address or phone
+number itself:
+
+Example:
+
+Email {{ support_email }} or call {{ customer_support_mobile }}.
+
+Rule:
+- `{{ support_email }}` and `{{ customer_support_mobile }}` are resolved from
+  PANEL's Site Settings each time the story is rendered.
+- Changing the support address or customer-care number in PANEL updates every
+  published story that uses the token; the story row keeps only the token.
+- The public story renders the support email as a `mailto:` link and the
+  customer-care number as a `tel:` link. Cards, tickers and excerpts show the
+  current value as plain text.
+- If the corresponding setting is blank, the token falls back to readable
+  label text instead of printing the raw placeholder.
+- Do not paste a personal or one-off address with these buttons; use a normal
+  link or write the address directly when it should not change site-wide.
+
 ---
 
 ## WRITING STYLE FOR AUTHORS
@@ -246,6 +269,7 @@ Recommended guidance for writers:
 - Start a new line with imgc, followed by the image URL and optional alt text, to place a small inline image that is centered and blocking instead of floated.
 - Start a new line with vidl or vidr, followed by the video URL and optional caption, to place a small inline video that floats left or right and plays on its own with a play/pause button and a sound button (sound starts off).
 - Start a new line with vidc, followed by the video URL and optional caption, to place a small inline video that is centered and blocking instead of floated.
+- Use the editor's Support email and Customer care buttons (or type {{ support_email }} / {{ customer_support_mobile }}) when the story should show the site's current contact details.
 
 ---
 
@@ -281,6 +305,7 @@ This is the most important rule:
 - Inline video: vidl (left), vidr (right), or vidc (centered, blocking) only
 - Inline file: filel only
 - Button: btn only
+- Current contact details: {{ support_email }} / {{ customer_support_mobile }} only
 
 Do not introduce alternate patterns for the same purpose. This keeps the editor simple and the parser reliable.
 

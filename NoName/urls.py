@@ -76,6 +76,9 @@ urlpatterns = [
     path('story/', include("BLOG.urls")),
     path('portfolio/', include("STAFF.urls")),
     path('archive/', include("ARCHIVE.urls")),
+    #   Off-grid advert landing pages: /ads/<heading-slug>-<id>/. Kept above
+    #   the HOME catch-all and next to the other fixed top-level sections.
+    path('ads/', include("Partner.urls")),
     
     path('', include("HOME.urls")),
 ]
