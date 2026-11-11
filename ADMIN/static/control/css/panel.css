@@ -565,7 +565,7 @@ body.ad-landing-open { overflow: hidden; }
   grid-column: 2; grid-row: 1; min-height: 0; display: flex; flex-direction: column;
   border-left: 1px solid var(--line); background: var(--paper-dim);
 }
-.ad-landing-note { margin: 0 0 14px; color: var(--ink); opacity: .78; font-size: 0.8rem; line-height: 1.55; }
+.ad-landing-note { margin: 0 0 14px; color: var(--ink); opacity: .92; font-size: 0.8rem; line-height: 1.55; }
 .ad-landing-note code { padding: 1px 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-size: .92em; }
 .ad-landing-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ad-landing-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }

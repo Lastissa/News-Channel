@@ -598,7 +598,46 @@
 
   });
 
+  /* The file loader lives in this outer scope, so it cannot call the draft
+     placard helpers (screenHasStory, value, fillEditor) that sit inside their
+     own IIFE further down this file. Keep a small, self-contained set of field
+     helpers here so importing the JSON we export always works. */
+  function importedField(name) {
+    return form ? form.querySelector('[name="' + name + '"]') : null;
+  }
+
+  function importedValue(name) {
+    var field = importedField(name);
+    return field ? String(field.value || "") : "";
+  }
+
+  function importedSetField(name, value, eventName) {
+    var field = importedField(name);
+    if (!field || value === undefined || value === null) return;
+    field.value = value;
+    try { field.dispatchEvent(new Event(eventName || "input", { bubbles: true })); } catch (e) { /* keep importing */ }
+  }
+
+  function importedScreenHasStory() {
+    return !!(importedValue("heading").trim() || importedValue("content").trim() || importedValue("image_1").trim());
+  }
+
+  function fillImportedNews(news) {
+    importedSetField("heading", news.heading);
+    importedSetField("image_1", news.image_1);
+    importedSetField("image_info", news.image_info);
+    importedSetField("category", news.category, "change");
+    importedSetField("content", news.content);
+    importedSetField("toc_mode", news.toc_mode, "change");
+    importedSetField("image_quality", news.image_quality, "change");
+    var newsletter = importedField("newsletter");
+    if (newsletter) newsletter.checked = !!news.newsletter;
+  }
+
   function normalizeImportedNews(data) {
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch (e) { return null; }
+    }
     var src = (data && typeof data === "object" && data.draft && typeof data.draft === "object") ? data.draft : data;
     if (!src || typeof src !== "object") return null;
     var looksLikeNews = "heading" in src || "content" in src || "image_1" in src || "category" in src || "toc_mode" in src;
@@ -620,17 +659,20 @@
     var reader = new FileReader();
     reader.onload = function () {
       try {
-        var parsed = JSON.parse(String(reader.result || ""));
+        /* A JSON file saved on Windows can carry a UTF-8 byte-order mark.
+           JSON.parse rejects it, so strip it before parsing. */
+        var raw = String(reader.result || "").replace(/^\uFEFF/, "").trim();
+        if (!raw) { toast("That JSON file is empty.", "error"); return; }
+        var parsed = JSON.parse(raw);
         var news = normalizeImportedNews(parsed);
         if (!news) { toast("That file is not a valid news draft JSON.", "error"); return; }
-        var hasStory = typeof screenHasStory === "function" ? screenHasStory() : !!(value("heading").trim() || value("content").trim() || value("image_1").trim());
+        var hasStory = importedScreenHasStory();
         if (hasStory && !window.confirm("Replace what is in the editor with this file? Save your current work as a draft first if you still need it.")) return;
-        fillEditor(news);
-        if (typeof updateEditorLiveUI === "function") updateEditorLiveUI();
-        if (typeof updateImagePreview === "function") updateImagePreview();
+        fillImportedNews(news);
         toast("News loaded from file.");
       } catch (e) {
-        toast("Could not read that JSON file.", "error");
+        if (window.console && console.error) console.error("Could not import the news JSON.", e);
+        toast("Could not read that JSON file. Make sure it is the JSON file saved by this editor.", "error");
       }
     };
     reader.onerror = function () { toast("Could not read that file.", "error"); };

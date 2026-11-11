@@ -55,6 +55,8 @@
 
 @keyframes archiveRule { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
+@keyframes archiveFilterIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
 .archive-heading { min-width: 0; animation: archiveRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 .archive-hero h1 {
@@ -117,6 +119,10 @@
 .archive-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .archive-btn-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* The short label only exists on very small screens; the full label is the
+   default so the desktop header is unchanged. */
+.archive-action-label-short { display: none; }
 
 .archive-link-btn {
   border: 0;
@@ -192,6 +198,57 @@
 
 .archive-icon-btn svg { width: 18px; height: 18px; }
 
+/* Mobile-only disclosure for the category / added-by filters. The filters
+   stay visible for readers without JS (see the 560px block at the end). */
+.archive-filter-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.archive-filter-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+.archive-filter-btn:hover,
+.archive-filter-btn:focus-visible,
+.archive-filter-btn.is-active {
+  border-color: var(--amber-alt);
+  background: var(--paper-dim);
+}
+
+.archive-filter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber-alt);
+  flex-shrink: 0;
+}
+
+.archive-search-glyph {
+  display: none;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 17px;
+  height: 17px;
+  color: var(--slate);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.archive-search-glyph svg { display: block; width: 100%; height: 100%; }
+
 .archive-icon-btn:hover,
 .archive-icon-btn:focus-visible,
 .archive-search.is-open .archive-icon-btn {
@@ -199,7 +256,7 @@
   background: var(--paper-dim);
 }
 
-.archive-search-field { min-width: 0; }
+.archive-search-field { position: relative; min-width: 0; }
 
 .archive-search-input {
   width: 100%;
@@ -1371,24 +1428,105 @@ html.archive-locked { overflow: hidden; }
 .archive-manage-row-form { flex-wrap: wrap; }
 
 @media (max-width: 560px) {
-  .archive-shell { padding: 24px 14px 44px; }
+  .archive-shell { padding: 18px 14px 44px; }
 
-  .archive-header-actions { width: 100%; }
-  .archive-header-actions .archive-action-btn { flex: 1 1 auto; }
-
-  .archive-toolbar { flex-wrap: wrap; }
-  .archive-search.is-open { flex: 1 1 100%; justify-content: flex-end; }
-  .archive-js .archive-search.is-open .archive-search-field { flex: 1 1 auto; width: auto; }
-
-  /* Category + Added by scroll sideways instead of stacking, so both stay
-     reachable without pushing the grid down the page. */
-  .archive-filters-form {
-    flex-wrap: wrap;
-    width: 100%;
+  /* One compact card at the top: the title, the explanation and the two
+     actions. No full-width button pile. */
+  .archive-hero {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
   }
-  .archive-filters-form::-webkit-scrollbar { height: 6px; }
-  .archive-filters-form::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
-  .archive-filter-field { min-width: 170px; flex: 0 0 auto; }
+  .archive-hero::after { left: 14px; bottom: -1px; width: 54px; }
+  .archive-hero h1 { font-size: clamp(1.7rem, 8vw, 2rem); }
+  .archive-subtitle { margin-top: 5px; font-size: 0.86rem; line-height: 1.45; }
+
+  .archive-header-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .archive-header-actions .archive-action-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 42px;
+    padding: 9px 10px;
+    font-size: 0.82rem;
+  }
+  .archive-action-label-full { display: none; }
+  .archive-action-label-short { display: inline; }
+
+  /* Tabs form a single segmented control, then search and Filters share one
+     row. The two filter selects live behind the Filters button. */
+  .archive-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 14px 0 0;
+  }
+  .archive-tabs {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-s);
+    background: var(--paper-dim);
+  }
+  .archive-tab {
+    display: grid;
+    place-items: center;
+    padding: 8px 3px;
+    border-radius: 3px;
+    font-size: 0.79rem;
+    text-align: center;
+  }
+  .archive-tab::after { display: none; }
+  .archive-tab.is-active {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--line), var(--shadow-card);
+  }
+
+  .archive-search { grid-column: 1; min-width: 0; }
+  .archive-js .archive-search-field,
+  .archive-js .archive-search.is-open .archive-search-field {
+    flex: 1 1 auto;
+    width: auto;
+    opacity: 1;
+    visibility: visible;
+    overflow: visible;
+    transition: none;
+  }
+  .archive-search-glyph { display: block; }
+  .archive-search-input { padding-left: 38px; }
+  .archive-search .archive-icon-btn { display: none; }
+
+  .archive-js .archive-filter-btn { display: inline-flex; grid-column: 2; }
+
+  .archive-js .archive-filters { display: none; padding: 8px 0 2px; }
+  .archive-js .archive-filters.is-open {
+    display: block;
+    animation: archiveFilterIn 0.22s ease both;
+  }
+  .archive-filters { padding: 8px 0 2px; }
+  .archive-filters-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-s);
+    background: var(--paper-dim);
+  }
+  .archive-filter-field { min-width: 0; }
+  .archive-filter-label { font-size: 0.66rem; }
+  .archive-filter-select { height: 40px; font-size: 0.82rem; }
 
   .archive-modal-layer { padding: 8px; }
   .archive-modal-card { padding: 18px 14px 14px; }

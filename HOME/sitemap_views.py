@@ -142,12 +142,7 @@ class StoryCategoriesSitemapView(View):
         today = timezone.localdate()
         
         # Get all categories that have stories
-        published_categories = set(
-            Blog.objects.exclude(slug__isnull=True)
-            .exclude(slug="")
-            .values_list("category", flat=True)
-            .distinct()
-        )
+        published_categories = set(Blog.objects.exclude(slug__isnull=True).exclude(slug="").values_list("category", flat=True).distinct())
         
         urls = []
         for name, _ in get_category_choices():

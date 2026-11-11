@@ -25,7 +25,7 @@ from django.views import View
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Category, get_category_choices
 from HOME.views import _resolve_page_number
-from SERVICE_INTERNAL.abstract import info_logger, is_rate_limited
+from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
@@ -1552,6 +1552,10 @@ class AnalyticsAuthorCompareView(View):
         def author_id(name):
             raw = (request.GET.get(name) or "").strip()
             return int(raw) if raw.isdigit() else None
+        
+        remaining_seconds, limited = is_rate_limited(request, timeout_window=3, max_requests=2, reset_timeout = False, scope=f"{get_client_ip(request)}{3}")
+        if limited: return JsonResponse({"detail": f"Rate limit exceeded. Please wait {remaining_seconds} seconds and try again."}, status=429)
+        
 
         return render(
             request,

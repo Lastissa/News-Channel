@@ -268,7 +268,7 @@
       activeXhr = null;
       gridShell.classList.remove("is-searching");
       if (!gridShell.classList.contains("is-paginating")) {
-        toast(extractDetail(event.detail.xhr ? event.detail.xhr.responseText : "", "Could not load that page."), "error");
+        toast(extractDetail(event.detail.xhr ? event.detail.xhr.responseText : "", "Could not load page."), "error");
         return;
       }
       gridShell.classList.remove("is-paginating");
@@ -367,7 +367,11 @@
     });
   }
 
-  /* ---------- icon search ---------- */
+  /* ---------- icon search (always visible in the mobile layout) ---------- */
+  function isNarrowArchive() {
+    return !!(window.matchMedia && window.matchMedia("(max-width: 560px)").matches);
+  }
+
   function setSearchOpen(open, focusInput) {
     if (!searchForm) return;
     searchForm.classList.toggle("is-open", open);
@@ -376,12 +380,15 @@
   }
 
   if (searchForm && searchInput) {
+    /* On a phone the field is part of the compact toolbar, not a flyout. */
+    if (isNarrowArchive()) setSearchOpen(true, false);
+
     searchForm.addEventListener("submit", function (event) {
       if (!window.htmx) return;               /* no htmx: plain GET submit still works */
       event.preventDefault();
       var isOpen = searchForm.classList.contains("is-open");
-      if (!isOpen) { setSearchOpen(true, true); return; }
-      if (!searchInput.value.trim()) { setSearchOpen(false); return; }
+      if (!isOpen && !isNarrowArchive()) { setSearchOpen(true, true); return; }
+      if (!searchInput.value.trim() && !isNarrowArchive()) { setSearchOpen(false); return; }
       loadGrid(1);
     });
 
@@ -405,6 +412,33 @@
       if (document.querySelector("[data-archive-modal]") || (viewer && !viewer.hidden)) return;
       event.preventDefault();
       setSearchOpen(true, true);
+    });
+  }
+
+  /* ---------- compact mobile filter disclosure ---------- */
+  var filterToggle = document.querySelector("[data-archive-filter-toggle]");
+  var filterPanel = document.getElementById("archive-filter-panel");
+
+  if (filterToggle && filterPanel) {
+    var setFilterOpen = function (open) {
+      filterPanel.classList.toggle("is-open", open);
+      filterToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+
+    filterToggle.addEventListener("click", function () {
+      setFilterOpen(!filterPanel.classList.contains("is-open"));
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!filterPanel.classList.contains("is-open")) return;
+      if (filterPanel.contains(event.target) || filterToggle.contains(event.target)) return;
+      setFilterOpen(false);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape" || !filterPanel.classList.contains("is-open")) return;
+      setFilterOpen(false);
+      filterToggle.focus();
     });
   }
 

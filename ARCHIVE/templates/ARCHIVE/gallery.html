@@ -12,7 +12,7 @@
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}?v=20261013-1">
+<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}?v=20261111-1">
 <script>document.documentElement.classList.add("archive-js");</script>
 {# Structured data so a crawler reads /archive/ as a browsable collection #}
 {# rather than a loose list of links. The sitewide NewsMediaOrganization #}
@@ -42,18 +42,22 @@
     <div class="archive-header-actions">
       {% if can_upload %}
       <button type="button" class="archive-action-btn primary" data-archive-add-btn
+              aria-label="Add an image or file"
               hx-get="{% url 'archive:upload_modal' %}"
               hx-target="[data-archive-overlay]"
               hx-swap="innerHTML">
         <svg viewBox="0 0 20 20" class="archive-btn-icon" aria-hidden="true"><path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span>Add image or file</span>
+        <span class="archive-action-label-full">Add image or file</span>
+        <span class="archive-action-label-short" aria-hidden="true">Add file</span>
       </button>
       <button type="button" class="archive-action-btn" data-archive-manage-btn
+              aria-label="Manage my uploads"
               hx-get="{% url 'archive:manage_modal' %}"
               hx-target="[data-archive-overlay]"
               hx-swap="innerHTML">
         <svg viewBox="0 0 20 20" class="archive-btn-icon" aria-hidden="true"><path d="m4 16 .7-3.3L13.4 4a1.4 1.4 0 0 1 2 0l.6.6a1.4 1.4 0 0 1 0 2l-8.7 8.7L4 16Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        <span>Manage my uploads</span>
+        <span class="archive-action-label-full">Manage my uploads</span>
+        <span class="archive-action-label-short" aria-hidden="true">Manage</span>
       </button>
       {% else %}
       <a class="archive-action-btn primary" href="{% url 'auth:login' %}?to=/archive/">Sign in to add files</a>
@@ -82,6 +86,9 @@
       <input type="hidden" name="category" value="{{ category }}" data-archive-grid-category>
       <input type="hidden" name="uploader" value="{{ uploader }}" data-archive-grid-uploader>
       <div class="archive-search-field">
+        <span class="archive-search-glyph" aria-hidden="true">
+          <svg viewBox="0 0 20 20"><circle cx="8.6" cy="8.6" r="5.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m12.7 12.7 4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </span>
         <input id="archive-search-descr" class="archive-search-input" type="search" name="descr" value="{{ descr }}"
                maxlength="150" placeholder="Search descriptions" aria-label="Search descriptions" autocomplete="off"
                data-archive-search
@@ -97,9 +104,15 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.6" cy="8.6" r="5.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m12.7 12.7 4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
       </button>
     </form>
+    <button type="button" class="archive-filter-btn{% if category or uploader %} is-active{% endif %}" data-archive-filter-toggle
+            aria-expanded="{% if category or uploader %}true{% else %}false{% endif %}" aria-controls="archive-filter-panel">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M6 10h8M8.5 15h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Filters</span>
+      {% if category or uploader %}<span class="archive-filter-dot" aria-hidden="true"></span>{% endif %}
+    </button>
   </div>
 
-  <div class="archive-filters">
+  <div class="archive-filters{% if category or uploader %} is-open{% endif %}" id="archive-filter-panel">
     <form class="archive-filters-form" method="get" action="{% url 'archive:gallery' %}" data-archive-filters-form>
       <input type="hidden" name="kind" value="{{ kind }}" data-archive-form-kind>
       <input type="hidden" name="descr" value="{{ descr }}" data-archive-form-descr>
@@ -205,5 +218,5 @@
 {% block extra_scripts %}
 {{ block.super }}
 <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'archive/js/archive.js' %}?v=20261012-4" defer></script>
+<script src="{% static 'archive/js/archive.js' %}?v=20261111-1" defer></script>
 {% endblock %}
