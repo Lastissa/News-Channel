@@ -506,7 +506,7 @@ html.auth-gate-locked { overflow: hidden; }
 /* .hero and .hero-teaser are separate, sibling blocks - .hero-row only
    exists to lay them out. Desktop: a 70/30 flex row with a divider between
    them. Mobile: they detach completely (column, teaser gets margin-top)
-   and the teaser becomes its own "peek" carousel underneath the hero. */
+   and the advert rail becomes its own swipeable strip underneath the hero. */
 .hero-row { display: flex; align-items: stretch; width: 100%; }
 
 .hero { position: relative; overflow: hidden; background: var(--nav-bg); border-bottom-left-radius: 25px; width: 70vw; height: 70vh; min-height: 400px; max-height: 640px; }
@@ -618,27 +618,40 @@ html.auth-gate-locked { overflow: hidden; }
   .hero-content { padding: 40px 60px 110px; }
 }
 
-/* ---------- Hero teaser (side carousel) ---------- */
+/* ---------- Hero advert rail ---------- */
 /* A separate block from .hero that shares .hero-row's flex line on desktop
-   and stands completely on its own on mobile. Auto-advances only - no
-   arrows/dots on either layout. Desktop: slides are stacked full-bleed and
-   crossfade. Mobile: slides sit side by side and the active one is a
-   genuinely wider box (flex-basis swap, not just a visual scale trick)  - 
-   hero-teaser.js reads the active slide's real offsetLeft afterwards and
-   slides the whole strip so focus moves right to left. */
+   and stands completely on its own on mobile. It is a reader-driven,
+   horizontally scrollable rail with scroll snapping: swipe, trackpad,
+   shift+wheel, the keyboard arrows or the two buttons move one advert at a
+   time. Nothing auto-advances, so the reader can stop on the advert they
+   want. The controls are only painted after hero-teaser.js has wired them
+   up; without JS the track still scrolls natively. */
 .hero-teaser {
   position: relative; width: 30vw; overflow: hidden;
   background: transparent; border-left: 2px solid var(--brand-deep);
   height: 70vh; min-height: 400px; max-height: 640px;
 }
-.teaser-track { position: relative; height: 100%; transition: transform 0.6s ease; will-change: transform; }
+.teaser-track {
+  position: relative; height: 100%;
+  display: flex;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.teaser-track::-webkit-scrollbar { display: none; }
+.teaser-track:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
 .teaser-slide {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  position: relative; inset: auto;
+  flex: 0 0 100%; height: 100%;
+  scroll-snap-align: start; scroll-snap-stop: always;
+  display: flex; align-items: center; justify-content: center;
   text-align: center; padding: 10px; background-size: cover; background-position: center;
   background-color: var(--nav-bg-dynamic); background-image: var(--teaser-image, none);
-  opacity: 0; visibility: hidden; transition: opacity 0.9s ease, visibility 0s linear 0.9s;
+  opacity: 1; visibility: visible;
 }
-.teaser-slide.is-active { opacity: 1; visibility: visible; transition: opacity 0.9s ease, visibility 0s linear 0s; }
 .teaser-slide-inner { position: relative; z-index: 1; max-width: 100%; }
 .teaser-heading, .teaser-placeholder { color: #FAF8F3; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; margin: 0; }
 .teaser-body { color: rgba(250,248,243,0.75); font-size: 0.85rem; margin: 8px 0 0; }
@@ -654,27 +667,81 @@ a.teaser-slide { color: inherit; text-decoration: none; }
 .teaser-slide.has-image .teaser-heading { color: var(--ink); font-size: 1rem; }
 .teaser-slide.has-image .teaser-body { color: var(--ink-soft); margin-top: 4px; }
 
+/* Small pager. It stays hidden until the script has bound its buttons, so a
+   no-JS page never shows dead controls (the rail itself still works). */
+.teaser-controls {
+  display: none;
+  position: absolute; top: 12px; right: 12px; z-index: 3;
+  align-items: center; gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(250,248,243,0.28);
+  border-radius: var(--radius-s);
+  background: rgba(14,27,44,0.82);
+  color: #FAF8F3;
+  box-shadow: 0 4px 14px rgba(14,27,44,0.24);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.hero-teaser.is-scroll-ready .teaser-controls { display: flex; }
+.teaser-arrow {
+  width: 30px; height: 30px; padding: 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: 2px;
+  background: transparent; color: inherit;
+  cursor: pointer;
+}
+.teaser-arrow svg { width: 15px; height: 15px; }
+.teaser-arrow:hover:not(:disabled),
+.teaser-arrow:focus-visible:not(:disabled) { background: var(--paper); color: var(--ink); }
+.teaser-arrow:disabled { opacity: 0.35; cursor: default; }
+.teaser-spacer { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .teaser-track { scroll-behavior: auto; }
+}
+
 @media (max-width: 899px) {
   .hero-teaser {
     width: 100%; height: auto; min-height: 0; max-height: none;
     border-left: none; margin-top: 20px; padding: 1px 10px;
   }
-  .teaser-track { height: auto; display: flex; align-items: stretch; gap: 12px; transform: translateX(0); }
+  .teaser-track { height: auto; align-items: stretch; gap: 12px; }
   .teaser-slide {
-    /* Fixed, non-transitioning flex-basis: the size change is instant so
-       hero-teaser.js can read the new offsetLeft immediately and get an
-       exact number for the strip's slide transform - no fighting between
-       an animating box size and an animating position at once. */
+    /* The focused advert is the main one; the rest sit small beside it. The
+       active width changes instantly (no flex transition) so the JS can read
+       the new offset and keep the chosen advert in view without fighting an
+       animation. */
     position: relative; inset: auto; height: 96px;
     flex: 0 0 32%; min-width: 110px;
-    border-radius: var(--radius-m); opacity: 0.65; visibility: visible;
-    transition: opacity 0.4s ease;
+    border-radius: var(--radius-m);
+    opacity: 0.65;
+    visibility: visible;
+    transition: opacity 0.25s ease;
     padding: 12px;
   }
   .teaser-slide.is-active { flex: 0 0 46%; opacity: 1; }
+  /* The final advert cannot start at the left edge without a lot of empty
+     scroll room, so snap its right edge instead. That keeps the whole focused
+     card visible when the reader reaches it with the next arrow. */
+  .teaser-slide.is-last { scroll-snap-align: end; }
   .teaser-heading, .teaser-placeholder { font-size: 0.92rem; }
   .teaser-body { display: none; }
   .teaser-slide.has-image .teaser-slide-inner { display: none; }
+
+  /* Trailing room keeps a short advert strip scrollable instead of stopping
+     dead at the first card; the last card also gets an end snap above. */
+  .teaser-spacer {
+    display: block;
+    flex: 0 0 calc(100% - 46%);
+    pointer-events: none;
+  }
+
+  /* Below the cards, not over the picture or its caption. */
+  .teaser-controls {
+    position: static;
+    width: max-content;
+    margin: 10px 0 0 auto;
+  }
 }
 
 /* ---------- Home tickers ---------- */
@@ -2960,7 +3027,6 @@ html.nav-locked { overflow: hidden; }
    - no default blue/grey "pressed link" blob on any tap target
    - round the buttons that were still genuinely rectangular
    - solid toast surface
-   - hide teaser clones on the desktop (stacked) layout
    - standalone "Popular Stories" rail on Home pages 2+
    - slow-connection / FOUC hardening (content-visibility)
    ============================================================ */
@@ -3018,10 +3084,7 @@ a:focus:not(:focus-visible) {
 }
 .site-toast--error .site-toast__progress { background: var(--toast-accent-error); }
 
-/* --- 4. Teaser clones: only the mobile (strip) layout ever shows them --- */
-@media (min-width: 900px) {
-  .teaser-slide[data-clone="true"] { display: none; }
-}
+/* --- 4. (teaser clones removed: the advert rail uses native scrolling) --- */
 
 /* --- 5. Standalone "Popular Stories" rail on Home pages 2+ ---------------
    story_cards.html wraps the rail in .trending-wide outside the page-1

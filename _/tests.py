@@ -194,6 +194,15 @@ class CSPReportTests(TestCase):
         self.assertNotIn("report-to", policy)
         self.assertNotIn("Reporting-Endpoints", response)
 
+    def test_advert_landing_pages_keep_the_policy_but_skip_reports(self):
+        response = self.client.get("/ads/1/")
+
+        policy = response["Content-Security-Policy-Report-Only"]
+        self.assertIn("default-src 'self'", policy)
+        self.assertNotIn("report-uri", policy)
+        self.assertNotIn("report-to", policy)
+        self.assertNotIn("Reporting-Endpoints", response)
+
     @override_settings(CSP_REPORT_EMAIL="alerts@example.com")
     @patch("SERVICE_INTERNAL.email_single._dispatch_email")
     def test_email_builder_uses_configured_recipient(self, dispatch_email):

@@ -25,7 +25,7 @@ from django.views import View
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Category, get_category_choices
 from HOME.views import _resolve_page_number
-from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, is_rate_limited
+from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, invalidate_cache, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
@@ -58,7 +58,7 @@ from Partner.landing import (
     render_advert_landing_document,
     strip_advert_landing_author_header,
 )
-from Partner.models import AdvertImage, AdvertLandingPage, Announcement
+from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead, Announcement
 from ADMIN.models import SiteSettings
 from ADMIN.analytics import (
     AUTHOR_DEFAULT_RANGE,
@@ -812,6 +812,8 @@ class PanelView(View):
                 "category_rows": _category_rows(),
                 "announcement_items": _announcement_items(),
                 "image_advert_items": _image_advert_items(),
+                "advert_leads": AdvertLead.objects.select_related("user").order_by("-created_at")[:20],
+                "advert_lead_total": AdvertLead.objects.count(),
                 "landing_tokens": ADVERT_LANDING_TOKENS,
                 "landing_robots_choices": AdvertLandingPage.ROBOTS_CHOICES,
                 "gallery_items": staff_directory_rows(list(gallery_page.object_list)),
@@ -1929,7 +1931,13 @@ class PanelSiteSettingsUpdateView(View):
         settings_row.support_email = (request.POST.get("support_email") or "").strip()
         settings_row.whatsapp_channel = (request.POST.get("whatsapp_channel") or "").strip()
         settings_row.customer_support_mobile = (request.POST.get("customer_support_mobile") or "").strip()
+        settings_row.ads_whatsapp_support = (request.POST.get("ads_whatsapp_support") or "").strip()
         settings_row.save()
+
+        #   The context processor keeps this row in the cache with no TTL, so
+        #   saving without clearing it would leave the old contact details on
+        #   the site until the process restarted.
+        invalidate_cache("site_settings_socials")
 
         info_logger(msg=f"PANEL: site settings updated by {request.user.email}")
 

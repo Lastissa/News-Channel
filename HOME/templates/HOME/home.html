@@ -140,28 +140,26 @@
 </section>
 
 {% comment %}
-  Side/teaser carousel. A block of its own, not nested inside .hero - it
-  just shares .hero-row's flex line on desktop (70vw/30vw split, divider
-  between them) and fades between slides on its own, no user controls.
-  Mobile: it detaches from the hero entirely (own margin-top) and becomes
-  a multi-tab peek carousel - the active tab is a genuinely wider box, the
-  rest share the remaining space evenly, sliding right to left as it
-  auto-advances. Same markup drives both layouts; CSS + hero-teaser.js
-  handle the rest.
+  Advert rail. A block of its own, not nested inside .hero - it just shares
+  .hero-row's flex line on desktop (70vw/30vw split, divider between them).
+  The rail is driven by the reader: swipe, trackpad, keyboard or the arrow
+  buttons, with scroll snapping so one advert lands cleanly at a time. It no
+  longer auto-advances, so a reader can stop and choose the advert they want.
 
   teaser_items comes from HomeView (see HOME/views.py, _teaser_items()):
   the live image adverts an admin manages in PANEL, as dicts with
   heading/body/image/url keys (placeholder slides until one exists).
 {% endcomment %}
-<aside class="hero-teaser" id="teaser-carousel" aria-label="Adverts" data-autoplay="4200">
-  <div class="teaser-track">
+<aside class="hero-teaser" id="teaser-carousel" aria-label="Adverts">
+  <div class="teaser-track" data-teaser-track tabindex="0"
+       aria-label="Advert carousel. Scroll or use the arrow buttons to choose an advert.">
     {% for item in teaser_items %}
-    {% if item.url %}<a class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %} aria-label="{{ item.heading|default:'Advert' }}"
+    {% if item.url %}<a class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}{% if forloop.last %} is-last{% endif %}" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %} aria-label="{{ item.heading|default:'Advert' }}"
          data-index="{{ forloop.counter0 }}"
-         {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% else %}<div class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}"
+         {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% else %}<div class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}{% if forloop.last %} is-last{% endif %}"
          data-index="{{ forloop.counter0 }}"
          {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% endif %}
-      {% comment %} Mobile: picture only (CSS hides .teaser-slide-inner on .has-image). Desktop: caption bar at the bottom in paper/ink. {% endcomment %}
+      {% comment %} Mobile: picture plus a compact caption bar (CSS); desktop: caption bar at the bottom in paper/ink. {% endcomment %}
       {% if item.heading or item.body or not item.image %}
       <div class="teaser-slide-inner">
         {% if item.heading %}<p class="teaser-heading">{{ item.heading }}</p>{% endif %}
@@ -171,7 +169,18 @@
       {% endif %}
     {% if item.url %}</a>{% else %}</div>{% endif %}
     {% endfor %}
+    {% if teaser_items|length > 1 %}<span class="teaser-spacer" aria-hidden="true"></span>{% endif %}
   </div>
+  {% if teaser_items|length > 1 %}
+  <div class="teaser-controls" data-teaser-controls>
+    <button type="button" class="teaser-arrow" data-teaser-prev aria-label="Previous advert" disabled>
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4 7 10l5.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button type="button" class="teaser-arrow" data-teaser-next aria-label="Next advert">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4 13 10l-5.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  {% endif %}
 </aside>
 </div>
 {% endif %}

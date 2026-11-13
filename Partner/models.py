@@ -41,6 +41,45 @@ class AdvertImage(models.Model):
         return (self.heading or "Image advert") + " ---Expiry: " + str(self.expiry_date.strftime("%d of %b, %Y"))
 
 
+class AdvertLead(models.Model):
+    """A business enquiry sent from the public partner page.
+
+    This is deliberately a lead, not an advertiser account: it catches the
+    business details before the ads team replies on WhatsApp. A signed-in
+    reader's account is attached when one exists, so the enquiry can later be
+    matched to the same account that will own the advert reference.
+    """
+
+    PLAN_REGULAR = "regular"
+    PLAN_PRO = "pro"
+    PLAN_ADVANCE = "advance"
+    PLAN_CHOICES = (
+        (PLAN_REGULAR, "Regular"),
+        (PLAN_PRO, "Pro"),
+        (PLAN_ADVANCE, "Advance"),
+    )
+
+    user = models.ForeignKey(
+        "AUTHENTICATION.Auth",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="advert_leads",
+    )
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES)
+    business_name = models.CharField(max_length=120)
+    contact_email = models.EmailField()
+    whatsapp_number = models.CharField(max_length=32, blank=True, default="")
+    business_details = models.TextField(max_length=2000)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.business_name} - {self.get_plan_display()} enquiry"
+
+
 class AdvertLandingPage(models.Model):
     """The full, off-grid page an image advert opens on this domain.
 

@@ -2,64 +2,389 @@
 {% load static seo_tags %}
 
 {% block adsense %}{% endblock %}
-{% block title %}Promote your business | {{ project_name }}{% endblock %}
-{% block meta_description %}Promote your business on {{ project_name }}. Our self-serve advert dashboard is still being built, so we set everything up for you by hand - free for the first 2 weeks.{% endblock %}
-{% block og_title %}Promote your business | {{ project_name }}{% endblock %}
-{% block og_description %}Reach {{ project_name }} readers. The service is new, so your advert runs free for the first 2 weeks.{% endblock %}
-{% block twitter_title %}Promote your business | {{ project_name }}{% endblock %}
-{% block twitter_description %}Reach {{ project_name }} readers. Free for the first 2 weeks.{% endblock %}
+{% block title %}Advertise on {{ project_name }} | Weekly plans from &#8358;255{% endblock %}
+{% block meta_description %}Advertise on {{ project_name }}. Weekly plans start at &#8358;255. Choose a plan, tell us about your business, and our ads team will set up your advert.{% endblock %}
+{% block og_title %}Advertise on {{ project_name }} | Weekly plans from &#8358;255{% endblock %}
+{% block og_description %}Reach {{ project_name }} readers with a clearly labelled advert. Weekly plans start at &#8358;255.{% endblock %}
+{% block twitter_title %}Advertise on {{ project_name }} | Weekly plans from &#8358;255{% endblock %}
+{% block twitter_description %}Reach {{ project_name }} readers with a clearly labelled advert. Weekly plans start at &#8358;255.{% endblock %}
 
 {% block extra_head %}
   {{ block.super }}
   {% url 'home:home' as breadcrumb_home_url %}
-  {% breadcrumb_schema "Home" breadcrumb_home_url "Promote your business" %}
-  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}?v=20261107-1">
+  {% breadcrumb_schema "Home" breadcrumb_home_url "Advertise" %}
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&amp;display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&amp;display=swap"></noscript>
+  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}?v=20261113-6">
+  <script>document.documentElement.classList.add('promote-motion');</script>
 {% endblock %}
 
 {% block content %}
-<section class="promote-page">
+<section class="promote-page" data-promote-page>
+  <nav class="promote-jump" aria-label="On this page" data-promote-nav>
+    <a href="#plans" class="is-active" aria-current="location">Plans</a>
+    <a href="#how">How it works</a>
+    <a href="#advertise">Enquire</a>
+    <a href="#live">Live adverts</a>
+  </nav>
+
   <header class="promote-hero">
     <div class="promote-hero-copy">
-      <p class="promote-eyebrow">Partnerships</p>
-      <h1 class="promote-title">Promote your business on {{ project_name }}</h1>
-
-      <p class="promote-status" role="status">
-        <span class="promote-status-pulse" aria-hidden="true"></span>
-        <span>Still In Progress</span>
+      {% comment %}
+        Previous pill eyebrow, kept here so it can be restored quickly:
+        <p class="promote-eyebrow" data-reveal style="--reveal-delay: 40ms">
+          <span class="promote-pulse" aria-hidden="true"></span>
+          Now booking weekly placements
+        </p>
+      {% endcomment %}
+      <p class="promote-dateline" data-reveal style="--reveal-delay: 40ms">
+        <span class="promote-dateline-mark" aria-hidden="true"></span>
+        <span class="promote-dateline-copy">
+          <strong>Now booking</strong>
+          <span>Weekly placements</span>
+        </span>
       </p>
-      <div class="promote-progress" aria-hidden="true"><span></span></div>
 
-      <p class="promote-lede">
-        Our self-serve advert dashboard is still being built. Until it is ready we'll set up
-        everything for you manually and because this side of {{ project_name }} is
-        brand still very new, your advert runs <strong>free for the first 2 weeks if you reach out to us now</strong>.
+      <h1 class="promote-title" data-reveal style="--reveal-delay: 90ms">
+        Make your business <em>impossible to scroll past.</em>
+      </h1>
+
+      <p class="promote-lede" data-reveal style="--reveal-delay: 150ms">
+        Put your brand inside the {{ project_name }} reading experience. Choose a
+        weekly plan, send your brief once, and our ads team builds the rest.
+        Plans start at <strong>&#8358;255 per week</strong>.
       </p>
 
-      {% if advert_email %}
-      <p class="promote-cta">
-        <a class="promote-mail" href="mailto:{{ advert_email }}?subject=Advert%20enquiry">
-          <span class="promote-mail-kicker">Email us</span>
-          <span class="promote-mail-address">{{ advert_email }}</span>
+      <div class="promote-actions" data-reveal style="--reveal-delay: 210ms">
+        <a class="promote-primary" href="#plans">
+          <span>View Plans</span>
+          <svg class="promote-btn-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
         </a>
+        {% if ads_whatsapp_url %}
+        <a class="promote-secondary" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer">
+          <span>Not Sure? WhatsApp Us</span>
+          <svg class="promote-btn-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M5 15 15 5M7 5h8v8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </a>
+        {% endif %}
+      </div>
+
+      {% comment %} <div class="promote-proof" data-reveal style="--reveal-delay: 270ms" aria-label="Plan facts">
+        <span class="promote-proof-item"><strong>3</strong><span>weekly plans</span></span>
+        <span class="promote-proof-item"><strong>7 days</strong><span>per cycle</span></span>
+        <span class="promote-proof-item"><strong>1:1</strong><span>human setup</span></span>
+      </div> {% endcomment %}
+
+      <p class="promote-account" data-reveal style="--reveal-delay: 330ms">
+        {% if account_signed_in %}
+          Signed in as {{ account_email }}.
+          <a href="{% url 'home:profile' %}">Go to your profile</a>.
+        {% else %}
+          Already advertising?
+          <a href="{{ account_login_url }}">Sign in</a>
+          or <a href="{{ account_register_url }}">create a free account</a>.
+        {% endif %}
       </p>
-      <p class="promote-cta-note">Tell us what you want to promote and we&rsquo;ll help with the rest.</p>
-      {% else %}
-      <p class="promote-cta-note">
-        Our partnership mailbox is being set up. Meanwhile you can
-        <a href="{% url 'home:advert_inquiry' %}">register your interest here</a> and we&rsquo;ll reach out.
-      </p>
-      {% endif %}
     </div>
 
-    <figure class="promote-hero-media">
-      <img src="{% static 'promote.jpg' %}" width="1672" height="941" fetchpriority="high" decoding="async"
-           alt="A business promoting its advert to {{ project_name }} readers">
+    <figure class="promote-hero-media" data-hero-media data-reveal style="--reveal-delay: 180ms">
+      <div class="promote-hero-frame">
+        <img src="{% static 'promote.jpg' %}" width="1672" height="941" fetchpriority="high" decoding="async"
+             alt="A business promoting its advert to {{ project_name }} readers">
+        <span class="promote-live-chip"><span class="promote-live-dot" aria-hidden="true"></span> Live placements</span>
+        <div class="promote-hero-float" aria-hidden="true">
+          <span class="promote-hero-float-label">Advance</span>
+          <strong>&#8358;{{ advance_plan.price }}<small>/week</small></strong>
+          <span class="promote-hero-float-note">Launch offer</span>
+        </div>
+        <figcaption class="promote-hero-caption">
+          <span>Built for readers, not interruptions.</span>
+          <span class="promote-hero-caption-mark" aria-hidden="true">&#8599;</span>
+        </figcaption>
+      </div>
+      <span class="promote-hero-orbit" aria-hidden="true"><span></span></span>
     </figure>
   </header>
 
-  <section class="promote-ads" aria-labelledby="promote-ads-title">
+  {% comment %} <div class="promote-ticker" aria-hidden="true">
+    <div class="promote-ticker-track">
+      <div class="promote-ticker-set">
+        <span>Weekly placements</span><i></i>
+        <span>Clearly labelled</span><i></i>
+        <span>Human-built pages</span><i></i>
+        <span>Reader-first formats</span><i></i>
+        <span>One direct line</span><i></i>
+      </div>
+      <div class="promote-ticker-set">
+        <span>Weekly placements</span><i></i>
+        <span>Clearly labelled</span><i></i>
+        <span>Human-built pages</span><i></i>
+        <span>Reader-first formats</span><i></i>
+        <span>One direct line</span><i></i>
+      </div>
+    </div>
+  </div> {% endcomment %}
+
+  <section class="promote-plans" id="plans" aria-labelledby="promote-plans-title">
+    <div class="promote-section-head promote-section-head--split">
+      <div>
+        <p class="promote-kicker">Weekly plans</p>
+        <h2 id="promote-plans-title">Three Preferences.<br><em>Choose One That Fit Your Bussienss.</em></h2>
+      </div>
+      {% comment %} <p class="promote-section-lede">
+        Every plan includes a clearly labelled advert, a real person on WhatsApp,
+        and no long contract. Pick the level of finish your business needs.
+      </p> {% endcomment %}
+    </div>
+
+    <div class="promote-plans-pin" data-plan-pin>
+      <div class="promote-plans-stick">
+        <div class="promote-plan-grid" data-plan-rail>
+          {% for plan in plans %}
+          <article class="promote-plan promote-plan--{{ plan.slug }}{% if plan.featured %} is-featured{% endif %}"
+                   data-plan-card data-tilt data-spotlight data-reveal>
+            {% if plan.featured %}<span class="promote-plan-aura" aria-hidden="true"></span>{% endif %}
+            {% if plan.ribbon %}<span class="promote-plan-ribbon">{{ plan.ribbon }}</span>{% endif %}
+
+            <div class="promote-plan-top">
+              <h3>{{ plan.name }}</h3>
+              {% if plan.badge %}<span class="promote-plan-badge">{{ plan.badge }}</span>{% endif %}
+            </div>
+
+            <div class="promote-plan-price-row">
+              <p class="promote-plan-price">
+                <span class="promote-plan-currency">&#8358;</span>{{ plan.price }}<span class="promote-plan-period">/week</span>
+              </p>
+              {% if plan.saving %}<span class="promote-plan-save">Save &#8358;{{ plan.saving }}</span>{% endif %}
+            </div>
+            {% if plan.original_price %}
+            <p class="promote-plan-original">Normally &#8358;{{ plan.original_price }}/week</p>
+            {% endif %}
+
+            <p class="promote-plan-summary">{{ plan.summary }}</p>
+
+            <ul class="promote-plan-list">
+              {% for feature in plan.features %}
+              <li>{{ feature }}</li>
+              {% endfor %}
+            </ul>
+
+            <a class="promote-plan-cta" href="{% url 'home:promote' %}?plan={{ plan.slug }}#advertise">
+              <span>Choose {{ plan.name }}</span>
+              <svg class="promote-btn-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </a>
+
+            {% if plan.featured %}
+            <p class="promote-plan-foot">Premium build, priority setup, and the launch price while it lasts.</p>
+            {% endif %}
+          </article>
+          {% endfor %}
+        </div>
+
+        <div class="promote-plan-progress" aria-hidden="true">
+          <span class="promote-plan-progress-label">Scroll or swipe &middot; {{ plans|length }} plans &rarr;</span>
+          <span class="promote-plan-progress-bar"><i data-plan-progress></i></span>
+        </div>
+      </div>
+    </div>
+
+    <p class="promote-plan-note">
+      Prices are weekly. The Advance launch offer applies while the current promotion lasts.
+      We confirm the total on WhatsApp before you pay.
+    </p>
+  </section>
+
+  <section class="promote-manifesto" aria-label="Our advertising approach" data-reveal>
+    <p class="promote-manifesto-kicker">Our approach</p>
+    <p class="promote-manifesto-copy">
+      Readers came for the story.<br><em>Your brand can be the next thing they remember.</em>
+    </p>
+    <p class="promote-manifesto-note">Reader-first advertising &middot; clearly labelled</p>
+  </section>
+
+  <section class="promote-how" id="how" aria-labelledby="promote-how-title">
+    <div class="promote-section-head promote-section-head--split">
+      <div>
+        <p class="promote-kicker">The path</p>
+        <h2 id="promote-how-title">From first message <em>to live advert.</em></h2>
+      </div>
+      <p class="promote-section-lede">
+        No maze of settings. One brief, one WhatsApp thread, and a clear build sequence.
+      </p>
+    </div>
+
+    <ol class="promote-steps">
+      <li data-reveal>
+        <span aria-hidden="true">01</span>
+        <div>
+          <h3>Tell us about your business</h3>
+          <p>Use the form below. We save the enquiry and open WhatsApp with your brief ready to send.</p>
+        </div>
+      </li>
+      <li data-reveal>
+        <span aria-hidden="true">02</span>
+        <div>
+          <h3>Confirm your plan</h3>
+          <p>Our ads team confirms the amount and the next step on WhatsApp. No payment happens on this page.</p>
+        </div>
+      </li>
+      <li data-reveal>
+        <span aria-hidden="true">03</span>
+        <div>
+          <h3>Get your reference</h3>
+          <p>After payment, we issue your advert reference. Keep it: it is how we identify your advert.</p>
+        </div>
+      </li>
+      <li data-reveal>
+        <span aria-hidden="true">04</span>
+        <div>
+          <h3>We build and publish</h3>
+          <p>Send your picture and final copy. We set up the advert and, on Pro or Advance, the page.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="promote-enquiry" id="advertise" aria-labelledby="promote-enquiry-title">
+    <div class="promote-enquiry-copy">
+      <p class="promote-kicker">Start here</p>
+      <h2 id="promote-enquiry-title">Tell us what you sell.<br><em>We&rsquo;ll take it from there.</em></h2>
+      <p>
+        Choose a plan and tell us what your business does. We save the enquiry and open
+        WhatsApp with your details ready for you to send.
+      </p>
+
+      <aside class="promote-handoff" data-reveal aria-label="WhatsApp message preview">
+        <div class="promote-handoff-top">
+          <span class="promote-handoff-label"><span class="promote-live-dot" aria-hidden="true"></span> WhatsApp handoff</span>
+          <span class="promote-handoff-preview">Preview</span>
+        </div>
+        <p class="promote-handoff-caption">Your message starts like this</p>
+        <p class="promote-handoff-bubble">
+          Hi {{ project_name }} Ads, I want the
+          {% for plan in plans %}{% if form_data.plan == plan.slug %}<strong data-handoff-plan>{{ plan.name }}</strong> plan (<span data-handoff-price>&#8358;{{ plan.price }}/week</span>){% endif %}{% endfor %}.
+          My business is &hellip;
+        </p>
+        <div class="promote-handoff-foot">
+          <span>Saved to our panel</span>
+          <span>Opens in WhatsApp</span>
+        </div>
+      </aside>
+
+      <p class="promote-enquiry-note">
+        We only use these details to respond to your advert enquiry.
+      </p>
+      {% if advert_email %}
+      <p class="promote-enquiry-note">
+        Prefer email? <a href="mailto:{{ advert_email }}?subject=Advert%20enquiry">{{ advert_email }}</a>
+      </p>
+      {% endif %}
+      <p class="promote-enquiry-note">
+        {% if account_signed_in %}
+          Your enquiry will be attached to <strong>{{ account_email }}</strong>.
+        {% else %}
+          Want your future reference attached to an account?
+          <a href="{{ account_login_url }}">Sign in</a> or
+          <a href="{{ account_register_url }}">create one free</a>.
+        {% endif %}
+      </p>
+    </div>
+
+    <form class="promote-form" method="post" action="{% url 'home:promote_lead' %}" novalidate data-promote-form>
+      {% csrf_token %}
+
+      <div class="promote-form-head">
+        <div>
+          <p class="promote-kicker">Advert enquiry</p>
+          <h3>Your brief, in one step.</h3>
+        </div>
+        <span class="promote-form-chip">No payment now</span>
+      </div>
+
+      {% if form_error %}
+      <p class="promote-form-error" role="alert">{{ form_error }}</p>
+      {% endif %}
+      {% if form_success %}
+      <p class="promote-form-success" role="status">{{ form_success }}</p>
+      {% endif %}
+
+      <fieldset class="promote-plan-picker">
+        <legend>Choose your plan</legend>
+        <div class="promote-plan-options">
+          {% for plan in plans %}
+          <label class="promote-plan-option{% if plan.featured %} is-featured{% endif %}{% if form_data.plan == plan.slug %} is-selected{% endif %}">
+            <input type="radio" name="plan" value="{{ plan.slug }}"
+                   data-plan-radio data-plan-name="{{ plan.name }}"
+                   data-plan-price="&#8358;{{ plan.price }}/week"
+                   {% if form_data.plan == plan.slug %}checked{% endif %} required>
+            <span class="promote-plan-option-name">{{ plan.name }}</span>
+            <span class="promote-plan-option-price">&#8358;{{ plan.price }}<small>/wk</small></span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <p class="promote-selected" aria-live="polite">
+        <span>Selected plan</span>
+        {% for plan in plans %}{% if form_data.plan == plan.slug %}
+        <strong data-selected-plan-name>{{ plan.name }}</strong>
+        <em data-selected-plan-price>&#8358;{{ plan.price }}/week</em>
+        {% endif %}{% endfor %}
+      </p>
+
+      <div class="promote-field">
+        <label for="promote-business">Business name</label>
+        <input id="promote-business" type="text" name="business_name" maxlength="120"
+               value="{{ form_data.business_name }}" required autocomplete="organization"
+               placeholder="e.g. Grace Stores">
+      </div>
+
+      <div class="promote-field-row">
+        <div class="promote-field">
+          <label for="promote-email">Email address</label>
+          <input id="promote-email" type="email" name="contact_email" maxlength="254"
+                 value="{{ form_data.contact_email }}" required autocomplete="email"
+                 placeholder="you@business.com">
+        </div>
+        <div class="promote-field">
+          <label for="promote-whatsapp">WhatsApp number <span>(optional)</span></label>
+          <input id="promote-whatsapp" type="tel" name="whatsapp_number" maxlength="32"
+                 value="{{ form_data.whatsapp_number }}" autocomplete="tel"
+                 placeholder="+234 800 000 0000">
+        </div>
+      </div>
+
+      <div class="promote-field">
+        <label for="promote-details">What should the advert say?</label>
+        <textarea id="promote-details" name="business_details" rows="5" maxlength="2000" required
+                  placeholder="What you sell, where you are, and what you want readers to do.">{{ form_data.business_details }}</textarea>
+        <small>Up to 2,000 characters. Keep it clear and specific.</small>
+      </div>
+
+      <button class="promote-submit" type="submit">
+        <span>Save and open WhatsApp</span>
+        <svg class="promote-submit-arrow" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+      <p class="promote-form-foot">
+        Your enquiry is saved here before WhatsApp opens. The WhatsApp message is not sent
+        until you press send.
+      </p>
+    </form>
+  </section>
+
+  <section class="promote-ads" id="live" aria-labelledby="promote-ads-title">
     <div class="promote-ads-head">
-      <h2 id="promote-ads-title">Running on {{ project_name }} right now</h2>
+      <div>
+        <p class="promote-kicker"><span class="promote-live-dot" aria-hidden="true"></span> Live now</p>
+        <h2 id="promote-ads-title">Running on {{ project_name }} right now</h2>
+      </div>
       <p class="promote-ads-sub">A live look at the adverts our readers are seeing.</p>
     </div>
 
@@ -79,8 +404,8 @@
     <noscript>
       <style>.promote-ads-grid { display: none; }</style>
       <p class="promote-ads-noscript">
-        Turn on JavaScript to see the adverts we&rsquo;re running - or
-        {% if advert_email %}<a href="mailto:{{ advert_email }}">email us</a>{% else %}<a href="{% url 'home:advert_inquiry' %}">register your interest</a>{% endif %}
+        Turn on JavaScript to see the adverts we&rsquo;re running, or
+        {% if advert_email %}<a href="mailto:{{ advert_email }}">email us</a>{% else %}<a href="#advertise">send us your details</a>{% endif %}
         and we&rsquo;ll show you examples.
       </p>
     </noscript>
@@ -89,5 +414,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{% static 'home/js/promote.js' %}" defer></script>
+<script src="{% static 'home/js/promote.js' %}?v=20261113-4" defer></script>
 {% endblock %}

@@ -3,7 +3,7 @@ import logging
 import random
 import re
 from datetime import timedelta
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from xml.sax.saxutils import quoteattr
 
 from django.contrib import messages
@@ -12,10 +12,10 @@ from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.core.exceptions import BadRequest, ValidationError
 from django.core.paginator import Paginator, EmptyPage, Page
-from django.core.validators import URLValidator
+from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Prefetch
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
@@ -92,7 +92,7 @@ def _image_link_is_unsafe(link):
     return any(char in UNSAFE_IMAGE_LINK_CHARS for char in (link or ""))
 
 
-TEASER_PLACEHOLDER_COUNT = 20  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO SIDE CAROUSEL UNTIL REAL DATA EXISTS
+TEASER_PLACEHOLDER_COUNT = 3  #   HOW MANY "COMING SOON" SLIDES TO SHOW IN THE HERO ADVERT RAIL UNTIL REAL DATA EXISTS
 
 #   "CONTINUE READING" POPUP (HOME/partials/continue_popup.html). How many
 #   last-read stories get pinned at the top, and how many recommendation
@@ -719,10 +719,10 @@ def _partnership_email():
 
 
 def _teaser_items():
-    """Data for the hero's side picture carousel (HOME/home.html). Each item is
+    """Data for the hero's side advert rail (HOME/home.html). Each item is
     {heading, body, image, url}. Real data is the live Partner.AdvertImage rows
     the admin manages in PANEL (active + not expired, newest first). Until at
-    least one exists the old placeholder slides are shown so the carousel is
+    least one exists the old placeholder slides are shown so the rail is
     never empty. The template and hero-teaser.js only read those four keys.
 
     `url` is the advert's landing page when one is published and its writer is
@@ -771,12 +771,11 @@ def _teaser_items():
         static('partner/ad_demo_2.jpg'),
         static('partner/ad_demo_3.jpg'),
     ]
-    len_current_dummy = len(curent_dummy_image) -1  if bool(curent_dummy_image) else 0
     return [
         {
             "heading": "Have something to promote? Let’s help you get the word out! Whether it’s your business, product, service, or event, we’d love to help you reach more people.",
             "body": "Tap the image above to reach us and let’s work together!",
-            "image": curent_dummy_image[random.randint(0, len_current_dummy - 1)],
+            "image": random.choice(curent_dummy_image),
             "url": placeholder_url
         }
         for _ in range(TEASER_PLACEHOLDER_COUNT)
@@ -1688,10 +1687,55 @@ class PrivacyPolicyView(View):
         return render(request, "HOME/privacy_policy.html")
 
 
+PROMOTE_PLANS = (
+    {
+        "slug": "regular",
+        "name": "Regular",
+        "price": "255",
+        "summary": "A straightforward image advert in our news rotation.",
+        "features": (
+            "One image advert in our news rotation",
+            "Runs for 7 days",
+            "We set it up for you",
+        ),
+    },
+    {
+        "slug": "pro",
+        "name": "Pro",
+        "price": "500",
+        "summary": "A dedicated page and clear numbers on how your advert performs.",
+        "features": (
+            "Everything in Regular",
+            "Dedicated single-page website",
+            "Analytics dashboard for views, clicks and traffic",
+            f"See {About.project_name} traffic separately from outside traffic",
+        ),
+    },
+    {
+        "slug": "advance",
+        "name": "Advance",
+        "price": "500",
+        "original_price": "1,000",
+        "saving": "500",
+        "badge": "Launch offer",
+        "ribbon": "Most complete",
+        "featured": True,
+        "summary": "A multipage business site with a premium finish.",
+        "features": (
+            "Everything in Pro",
+            "Premium multipage website with custom design",
+            "Personalised domain setup",
+            "SEO setup included",
+        ),
+    },
+)
+PROMOTE_PLAN_BY_SLUG = {plan["slug"]: plan for plan in PROMOTE_PLANS}
+
+
 def _promote_contact_email():
-    """The address the promote page's call to action mails. It reads the
+    """The address the promote page's email fallback mails. It reads the
     partnership mailbox from SiteSettings directly (not the cached context
-    processor value) and falls back to the support address so the button is
+    processor value) and falls back to the support address so the link is
     never a dead `mailto:`."""
     from ADMIN.models import SiteSettings
 
@@ -1699,14 +1743,210 @@ def _promote_contact_email():
     return (row.promotion_email or "").strip() or (row.support_email or "").strip()
 
 
+def _ads_whatsapp_digits(value):
+    """Turn a panel-entered phone number or WhatsApp URL into bare digits."""
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if value.lower().startswith(("http://", "https://")):
+        value = urlsplit(value).path.rstrip("/").rsplit("/", 1)[-1]
+    digits = re.sub(r"\D", "", value)
+    if digits.startswith("00"):
+        digits = digits[2:]
+    if digits.startswith("0") and len(digits) == 11:
+        digits = "234" + digits[1:]
+    elif len(digits) == 10:
+        digits = "234" + digits
+    return digits
+
+
+def _ads_whatsapp_url():
+    """The ads WhatsApp link, using the panel field and falling back to the
+    project number when the field is blank or malformed."""
+    from ADMIN.models import SiteSettings
+
+    row = SiteSettings.get_solo()
+    configured = (row.ads_whatsapp_support or "").strip()
+    digits = _ads_whatsapp_digits(configured or About.whatsapp_dm)
+    if not digits and configured:
+        digits = _ads_whatsapp_digits(About.whatsapp_dm)
+    return f"https://wa.me/{digits}" if digits else ""
+
+
+def _promote_form_data(request, plan=None):
+    user = getattr(request, "user", None)
+    plan = (plan or "").strip()
+    if plan not in PROMOTE_PLAN_BY_SLUG:
+        plan = "regular"
+    return {
+        "plan": plan,
+        "business_name": "",
+        "contact_email": user.email if user and user.is_authenticated else "",
+        "whatsapp_number": "",
+        "business_details": "",
+    }
+
+
+def _promote_context(request, form_data=None, form_error="", form_success=""):
+    if form_data is None:
+        form_data = _promote_form_data(request, request.GET.get("plan"))
+    else:
+        form_data = {**_promote_form_data(request), **form_data}
+        if form_data.get("plan") not in PROMOTE_PLAN_BY_SLUG:
+            form_data["plan"] = "regular"
+
+    #   Error responses are rendered from /enquiry/, so never build links from
+    #   request.get_full_path(): plan links and post-login redirects must always
+    #   point back at the public page, not the POST-only endpoint.
+    page_url = f"{reverse('home:promote')}?{urlencode({'plan': form_data['plan']})}"
+    return {
+        "advert_email": _promote_contact_email(),
+        "ads_whatsapp_url": _ads_whatsapp_url(),
+        "plans": PROMOTE_PLANS,
+        "advance_plan": PROMOTE_PLAN_BY_SLUG["advance"],
+        "form_data": form_data,
+        "form_error": form_error,
+        "form_success": form_success,
+        "account_signed_in": bool(request.user.is_authenticated),
+        "account_email": request.user.email if request.user.is_authenticated else "",
+        "account_login_url": f"{reverse('auth:login')}?{urlencode({'to': page_url})}",
+        "account_register_url": f"{reverse('auth:register')}?{urlencode({'to': page_url})}",
+    }
+
+
 class PromoteView(View):
-    """Public landing page for the footer's "promote your business" banner.
-    The self-serve advert dashboard is not built yet, so the page says so, takes
-    interest by email (free for the first two weeks while the service is new)
-    and shows the adverts running on the site right now."""
+    """Public partner page for the footer's "promote your business" banner.
+
+    It explains the weekly plans, collects a business enquiry, and hands the
+    visitor to the ads WhatsApp line. The reference/dashboard flow is a later
+    pass; this page only captures the lead and links to the normal account
+    login so the future advertiser area has an account to attach to.
+    """
 
     def get(self, request):
-        return render(request, "HOME/promote.html", {"advert_email": _promote_contact_email()})
+        return render(request, "HOME/promote.html", _promote_context(request))
+
+
+class PromoteLeadView(View):
+    """Save a partner-page enquiry, then open WhatsApp with a prefilled brief.
+
+    The database row is written first so a visitor who never presses send in
+    WhatsApp still leaves the ads team something to follow up. The reference
+    number is deliberately not created here: ads staff issue it after payment.
+    """
+
+    def get(self, request):
+        plan = (request.GET.get("plan") or "").strip()
+        target = reverse("home:promote")
+        if plan in PROMOTE_PLAN_BY_SLUG:
+            target = f"{target}?{urlencode({'plan': plan})}"
+        return redirect(target)
+
+    def post(self, request):
+        remaining_seconds, limited = is_rate_limited(
+            request, 3600, 5, scope="promote_lead"
+        )
+        posted = {
+            "plan": (request.POST.get("plan") or "").strip(),
+            "business_name": (request.POST.get("business_name") or "").strip(),
+            "contact_email": (request.POST.get("contact_email") or "").strip(),
+            "whatsapp_number": (request.POST.get("whatsapp_number") or "").strip(),
+            "business_details": (request.POST.get("business_details") or "").strip(),
+        }
+
+        if limited:
+            return render(
+                request,
+                "HOME/promote.html",
+                _promote_context(
+                    request,
+                    form_data=posted,
+                    form_error=(
+                        "Too many enquiries from this connection. "
+                        f"Try again in {remaining_seconds} seconds."
+                    ),
+                ),
+                status=429,
+            )
+
+        errors = []
+        if posted["plan"] not in PROMOTE_PLAN_BY_SLUG:
+            errors.append("Choose a valid plan.")
+        if not posted["business_name"]:
+            errors.append("Enter your business name.")
+        elif len(posted["business_name"]) > 120:
+            errors.append("Business name must be 120 characters or fewer.")
+        if not posted["contact_email"]:
+            errors.append("Enter your email address.")
+        else:
+            try:
+                validate_email(posted["contact_email"])
+            except ValidationError:
+                errors.append("Enter a valid email address.")
+        if len(posted["whatsapp_number"]) > 32:
+            errors.append("WhatsApp number must be 32 characters or fewer.")
+        if not posted["business_details"]:
+            errors.append("Tell us what the advert should say.")
+        elif len(posted["business_details"]) > 2000:
+            errors.append("Business details must be 2,000 characters or fewer.")
+
+        if errors:
+            return render(
+                request,
+                "HOME/promote.html",
+                _promote_context(
+                    request,
+                    form_data=posted,
+                    form_error=" ".join(errors),
+                ),
+                status=400,
+            )
+
+        from Partner.models import AdvertLead
+
+        lead = AdvertLead.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            plan=posted["plan"],
+            business_name=posted["business_name"],
+            contact_email=posted["contact_email"],
+            whatsapp_number=posted["whatsapp_number"],
+            business_details=posted["business_details"],
+        )
+
+        plan = PROMOTE_PLAN_BY_SLUG[posted["plan"]]
+        details = posted["business_details"]
+        if len(details) > 1200:
+            details = details[:1197].rstrip() + "..."
+        message = (
+            f"Hi {About.project_name} Ads, I want the {plan['name']} plan "
+            f"(₦{plan['price']} per week).\n\n"
+            f"Enquiry: #{lead.pk}\n"
+            f"Business: {posted['business_name']}\n"
+            f"Account email: {posted['contact_email']}\n"
+            f"WhatsApp: {posted['whatsapp_number'] or 'use this chat'}\n\n"
+            f"{details}"
+        )
+
+        whatsapp_url = _ads_whatsapp_url()
+        if whatsapp_url:
+            response = HttpResponseRedirect(
+                f"{whatsapp_url}?{urlencode({'text': message})}"
+            )
+            response.status_code = 303
+            return response
+
+        return render(
+            request,
+            "HOME/promote.html",
+            _promote_context(
+                request,
+                form_data=_promote_form_data(request, posted["plan"]),
+                form_success=(
+                    "Your enquiry was saved. Please email us or message support "
+                    "so we can continue."
+                ),
+            ),
+        )
 
 
 class PromoteAdsView(View):

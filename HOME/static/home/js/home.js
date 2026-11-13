@@ -5,8 +5,8 @@
      2. progress timers shown on the mobile segments and the desktop rail
      3. "Load more stories" key
      4. broken image fallback
-   carousel.js and hero-teaser.js from base.html exit on their own here
-   because the markup they look for no longer exists. */
+   carousel.js from base.html exits on its own here because the old markup
+   no longer exists; hero-teaser.js still runs for the advert rail. */
 (function () {
   "use strict";
 

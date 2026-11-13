@@ -24,9 +24,11 @@ from ADMIN.analytics import (
     member_new_today,
     member_overview,
 )
+from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
+from Partner.models import AdvertLead
 from SERVICE_INTERNAL import email_single
 from SERVICE_INTERNAL.config import About
 from STAFF.models import AuthorFollow, StaffProfile
@@ -2950,3 +2952,67 @@ class AuthorLyticsInsightsTests(TestCase):
 
         self.assertIn("nothing to chart", body)
         self.assertNotIn("Publishing rhythm", body)
+
+
+@override_settings(CACHES=ISOLATED_CACHE)
+class PanelSiteSettingsUpdateTests(TestCase):
+    """The ads WhatsApp number is edited from PANEL, and saving it must clear
+    the cached settings row the context processor otherwise keeps forever."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+        patcher = mock.patch("ADMIN.views.is_rate_limited", return_value=(0, False))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.admin = Auth.objects.create_admin(email="settings-admin@example.com")
+
+    def test_ads_whatsapp_support_is_saved_and_settings_cache_is_cleared(self):
+        cache.set("site_settings_socials", {"twitter_handle": "old"}, None)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("control:panel_settings"),
+            {"ads_whatsapp_support": "+234 800 123 4567"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            SiteSettings.get_solo().ads_whatsapp_support,
+            "+234 800 123 4567",
+        )
+        self.assertIsNone(cache.get("site_settings_socials"))
+
+
+@override_settings(CACHES=ISOLATED_CACHE)
+class PanelAdvertLeadTests(TestCase):
+    """The public partner form saves an AdvertLead, and PANEL must show it to
+    the ads team instead of leaving it only in the Django admin."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+        patcher = mock.patch("AUTHENTICATION.signals._try_send_login_email")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.admin = Auth.objects.create_admin(email="leads-admin@example.com")
+
+    def test_panel_lists_the_latest_advert_enquiries(self):
+        AdvertLead.objects.create(
+            plan="pro",
+            business_name="Grace Stores",
+            contact_email="grace@example.com",
+            whatsapp_number="+2348011112222",
+            business_details="We sell fabrics in Kano.",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("control:panel"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Advert enquiries")
+        self.assertContains(response, "Grace Stores")
+        self.assertContains(response, "grace@example.com")
+        self.assertContains(response, "We sell fabrics in Kano.")

@@ -50,8 +50,12 @@ class SecurityHeadersMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
 
+        #   Advert landing pages are staff-authored and run off the normal
+        #   template, so their third-party assets would only create report
+        #   noise. Keep the policy itself, but do not attach the report
+        #   endpoint for /ads/ responses.
         report_url = ""
-        if getattr(settings, "CSP_REPORT_ENABLED", True):
+        if getattr(settings, "CSP_REPORT_ENABLED", True) and not request.path.startswith("/ads/"):
             try:
                 report_url = request.build_absolute_uri(reverse("csp_report"))
             except Exception:

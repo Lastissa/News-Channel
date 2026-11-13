@@ -19,6 +19,12 @@ class SiteSettings(models.Model):
     customer_support_mobile = models.CharField(
         max_length=32, blank=True, default="", help_text="Customer support phone / WhatsApp number shown to readers."
     )
+    ads_whatsapp_support = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="WhatsApp number for advertising and partnership enquiries.",
+    )
     #   ARCHIVE UPLOAD ALERTS: a superuser turns this on from their profile.
     #   While it is on, every new item added to the /archive/ gallery emails
     #   ARCHIVE_UPLOAD_ALERT_EMAIL with who uploaded it and what kind of file

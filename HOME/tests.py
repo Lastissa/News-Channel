@@ -20,7 +20,7 @@ from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, Category, get_category_choices, refresh_category_cache
 from HOME.models import ReadingHistory, CategorySubscription, CategorySubscription
-from Partner.models import AdvertImage, AdvertLandingPage
+from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.cache_keys import HOME_PAGE_HTML_CACHE_KEY
 from SERVICE_INTERNAL.config import About, custom_context_processors
@@ -801,9 +801,22 @@ class HomeAdvertTeaserTests(QuietTestCase):
 class AdSurfaceLabellingTests(QuietTestCase):
     """Segment 6 (ad & traffic policy hygiene): the paid/promotional surfaces on
     the home page must be labelled and must not point anywhere dead. The
-    hero-teaser advert carousel carries an "Adverts" label and every advert link
+    hero-teaser advert rail carries an "Adverts" label and every advert link
     carries rel="sponsored"; the top bar is now an announcement strip, so its
     house fallback must still land on the promote page rather than a broken URL."""
+
+    def test_advert_rail_is_reader_driven_and_scrollable(self):
+        """The rail must not auto-advance: readers get native scrolling plus
+        prev/next controls so they can choose the advert they want."""
+        response = self.client.get(reverse("home:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-teaser-track')
+        self.assertContains(response, 'data-teaser-prev')
+        self.assertContains(response, 'data-teaser-next')
+        self.assertContains(response, 'teaser-spacer')
+        self.assertNotContains(response, 'data-teaser-count')
+        self.assertNotContains(response, 'aria-label="Adverts" data-autoplay')
 
     def test_ad_surfaces_are_labelled_and_the_ticker_fallback_is_live(self):
         response = self.client.get(reverse("home:home"))
@@ -825,14 +838,14 @@ class AdSurfaceLabellingTests(QuietTestCase):
 
 
 class PromotePageViewTests(QuietTestCase):
-    """The footer's "promote your business" banner lands on PromoteView, a
-    "still in progress" offer page (HOME/promote.html): a working mailto, the
-    free-first-two-weeks note, and the async advert gallery fed by PromoteAdsView
-    (HOME/promote_ads.html) which starts on a skeleton and must never be blank."""
+    """The footer's "promote your business" banner lands on the partner page:
+    the weekly plans, the account links, the lead form that hands off to
+    WhatsApp, and the async advert gallery fed by PromoteAdsView."""
 
-    def test_promote_page_renders_the_offer_page(self):
+    def test_promote_page_renders_plans_and_gallery(self):
         row = SiteSettings.get_solo()
         row.promotion_email = "partners@example.com"
+        row.ads_whatsapp_support = "+234 800 123 4567"
         row.save()
 
         response = self.client.get(reverse("home:promote"))
@@ -840,25 +853,129 @@ class PromotePageViewTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         #   The old stub returned exactly this body; the real page must not.
         self.assertNotEqual(response.content, b"still in progress")
-        self.assertContains(response, "Promote your business")
-        self.assertContains(response, "free for the first 2 weeks")
-        #   The page's own call to action (not the footer's generic links).
+        self.assertContains(response, "Advertise on")
+        self.assertContains(response, "Regular")
+        self.assertContains(response, "Pro")
+        self.assertContains(response, "Advance")
+        self.assertContains(response, "Launch offer")
+        self.assertNotContains(response, "free for the first 2 weeks")
+        self.assertNotContains(response, "PROD")
+        #   The page's own email fallback (not the footer's generic links).
         self.assertContains(response, 'href="mailto:partners@example.com?subject=Advert%20enquiry"')
+        self.assertContains(response, "https://wa.me/2348001234567")
         self.assertContains(response, "data-promote-ads")
         self.assertContains(response, 'data-ads-url="' + reverse("home:promote_ads") + '"')
         self.assertContains(response, '<meta name="robots" content="index, follow">')
 
-    def test_promote_page_falls_back_to_interest_link_without_a_mailbox(self):
+    def test_promote_page_falls_back_to_default_whatsapp_without_a_mailbox(self):
         row = SiteSettings.get_solo()
         row.promotion_email = ""
         row.support_email = ""
+        row.ads_whatsapp_support = ""
         row.save()
 
         response = self.client.get(reverse("home:promote"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "promote-mail")
-        self.assertContains(response, reverse("home:advert_inquiry"))
+        self.assertNotContains(response, "mailto:partners@example.com")
+        self.assertContains(response, "https://wa.me/2349031394284")
+
+    def test_promote_page_links_to_account_login_and_register(self):
+        response = self.client.get(reverse("home:promote"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("auth:login"))
+        self.assertContains(response, reverse("auth:register"))
+        self.assertContains(response, "create a free account")
+
+    def test_signed_in_user_email_is_prefilled(self):
+        advertiser = Auth.objects.create_user(email="advertiser@example.com")
+        self.client.force_login(advertiser)
+
+        response = self.client.get(reverse("home:promote"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="ADVERTISER@EXAMPLE.COM"')
+        self.assertContains(response, "Signed in as ADVERTISER@EXAMPLE.COM")
+
+    def test_enquiry_is_saved_and_redirects_to_whatsapp(self):
+        row = SiteSettings.get_solo()
+        row.ads_whatsapp_support = "+2348001234567"
+        row.save()
+
+        response = self.client.post(
+            reverse("home:promote_lead"),
+            {
+                "plan": "pro",
+                "business_name": "Grace Stores",
+                "contact_email": "grace@example.com",
+                "whatsapp_number": "+2348011112222",
+                "business_details": "We sell fabrics in Kano.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 303)
+        lead = AdvertLead.objects.get()
+        self.assertEqual(lead.plan, "pro")
+        self.assertEqual(lead.business_name, "Grace Stores")
+        self.assertEqual(lead.contact_email, "grace@example.com")
+        self.assertIsNone(lead.user_id)
+        self.assertTrue(response.url.startswith("https://wa.me/2348001234567?"))
+        message = parse_qs(urlsplit(response.url).query)["text"][0]
+        self.assertIn("Pro plan", message)
+        self.assertIn("Grace Stores", message)
+        self.assertIn(f"#{lead.pk}", message)
+
+    def test_signed_in_enquiry_attaches_the_account(self):
+        advertiser = Auth.objects.create_user(email="advertiser@example.com")
+        self.client.force_login(advertiser)
+
+        response = self.client.post(
+            reverse("home:promote_lead"),
+            {
+                "plan": "regular",
+                "business_name": "Advertiser Shop",
+                "contact_email": "advertiser@example.com",
+                "business_details": "A small shop near the campus.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(AdvertLead.objects.get().user_id, advertiser.pk)
+
+    def test_enquiry_rejects_an_unknown_plan(self):
+        response = self.client.post(
+            reverse("home:promote_lead"),
+            {
+                "plan": "gold",
+                "business_name": "Grace Stores",
+                "contact_email": "grace@example.com",
+                "business_details": "We sell fabrics in Kano.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Choose a valid plan.", status_code=400)
+        self.assertEqual(AdvertLead.objects.count(), 0)
+        #   Error pages render from /enquiry/; plan links and the post-login
+        #   redirect must still point at the public page, not the POST endpoint.
+        self.assertContains(
+            response,
+            f'href="{reverse("home:promote")}?plan=pro#advertise"',
+            status_code=400,
+        )
+
+    def test_enquiry_endpoint_redirects_get_to_the_public_page(self):
+        response = self.client.get(
+            reverse("home:promote_lead"),
+            {"plan": "advance"},
+        )
+
+        self.assertRedirects(
+            response,
+            f'{reverse("home:promote")}?plan=advance',
+            fetch_redirect_response=False,
+        )
 
     def test_footer_links_to_the_promote_page(self):
         response = self.client.get(reverse("home:home"))

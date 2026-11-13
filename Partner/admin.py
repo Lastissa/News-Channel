@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from Partner.models import AdvertImage, AdvertLandingPage, Announcement
+from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead, Announcement
 from SERVICE_INTERNAL.images import destroy_archive_asset
 
 
@@ -36,6 +36,17 @@ class AdvertLandingPageAdmin(admin.ModelAdmin):
     readonly_fields = ("html_public_id", "html_bytes", "date_created", "date_updated")
 
 
+class AdvertLeadAdmin(admin.ModelAdmin):
+    """Inspection for superusers. The normal ads team view lives in PANEL,
+    where the enquiry details are shown in one list."""
+
+    list_display = ("business_name", "plan", "contact_email", "created_at", "user")
+    list_filter = ("plan",)
+    search_fields = ("business_name", "contact_email", "business_details", "user__email")
+    readonly_fields = ("created_at",)
+
+
 admin.site.register([Announcement])
 admin.site.register(AdvertImage, AdvertImageAdmin)
 admin.site.register(AdvertLandingPage, AdvertLandingPageAdmin)
+admin.site.register(AdvertLead, AdvertLeadAdmin)

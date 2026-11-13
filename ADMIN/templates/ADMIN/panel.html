@@ -51,6 +51,7 @@
       <a class="panel-nav-link" href="#panel-staff-gallery" aria-label="Staff" title="Staff"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="panel-nav-text">Staff</span></a>
       <a class="panel-nav-link" href="#panel-announcements" aria-label="Announcements" title="Announcements"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg><span class="panel-nav-text">Announcements</span></a>
       <a class="panel-nav-link" href="#panel-image-adverts" aria-label="Image adverts" title="Image adverts"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg><span class="panel-nav-text">Image adverts</span></a>
+      <a class="panel-nav-link" href="#panel-advert-leads" aria-label="Advert enquiries" title="Advert enquiries"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span class="panel-nav-text">Advert enquiries</span></a>
       <a class="panel-nav-link" href="#panel-mass-email" aria-label="Mass email" title="Mass email"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span class="panel-nav-text">Mass email</span></a>
       <a class="panel-nav-link" href="#panel-sessions" aria-label="Active sessions" title="Active sessions"><svg class="ic" aria-hidden="true"><use href="#i-monitor"/></svg><span class="panel-nav-text">Active sessions</span></a>
       <a class="panel-nav-link" href="#panel-socials" aria-label="Site socials" title="Site socials"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg><span class="panel-nav-text">Site socials</span></a>
@@ -219,6 +220,33 @@
           </div>
         </div>
         {{ image_advert_items|json_script:"ad-initial" }}
+      </div></div>
+    </section>
+
+    <section class="panel-card panel-card-wide is-collapsed" id="panel-advert-leads" aria-label="Advert enquiries">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg></span>
+        <h2>Advert enquiries</h2>
+        <span class="panel-eyebrow">{{ advert_lead_total }}</span>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Advert enquiries" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+        </div>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <div class="panel-row-list">
+          {% for lead in advert_leads %}
+          <div class="panel-row">
+            <span class="panel-row-main">
+              <span class="panel-row-name">{{ lead.business_name }}</span>
+              <span class="panel-row-sub">{{ lead.get_plan_display }} · {{ lead.contact_email }}{% if lead.whatsapp_number %} · {{ lead.whatsapp_number }}{% endif %} · {{ lead.created_at|date:"d M Y, H:i" }}</span>
+              {% if lead.user %}<span class="panel-row-sub">Account: {{ lead.user.email }}</span>{% endif %}
+              <span class="panel-row-sub">{{ lead.business_details|truncatechars:220 }}</span>
+            </span>
+          </div>
+          {% empty %}
+          <p class="panel-empty">No advert enquiries yet.</p>
+          {% endfor %}
+        </div>
       </div></div>
     </section>
 
@@ -431,6 +459,10 @@
             <div class="panel-field">
               <label for="settings-support-mobile">Support mobile</label>
               <input id="settings-support-mobile" type="tel" name="customer_support_mobile" value="{{ site_settings.customer_support_mobile }}" placeholder="+234xxxxxxxxxx">
+            </div>
+            <div class="panel-field">
+              <label for="settings-ads-whatsapp">Ads WhatsApp support <small>(advertising)</small></label>
+              <input id="settings-ads-whatsapp" type="tel" name="ads_whatsapp_support" maxlength="32" value="{{ site_settings.ads_whatsapp_support }}" placeholder="+234xxxxxxxxxx">
             </div>
             <div class="panel-field">
               <label for="settings-promotion">Promotion email <small>(partnership)</small></label>
