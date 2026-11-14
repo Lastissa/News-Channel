@@ -18,6 +18,9 @@ urlpatterns = [
     path('login/undefined', _auth_root_null),
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('register/', views.RegisterView.as_view(), name='register'),
+    #   Advertising sign-up: same account system, but the new account is
+    #   tagged is_advertiser so its profile opens the advertiser dashboard.
+    path('advertise/signup/', views.AdvertiserRegisterView.as_view(), name='advertiser_register'),
     path('register/null', _auth_root_null),
     path('register/undefined', _auth_root_null),
     path('gate/', views.GateView.as_view(), name='gate'),

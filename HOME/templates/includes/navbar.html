@@ -1,6 +1,7 @@
 {% load static %}
 {% url 'home:home' as home_url %}
 {% url 'archive:gallery' as archive_url %}
+{% url 'auth:register' as default_signup_path %}
 <header class="site-header" id="site-header">
   <div class="header-bar">
     <a href="{% url 'home:home' %}" class="brand">
@@ -37,11 +38,16 @@
             <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <ul class="dropdown-menu">
+            {% if request.user.is_advertiser %}
+            <li><a href="{% url 'home:advertise_dashboard' %}">Advertiser dashboard</a></li>
+            <li><a href="{% url 'home:profile' %}?view=profile">Reader profile</a></li>
+            {% else %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
-            {% if request.user.is_staff %}<li><a href="{% url 'home:profile' %}#publish-stories">Published stories</a></li>{% endif %}
-            <li><a href="{% url 'home:profile' %}#recent-bookmarks">Bookmarks</a></li>
-            <li><a href="{% url 'home:profile' %}#reading-history">Stories history</a></li>
-            <li><a href="{% url 'home:profile' %}#recent-comments">Comment history</a></li>
+            {% endif %}
+            {% if request.user.is_staff %}<li><a href="{% url 'home:profile' %}?view=profile#publish-stories">Published stories</a></li>{% endif %}
+            <li><a href="{% url 'home:profile' %}?view=profile#recent-bookmarks">Bookmarks</a></li>
+            <li><a href="{% url 'home:profile' %}?view=profile#reading-history">Stories history</a></li>
+            <li><a href="{% url 'home:profile' %}?view=profile#recent-comments">Comment history</a></li>
           </ul>
         </li>
         {% comment %}
@@ -59,7 +65,7 @@
         </li>
         {% else %}
         <li class="nav-auth">
-          <a href="{% url 'auth:register' %}?to={{ request.get_full_path|urlencode }}" class="nav-auth-signup" rel="nofollow">Sign up</a>
+          <a href="{{ auth_signup_path|default:default_signup_path }}?to={{ request.get_full_path|urlencode }}" class="nav-auth-signup" rel="nofollow">Sign up</a>
           <a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}" class="nav-auth-login" rel="nofollow">Log in</a>
         </li>
         {% endif %}

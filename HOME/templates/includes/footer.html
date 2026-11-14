@@ -1,4 +1,5 @@
 {% load static %}
+{% url 'auth:register' as default_signup_path %}
 <footer class="site-footer">
   <div class="footer-newsletter">
     <div class="footer-newsletter-inner">
@@ -30,7 +31,7 @@
         </div>
         <div class="footer-auth-actions">
           <a href="{% url 'auth:login' %}?to={{ request.get_full_path|urlencode }}" class="footer-auth-link primary">Sign in</a>
-          <a href="{% url 'auth:register' %}?to={{ request.get_full_path|urlencode }}" class="footer-auth-link secondary">Create account</a>
+          <a href="{{ auth_signup_path|default:default_signup_path }}?to={{ request.get_full_path|urlencode }}" class="footer-auth-link secondary">Create account</a>
         </div>
       </div>
     </div>

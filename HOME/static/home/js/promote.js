@@ -162,131 +162,200 @@
     updateActiveSection();
   }
 
-  /* ---------- weekly plan rail: pinned horizontal scroll ---------- */
-  //   On small screens the plan cards become a horizontal rail. Rather than
-  //   hiding the rest of the plans off the right edge, the rail sticks in the
-  //   viewport while the page scrolls vertically, translating the cards
-  //   horizontally. A visible progress line tells readers the rail exists and
-  //   how much is left. Short viewports, reduced motion, and desktop keep the
-  //   native swipe rail, so the effect is an enhancement, not a scroll trap.
-  var planSection = page.querySelector(".promote-plans");
-  var planPin = page.querySelector("[data-plan-pin]");
-  var planStick = planPin ? planPin.querySelector(".promote-plans-stick") : null;
-  var planRail = page.querySelector("[data-plan-rail]");
-  var planProgress = page.querySelector("[data-plan-progress]");
-  var planNav = page.querySelector("[data-promote-nav]");
-  var adRail = page.querySelector("[data-promote-ads]");
-  var planPinned = false;
-  var planDistance = 0;
-  var planTopOffset = 0;
-  var railTicking = false;
+  /* ---------- pinned horizontal rails: plans and the path ---------- */
+  //   On small screens the plan cards and the path steps become horizontal
+  //   rails. Rather than hiding the rest off the right edge, each rail sticks
+  //   in the viewport while the page scrolls vertically, translating the
+  //   cards horizontally. A visible progress line tells readers the rail
+  //   exists and how much is left. Short viewports, reduced motion, and
+  //   desktop keep the native swipe rail, so the effect is an enhancement,
+  //   not a scroll trap.
+  function createPinnedRail(config) {
+    var section = config.section;
+    var pin = config.pin;
+    var stick = config.stick;
+    var rail = config.rail;
+    var progress = config.progress;
+    var progressBox = config.progressBox;
+    var nav = config.nav;
+    var itemSelector = config.itemSelector;
+    var pinnedClass = config.pinnedClass;
+    var maxWidth = config.maxWidth || 980;
+    var bottomGap = config.bottomGap == null ? 14 : config.bottomGap;
+    var pinned = false;
+    var distance = 0;
+    var topOffset = 0;
 
-  function setPlanProgress(value) {
-    if (!planProgress) return;
-    value = Math.max(0, Math.min(1, value));
-    planProgress.style.width = (value * 100).toFixed(2) + "%";
-  }
+    if (!section || !pin || !stick || !rail || !progress) return null;
 
-  function updatePlanProgressFromRail() {
-    if (!planRail || planPinned) return;
-    var max = planRail.scrollWidth - planRail.clientWidth;
-    setPlanProgress(max > 2 ? planRail.scrollLeft / max : 0);
-  }
-
-  function updatePlanRail() {
-    if (!planRail) return;
-
-    if (!planPinned) {
-      updatePlanProgressFromRail();
-      return;
+    function setProgress(value) {
+      value = Math.max(0, Math.min(1, value));
+      progress.style.width = (value * 100).toFixed(2) + "%";
     }
 
-    if (!planPin || !planStick) return;
-
-    var rect = planPin.getBoundingClientRect();
-    var total = planPin.offsetHeight - planStick.offsetHeight;
-
-    if (total <= 0) {
-      setPlanProgress(0);
-      return;
+    function updateProgressFromRail() {
+      if (pinned) return;
+      var max = rail.scrollWidth - rail.clientWidth;
+      setProgress(max > 2 ? rail.scrollLeft / max : 0);
     }
 
-    var elapsed = planTopOffset - rect.top;
-    var progress = Math.max(0, Math.min(1, elapsed / total));
-
-    planRail.style.transform =
-      "translate3d(" + (-progress * planDistance).toFixed(2) + "px, 0, 0)";
-    setPlanProgress(progress);
-  }
-
-  function measurePlanRail() {
-    if (
-      !planSection ||
-      !planPin ||
-      !planStick ||
-      !planRail ||
-      !planProgress
-    ) {
-      return;
-    }
-
-    var rootStyles = getComputedStyle(document.documentElement);
-    var headerHeight = parseFloat(rootStyles.getPropertyValue("--header-h"));
-    if (isNaN(headerHeight) || headerHeight <= 0) headerHeight = 64;
-
-    var canPin = false;
-    var available = 0;
-
-    if (
-      !reduceMotion &&
-      window.matchMedia &&
-      window.matchMedia("(max-width: 980px)").matches
-    ) {
-      var jumpHeight = planNav ? planNav.offsetHeight : 0;
-      planTopOffset = headerHeight + 12 + jumpHeight + 8;
-      available = window.innerHeight - planTopOffset;
-      planDistance = Math.max(0, planRail.scrollWidth - planStick.clientWidth);
-
-      canPin =
-        planDistance > 2 &&
-        available > 0 &&
-        planRail.offsetHeight + planProgress.offsetHeight + 14 <= available;
-    }
-
-    if (canPin) {
-      if (!planPinned) planRail.scrollLeft = 0;
-
-      planSection.classList.add("is-plan-pinned");
-      planSection.style.setProperty("--promote-pin-top", planTopOffset + "px");
-      planSection.style.setProperty("--promote-pin-height", available + "px");
-      planPin.style.height = planDistance + available + "px";
-      planPinned = true;
-    } else {
-      var lastProgress = planProgress.style.width
-        ? parseFloat(planProgress.style.width) / 100
-        : 0;
-
-      planSection.classList.remove("is-plan-pinned");
-      planSection.style.removeProperty("--promote-pin-top");
-      planSection.style.removeProperty("--promote-pin-height");
-      planPin.style.height = "";
-      planRail.style.removeProperty("transform");
-      planPinned = false;
-      planDistance = 0;
-
-      //   Keep the native rail at the same card when a resize turns the
-      //   pinned effect off.
-      if (lastProgress > 0) {
-        var restore = lastProgress;
-        window.requestAnimationFrame(function () {
-          var max = planRail.scrollWidth - planRail.clientWidth;
-          if (max > 2) planRail.scrollLeft = restore * max;
-        });
+    function update() {
+      if (!pinned) {
+        updateProgressFromRail();
+        return;
       }
 
-      updatePlanProgressFromRail();
+      var rect = pin.getBoundingClientRect();
+      var total = pin.offsetHeight - stick.offsetHeight;
+
+      if (total <= 0) {
+        setProgress(0);
+        return;
+      }
+
+      var elapsed = topOffset - rect.top;
+      var value = Math.max(0, Math.min(1, elapsed / total));
+
+      rail.style.transform =
+        "translate3d(" + (-value * distance).toFixed(2) + "px, 0, 0)";
+      setProgress(value);
     }
+
+    function measure() {
+      var rootStyles = getComputedStyle(document.documentElement);
+      var headerHeight = parseFloat(rootStyles.getPropertyValue("--header-h"));
+      if (isNaN(headerHeight) || headerHeight <= 0) headerHeight = 64;
+
+      var canPin = false;
+      var available = 0;
+
+      if (
+        !reduceMotion &&
+        window.matchMedia &&
+        window.matchMedia("(max-width: " + maxWidth + "px)").matches
+      ) {
+        var jumpHeight = nav ? nav.offsetHeight : 0;
+        topOffset = headerHeight + 12 + jumpHeight + 8;
+        available = window.innerHeight - topOffset;
+        distance = Math.max(0, rail.scrollWidth - stick.clientWidth);
+
+        canPin =
+          distance > 2 &&
+          available > 0 &&
+          rail.offsetHeight +
+            (progressBox ? progressBox.offsetHeight : 0) +
+            bottomGap <=
+            available;
+      }
+
+      if (canPin) {
+        if (!pinned) rail.scrollLeft = 0;
+
+        section.classList.add(pinnedClass);
+        section.style.setProperty("--promote-pin-top", topOffset + "px");
+        section.style.setProperty("--promote-pin-height", available + "px");
+        pin.style.height = distance + available + "px";
+        pinned = true;
+      } else {
+        var lastProgress = progress.style.width
+          ? parseFloat(progress.style.width) / 100
+          : 0;
+
+        section.classList.remove(pinnedClass);
+        section.style.removeProperty("--promote-pin-top");
+        section.style.removeProperty("--promote-pin-height");
+        pin.style.height = "";
+        rail.style.removeProperty("transform");
+        pinned = false;
+        distance = 0;
+
+        //   Keep the native rail at the same card when a resize turns the
+        //   pinned effect off.
+        if (lastProgress > 0) {
+          var restore = lastProgress;
+          window.requestAnimationFrame(function () {
+            var max = rail.scrollWidth - rail.clientWidth;
+            if (max > 2) rail.scrollLeft = restore * max;
+          });
+        }
+
+        updateProgressFromRail();
+      }
+    }
+
+    function focusItem(event) {
+      if (!pinned) return;
+
+      var item =
+        event.target && event.target.closest
+          ? event.target.closest(itemSelector)
+          : null;
+      if (!item) return;
+
+      var max = rail.scrollWidth - stick.clientWidth;
+      if (max <= 2) return;
+
+      //   The rail is translated rather than scrolled while pinned, so bring
+      //   the page to the focused card. This keeps keyboard focus visible
+      //   instead of letting it disappear off the side of the translated rail.
+      var target = (item.offsetLeft - rail.offsetLeft) / max;
+      target = Math.max(0, Math.min(1, target));
+
+      var pinRect = pin.getBoundingClientRect();
+      var total = pin.offsetHeight - stick.offsetHeight;
+      if (total <= 0) return;
+
+      var current = Math.max(
+        0,
+        Math.min(1, (topOffset - pinRect.top) / total)
+      );
+      if (Math.abs(target - current) < 0.01) return;
+
+      window.scrollTo({
+        top:
+          pin.getBoundingClientRect().top +
+          window.scrollY -
+          topOffset +
+          target * total,
+        behavior: reduceMotion ? "auto" : "smooth"
+      });
+    }
+
+    rail.addEventListener("scroll", updateProgressFromRail, {
+      passive: true
+    });
+    rail.addEventListener("focusin", focusItem);
+
+    return { measure: measure, update: update };
   }
+
+  var planRailController = createPinnedRail({
+    section: page.querySelector(".promote-plans"),
+    pin: page.querySelector("[data-plan-pin]"),
+    stick: page.querySelector(".promote-plans-stick"),
+    rail: page.querySelector("[data-plan-rail]"),
+    progress: page.querySelector("[data-plan-progress]"),
+    progressBox: page.querySelector(".promote-plan-progress"),
+    nav: page.querySelector("[data-promote-nav]"),
+    itemSelector: ".promote-plan",
+    pinnedClass: "is-plan-pinned"
+  });
+
+  var stepsRailController = createPinnedRail({
+    section: page.querySelector(".promote-how"),
+    pin: page.querySelector("[data-steps-pin]"),
+    stick: page.querySelector(".promote-steps-stick"),
+    rail: page.querySelector("[data-steps-rail]"),
+    progress: page.querySelector("[data-steps-progress]"),
+    progressBox: page.querySelector(".promote-steps-progress"),
+    nav: page.querySelector("[data-promote-nav]"),
+    itemSelector: ".promote-steps li",
+    pinnedClass: "is-steps-pinned"
+  });
+
+  var pinnedRails = [planRailController, stepsRailController].filter(Boolean);
+  var adRail = page.querySelector("[data-promote-ads]");
+  var railTicking = false;
 
   /* ---------- advert rail scroll drift ---------- */
   function updateAdDrift() {
@@ -312,82 +381,58 @@
   }
 
   function updateRails() {
-    updatePlanRail();
+    pinnedRails.forEach(function (controller) {
+      controller.update();
+    });
     updateAdDrift();
   }
 
-  function focusPlanCard(event) {
-    if (!planPinned || !planPin || !planStick || !planRail) return;
-
-    var card =
-      event.target && event.target.closest
-        ? event.target.closest(".promote-plan")
-        : null;
-    if (!card) return;
-
-    var max = planRail.scrollWidth - planStick.clientWidth;
-    if (max <= 2) return;
-
-    //   The rail is translated rather than scrolled while pinned, so bring the
-    //   page to the focused card. This keeps keyboard focus visible instead of
-    //   letting it disappear off the side of the translated rail.
-    var target = (card.offsetLeft - planRail.offsetLeft) / max;
-    target = Math.max(0, Math.min(1, target));
-
-    var pinRect = planPin.getBoundingClientRect();
-    var total = planPin.offsetHeight - planStick.offsetHeight;
-    if (total <= 0) return;
-
-    var current = Math.max(
-      0,
-      Math.min(1, (planTopOffset - pinRect.top) / total)
-    );
-    if (Math.abs(target - current) < 0.01) return;
-
-    window.scrollTo({
-      top:
-        planPin.getBoundingClientRect().top +
-        window.scrollY -
-        planTopOffset +
-        target * total,
-      behavior: reduceMotion ? "auto" : "smooth"
+  function measureRails() {
+    pinnedRails.forEach(function (controller) {
+      controller.measure();
     });
   }
 
   function requestRailUpdate() {
     if (railTicking) return;
     railTicking = true;
-    window.requestAnimationFrame(function () {
+
+    var done = false;
+    var fallback = 0;
+
+    function run() {
+      if (done) return;
+      done = true;
+      if (fallback) window.clearTimeout(fallback);
       railTicking = false;
       updateRails();
-    });
+    }
+
+    window.requestAnimationFrame(run);
+    //   Hidden tabs can suspend animation frames indefinitely. The timeout
+    //   releases the latch and still paints the rail if the tab is visible
+    //   but rAF is delayed by the browser.
+    fallback = window.setTimeout(run, 120);
   }
 
-  if (planRail || adRail) {
+  if (pinnedRails.length || adRail) {
     window.addEventListener("scroll", requestRailUpdate, { passive: true });
     window.addEventListener(
       "resize",
       function () {
-        measurePlanRail();
+        measureRails();
         requestRailUpdate();
       },
       { passive: true }
     );
 
-    if (planRail) {
-      planRail.addEventListener("scroll", updatePlanProgressFromRail, {
-        passive: true
-      });
-      planRail.addEventListener("focusin", focusPlanCard);
-    }
-
-    measurePlanRail();
+    measureRails();
     updateRails();
 
     window.addEventListener(
       "load",
       function () {
-        measurePlanRail();
+        measureRails();
         requestRailUpdate();
       },
       { once: true }
@@ -395,7 +440,7 @@
 
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () {
-        measurePlanRail();
+        measureRails();
         requestRailUpdate();
       });
     }
@@ -499,11 +544,12 @@
 
     var name = radio.getAttribute("data-plan-name") || "";
     var price = radio.getAttribute("data-plan-price") || "";
+    var handoff = radio.getAttribute("data-plan-handoff-price") || price;
 
     if (selectedName) selectedName.textContent = name;
     if (selectedPrice) selectedPrice.textContent = price;
     if (handoffName) handoffName.textContent = name;
-    if (handoffPrice) handoffPrice.textContent = price;
+    if (handoffPrice) handoffPrice.textContent = handoff;
   }
 
   if (radios.length) {

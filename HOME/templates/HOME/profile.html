@@ -8,8 +8,11 @@
 
 {% block content %}
 <section class="profile-shell">
-  <div class="profile-quick-nav" style="margin-bottom: 16px;">
-    <a href="#profile-prefs" class="profile-add-news-link" style="display: inline-flex; align-items: center; gap: 6px;">Account Settings <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <div class="profile-quick-nav" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+    <a href="#profile-prefs" class="profile-add-news-link" style="margin-left: 0; display: inline-flex; align-items: center; gap: 6px;">Account Settings <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    {% if is_advertiser_user %}
+    <a href="{% url 'home:advertise_dashboard' %}" class="profile-add-news-link" style="margin-left: 0; display: inline-flex; align-items: center; gap: 6px;">Advertiser analytics <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    {% endif %}
   </div>
   {% comment %} {% if is_admin_user %}
     <div class="profile-header-bar">
@@ -31,7 +34,7 @@
         <div class="profile-identity-copy">
           <h2>{% if profile and profile.full_name %}{{ profile.full_name }}{% else %}{{ request.user.email | before_at }}{% endif %}</h2>
           <p class="profile-role">
-            {% if is_admin_user %}Admin{% elif is_staff_user %}Staff{% else %}Member account{% endif %}
+            {% if is_admin_user %}Admin{% elif is_staff_user %}Staff{% elif is_advertiser_user %}Advertiser{% else %}Member account{% endif %}
           </p>
         </div>
       </div>

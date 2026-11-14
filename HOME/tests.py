@@ -880,13 +880,22 @@ class PromotePageViewTests(QuietTestCase):
         self.assertNotContains(response, "mailto:partners@example.com")
         self.assertContains(response, "https://wa.me/2349031394284")
 
-    def test_promote_page_links_to_account_login_and_register(self):
+    def test_promote_page_links_to_account_login_and_advertiser_signup(self):
         response = self.client.get(reverse("home:promote"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("auth:login"))
-        self.assertContains(response, reverse("auth:register"))
-        self.assertContains(response, "create a free account")
+        self.assertContains(response, reverse("auth:advertiser_register"))
+        self.assertNotContains(response, reverse("auth:register"))
+        self.assertContains(response, "Create an advertiser account")
+
+    def test_promote_page_explains_that_the_weekly_figure_is_a_rate(self):
+        response = self.client.get(reverse("home:promote"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "weekly rates, not weekly charges")
+        self.assertContains(response, "calculated from the weekly rate")
+        self.assertContains(response, "not a requirement to pay every week")
 
     def test_signed_in_user_email_is_prefilled(self):
         advertiser = Auth.objects.create_user(email="advertiser@example.com")
@@ -897,6 +906,80 @@ class PromotePageViewTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="ADVERTISER@EXAMPLE.COM"')
         self.assertContains(response, "Signed in as ADVERTISER@EXAMPLE.COM")
+
+    def test_advertiser_profile_defaults_to_the_dashboard(self):
+        advertiser = Auth.objects.create_user(
+            email="advertiser@example.com", is_advertiser=True
+        )
+        self.client.force_login(advertiser)
+
+        response = self.client.get(reverse("home:profile"))
+
+        self.assertRedirects(
+            response,
+            reverse("home:advertise_dashboard"),
+            fetch_redirect_response=False,
+        )
+
+    def test_advertiser_can_still_open_the_regular_profile(self):
+        advertiser = Auth.objects.create_user(
+            email="advertiser@example.com", is_advertiser=True
+        )
+        self.client.force_login(advertiser)
+
+        response = self.client.get(reverse("home:profile"), {"view": "profile"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Advertiser analytics")
+        self.assertContains(response, "Advertiser")
+
+    def test_dashboard_shows_only_this_advertisers_enquiries(self):
+        advertiser = Auth.objects.create_user(
+            email="advertiser@example.com", is_advertiser=True
+        )
+        other = Auth.objects.create_user(email="other@example.com")
+        AdvertLead.objects.create(
+            user=advertiser,
+            plan="pro",
+            business_name="Advertiser Shop",
+            contact_email=advertiser.email,
+            business_details="One shop.",
+        )
+        AdvertLead.objects.create(
+            plan="regular",
+            business_name="Same Email Shop",
+            contact_email=advertiser.email,
+            business_details="A lead sent before signing up.",
+        )
+        AdvertLead.objects.create(
+            user=other,
+            plan="advance",
+            business_name="Other Shop",
+            contact_email=other.email,
+            business_details="Someone else.",
+        )
+        self.client.force_login(advertiser)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["lead_count"], 2)
+        self.assertContains(response, "Advertiser Shop")
+        self.assertContains(response, "Same Email Shop")
+        self.assertNotContains(response, "Other Shop")
+        self.assertContains(response, "Views, clicks and traffic")
+
+    def test_dashboard_redirects_accounts_without_the_advertiser_tag(self):
+        reader = Auth.objects.create_user(email="reader@example.com")
+        self.client.force_login(reader)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertRedirects(
+            response,
+            reverse("home:promote"),
+            fetch_redirect_response=False,
+        )
 
     def test_enquiry_is_saved_and_redirects_to_whatsapp(self):
         row = SiteSettings.get_solo()
@@ -923,6 +1006,7 @@ class PromotePageViewTests(QuietTestCase):
         self.assertTrue(response.url.startswith("https://wa.me/2348001234567?"))
         message = parse_qs(urlsplit(response.url).query)["text"][0]
         self.assertIn("Pro plan", message)
+        self.assertIn("per week as a rate", message)
         self.assertIn("Grace Stores", message)
         self.assertIn(f"#{lead.pk}", message)
 

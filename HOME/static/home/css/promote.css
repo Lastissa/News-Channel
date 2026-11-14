@@ -999,6 +999,17 @@
   white-space: nowrap;
 }
 
+.promote-plan-rate-note {
+  margin: 8px 0 0;
+  color: var(--slate);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.promote-plan.is-featured .promote-plan-rate-note {
+  color: var(--promote-muted);
+}
+
 .promote-plan-original {
   margin: 8px 0 0;
   color: var(--slate);
@@ -1122,11 +1133,13 @@
 }
 
 /* ---------- plan rail discoverability ---------- */
-.promote-plans-pin {
+.promote-plans-pin,
+.promote-steps-pin {
   position: relative;
 }
 
-.promote-plan-progress {
+.promote-plan-progress,
+.promote-steps-progress {
   display: none;
 }
 
@@ -2149,7 +2162,8 @@ a.promote-ad-link:focus-visible .promote-ad-heading {
     min-height: 0;
   }
 
-  .promote-plan-progress {
+  .promote-plan-progress,
+  .promote-steps-progress {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -2218,6 +2232,40 @@ a.promote-ad-link:focus-visible .promote-ad-heading {
     flex: 0 0 auto;
   }
 
+  .promote-how.is-steps-pinned .promote-steps-stick {
+    position: sticky;
+    top: var(--promote-pin-top, calc(var(--header-h) + 70px));
+    height: var(--promote-pin-height, calc(100vh - var(--header-h) - 70px));
+    height: var(--promote-pin-height, calc(100svh - var(--header-h) - 70px));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    overflow: hidden;
+    touch-action: pan-y;
+  }
+
+  .promote-how.is-steps-pinned .promote-steps {
+    width: max-content;
+    max-width: none;
+    overflow: visible;
+    margin-inline: 0;
+    padding: 4px 2px 10px;
+    scroll-padding-inline: 2px;
+    scroll-snap-type: none;
+    will-change: transform;
+  }
+
+  .promote-how.is-steps-pinned .promote-steps li {
+    opacity: 1;
+    translate: 0 0;
+    scroll-snap-align: none;
+  }
+
+  .promote-how.is-steps-pinned .promote-steps-progress {
+    flex: 0 0 auto;
+  }
+
   .promote-enquiry {
     grid-template-columns: 1fr;
   }
@@ -2227,7 +2275,22 @@ a.promote-ad-link:focus-visible .promote-ad-heading {
   }
 
   .promote-steps {
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 4px 2px 10px;
+    scroll-padding-inline: 2px;
+    scroll-snap-type: x mandatory;
+    scrollbar-color: color-mix(in srgb, var(--amber-alt-deep) 38%, transparent) transparent;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .promote-steps li {
+    flex: 0 0 clamp(240px, 76vw, 340px);
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .promote-steps::before {
@@ -2243,15 +2306,6 @@ a.promote-ad-link:focus-visible .promote-ad-heading {
   .promote-ads-sub {
     max-width: none;
     text-align: left;
-  }
-}
-
-/*   Short phones: the plan cards still keep their title, price, feature list
-     and CTA. Dropping the marketing paragraph lets the pinned rail fit inside
-     the viewport, so the effect is not limited to tall phones. */
-@media (max-width: 980px) and (max-height: 760px) {
-  .promote-plan-summary {
-    display: none;
   }
 }
 
@@ -2309,7 +2363,9 @@ a.promote-ad-link:focus-visible .promote-ad-heading {
   }
 
   .promote-steps {
-    grid-template-columns: 1fr;
+    margin-inline: -14px;
+    padding: 4px 14px 12px;
+    scroll-padding-inline: 14px;
   }
 
   .promote-field-row {
@@ -2477,6 +2533,50 @@ a.promote-ad-link:focus-visible .promote-ad-heading {
     flex-direction: row;
     align-items: baseline;
     justify-content: space-between;
+  }
+}
+
+/*   Short phones: the plan cards still keep their title, price, feature list
+     and CTA. Dropping the marketing paragraph and the per-card rate line helps
+     the pinned rail fit inside the viewport, so the effect is not limited to
+     tall phones. The section note below the rail still explains the weekly
+     rate, so the pricing message is never lost. These rules sit after the
+     width breakpoints so the tighter card padding wins on narrow screens. */
+@media (max-width: 980px) and (max-height: 760px) {
+  .promote-plan-summary,
+  .promote-plan-rate-note {
+    display: none;
+  }
+}
+
+/*   Very short phones: tighten the card internals and drop the featured-card
+     footnote. If a narrow screen still cannot fit the rail, the native swipe
+     rail remains available instead of forcing content into a clipped panel. */
+@media (max-width: 980px) and (max-height: 700px) {
+  .promote-plan {
+    padding: 20px 18px 18px;
+  }
+
+  .promote-plan-price-row {
+    margin-top: 14px;
+  }
+
+  .promote-plan-list {
+    gap: 6px;
+    margin: 14px 0 16px;
+  }
+
+  .promote-plan-list li {
+    font-size: 0.84rem;
+    line-height: 1.4;
+  }
+
+  .promote-plan-cta {
+    min-height: 44px;
+  }
+
+  .promote-plan-foot {
+    display: none;
   }
 }
 

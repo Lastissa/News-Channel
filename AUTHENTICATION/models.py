@@ -46,6 +46,10 @@ class Auth(AbstractBaseUser):
     is_staff = models.BooleanField(default = False)
     is_superuser = models.BooleanField(default = False)
     is_admin = models.BooleanField(default=False)
+    #   Set when the account is created from the advertising sign-up page.
+    #   Advertisers are still normal reader accounts; this flag only changes
+    #   the default profile destination and unlocks the advertiser dashboard.
+    is_advertiser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     receive_email_login_alert = models.BooleanField(default=True)#  login alert sent every time user login
     send_newsletter = models.BooleanField(default=False)    #   permission to send news alert

@@ -1,0 +1,27 @@
+{% extends "auth/register.html" %}
+{% load static %}
+
+{% block title %}Create an advertiser account | {{ project_name }}{% endblock %}
+{% block meta_description %}Create a {{ project_name }} advertiser account to manage advert enquiries and open your advertising dashboard.{% endblock %}
+
+{% block auth_heading %}Create your advertiser account{% endblock %}
+
+{% block auth_intro %}
+{% comment %} <p class="auth-note-copy">
+  One account for advertising and reading. You get an advertiser profile, a dashboard
+  for your advert enquiries, and a direct line to our ads team.
+</p> {% endcomment %}
+{% comment %} <div class="auth-support-note">
+  <p>Already have a reader account? <a href="{% url 'auth:login' %}?to={{ return_to|urlencode }}">Sign in</a> and send your brief from the partner page. Our ads team will attach the advert to that account.</p>
+</div> {% endcomment %}
+{% endblock %}
+
+{% block auth_switch %}
+<p class="auth-switch">
+  Already have an advertiser account?
+  <a href="{% url 'auth:login' %}?to={{ return_to|urlencode }}">Sign in</a>
+</p>
+<p class="auth-switch">
+  Still comparing plans? <a href="{% url 'home:promote' %}">See the weekly rates</a>.
+</p>
+{% endblock %}

@@ -50,6 +50,7 @@ urlpatterns = [
     path("promote-your-bussiness/", views.PromoteView.as_view(), name="promote"),
     path("promote-your-bussiness/enquiry/", views.PromoteLeadView.as_view(), name="promote_lead"),
     path("promote-ads/", views.PromoteAdsView.as_view(), name="promote_ads"),
+    path("advertise/dashboard/", views.AdvertiserDashboardView.as_view(), name="advertise_dashboard"),
     path("advertise/", views.AdvertInquiryView.as_view(), name="advert_inquiry"),
     path("most-viewed/", views.MostViewedView.as_view(), name="most_viewed"),
 ]

@@ -2,12 +2,12 @@
 {% load static seo_tags %}
 
 {% block adsense %}{% endblock %}
-{% block title %}Advertise on {{ project_name }} | Weekly plans from &#8358;255{% endblock %}
-{% block meta_description %}Advertise on {{ project_name }}. Weekly plans start at &#8358;255. Choose a plan, tell us about your business, and our ads team will set up your advert.{% endblock %}
-{% block og_title %}Advertise on {{ project_name }} | Weekly plans from &#8358;255{% endblock %}
-{% block og_description %}Reach {{ project_name }} readers with a clearly labelled advert. Weekly plans start at &#8358;255.{% endblock %}
-{% block twitter_title %}Advertise on {{ project_name }} | Weekly plans from &#8358;255{% endblock %}
-{% block twitter_description %}Reach {{ project_name }} readers with a clearly labelled advert. Weekly plans start at &#8358;255.{% endblock %}
+{% block title %}Advertise on {{ project_name }} | Weekly rates from &#8358;255{% endblock %}
+{% block meta_description %}Advertise on {{ project_name }}. Weekly rates start at &#8358;255; your total is calculated for the period you choose. Tell us about your business and our ads team will set up your advert.{% endblock %}
+{% block og_title %}Advertise on {{ project_name }} | Weekly rates from &#8358;255{% endblock %}
+{% block og_description %}Reach {{ project_name }} readers with a clearly labelled advert. Weekly rates start at &#8358;255, calculated for the period you choose.{% endblock %}
+{% block twitter_title %}Advertise on {{ project_name }} | Weekly rates from &#8358;255{% endblock %}
+{% block twitter_description %}Reach {{ project_name }} readers with a clearly labelled advert. Weekly rates start at &#8358;255, calculated for the period you choose.{% endblock %}
 
 {% block extra_head %}
   {{ block.super }}
@@ -15,7 +15,7 @@
   {% breadcrumb_schema "Home" breadcrumb_home_url "Advertise" %}
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&amp;display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&amp;display=swap"></noscript>
-  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}?v=20261113-6">
+  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}?v=20261113-10">
   <script>document.documentElement.classList.add('promote-motion');</script>
 {% endblock %}
 
@@ -41,7 +41,7 @@
         <span class="promote-dateline-mark" aria-hidden="true"></span>
         <span class="promote-dateline-copy">
           <strong>Now booking</strong>
-          <span>Weekly placements</span>
+          <span>Weekly rates</span>
         </span>
       </p>
 
@@ -51,8 +51,9 @@
 
       <p class="promote-lede" data-reveal style="--reveal-delay: 150ms">
         Put your brand inside the {{ project_name }} reading experience. Choose a
-        weekly plan, send your brief once, and our ads team builds the rest.
-        Plans start at <strong>&#8358;255 per week</strong>.
+        plan, tell us how long you want to run, and our ads team builds the rest.
+        Plans start at <strong>&#8358;255 per week</strong> &mdash; that weekly figure
+        is the rate we calculate from, not a requirement to pay every week.
       </p>
 
       <div class="promote-actions" data-reveal style="--reveal-delay: 210ms">
@@ -81,11 +82,11 @@
       <p class="promote-account" data-reveal style="--reveal-delay: 330ms">
         {% if account_signed_in %}
           Signed in as {{ account_email }}.
-          <a href="{% url 'home:profile' %}">Go to your profile</a>.
+          <a href="{{ account_profile_url }}">{{ account_profile_label }}</a>.
         {% else %}
-          Already advertising?
-          <a href="{{ account_login_url }}">Sign in</a>
-          or <a href="{{ account_register_url }}">create a free account</a>.
+          Ready to advertise?
+          <a href="{{ account_register_url }}">Create an advertiser account</a>
+          or <a href="{{ account_login_url }}">sign in</a>.
         {% endif %}
       </p>
     </div>
@@ -97,7 +98,7 @@
         <span class="promote-live-chip"><span class="promote-live-dot" aria-hidden="true"></span> Live placements</span>
         <div class="promote-hero-float" aria-hidden="true">
           <span class="promote-hero-float-label">Advance</span>
-          <strong>&#8358;{{ advance_plan.price }}<small>/week</small></strong>
+          <strong>&#8358;{{ advance_plan.price }}<small>/week rate</small></strong>
           <span class="promote-hero-float-note">Launch offer</span>
         </div>
         <figcaption class="promote-hero-caption">
@@ -131,13 +132,14 @@
   <section class="promote-plans" id="plans" aria-labelledby="promote-plans-title">
     <div class="promote-section-head promote-section-head--split">
       <div>
-        <p class="promote-kicker">Weekly plans</p>
-        <h2 id="promote-plans-title">Three Preferences.<br><em>Choose One That Fit Your Bussienss.</em></h2>
+        <p class="promote-kicker">Plans and weekly rates</p>
+        <h2 id="promote-plans-title">Three ways to stand out.<br><em>Choose what fits your business.</em></h2>
       </div>
-      {% comment %} <p class="promote-section-lede">
-        Every plan includes a clearly labelled advert, a real person on WhatsApp,
-        and no long contract. Pick the level of finish your business needs.
-      </p> {% endcomment %}
+      <p class="promote-section-lede">
+        Every plan is priced from a weekly rate. You choose how long to run,
+        and we calculate the total for that period &mdash; there is no automatic
+        weekly charge.
+      </p>
     </div>
 
     <div class="promote-plans-pin" data-plan-pin>
@@ -156,12 +158,13 @@
 
             <div class="promote-plan-price-row">
               <p class="promote-plan-price">
-                <span class="promote-plan-currency">&#8358;</span>{{ plan.price }}<span class="promote-plan-period">/week</span>
+                <span class="promote-plan-currency">&#8358;</span>{{ plan.price }}<span class="promote-plan-period">/week rate</span>
               </p>
               {% if plan.saving %}<span class="promote-plan-save">Save &#8358;{{ plan.saving }}</span>{% endif %}
             </div>
+            <p class="promote-plan-rate-note">Weekly rate, not a weekly charge.</p>
             {% if plan.original_price %}
-            <p class="promote-plan-original">Normally &#8358;{{ plan.original_price }}/week</p>
+            <p class="promote-plan-original">Standard weekly rate &#8358;{{ plan.original_price }}</p>
             {% endif %}
 
             <p class="promote-plan-summary">{{ plan.summary }}</p>
@@ -180,7 +183,7 @@
             </a>
 
             {% if plan.featured %}
-            <p class="promote-plan-foot">Premium build, priority setup, and the launch price while it lasts.</p>
+            <p class="promote-plan-foot">Premium build, priority setup, and the launch weekly rate while it lasts.</p>
             {% endif %}
           </article>
           {% endfor %}
@@ -194,8 +197,9 @@
     </div>
 
     <p class="promote-plan-note">
-      Prices are weekly. The Advance launch offer applies while the current promotion lasts.
-      We confirm the total on WhatsApp before you pay.
+      These are weekly rates, not weekly charges. Your total is calculated from the weekly rate
+      for the period you choose. The Advance launch offer applies while the current promotion
+      lasts, and we confirm the exact total on WhatsApp before you pay.
     </p>
   </section>
 
@@ -218,36 +222,45 @@
       </p>
     </div>
 
-    <ol class="promote-steps">
-      <li data-reveal>
-        <span aria-hidden="true">01</span>
-        <div>
-          <h3>Tell us about your business</h3>
-          <p>Use the form below. We save the enquiry and open WhatsApp with your brief ready to send.</p>
+    <div class="promote-steps-pin" data-steps-pin>
+      <div class="promote-steps-stick">
+        <ol class="promote-steps" data-steps-rail>
+          <li data-reveal>
+            <span aria-hidden="true">01</span>
+            <div>
+              <h3>Tell us about your business</h3>
+              <p>Use the form below. We save the enquiry and open WhatsApp with your brief ready to send.</p>
+            </div>
+          </li>
+          <li data-reveal>
+            <span aria-hidden="true">02</span>
+            <div>
+              <h3>Confirm your plan and period</h3>
+              <p>We calculate the total from the weekly rate and agree how long you want to run. No payment happens on this page.</p>
+            </div>
+          </li>
+          <li data-reveal>
+            <span aria-hidden="true">03</span>
+            <div>
+              <h3>Get your reference</h3>
+              <p>After payment, we issue your advert reference. Keep it: it is how we identify your advert.</p>
+            </div>
+          </li>
+          <li data-reveal>
+            <span aria-hidden="true">04</span>
+            <div>
+              <h3>We build and publish</h3>
+              <p>Send your picture and final copy. We set up the advert and, on Pro or Advance, the page.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="promote-steps-progress" aria-hidden="true">
+          <span class="promote-plan-progress-label">Scroll or swipe &middot; 4 steps &rarr;</span>
+          <span class="promote-plan-progress-bar"><i data-steps-progress></i></span>
         </div>
-      </li>
-      <li data-reveal>
-        <span aria-hidden="true">02</span>
-        <div>
-          <h3>Confirm your plan</h3>
-          <p>Our ads team confirms the amount and the next step on WhatsApp. No payment happens on this page.</p>
-        </div>
-      </li>
-      <li data-reveal>
-        <span aria-hidden="true">03</span>
-        <div>
-          <h3>Get your reference</h3>
-          <p>After payment, we issue your advert reference. Keep it: it is how we identify your advert.</p>
-        </div>
-      </li>
-      <li data-reveal>
-        <span aria-hidden="true">04</span>
-        <div>
-          <h3>We build and publish</h3>
-          <p>Send your picture and final copy. We set up the advert and, on Pro or Advance, the page.</p>
-        </div>
-      </li>
-    </ol>
+      </div>
+    </div>
   </section>
 
   <section class="promote-enquiry" id="advertise" aria-labelledby="promote-enquiry-title">
@@ -267,7 +280,7 @@
         <p class="promote-handoff-caption">Your message starts like this</p>
         <p class="promote-handoff-bubble">
           Hi {{ project_name }} Ads, I want the
-          {% for plan in plans %}{% if form_data.plan == plan.slug %}<strong data-handoff-plan>{{ plan.name }}</strong> plan (<span data-handoff-price>&#8358;{{ plan.price }}/week</span>){% endif %}{% endfor %}.
+          {% for plan in plans %}{% if form_data.plan == plan.slug %}<strong data-handoff-plan>{{ plan.name }}</strong> plan (<span data-handoff-price>&#8358;{{ plan.price }}/week, calculated for my period</span>){% endif %}{% endfor %}.
           My business is &hellip;
         </p>
         <div class="promote-handoff-foot">
@@ -289,8 +302,8 @@
           Your enquiry will be attached to <strong>{{ account_email }}</strong>.
         {% else %}
           Want your future reference attached to an account?
-          <a href="{{ account_login_url }}">Sign in</a> or
-          <a href="{{ account_register_url }}">create one free</a>.
+          <a href="{{ account_register_url }}">Create an advertiser account</a> or
+          <a href="{{ account_login_url }}">sign in</a>.
         {% endif %}
       </p>
     </div>
@@ -320,10 +333,11 @@
           <label class="promote-plan-option{% if plan.featured %} is-featured{% endif %}{% if form_data.plan == plan.slug %} is-selected{% endif %}">
             <input type="radio" name="plan" value="{{ plan.slug }}"
                    data-plan-radio data-plan-name="{{ plan.name }}"
-                   data-plan-price="&#8358;{{ plan.price }}/week"
+                   data-plan-price="&#8358;{{ plan.price }}/week rate"
+                   data-plan-handoff-price="&#8358;{{ plan.price }}/week, calculated for my period"
                    {% if form_data.plan == plan.slug %}checked{% endif %} required>
             <span class="promote-plan-option-name">{{ plan.name }}</span>
-            <span class="promote-plan-option-price">&#8358;{{ plan.price }}<small>/wk</small></span>
+            <span class="promote-plan-option-price">&#8358;{{ plan.price }}<small>/wk rate</small></span>
           </label>
           {% endfor %}
         </div>
@@ -333,7 +347,7 @@
         <span>Selected plan</span>
         {% for plan in plans %}{% if form_data.plan == plan.slug %}
         <strong data-selected-plan-name>{{ plan.name }}</strong>
-        <em data-selected-plan-price>&#8358;{{ plan.price }}/week</em>
+        <em data-selected-plan-price>&#8358;{{ plan.price }}/week rate</em>
         {% endif %}{% endfor %}
       </p>
 
@@ -414,5 +428,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{% static 'home/js/promote.js' %}?v=20261113-4" defer></script>
+<script src="{% static 'home/js/promote.js' %}?v=20261113-7" defer></script>
 {% endblock %}

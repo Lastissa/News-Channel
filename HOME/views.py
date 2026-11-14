@@ -28,7 +28,7 @@ from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark, CategorySubscription
-from Partner.models import AdvertImage
+from Partner.models import AdvertImage, AdvertLead
 from SERVICE_INTERNAL.abstract import (
     _response,
     cache_or_run,
@@ -1695,7 +1695,7 @@ PROMOTE_PLANS = (
         "summary": "A straightforward image advert in our news rotation.",
         "features": (
             "One image advert in our news rotation",
-            "Runs for 7 days",
+            "Priced in 7-day weeks",
             "We set it up for you",
         ),
     },
@@ -1799,6 +1799,8 @@ def _promote_context(request, form_data=None, form_error="", form_success=""):
     #   request.get_full_path(): plan links and post-login redirects must always
     #   point back at the public page, not the POST-only endpoint.
     page_url = f"{reverse('home:promote')}?{urlencode({'plan': form_data['plan']})}"
+    signed_in = bool(request.user.is_authenticated)
+    is_advertiser = bool(signed_in and getattr(request.user, "is_advertiser", False))
     return {
         "advert_email": _promote_contact_email(),
         "ads_whatsapp_url": _ads_whatsapp_url(),
@@ -1807,20 +1809,35 @@ def _promote_context(request, form_data=None, form_error="", form_success=""):
         "form_data": form_data,
         "form_error": form_error,
         "form_success": form_success,
-        "account_signed_in": bool(request.user.is_authenticated),
-        "account_email": request.user.email if request.user.is_authenticated else "",
+        "account_signed_in": signed_in,
+        "account_email": request.user.email if signed_in else "",
+        "account_is_advertiser": is_advertiser,
         "account_login_url": f"{reverse('auth:login')}?{urlencode({'to': page_url})}",
-        "account_register_url": f"{reverse('auth:register')}?{urlencode({'to': page_url})}",
+        #   Advertising sign-up is deliberately a different door from the
+        #   reader register page: it tags the new account as an advertiser.
+        "account_register_url": f"{reverse('auth:advertiser_register')}?{urlencode({'to': page_url})}",
+        #   The shared navbar and footer read this override so every guest
+        #   "Sign up" / "Create account" link on the partner page stays in the
+        #   advertising flow. Other pages fall back to the reader register.
+        "auth_signup_path": reverse("auth:advertiser_register"),
+        "account_profile_url": (
+            reverse("home:advertise_dashboard")
+            if is_advertiser
+            else reverse("home:profile")
+        ),
+        "account_profile_label": (
+            "Open your advertiser dashboard" if is_advertiser else "Go to your profile"
+        ),
     }
 
 
 class PromoteView(View):
     """Public partner page for the footer's "promote your business" banner.
 
-    It explains the weekly plans, collects a business enquiry, and hands the
-    visitor to the ads WhatsApp line. The reference/dashboard flow is a later
-    pass; this page only captures the lead and links to the normal account
-    login so the future advertiser area has an account to attach to.
+    It explains the weekly rates, collects a business enquiry, and hands the
+    visitor to the ads WhatsApp line. The sign-up link goes to the dedicated
+    advertiser page (not the reader register page) so the account is tagged
+    and its profile opens the advertiser dashboard.
     """
 
     def get(self, request):
@@ -1902,8 +1919,6 @@ class PromoteLeadView(View):
                 status=400,
             )
 
-        from Partner.models import AdvertLead
-
         lead = AdvertLead.objects.create(
             user=request.user if request.user.is_authenticated else None,
             plan=posted["plan"],
@@ -1919,7 +1934,8 @@ class PromoteLeadView(View):
             details = details[:1197].rstrip() + "..."
         message = (
             f"Hi {About.project_name} Ads, I want the {plan['name']} plan "
-            f"(₦{plan['price']} per week).\n\n"
+            f"(\u20a6{plan['price']} per week as a rate; the total depends on "
+            f"the period I choose).\n\n"
             f"Enquiry: #{lead.pk}\n"
             f"Business: {posted['business_name']}\n"
             f"Account email: {posted['contact_email']}\n"
@@ -1946,6 +1962,75 @@ class PromoteLeadView(View):
                     "so we can continue."
                 ),
             ),
+        )
+
+
+class AdvertiserDashboardView(View):
+    """First advertiser dashboard pass.
+
+    The account is tagged at sign-up (Auth.is_advertiser). This view gives that
+    account a real home: the enquiries it has sent, the plans it has asked
+    about, and a clear place for the performance numbers once the ads team
+    issues an advert reference. It does not pretend that click/view tracking
+    already exists -- the performance panel says what unlocks next.
+    """
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            messages.info(request, "Sign in to open your advertiser dashboard.")
+            return redirect(
+                reverse("auth:login") + "?" + urlencode({"to": request.get_full_path()})
+            )
+
+        if not getattr(request.user, "is_advertiser", False):
+            messages.info(
+                request,
+                "Create an advertiser account to open the advertising dashboard.",
+            )
+            return redirect(reverse("home:promote"))
+
+        leads = (
+            AdvertLead.objects.filter(
+                Q(user=request.user) | Q(contact_email__iexact=request.user.email)
+            )
+            .order_by("-created_at")
+        )
+        lead_count = leads.count()
+        latest_lead = leads.first()
+
+        #   Plan interest is the only real analytics available before the
+        #   reference/tracking pass, so show it honestly instead of inventing
+        #   views or clicks.
+        counts = {
+            row["plan"]: row["total"]
+            for row in leads.values("plan").annotate(total=Count("id"))
+        }
+        highest = max(counts.values(), default=0) or 1
+        plan_rows = [
+            {
+                "slug": plan["slug"],
+                "name": plan["name"],
+                "count": counts.get(plan["slug"], 0),
+                "width": round(counts.get(plan["slug"], 0) / highest * 100),
+            }
+            for plan in PROMOTE_PLANS
+        ]
+
+        return render(
+            request,
+            "HOME/advertiser_dashboard.html",
+            {
+                "account_email": request.user.email,
+                "account_since": request.user.date_joined,
+                "ads_whatsapp_url": _ads_whatsapp_url(),
+                "business_name": latest_lead.business_name if latest_lead else "",
+                "latest_lead": latest_lead,
+                "lead_count": lead_count,
+                "leads": list(leads[:6]),
+                "plan_rows": plan_rows,
+                "profile_url": f"{reverse('home:profile')}?view=profile",
+                "promote_url": reverse("home:promote"),
+            },
         )
 
 
@@ -2927,6 +3012,13 @@ class ProfileView(View):
             messages.info(request, "sign in to open your profile.")
             return redirect(reverse("auth:login") + "?" + urlencode({"to": request.get_full_path()}))
 
+        #   Advertisers land on their analytics by default. The regular reader
+        #   profile is still one click away (and one query flag away for links
+        #   and tests), so both identities remain usable on the same account.
+        is_advertiser = bool(getattr(request.user, "is_advertiser", False))
+        if is_advertiser and request.GET.get("view") != "profile":
+            return redirect(reverse("home:advertise_dashboard"))
+
         profile = StaffProfile.objects.filter(auth=request.user).first()
         bookmark_qs = Bookmark.objects.filter(user=request.user).select_related("blog").order_by("-created_at")
         bookmark_page_number = _resolve_page_number(request.GET.get("page"), default=1)
@@ -3026,6 +3118,7 @@ class ProfileView(View):
 
             "is_staff_user": staff_only(request.user),
             "is_admin_user": is_admin,
+            "is_advertiser_user": is_advertiser,
             "archive_upload_alerts": archive_upload_alerts,
             "subscribed_categories": subscribed_category_names,
             "available_categories": available_category_names,

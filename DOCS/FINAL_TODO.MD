@@ -34,5 +34,18 @@ Special Launch promo: as we just launch - we are offering advance plan for just 
 * dedicated 
 
 ### Advertiser dashboard
+- [x] Advertiser sign-up at `/auth/advertise/signup/`, tagged with `Auth.is_advertiser`.
+- [x] Advertiser dashboard at `/advertise/dashboard/` showing real advert enquiries and an honest empty state for click/view performance.
+- [x] Advertiser profiles default to the dashboard, with links back to the reader profile.
+- [ ] Issue one `AdvertReference` per advert. It is permanent, stored plaintext, and linked to an existing `Auth` account selected by email. Keep the plan expiry as a separate field.
+- [ ] Reference format: 16 characters = first 5 letters of the account email + `DDMMYY` + 5 random characters. Enforce uniqueness and show it only to the owner and ads staff.
+- [ ] Add reference issuance to the staff flow after payment is confirmed. Do not create duplicate references when the same email buys another advert; issue a new reference for each advert, not each account.
+- [ ] Require a signed-in account that owns the reference before showing analytics or advert controls. Registration logs users in without email verification, so the owner check must not rely on the email being verified.
+- [ ] Add `Auth.is_ads_staff`. Make it selectable on Create Staff and editable on staff detail, and use it to grant ads/PANEL access without granting full superuser rights.
+- [ ] Track advert clicks and views. On-site links should carry `utm_source=abureport`; classify external traffic separately so the dashboard can show on-site vs external performance.
+- [ ] Add advert lifecycle fields (status, start/end dates, plan, public page URL) and a staff view for pausing, renewing, and replacing an advert.
+- [ ] Keep `/ads/` staff-built on our domain. If raw HTML remains in use, validate or sanitise it before render and keep CSP report suppression scoped to `/ads/` only.
+- [ ] Keep the Home advert rail reader-driven: no autoplay, no numeric counter, and always horizontally scrollable.
+
 ### Analytics for advertiser
 

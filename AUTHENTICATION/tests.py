@@ -58,6 +58,73 @@ class AuthReturnPathTests(TestCase):
         self.assertRedirects(response, "/", fetch_redirect_response=False)
 
 
+class AdvertiserSignupTests(TestCase):
+    """The advertising sign-up is a separate door from the reader register
+    page: same account system, but the new account carries the advertiser tag."""
+
+    def test_advertiser_signup_page_uses_advertiser_copy(self):
+        response = self.client.get(reverse("auth:advertiser_register"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Create your advertiser account")
+        self.assertContains(response, "advertising dashboard")
+        self.assertContains(response, "See the weekly rates")
+        self.assertContains(response, 'name="password_confirm"')
+        #   The shared navbar/footer must stay in the advertiser flow here too.
+        self.assertNotContains(response, reverse("auth:register"))
+
+    def test_advertiser_signup_tags_the_new_account(self):
+        response = self.client.post(
+            reverse("auth:advertiser_register"),
+            {
+                "email": "new-advertiser@example.com",
+                "password": "testpass123",
+                "password_confirm": "testpass123",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("home:advertise_dashboard"),
+            fetch_redirect_response=False,
+        )
+        user = Auth.objects.get(email="NEW-ADVERTISER@EXAMPLE.COM")
+        self.assertTrue(user.is_advertiser)
+
+    def test_advertiser_signup_honours_a_safe_return_path(self):
+        response = self.client.post(
+            reverse("auth:advertiser_register"),
+            {
+                "email": "returning-advertiser@example.com",
+                "password": "testpass123",
+                "password_confirm": "testpass123",
+                "to": reverse("home:promote"),
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("home:promote"),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(
+            Auth.objects.get(email="RETURNING-ADVERTISER@EXAMPLE.COM").is_advertiser
+        )
+
+    def test_reader_registration_does_not_set_the_advertiser_tag(self):
+        response = self.client.post(
+            reverse("auth:register"),
+            {
+                "email": "plain-reader@example.com",
+                "password": "testpass123",
+                "password_confirm": "testpass123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Auth.objects.get(email="PLAIN-READER@EXAMPLE.COM").is_advertiser)
+
+
 class GateConfirmPasswordTests(TestCase):
     """The guest "Sign in" popup no longer asks for a confirm password (see
     auth/gate.html); the full register page keeps its confirm box, and the

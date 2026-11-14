@@ -184,18 +184,26 @@ class LogoutView(View):
 
 
 class RegisterView(View):
+    template_name = "auth/register.html"
+    register_route = "auth:register"
+    makes_advertiser = False
+    default_redirect = ""
+
+    def _render(self, request, status=200, **context):
+        return render(request, self.template_name, _auth_context(request, **context), status=status)
+
     def get(self, request):
         raw_to = (request.GET.get("to") or request.POST.get("to") or "").strip()
         if raw_to.lower() in ("null", "undefined", "none"):
-            return redirect(reverse("auth:register"))
+            return redirect(reverse(self.register_route))
         cleaned = _return_to(request)
         if raw_to and cleaned == "/":
             low_raw = raw_to.lower()
             if low_raw.startswith("/auth/") or low_raw in ("null", "undefined", "none") or len(raw_to) > 512 or "%" in raw_to:
-                return redirect(reverse("auth:register"))
+                return redirect(reverse(self.register_route))
         if request.user.is_authenticated:
             return redirect(_return_to(request))
-        return render(request, "auth/register.html", _auth_context(request))
+        return self._render(request)
 
     def post(self, request):
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -222,20 +230,48 @@ class RegisterView(View):
         if error is not None:
             if is_ajax:
                 return _response({"detail": error}, status=400)
-            return render(request, "auth/register.html", _auth_context(request, error=error), status=400)
+            return self._render(request, error=error, status=400)
 
+        extra_fields = {"is_advertiser": True} if self.makes_advertiser else {}
         try:
-            user = get_user_model().objects.create_user(email=email, password=password)
+            user = get_user_model().objects.create_user(
+                email=email,
+                password=password,
+                **extra_fields,
+            )
         except Exception as e:
             info_logger(msg=f"AUTH REGISTER: failed attempt to create account for {email} with error {e}")
             if is_ajax:
                 return _response({"detail": "Email Taken OR Email Not Allowed"}, status=400)
-            return render(request, "auth/register.html", _auth_context(request, error="Email Taken OR Email Not Allowed"), status=400)
+            return self._render(request, error="Email Taken OR Email Not Allowed", status=400)
         login(request, user)
         return_to = _return_to(request)
+        if self.default_redirect and not (request.POST.get("to") or request.GET.get("to") or "").strip():
+            return_to = reverse(self.default_redirect)
         if is_ajax:
             return _response({"detail": "Account created successfully.", "redirect_to": return_to}, status=200)
         return redirect(return_to)
+
+
+class AdvertiserRegisterView(RegisterView):
+    """The advertising sign-up page.
+
+    It is the normal register flow with advertiser copy and one extra step:
+    the new account carries ``is_advertiser=True`` so the profile opens the
+    advertiser dashboard by default. The reader features stay on the same
+    account, so nobody needs a second login.
+    """
+
+    template_name = "auth/advertiser_register.html"
+    register_route = "auth:advertiser_register"
+    makes_advertiser = True
+    default_redirect = "home:advertise_dashboard"
+
+    def _render(self, request, status=200, **context):
+        #   Keep the shared navbar/footer sign-up links inside the advertising
+        #   flow while this page is open, just like the partner page does.
+        context.setdefault("auth_signup_path", reverse(self.register_route))
+        return super()._render(request, status=status, **context)
 
 
 def _generate_reset_key():

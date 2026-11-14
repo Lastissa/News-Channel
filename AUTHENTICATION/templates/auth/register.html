@@ -17,8 +17,9 @@
 
   <div class="auth-panel">
     <div class="auth-header">
-      <h1>Create account</h1>
+      <h1>{% block auth_heading %}Create account{% endblock %}</h1>
     </div>
+    {% block auth_intro %}{% endblock %}
 
     <form method="post" class="auth-form" novalidate data-auth-form data-server-error="{{ error|escapejs }}">
       {% csrf_token %}
@@ -50,10 +51,12 @@
       <button type="submit" class="auth-submit">Create account</button>
     </form>
 
+    {% block auth_switch %}
     <p class="auth-switch">
       Already have an account?
       <a href="{% url 'auth:login' %}">Sign in</a>
     </p>
+    {% endblock %}
   </div>
 </div>
 {% endblock %}

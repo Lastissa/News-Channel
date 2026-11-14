@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block adsense %}{% endblock %}
+{% block title %}Advertiser dashboard | {{ project_name }}{% endblock %}
+{% block meta_description %}Your {{ project_name }} advertising dashboard: enquiries, plan interest, and the place where advert performance will appear.{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock meta_robots %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'home/css/advertiser.css' %}?v=20261113-1">
+{% endblock %}
+
+{% block content %}
+<section class="ads-dash">
+  <header class="ads-dash-hero">
+    <div class="ads-dash-hero-copy">
+      <p class="ads-dash-eyebrow"><span class="ads-dash-dot" aria-hidden="true"></span> Advertiser dashboard</p>
+      <h1>Your adverts,<br><em>in one clear view.</em></h1>
+      <p class="ads-dash-sub">
+        {% if business_name %}
+          Following {{ business_name }}&rsquo;s advertising enquiries. Start a new brief any time, or check what you have already sent.
+        {% else %}
+          You are set up as an advertiser. Send your first brief and we will link your advert here once it is live.
+        {% endif %}
+      </p>
+      <div class="ads-dash-actions">
+        <a class="ads-dash-btn ads-dash-btn--accent" href="{{ promote_url }}">Start a new enquiry</a>
+        <a class="ads-dash-btn" href="{{ profile_url }}">Regular profile</a>
+        {% if ads_whatsapp_url %}
+        <a class="ads-dash-btn ads-dash-btn--ghost" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer">WhatsApp ads team</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <aside class="ads-dash-account" aria-label="Account summary">
+      <span class="ads-dash-account-label">Account</span>
+      <strong>{{ account_email }}</strong>
+      <span class="ads-dash-account-meta">Advertiser since {{ account_since|date:"M Y" }}</span>
+      <span class="ads-dash-account-status"><i aria-hidden="true"></i> Advertiser account active</span>
+    </aside>
+  </header>
+
+  <div class="ads-dash-kpis">
+    <article class="ads-dash-kpi">
+      <span class="ads-dash-kpi-label">Total enquiries</span>
+      <strong class="ads-dash-kpi-value">{{ lead_count }}</strong>
+      <small>Saved from the partner page</small>
+    </article>
+    <article class="ads-dash-kpi">
+      <span class="ads-dash-kpi-label">Latest plan</span>
+      <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">{% if latest_lead %}{{ latest_lead.get_plan_display }}{% else %}&mdash;{% endif %}</strong>
+      <small>{% if latest_lead %}Enquiry #{{ latest_lead.pk }}{% else %}No plan selected yet{% endif %}</small>
+    </article>
+    <article class="ads-dash-kpi">
+      <span class="ads-dash-kpi-label">Business</span>
+      <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">{% if business_name %}{{ business_name }}{% else %}Not added yet{% endif %}</strong>
+      <small>From your latest enquiry</small>
+    </article>
+    <article class="ads-dash-kpi ads-dash-kpi--locked">
+      <span class="ads-dash-kpi-label">Advert reference</span>
+      <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">Pending</strong>
+      <small>Issued after payment confirmation</small>
+    </article>
+  </div>
+
+  <div class="ads-dash-columns">
+    <section class="ads-dash-card" aria-labelledby="ads-dash-activity-title">
+      <div class="ads-dash-card-head">
+        <div>
+          <p class="ads-dash-card-kicker">Enquiry activity</p>
+          <h2 id="ads-dash-activity-title">What you have sent</h2>
+        </div>
+        <span class="ads-dash-chip">{{ lead_count }} total</span>
+      </div>
+
+      {% if leads %}
+      <ul class="ads-dash-leads">
+        {% for lead in leads %}
+        <li>
+          <div>
+            <strong>{{ lead.business_name }}</strong>
+            <span>{{ lead.get_plan_display }} plan &middot; {{ lead.created_at|date:"M d, Y" }}</span>
+          </div>
+          <span class="ads-dash-lead-id">#{{ lead.pk }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="ads-dash-empty">
+        <span class="ads-dash-empty-number" aria-hidden="true">01</span>
+        <h3>No enquiry yet</h3>
+        <p>Choose a plan and send your brief. Your enquiries will appear here, and we will link your advert once it is live.</p>
+        <a href="{{ promote_url }}">Choose a plan</a>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="ads-dash-card" aria-labelledby="ads-dash-interest-title">
+      <div class="ads-dash-card-head">
+        <div>
+          <p class="ads-dash-card-kicker">Plan interest</p>
+          <h2 id="ads-dash-interest-title">Where you have looked</h2>
+        </div>
+      </div>
+
+      <div class="ads-dash-bars">
+        {% for row in plan_rows %}
+        <div class="ads-dash-bar-row">
+          <span>{{ row.name }}</span>
+          <strong>{{ row.count }}</strong>
+          <span class="ads-dash-bar" aria-hidden="true"><i style="--ads-dash-bar: {{ row.width }}%"></i></span>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="ads-dash-note">Counts are based on enquiries saved from the public partner page.</p>
+    </section>
+  </div>
+
+  <section class="ads-dash-card ads-dash-performance" aria-labelledby="ads-dash-performance-title">
+    <div class="ads-dash-card-head">
+      <div>
+        <p class="ads-dash-card-kicker">Advert performance</p>
+        <h2 id="ads-dash-performance-title">Views, clicks and traffic</h2>
+      </div>
+      <span class="ads-dash-chip ads-dash-chip--muted">Unlocks after setup</span>
+    </div>
+
+    <div class="ads-dash-performance-body">
+      <div class="ads-dash-performance-copy">
+        <h3>Your numbers will live here.</h3>
+        <p>
+          Once our team confirms your plan and issues your advert reference, this panel will show how readers find and open your advert, including traffic from {{ project_name }} and traffic from other sources.
+        </p>
+        <div class="ads-dash-steps">
+          <span><b>1</b> Send your brief</span>
+          <span><b>2</b> Confirm payment and period</span>
+          <span><b>3</b> Receive your reference</span>
+        </div>
+      </div>
+
+      <div class="ads-dash-meter" aria-hidden="true">
+        <span class="ads-dash-meter-value">0</span>
+        <span class="ads-dash-meter-label">Live advert views</span>
+        <span class="ads-dash-meter-line"><i></i></span>
+      </div>
+    </div>
+  </section>
+</section>
+{% endblock %}
