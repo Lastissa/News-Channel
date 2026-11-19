@@ -1,8 +1,27 @@
+import re
+import secrets
+
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
+
+ADVERT_REFERENCE_LENGTH = 16
+_REFERENCE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _reference_email_prefix(email):
+    """The first five letters/digits of the email local part, uppercased.
+
+    The reference is shown in WhatsApp and read over the phone, so it stays
+    short and unambiguous: no 0/O or 1/I in the random half, and a padded
+    prefix when the email local part is shorter than five characters.
+    """
+    local = (email or "").split("@", 1)[0]
+    letters = re.sub(r"[^A-Za-z0-9]", "", local).upper()
+    return (letters[:5] or "ADVRT").ljust(5, "X")
 
 
 class Announcement(models.Model):
@@ -182,6 +201,271 @@ class AdvertLandingPage(models.Model):
     @property
     def og_image_value(self):
         return (self.og_image or self.advert.image_url or "").strip()
+
+
+class AdvertPage(models.Model):
+    """One extra page of an advert's site, such as /about/ (Advance plan).
+
+    The HTML is stored in Cloudinary the same way as the landing page. The
+    page is shown only while its last writer is still an active admin, the
+    advert's plan still includes extra pages, and the reference is live.
+    """
+
+    advert = models.ForeignKey(AdvertImage, on_delete=models.CASCADE, related_name="pages")
+    path = models.CharField(max_length=80, help_text="For example about or about/team")
+    html_public_id = models.CharField(max_length=255, blank=True, default="")
+    html_bytes = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+    author = models.ForeignKey(
+        "AUTHENTICATION.Auth",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="advert_pages",
+    )
+    date_created = models.DateTimeField(auto_now_add=True)
+    date_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("path",)
+        constraints = [
+            models.UniqueConstraint(fields=["advert", "path"], name="unique_advert_page_path"),
+        ]
+
+    def __str__(self):
+        return f"/{self.path}/ of advert #{self.advert_id}"
+
+    @property
+    def author_is_trusted(self):
+        author = self.author
+        return bool(author and author.is_active and (author.is_admin or author.is_superuser))
+
+    @property
+    def is_deliverable(self):
+        return bool(self.is_published and self.html_public_id and self.author_is_trusted)
+
+
+class AdvertReference(models.Model):
+    """The permanent key an advertiser uses to reach their advert's data.
+
+    One row is issued per advert, not per account: a business that buys a
+    second advert gets a second reference. The reference itself never expires;
+    the paid period lives in ``expires_at`` so a renewal changes the period
+    without changing the key the advertiser saved.
+
+    ``reference`` is stored plaintext on purpose. It is a customer-facing key
+    (read over WhatsApp, pasted into the dashboard), not a password. Only the
+    owner and ads staff ever see it. The row is tied to an existing Auth
+    account selected by email at issuance, and the dashboard filters on that
+    owner before it shows analytics.
+    """
+
+    STATUS_ACTIVE = "active"
+    STATUS_PAUSED = "paused"
+    STATUS_EXPIRED = "expired"
+    STATUS_CHOICES = (
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_PAUSED, "Paused"),
+        (STATUS_EXPIRED, "Expired"),
+    )
+
+    reference = models.CharField(
+        max_length=ADVERT_REFERENCE_LENGTH,
+        unique=True,
+        db_index=True,
+        editable=False,
+    )
+    user = models.ForeignKey(
+        "AUTHENTICATION.Auth",
+        on_delete=models.CASCADE,
+        related_name="advert_references",
+    )
+    #   Keep the address the reference was issued against. Account emails can
+    #   change later; staff still need to know which address was used.
+    email_used = models.EmailField(blank=True, default="")
+    plan = models.CharField(max_length=20, choices=AdvertLead.PLAN_CHOICES)
+    business_name = models.CharField(max_length=120)
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+        db_index=True,
+    )
+    starts_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    public_url = models.URLField(max_length=500, blank=True, default="")
+    #   One manager-assigned host label, e.g. "newads" -> newads.<base>. It is
+    #   unique across every advert so two campaigns can never share a URL.
+    subdomain = models.CharField(
+        max_length=63,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Optional label for this advert's own subdomain.",
+    )
+    advert = models.OneToOneField(
+        AdvertImage,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reference",
+    )
+    issued_by = models.ForeignKey(
+        "AUTHENTICATION.Auth",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="issued_advert_references",
+    )
+    notes = models.TextField(max_length=1000, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    @classmethod
+    def build_reference(cls, email, when=None):
+        """``<first 5 email chars><DDMMYY><5 random chars>``.
+
+        A date part keeps the key readable in a chat, and the random part is
+        checked against the table before it is returned. A collision is
+        vanishingly unlikely, but the loop costs nothing and means issuance
+        never fails because of it.
+        """
+        day = when or timezone.localdate()
+        date_part = day.strftime("%d%m%y")
+        prefix = _reference_email_prefix(email)
+        for _attempt in range(100):
+            suffix = "".join(secrets.choice(_REFERENCE_ALPHABET) for _ in range(5))
+            code = f"{prefix}{date_part}{suffix}"
+            if not cls.objects.filter(reference=code).exists():
+                return code
+        raise RuntimeError("Could not generate a unique advert reference.")
+
+    def save(self, *args, **kwargs):
+        if self.user_id and not self.email_used:
+            self.email_used = self.user.email
+        if not self.reference:
+            self.reference = self.build_reference(self.email_used)
+        self.subdomain = (self.subdomain or "").strip().lower() or None
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.reference} - {self.email_used or self.user_id}"
+
+    @property
+    def is_expired(self):
+        return bool(self.expires_at and self.expires_at < timezone.now())
+
+    @property
+    def is_live(self):
+        if self.status != self.STATUS_ACTIVE or self.is_expired:
+            return False
+        return not self.starts_at or self.starts_at <= timezone.now()
+
+    @property
+    def plan_name(self):
+        return dict(AdvertLead.PLAN_CHOICES).get(self.plan, self.plan)
+
+    @property
+    def public_target(self):
+        """Where a tracked click should send the reader.
+
+        A staff-entered public URL wins because Advance adverts can live on
+        their own domain. Otherwise use the advert's published landing page,
+        then the advertiser link saved on the advert.
+        """
+        public_url = (self.public_url or "").strip()
+        if public_url:
+            return public_url
+        advert = self.advert
+        if not advert:
+            return ""
+        landing = getattr(advert, "landing_page", None)
+        if landing and landing.is_deliverable:
+            return landing.get_absolute_url()
+        return (advert.url or "").strip()
+
+    @property
+    def public_host(self):
+        """The manager-assigned advert host, or "" when none was chosen."""
+        from SERVICE_INTERNAL.hosts import advert_host
+
+        return advert_host(self.subdomain)
+
+    @property
+    def public_page_url(self):
+        """Absolute URL for the advert's own subdomain, when one is set."""
+        host = self.public_host
+        if not host:
+            return ""
+        from SERVICE_INTERNAL.hosts import advert_origin
+
+        return f"{advert_origin(self.subdomain)}/"
+
+    @property
+    def public_link(self):
+        """The best public link to show: custom host first, then target."""
+        return self.public_page_url or self.public_target
+
+
+class AdvertEvent(models.Model):
+    """One tracked view or click for an advert reference.
+
+    Events are append-only and never exposed publicly. Views are deduplicated
+    for an hour per browser session/IP so a refresh does not inflate the
+    advertiser dashboard; clicks use a five-second window so a double click
+    still counts as one intentional action.
+    """
+
+    EVENT_VIEW = "view"
+    EVENT_CLICK = "click"
+    EVENT_CHOICES = (
+        (EVENT_VIEW, "View"),
+        (EVENT_CLICK, "Click"),
+    )
+
+    SOURCE_ABUREPORT = "abureport"
+    SOURCE_EXTERNAL = "external"
+    SOURCE_DIRECT = "direct"
+    SOURCE_CHOICES = (
+        (SOURCE_ABUREPORT, "From Abureport"),
+        (SOURCE_EXTERNAL, "External"),
+        (SOURCE_DIRECT, "Direct"),
+    )
+
+    reference = models.ForeignKey(
+        AdvertReference,
+        on_delete=models.CASCADE,
+        related_name="events",
+    )
+    event_type = models.CharField(max_length=8, choices=EVENT_CHOICES, db_index=True)
+    source = models.CharField(
+        max_length=16,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_DIRECT,
+        db_index=True,
+    )
+    target_url = models.URLField(max_length=1000, blank=True, default="")
+    path = models.CharField(max_length=500, blank=True, default="")
+    referrer = models.URLField(max_length=1000, blank=True, default="")
+    ip_hash = models.CharField(max_length=64, blank=True, default="")
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+    session_key = models.CharField(max_length=40, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = (
+            models.Index(
+                fields=("reference", "event_type", "created_at"),
+                name="partner_ref_event_idx",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.reference_id} - {self.event_type} - {self.created_at:%Y-%m-%d %H:%M}"
 
 
 @receiver(post_delete, sender=AdvertLandingPage)

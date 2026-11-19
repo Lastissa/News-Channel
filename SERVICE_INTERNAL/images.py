@@ -229,11 +229,16 @@ ADVERT_LANDING_MAX_BYTES = int(
 _ADVERT_LANDING_FOLDER = "abureport/advert-landing"
 
 
-def _advert_landing_public_id(advert_id) -> str:
+def _advert_landing_public_id(advert_id, page_path="") -> str:
+    """The home page is advert_<id>. An extra page adds its path with the
+    slashes turned into a double underscore (paths never contain an underscore,
+    so two different paths can never share an id)."""
+    if page_path:
+        return f"{_ADVERT_LANDING_FOLDER}/advert_{advert_id}_p_{page_path.replace('/', '__')}"
     return f"{_ADVERT_LANDING_FOLDER}/advert_{advert_id}"
 
 
-def upload_advert_landing_html(html_text: str, advert_id) -> dict:
+def upload_advert_landing_html(html_text: str, advert_id, page_path="") -> dict:
     """Upload (or overwrite) one advert's landing-page HTML.
 
     Returns `public_id` (this is what the caller stores on the row), `bytes`,
@@ -258,7 +263,7 @@ def upload_advert_landing_html(html_text: str, advert_id) -> dict:
             stream,
             resource_type="raw",
             type="authenticated",
-            public_id=_advert_landing_public_id(advert_id),
+            public_id=_advert_landing_public_id(advert_id, page_path),
             format="html",
             overwrite=True,
             invalidate=True,

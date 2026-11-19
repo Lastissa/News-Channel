@@ -8,68 +8,153 @@
 
 {% block extra_head %}
   {{ block.super }}
-  <link rel="stylesheet" href="{% static 'home/css/advertiser.css' %}?v=20261113-1">
+  <link rel="stylesheet" href="{% static 'home/css/advertiser.css' %}?v=20261119-4">
 {% endblock %}
 
 {% block content %}
 <section class="ads-dash">
-  <header class="ads-dash-hero">
-    <div class="ads-dash-hero-copy">
-      <p class="ads-dash-eyebrow"><span class="ads-dash-dot" aria-hidden="true"></span> Advertiser dashboard</p>
-      <h1>Your adverts,<br><em>in one clear view.</em></h1>
-      <p class="ads-dash-sub">
-        {% if business_name %}
-          Following {{ business_name }}&rsquo;s advertising enquiries. Start a new brief any time, or check what you have already sent.
-        {% else %}
-          You are set up as an advertiser. Send your first brief and we will link your advert here once it is live.
-        {% endif %}
-      </p>
-      <div class="ads-dash-actions">
-        <a class="ads-dash-btn ads-dash-btn--accent" href="{{ promote_url }}">Start a new enquiry</a>
-        <a class="ads-dash-btn" href="{{ profile_url }}">Regular profile</a>
+  <header class="ads-dash-top">
+    <div class="ads-dash-top-head">
+      <p class="ads-dash-eyebrow">Advertiser dashboard</p>
+      <nav class="ads-dash-actions" aria-label="Shortcuts">
+        <a class="ads-dash-action ads-dash-action--primary" href="{{ promote_url }}">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+          <span>Enquiry</span>
+        </a>
+        <a class="ads-dash-action" href="{{ profile_url }}" title="Regular profile" aria-label="Regular profile">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.8 16.5c.8-3 3.2-4.6 6.2-4.6s5.4 1.6 6.2 4.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>Profile</span>
+        </a>
         {% if ads_whatsapp_url %}
-        <a class="ads-dash-btn ads-dash-btn--ghost" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer">WhatsApp ads team</a>
+        <a class="ads-dash-action ads-dash-action--icon" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer" title="WhatsApp ads team" aria-label="WhatsApp ads team">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8a7.2 7.2 0 0 0-6.2 10.8L2.8 17.2l3.7-1A7.2 7.2 0 1 0 10 2.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7.4 7.2c.2 2.2 2 4.2 4.4 5l1-1.2-1.6-.8-.7.7c-.8-.4-1.5-1.1-1.9-1.9l.7-.7-.8-1.6-1.1.5Z" fill="currentColor"/></svg>
+        </a>
         {% endif %}
+      </nav>
+    </div>
+    <div class="ads-dash-identity">
+      <span class="ads-dash-avatar" aria-hidden="true">
+        {% if account_avatar %}
+        <img class="ads-dash-avatar-img" src="{{ account_avatar }}" alt="" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
+        <svg class="ads-dash-avatar-initial" viewBox="0 0 64 64" aria-hidden="true" focusable="false" hidden><text x="32" y="33" text-anchor="middle" dominant-baseline="central">{{ account_initial }}</text></svg>
+        {% else %}
+        <svg class="ads-dash-avatar-initial" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><text x="32" y="33" text-anchor="middle" dominant-baseline="central">{{ account_initial }}</text></svg>
+        {% endif %}
+      </span>
+      <div class="ads-dash-top-text">
+        <h1>{% if business_name %}{{ business_name }}{% else %}Your adverts{% endif %}</h1>
+        <p class="ads-dash-account-line">
+          <span>{{ account_email }}</span>
+          <span>Since {{ account_since|date:"M Y" }}</span>
+          <span class="ads-dash-active"><i aria-hidden="true"></i> Active</span>
+        </p>
       </div>
     </div>
-
-    <aside class="ads-dash-account" aria-label="Account summary">
-      <span class="ads-dash-account-label">Account</span>
-      <strong>{{ account_email }}</strong>
-      <span class="ads-dash-account-meta">Advertiser since {{ account_since|date:"M Y" }}</span>
-      <span class="ads-dash-account-status"><i aria-hidden="true"></i> Advertiser account active</span>
-    </aside>
   </header>
 
-  <div class="ads-dash-kpis">
-    <article class="ads-dash-kpi">
-      <span class="ads-dash-kpi-label">Total enquiries</span>
-      <strong class="ads-dash-kpi-value">{{ lead_count }}</strong>
-      <small>Saved from the partner page</small>
-    </article>
-    <article class="ads-dash-kpi">
-      <span class="ads-dash-kpi-label">Latest plan</span>
-      <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">{% if latest_lead %}{{ latest_lead.get_plan_display }}{% else %}&mdash;{% endif %}</strong>
-      <small>{% if latest_lead %}Enquiry #{{ latest_lead.pk }}{% else %}No plan selected yet{% endif %}</small>
-    </article>
-    <article class="ads-dash-kpi">
-      <span class="ads-dash-kpi-label">Business</span>
-      <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">{% if business_name %}{{ business_name }}{% else %}Not added yet{% endif %}</strong>
-      <small>From your latest enquiry</small>
-    </article>
-    <article class="ads-dash-kpi ads-dash-kpi--locked">
-      <span class="ads-dash-kpi-label">Advert reference</span>
-      <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">Pending</strong>
-      <small>Issued after payment confirmation</small>
-    </article>
-  </div>
+  <section class="ads-dash-overview" aria-labelledby="ads-dash-overview-title">
+    <div class="ads-dash-section-head">
+      <div>
+        <p class="ads-dash-section-kicker">Snapshot</p>
+        <h2 id="ads-dash-overview-title">Quick analytics</h2>
+      </div>
+      <span class="ads-dash-section-chip">Live view</span>
+    </div>
+
+    <div class="ads-dash-kpis">
+      <article class="ads-dash-kpi">
+        <span class="ads-dash-kpi-label">Total enquiries</span>
+        <strong class="ads-dash-kpi-value">{{ lead_count }}</strong>
+        <small>Saved from the partner page</small>
+      </article>
+      <article class="ads-dash-kpi">
+        <span class="ads-dash-kpi-label">Latest plan</span>
+        <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">{% if latest_lead %}{{ latest_lead.get_plan_display }}{% else %}&mdash;{% endif %}</strong>
+        <small>{% if latest_lead %}Enquiry #{{ latest_lead.pk }}{% else %}No plan selected yet{% endif %}</small>
+      </article>
+      <article class="ads-dash-kpi">
+        <span class="ads-dash-kpi-label">Business</span>
+        <strong class="ads-dash-kpi-value ads-dash-kpi-value--text">{% if business_name %}{{ business_name }}{% else %}Not added yet{% endif %}</strong>
+        <small>From your latest enquiry</small>
+      </article>
+      <article class="ads-dash-kpi{% if not has_references %} ads-dash-kpi--locked{% endif %}">
+        <span class="ads-dash-kpi-label">Advert references</span>
+        <strong class="ads-dash-kpi-value">{{ reference_count }}</strong>
+        <small>{% if reference_count %}{{ live_reference_count }} live now{% else %}Issued after payment confirmation{% endif %}</small>
+      </article>
+    </div>
+  </section>
+
+  <div class="ads-dash-main-grid">
+
+  {% if references %}
+  <section class="ads-dash-card ads-dash-refs" aria-labelledby="ads-dash-refs-title">
+    <div class="ads-dash-card-head">
+      <div>
+        <p class="ads-dash-card-kicker">Your advert keys</p>
+        {% comment %} <h2 id="ads-dash-refs-title">References and access</h2> {% endcomment %}
+        <p class="ads-dash-card-sub">Each issued advert with its paid period, plan, and public link.</p>
+      </div>
+      <span class="ads-dash-chip">{{ reference_count }} issued</span>
+    </div>
+
+    {% if references|length > 1 %}
+    <p class="ads-dash-scroll-hint" aria-hidden="true">Swipe to see all adverts</p>
+    {% endif %}
+
+    <div class="ads-dash-cards" role="list" aria-label="Your adverts">
+      {% for ref in references %}
+      <article class="ads-dash-ref-card ads-dash-ref-card--{% if ref.is_live %}live{% else %}off{% endif %}" role="listitem">
+        <header>
+          <div>
+            <code class="ads-dash-code">{{ ref.reference }}</code>
+            <h3>{{ ref.business_name }}</h3>
+          </div>
+          <div class="ads-dash-tags">
+            <span class="ads-dash-tag">{{ ref.plan_name }}</span>
+            <span class="ads-dash-tag ads-dash-tag--status">{% if ref.is_expired %}Expired{% else %}{{ ref.get_status_display }}{% endif %}</span>
+          </div>
+        </header>
+
+        <div class="ads-dash-time">
+          <div><strong>{{ ref.time_label }}</strong> <span>{% if ref.expires_at %}ends {{ ref.expires_at|date:"M d, Y" }}{% else %}no end date set{% endif %}</span></div>
+          <div class="ads-dash-timebar" aria-hidden="true"><i style="width: {{ ref.time_percent }}%"></i></div>
+        </div>
+
+        {% if ref.has_analytics %}
+        <dl class="ads-dash-tiles">
+          <div><dd>{{ ref.view_total }}</dd><dt>Views</dt></div>
+          <div><dd>{{ ref.click_total }}</dd><dt>Clicks</dt></div>
+          <div><dd>{{ ref.abureport_click_total }}</dd><dt>From {{ project_name }}</dt></div>
+        </dl>
+        {% else %}
+        <p class="ads-dash-locked">Views and clicks come with the Pro and Advance plans.</p>
+        {% endif %}
+
+        <ul class="ads-dash-includes" aria-label="Included in your plan">
+          <li class="is-on">Banner</li>
+          <li class="{% if ref.allows_landing %}is-on{% endif %}">Landing page</li>
+          <li class="{% if ref.has_analytics %}is-on{% endif %}">Analytics</li>
+          <li class="{% if ref.allows_pages %}is-on{% endif %}">Extra pages</li>
+        </ul>
+
+        {% if ref.public_link %}
+        <a class="ads-dash-open" href="{{ ref.public_link }}" target="_blank" rel="noopener noreferrer">Open public page</a>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% comment %} <p class="ads-dash-note">Your reference is permanent and private. Keep it safe: anyone signed in to your account can use it to open this dashboard.</p> {% endcomment %}
+  </section>
+  {% endif %}
 
   <div class="ads-dash-columns">
     <section class="ads-dash-card" aria-labelledby="ads-dash-activity-title">
       <div class="ads-dash-card-head">
         <div>
           <p class="ads-dash-card-kicker">Enquiry activity</p>
-          <h2 id="ads-dash-activity-title">What you have sent</h2>
+          <h2 id="ads-dash-activity-title">Past enquiries</h2>
+          <p class="ads-dash-card-sub">Everything you sent from the partner page.</p>
         </div>
         <span class="ads-dash-chip">{{ lead_count }} total</span>
       </div>
@@ -101,6 +186,7 @@
         <div>
           <p class="ads-dash-card-kicker">Plan interest</p>
           <h2 id="ads-dash-interest-title">Where you have looked</h2>
+          <p class="ads-dash-card-sub">Plans you asked about, based on your enquiries.</p>
         </div>
       </div>
 
@@ -122,10 +208,64 @@
       <div>
         <p class="ads-dash-card-kicker">Advert performance</p>
         <h2 id="ads-dash-performance-title">Views, clicks and traffic</h2>
+        <p class="ads-dash-card-sub">A live view of how readers find and open your published adverts.</p>
       </div>
+      {% if has_analytics %}
+      <span class="ads-dash-chip">{{ live_reference_count }} live</span>
+      {% else %}
       <span class="ads-dash-chip ads-dash-chip--muted">Unlocks after setup</span>
+      {% endif %}
     </div>
 
+    {% if has_analytics %}
+    <div class="ads-dash-metrics">
+      <div class="ads-dash-metric"><span>Views</span><strong>{{ view_total }}</strong></div>
+      <div class="ads-dash-metric"><span>Clicks</span><strong>{{ click_total }}</strong></div>
+      <div class="ads-dash-metric"><span>Click rate</span><strong>{{ click_rate }}%</strong></div>
+      <div class="ads-dash-metric"><span>Live adverts</span><strong>{{ live_reference_count }}</strong></div>
+    </div>
+
+    <div class="ads-dash-performance-body">
+      <div class="ads-dash-performance-copy">
+        <h3>Where your clicks come from.</h3>
+        <div class="ads-dash-bars">
+          {% for row in source_rows %}
+          <div class="ads-dash-bar-row">
+            <span>{{ row.name }}</span>
+            <strong>{{ row.count }}</strong>
+            <span class="ads-dash-bar" aria-hidden="true"><i style="--ads-dash-bar: {{ row.width }}%"></i></span>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="ads-dash-note">Views are counted when your advert becomes the focused slide or someone opens your landing page. Clicks from {{ project_name }} carry <code>utm_source=abureport</code>.</p>
+      </div>
+
+      <div class="ads-dash-events-wrap">
+        <span class="ads-dash-kpi-label">Latest activity</span>
+        {% if recent_events %}
+        <ul class="ads-dash-events">
+          {% for event in recent_events %}
+          <li>
+            <span class="ads-dash-event-type">{{ event.get_event_type_display }}</span>
+            <span class="ads-dash-event-ref">{{ event.reference.reference }}</span>
+            <time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"M d, H:i" }}</time>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="ads-dash-events-empty">No traffic recorded yet. Your reference is live; views and clicks will appear here.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% elif has_references %}
+    <div class="ads-dash-performance-body">
+      <div class="ads-dash-performance-copy">
+        <h3>Analytics come with Pro.</h3>
+        <p>Your Regular plan puts your banner on {{ project_name }}. Upgrade to Pro for a landing page and a dashboard of views, clicks and where your traffic comes from.</p>
+        {% if ads_whatsapp_url %}<a class="ads-dash-btn ads-dash-btn--accent" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer">Ask about Pro</a>{% endif %}
+      </div>
+    </div>
+    {% else %}
     <div class="ads-dash-performance-body">
       <div class="ads-dash-performance-copy">
         <h3>Your numbers will live here.</h3>
@@ -145,6 +285,8 @@
         <span class="ads-dash-meter-line"><i></i></span>
       </div>
     </div>
+    {% endif %}
   </section>
+  </div>
 </section>
 {% endblock %}

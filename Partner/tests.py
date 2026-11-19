@@ -6,7 +6,7 @@ from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from AUTHENTICATION.models import Auth
-from Partner.models import AdvertImage
+from Partner.models import AdvertEvent, AdvertImage, AdvertLead, AdvertPage, AdvertReference
 
 
 class AdvertImageAdminDeleteReleasesAssetTests(TestCase):
@@ -52,6 +52,7 @@ from Partner.landing import (
     strip_advert_landing_author_header,
 )
 from Partner.models import AdvertLandingPage
+from Partner.tracking import append_utm_source
 from SERVICE_INTERNAL.images import ImageUploadError
 
 
@@ -301,6 +302,214 @@ class AdvertLandingCloudinaryHelperTests(TestCase):
         )
 
 
+class AdvertReferenceTests(TestCase):
+    """The permanent 16-character key and its independent paid period."""
+
+    def setUp(self):
+        self.owner = Auth.objects.create_user(email="grace.stores@example.com")
+        self.admin = Auth.objects.create_user(
+            email="reference-admin@example.com", is_staff=True, is_admin=True
+        )
+
+    def _advert(self, heading="Reference advert"):
+        return AdvertImage.objects.create(
+            author=self.admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading=heading,
+            image_url="https://cdn.example.com/ads/reference.jpg",
+            url="https://example.com/reference",
+        )
+
+    def _reference(self, advert=None, **kwargs):
+        values = {
+            "user": self.owner,
+            "plan": "regular",
+            "business_name": "Grace Stores",
+        }
+        values.update(kwargs)
+        return AdvertReference.objects.create(advert=advert or self._advert(), **values)
+
+    def test_reference_is_16_chars_and_starts_with_five_email_chars(self):
+        row = self._reference()
+
+        self.assertEqual(len(row.reference), 16)
+        self.assertTrue(row.reference.startswith("GRACE"))
+        self.assertRegex(row.reference, r"^GRACE\d{6}[A-Z2-9]{5}$")
+        self.assertEqual(row.email_used, self.owner.email)
+
+    def test_same_email_gets_a_new_reference_for_a_second_advert(self):
+        first = self._reference()
+        second = self._reference(advert=self._advert("Second advert"))
+
+        self.assertNotEqual(first.reference, second.reference)
+        self.assertEqual(AdvertReference.objects.filter(user=self.owner).count(), 2)
+
+    def test_public_target_prefers_staff_url_then_landing_then_advert_link(self):
+        advert = self._advert()
+        row = self._reference(advert=advert, public_url="https://advance.example.com/page")
+        self.assertEqual(row.public_target, "https://advance.example.com/page")
+
+        row.public_url = ""
+        row.save(update_fields=["public_url"])
+        self.assertEqual(row.public_target, "https://example.com/reference")
+
+        AdvertLandingPage.objects.create(
+            advert=advert,
+            author=self.admin,
+            html_public_id="abureport/advert-landing/reference.html",
+            is_published=True,
+        )
+        row.advert = AdvertImage.objects.get(pk=advert.pk)
+        self.assertTrue(row.public_target.startswith("/ads/reference-advert-"))
+
+    def test_is_live_respects_pause_and_expiry(self):
+        row = self._reference()
+        self.assertTrue(row.is_live)
+
+        row.status = AdvertReference.STATUS_PAUSED
+        row.save(update_fields=["status"])
+        self.assertFalse(row.is_live)
+
+        row.status = AdvertReference.STATUS_ACTIVE
+        row.expires_at = timezone.now() - timedelta(minutes=1)
+        row.save(update_fields=["status", "expires_at"])
+        self.assertFalse(row.is_live)
+        self.assertTrue(row.is_expired)
+
+    def test_append_utm_source_only_touches_http_links_and_keeps_an_existing_source(self):
+        self.assertEqual(
+            append_utm_source("https://example.com/page"),
+            "https://example.com/page?utm_source=abureport",
+        )
+        self.assertEqual(
+            append_utm_source("https://example.com/page?utm_source=partner"),
+            "https://example.com/page?utm_source=partner",
+        )
+        self.assertEqual(append_utm_source("mailto:ads@example.com"), "mailto:ads@example.com")
+
+
+class AdvertTrackingTests(TestCase):
+    """Public tracking stays honest: no raw IPs, no bot hits, deduped views."""
+
+    def setUp(self):
+        self.owner = Auth.objects.create_user(email="tracker@example.com")
+        self.admin = Auth.objects.create_user(
+            email="tracking-admin@example.com", is_staff=True, is_admin=True
+        )
+        self.advert = AdvertImage.objects.create(
+            author=self.admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading="Tracked advert",
+            image_url="https://cdn.example.com/ads/tracked.jpg",
+            url="https://example.com/tracked",
+        )
+        self.reference = AdvertReference.objects.create(
+            user=self.owner,
+            plan="pro",
+            business_name="Tracked Business",
+            advert=self.advert,
+        )
+        self.client.defaults["HTTP_USER_AGENT"] = "Mozilla/5.0 (TestBrowser)"
+        self.client.defaults["HTTP_REFERER"] = "http://testserver/"
+
+    def test_view_pixel_records_one_view_and_returns_a_gif(self):
+        response = self.client.get(
+            reverse("partner:advert_view", args=[self.reference.reference])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/gif")
+        event = AdvertEvent.objects.get()
+        self.assertEqual(event.event_type, AdvertEvent.EVENT_VIEW)
+        self.assertEqual(event.source, AdvertEvent.SOURCE_ABUREPORT)
+        self.assertTrue(event.ip_hash)
+        self.assertNotEqual(event.ip_hash, "127.0.0.1")
+
+    def test_repeated_view_inside_three_seconds_is_not_counted_twice(self):
+        url = reverse("partner:advert_view", args=[self.reference.reference])
+        self.client.get(url)
+        self.client.get(url)
+
+        self.assertEqual(AdvertEvent.objects.filter(event_type=AdvertEvent.EVENT_VIEW).count(), 1)
+
+    def test_dedupe_is_three_seconds_per_ip_and_follows_cloudflare_ip(self):
+        url = reverse("partner:advert_view", args=[self.reference.reference])
+        count = lambda: AdvertEvent.objects.filter(event_type=AdvertEvent.EVENT_VIEW).count()
+
+        self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.1.1")
+        self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.1.1")
+        self.assertEqual(count(), 1)
+
+        #   Another device on another IP is never suppressed, even with the
+        #   same proxy address in REMOTE_ADDR.
+        self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.2.2")
+        self.assertEqual(count(), 2)
+
+        #   After the window the same IP counts again.
+        AdvertEvent.objects.update(created_at=timezone.now() - timedelta(seconds=4))
+        self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.1.1")
+        self.assertEqual(count(), 3)
+
+    def test_click_redirects_with_utm_source_and_records_the_click(self):
+        response = self.client.get(
+            reverse("partner:advert_click", args=[self.reference.reference])
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            "https://example.com/tracked?utm_source=abureport",
+        )
+        event = AdvertEvent.objects.get()
+        self.assertEqual(event.event_type, AdvertEvent.EVENT_CLICK)
+        self.assertEqual(event.source, AdvertEvent.SOURCE_ABUREPORT)
+        self.assertEqual(event.target_url, response.url)
+
+        #   A double click inside the three-second window still redirects, but
+        #   it must not inflate the advertiser's click count.
+        again = self.client.get(
+            reverse("partner:advert_click", args=[self.reference.reference])
+        )
+        self.assertEqual(again.status_code, 302)
+        self.assertEqual(AdvertEvent.objects.filter(event_type=AdvertEvent.EVENT_CLICK).count(), 1)
+
+    def test_external_referrer_is_classified_as_external(self):
+        self.client.defaults["HTTP_REFERER"] = "https://news.example.net/story"
+
+        self.client.get(reverse("partner:advert_click", args=[self.reference.reference]))
+
+        self.assertEqual(AdvertEvent.objects.get().source, AdvertEvent.SOURCE_EXTERNAL)
+
+    def test_paused_reference_stops_clicks_and_landing_pages(self):
+        self.reference.status = AdvertReference.STATUS_PAUSED
+        self.reference.save(update_fields=["status"])
+
+        click = self.client.get(
+            reverse("partner:advert_click", args=[self.reference.reference])
+        )
+        self.assertRedirects(click, reverse("home:promote"), fetch_redirect_response=False)
+        self.assertEqual(AdvertEvent.objects.count(), 0)
+
+        AdvertLandingPage.objects.create(
+            advert=self.advert,
+            author=self.admin,
+            html_public_id="abureport/advert-landing/tracked.html",
+            is_published=True,
+        )
+        landing = self.client.get(f"/ads/tracked-advert-{self.advert.pk}/")
+        self.assertEqual(landing.status_code, 404)
+
+    def test_bot_user_agent_is_not_counted(self):
+        self.client.defaults["HTTP_USER_AGENT"] = "Googlebot/2.1"
+
+        response = self.client.get(
+            reverse("partner:advert_view", args=[self.reference.reference])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AdvertEvent.objects.count(), 0)
+
+
 class AdvertLandingSignalTests(TestCase):
     def test_deleting_a_landing_page_destroys_its_cloudinary_html(self):
         admin = Auth.objects.create_user(
@@ -446,3 +655,71 @@ class PanelAdvertLandingTests(TestCase):
 
         self.assertEqual(read.status_code, 403)
         self.assertEqual(write.status_code, 403)
+
+
+class AdvertPlanServingTests(TestCase):
+    """The plan on the reference decides, on every request, what may show."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = Auth.objects.create_user(email="plan-admin@example.com", is_staff=True, is_admin=True)
+        self.owner = Auth.objects.create_user(email="plan-owner@example.com")
+        self.advert = AdvertImage.objects.create(
+            author=self.admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading="Plan Shop",
+            body="Shop text",
+            image_url="https://cdn.example.com/ads/shop.jpg",
+        )
+        AdvertLandingPage.objects.create(
+            advert=self.advert, author=self.admin, html_public_id="x/advert_1.html", is_published=True
+        )
+        AdvertPage.objects.create(
+            advert=self.advert, path="about", author=self.admin, html_public_id="x/advert_1_p_about.html"
+        )
+        self.reference = AdvertReference.objects.create(
+            user=self.owner, plan=AdvertLead.PLAN_PRO, business_name="Plan Shop", advert=self.advert
+        )
+        self.document = "<!doctype html><title>{{page_title}}</title><p>{{canonical_url}}</p>"
+
+    def _get(self, url):
+        with mock.patch("Partner.views.fetch_advert_landing_html", return_value=self.document):
+            return self.client.get(url)
+
+    def _set_plan(self, plan):
+        self.reference.plan = plan
+        self.reference.save()
+
+    def test_landing_page_shows_for_pro_and_not_for_regular(self):
+        url = f"/ads/plan-shop-{self.advert.pk}/"
+        self.assertEqual(self._get(url).status_code, 200)
+        self._set_plan(AdvertLead.PLAN_REGULAR)
+        self.assertEqual(self._get(url).status_code, 404)
+
+    def test_extra_pages_are_for_advance_only(self):
+        url = f"/ads/plan-shop-{self.advert.pk}/about/"
+        self.assertEqual(self._get(url).status_code, 404)
+
+        self._set_plan(AdvertLead.PLAN_ADVANCE)
+        response = self._get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f"http://testserver{url}", response.content.decode())
+
+        #   A downgrade stops the page straight away.
+        self._set_plan(AdvertLead.PLAN_PRO)
+        self.assertEqual(self._get(url).status_code, 404)
+
+    def test_extra_page_needs_to_be_published_and_its_writer_still_an_admin(self):
+        self._set_plan(AdvertLead.PLAN_ADVANCE)
+        url = f"/ads/plan-shop-{self.advert.pk}/about/"
+        AdvertPage.objects.update(is_published=False)
+        self.assertEqual(self._get(url).status_code, 404)
+        AdvertPage.objects.update(is_published=True)
+        Auth.objects.filter(pk=self.admin.pk).update(is_admin=False)
+        self.assertEqual(self._get(url).status_code, 404)
+
+    def test_a_paused_reference_stops_its_extra_pages(self):
+        self._set_plan(AdvertLead.PLAN_ADVANCE)
+        self.reference.status = AdvertReference.STATUS_PAUSED
+        self.reference.save()
+        self.assertEqual(self._get(f"/ads/plan-shop-{self.advert.pk}/about/").status_code, 404)

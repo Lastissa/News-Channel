@@ -28,7 +28,8 @@ from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark, CategorySubscription
-from Partner.models import AdvertImage, AdvertLead
+from Partner.models import AdvertEvent, AdvertImage, AdvertLead, AdvertReference
+from Partner.plans import plan_allows, time_left
 from SERVICE_INTERNAL.abstract import (
     _response,
     cache_or_run,
@@ -53,6 +54,13 @@ from SERVICE_INTERNAL.email_batch import (
     new_story_alert_counts_for,
 )
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
+from SERVICE_INTERNAL.hosts import (
+    ads_origin,
+    is_ads_subdomain,
+    promote_lead_path,
+    promote_path,
+    promote_public_url,
+)
 from SERVICE_INTERNAL.images import (
     ImageQuality,
     ImageUploadError,
@@ -285,7 +293,7 @@ class LlmsTxtView(View):
             f"- [Editorial team]({domain}/editorial/): who reports for {name} and how we work.",
             f"- [About us]({domain}{reverse('home:about')}): what we cover and how we report it.",
             f"- [Privacy policy]({domain}{reverse('home:privacy_policy')})",
-            f"- [Advertise and partner with us]({domain}{reverse('home:promote')})",
+            f"- [Advertise and partner with us]({promote_public_url()})",
             f"- [Author handbook]({domain}{reverse('home:author_handbook')}): the writing and formatting guide for our reporters.",
             f"- [Sitemap]({domain}/sitemap.xml): a machine-readable list of every story, category and portfolio.",
             f"- [RSS feed]({domain}/rss.xml): the newest stories, newest first, in a standard RSS 2.0 feed.",
@@ -720,10 +728,13 @@ def _partnership_email():
 
 def _teaser_items():
     """Data for the hero's side advert rail (HOME/home.html). Each item is
-    {heading, body, image, url}. Real data is the live Partner.AdvertImage rows
-    the admin manages in PANEL (active + not expired, newest first). Until at
-    least one exists the old placeholder slides are shown so the rail is
-    never empty. The template and hero-teaser.js only read those four keys.
+    {heading, body, image, url, view_url}. Real data is the live
+    Partner.AdvertImage rows the admin manages in PANEL (active + not expired,
+    newest first). Until at least one exists the old placeholder slides are
+    shown so the rail is never empty. ``url`` is the tracked click route when
+    the advert has a reference; ``view_url`` is the tiny view pixel the rail
+    requests when that slide becomes focused. Placeholder slides have an empty
+    ``view_url`` and are never counted.
 
     `url` is the advert's landing page when one is published and its writer is
     still an active admin, otherwise the advertiser link saved on the advert.
@@ -739,26 +750,49 @@ def _teaser_items():
     from Partner.models import AdvertImage
 
     live = (
-        AdvertImage.objects.select_related("landing_page__author")
+        AdvertImage.objects.select_related(
+            "landing_page__author", "reference__advert__landing_page"
+        )
         .filter(expiry_date__gte=timezone.now(), is_active=True)
         .order_by("-date_created")
     )
-    if live:
-        rows = []
-        for row in live:
-            landing = getattr(row, "landing_page", None)
-            rows.append(
-                {
-                    "heading": row.heading,
-                    "body": row.body,
-                    "image": row.image_url,
-                    "url": (
-                        advert_landing_url(row)
-                        if landing and landing.is_deliverable
-                        else (row.url or "")
-                    ),
-                }
+    rows = []
+    for row in live:
+        reference = getattr(row, "reference", None)
+        #   A paused/expired reference is the commercial switch. Keep the
+        #   advert row in the panel but stop showing it to readers.
+        if reference and not reference.is_live:
+            continue
+        landing = getattr(row, "landing_page", None)
+        target = (
+            advert_landing_url(row)
+            if landing and landing.is_deliverable
+            else (row.url or "")
+        )
+        if reference:
+            target = reference.public_target or target
+        click_url = target
+        view_url = ""
+        if reference:
+            #   The pixel records a view when the slide becomes focused; the
+            #   click URL records the outbound click and adds our utm_source.
+            view_url = reverse(
+                "partner:advert_view", kwargs={"reference": reference.reference}
             )
+            if target:
+                click_url = reverse(
+                    "partner:advert_click", kwargs={"reference": reference.reference}
+                )
+        rows.append(
+            {
+                "heading": row.heading,
+                "body": row.body,
+                "image": row.image_url,
+                "url": click_url,
+                "view_url": view_url,
+            }
+        )
+    if rows:
         return rows
 
     from django.templatetags.static import static
@@ -1131,7 +1165,7 @@ class SearchView(View):
             **_page_context(page, request.user),
         }
         if request.headers.get("HX-Request"):
-            return render(request, "HOME/partials/search_results.html", context)
+            return render(request, "HOME/partials/search_ajax.html", context)
         return render(request, "HOME/search.html", context)
 
 
@@ -1731,6 +1765,17 @@ PROMOTE_PLANS = (
 )
 PROMOTE_PLAN_BY_SLUG = {plan["slug"]: plan for plan in PROMOTE_PLANS}
 
+#   A 32-second preview of a real advert in the reader rail. The video is kept
+#   on Cloudinary (next to the archive assets) while the poster lives in static
+#   files, so the page can paint instantly and only fetch the MP4 when a visitor
+#   chooses to watch it. No autoplay.
+ADVERT_PREVIEW_VIDEO_URL = (
+    "https://res.cloudinary.com/brop3jeq/raw/upload/v1794655970/"
+    "abureport/archive/AbuReport-ad-preview-video_g4dmnb.mp4"
+)
+ADVERT_PREVIEW_POSTER = "home/images/advert-preview-poster.jpg"
+ADVERT_PREVIEW_SECONDS = 32
+
 
 def _promote_contact_email():
     """The address the promote page's email fallback mails. It reads the
@@ -1798,7 +1843,11 @@ def _promote_context(request, form_data=None, form_error="", form_success=""):
     #   Error responses are rendered from /enquiry/, so never build links from
     #   request.get_full_path(): plan links and post-login redirects must always
     #   point back at the public page, not the POST-only endpoint.
-    page_url = f"{reverse('home:promote')}?{urlencode({'plan': form_data['plan']})}"
+    page_path = promote_path(request)
+    page_url = f"{page_path}?{urlencode({'plan': form_data['plan']})}"
+    #   On the ads host the public page is "/", so the canonical and social URL
+    #   must be the ads root rather than the news domain plus the old path.
+    canonical_url = f"{ads_origin(request)}/" if is_ads_subdomain(request) else ""
     signed_in = bool(request.user.is_authenticated)
     is_advertiser = bool(signed_in and getattr(request.user, "is_advertiser", False))
     return {
@@ -1809,6 +1858,12 @@ def _promote_context(request, form_data=None, form_error="", form_success=""):
         "form_data": form_data,
         "form_error": form_error,
         "form_success": form_success,
+        "canonical_url": canonical_url,
+        "promote_page_url": page_path,
+        "promote_lead_url": promote_lead_path(request),
+        "advert_preview_video_url": ADVERT_PREVIEW_VIDEO_URL,
+        "advert_preview_poster": static(ADVERT_PREVIEW_POSTER),
+        "advert_preview_seconds": ADVERT_PREVIEW_SECONDS,
         "account_signed_in": signed_in,
         "account_email": request.user.email if signed_in else "",
         "account_is_advertiser": is_advertiser,
@@ -1854,7 +1909,7 @@ class PromoteLeadView(View):
 
     def get(self, request):
         plan = (request.GET.get("plan") or "").strip()
-        target = reverse("home:promote")
+        target = promote_path(request)
         if plan in PROMOTE_PLAN_BY_SLUG:
             target = f"{target}?{urlencode({'plan': plan})}"
         return redirect(target)
@@ -1966,13 +2021,13 @@ class PromoteLeadView(View):
 
 
 class AdvertiserDashboardView(View):
-    """First advertiser dashboard pass.
+    """Advertiser home: enquiries, owned references, and real traffic.
 
-    The account is tagged at sign-up (Auth.is_advertiser). This view gives that
-    account a real home: the enquiries it has sent, the plans it has asked
-    about, and a clear place for the performance numbers once the ads team
-    issues an advert reference. It does not pretend that click/view tracking
-    already exists -- the performance panel says what unlocks next.
+    Access is gated by ownership, not by the email being verified. An account
+    can open the dashboard when it is tagged as an advertiser OR when ads staff
+    have issued it an advert reference. Every reference, view and click is
+    filtered to ``user=request.user`` so one advertiser can never see another
+    advertiser's rows.
     """
 
     def get(self, request):
@@ -1982,10 +2037,39 @@ class AdvertiserDashboardView(View):
                 reverse("auth:login") + "?" + urlencode({"to": request.get_full_path()})
             )
 
-        if not getattr(request.user, "is_advertiser", False):
+        reference_rows = list(
+            AdvertReference.objects.filter(user=request.user)
+            .select_related("advert__landing_page", "issued_by")
+            .annotate(
+                view_total=Count(
+                    "events",
+                    filter=Q(events__event_type=AdvertEvent.EVENT_VIEW),
+                ),
+                click_total=Count(
+                    "events",
+                    filter=Q(events__event_type=AdvertEvent.EVENT_CLICK),
+                ),
+                abureport_click_total=Count(
+                    "events",
+                    filter=Q(
+                        events__event_type=AdvertEvent.EVENT_CLICK,
+                        events__source=AdvertEvent.SOURCE_ABUREPORT,
+                    ),
+                ),
+                other_click_total=Count(
+                    "events",
+                    filter=Q(events__event_type=AdvertEvent.EVENT_CLICK)
+                    & ~Q(events__source=AdvertEvent.SOURCE_ABUREPORT),
+                ),
+            )
+            .order_by("-created_at")
+        )
+        has_references = bool(reference_rows)
+
+        if not getattr(request.user, "is_advertiser", False) and not has_references:
             messages.info(
                 request,
-                "Create an advertiser account to open the advertising dashboard.",
+                "Create an advertiser account or receive an advert reference to open this dashboard.",
             )
             return redirect(reverse("home:promote"))
 
@@ -1998,9 +2082,6 @@ class AdvertiserDashboardView(View):
         lead_count = leads.count()
         latest_lead = leads.first()
 
-        #   Plan interest is the only real analytics available before the
-        #   reference/tracking pass, so show it honestly instead of inventing
-        #   views or clicks.
         counts = {
             row["plan"]: row["total"]
             for row in leads.values("plan").annotate(total=Count("id"))
@@ -2016,20 +2097,90 @@ class AdvertiserDashboardView(View):
             for plan in PROMOTE_PLANS
         ]
 
+        #   Analytics are part of Pro and Advance. A Regular reference is left
+        #   out of every total and of the activity list, so its numbers never
+        #   reach the page.
+        for row in reference_rows:
+            row.has_analytics = plan_allows(row.plan, "analytics")
+            row.allows_landing = plan_allows(row.plan, "landing_page")
+            row.allows_pages = plan_allows(row.plan, "extra_pages")
+            left = time_left(row)
+            row.time_label = left["time_label"]
+            row.time_percent = left["time_percent"]
+        analytics_rows = [row for row in reference_rows if row.has_analytics]
+        view_total = sum(row.view_total for row in analytics_rows)
+        click_total = sum(row.click_total for row in analytics_rows)
+        abureport_clicks = sum(row.abureport_click_total for row in analytics_rows)
+        other_clicks = sum(row.other_click_total for row in analytics_rows)
+        click_rate = round(click_total / view_total * 100, 1) if view_total else 0
+        source_highest = max(abureport_clicks, other_clicks, 0) or 1
+        source_rows = [
+            {
+                "name": "From Abureport",
+                "count": abureport_clicks,
+                "width": round(abureport_clicks / source_highest * 100),
+            },
+            {
+                "name": "Other sources",
+                "count": other_clicks,
+                "width": round(other_clicks / source_highest * 100),
+            },
+        ]
+
+        reference_ids = [row.pk for row in analytics_rows]
+        recent_events = (
+            AdvertEvent.objects.filter(reference_id__in=reference_ids)
+            .select_related("reference")
+            .order_by("-created_at")[:8]
+            if reference_ids
+            else []
+        )
+
+        latest_reference = reference_rows[0] if reference_rows else None
+        business_name = (
+            latest_lead.business_name
+            if latest_lead
+            else (latest_reference.business_name if latest_reference else "")
+        )
+
+        #   The dashboard avatar follows the same name the header shows: the
+        #   advertiser's business name first, then their staff profile name,
+        #   then the email local part as a last resort.
+        staff_profile = getattr(request.user, "staffprofile", None)
+        profile_name = (
+            staff_profile.full_name.strip() if staff_profile and staff_profile.full_name else ""
+        )
+        account_name = (business_name or profile_name or request.user.email.split("@", 1)[0]).strip()
+        account_initial = next((char.upper() for char in account_name if char.isalnum()), "?")
+
         return render(
             request,
             "HOME/advertiser_dashboard.html",
             {
                 "account_email": request.user.email,
+                "account_avatar": request.user.profile_img or "",
+                "account_initial": account_initial,
+                "account_name": account_name,
                 "account_since": request.user.date_joined,
                 "ads_whatsapp_url": _ads_whatsapp_url(),
-                "business_name": latest_lead.business_name if latest_lead else "",
+                "business_name": business_name,
                 "latest_lead": latest_lead,
                 "lead_count": lead_count,
                 "leads": list(leads[:6]),
                 "plan_rows": plan_rows,
                 "profile_url": f"{reverse('home:profile')}?view=profile",
                 "promote_url": reverse("home:promote"),
+                "references": reference_rows,
+                "reference_count": len(reference_rows),
+                "live_reference_count": sum(1 for row in reference_rows if row.is_live),
+                "latest_reference": latest_reference,
+                "has_references": has_references,
+                "has_analytics": bool(analytics_rows),
+                "view_total": view_total,
+                "click_total": click_total,
+                "click_rate": click_rate,
+                "source_rows": source_rows,
+                "recent_events": recent_events,
             },
         )
 
@@ -2932,6 +3083,14 @@ def _release_story_image(public_id):
         info_logger(msg=f"STORY IMAGE LEFT ON CLOUDINARY: could not delete {public_id}")
 
 
+def _deleted_accounts_for(user):
+    """The "deleted accounts" notice, for admins only (ADMIN imports this
+    module, so the import has to wait until it is called)."""
+    from ADMIN.views import deleted_accounts_notice
+
+    return deleted_accounts_notice(user)
+
+
 def _collect_account_assets(account):
     """Every Cloudinary asset a to-be-deleted account owns: its story banners,
     its image advert pictures, its archive uploads and its avatar. Gathered
@@ -2944,8 +3103,10 @@ def _collect_account_assets(account):
     #   deferred: ARCHIVE.views imports HOME.views, so this cannot sit on top.
     from ARCHIVE.views import _public_id_from_url
 
+    #   all_objects: stories of a soft-deleted author are hidden from the
+    #   normal manager, but their banners still have to be released.
     story_image_ids = set(
-        Blog.objects.filter(author=account)
+        Blog.all_objects.filter(author=account)
         .exclude(image_public_id="")
         .values_list("image_public_id", flat=True)
     )
@@ -3012,11 +3173,15 @@ class ProfileView(View):
             messages.info(request, "sign in to open your profile.")
             return redirect(reverse("auth:login") + "?" + urlencode({"to": request.get_full_path()}))
 
-        #   Advertisers land on their analytics by default. The regular reader
-        #   profile is still one click away (and one query flag away for links
-        #   and tests), so both identities remain usable on the same account.
+        #   Advertisers land on their analytics by default. A reader account
+        #   that owns an advert reference gets the same treatment, because the
+        #   reference -- not the sign-up tag -- is what proves the advert is
+        #   theirs. The regular reader profile is still one query flag away.
         is_advertiser = bool(getattr(request.user, "is_advertiser", False))
-        if is_advertiser and request.GET.get("view") != "profile":
+        has_advert_references = AdvertReference.objects.filter(
+            user=request.user
+        ).exists()
+        if (is_advertiser or has_advert_references) and request.GET.get("view") != "profile":
             return redirect(reverse("home:advertise_dashboard"))
 
         profile = StaffProfile.objects.filter(auth=request.user).first()
@@ -3116,9 +3281,12 @@ class ProfileView(View):
             "followers_page_obj": followers_page,
             "followers_page_range": list(followers_paginator.get_elided_page_range(followers_page.number, on_each_side=1, on_ends=1)) if followers_paginator else [],
 
+            "deleted_accounts": _deleted_accounts_for(request.user),
             "is_staff_user": staff_only(request.user),
             "is_admin_user": is_admin,
             "is_advertiser_user": is_advertiser,
+            "has_advert_references": has_advert_references,
+            "is_ads_staff_user": bool(getattr(request.user, "is_ads_staff", False)),
             "archive_upload_alerts": archive_upload_alerts,
             "subscribed_categories": subscribed_category_names,
             "available_categories": available_category_names,

@@ -1,0 +1,20 @@
+{% comment %}The filter bar. It sits in its own slot so a search can swap it in without reloading the page.{% endcomment %}
+{% if query %}
+<div class="search-filter-bar" aria-label="Search filters">
+  <label class="search-filter-label" for="search-scope">Filter</label>
+  <select id="search-scope"
+          name="scope"
+          class="search-filter-select"
+          hx-get="{% url 'home:search' %}"
+          hx-trigger="change"
+          hx-target="#search-results"
+          hx-swap="innerHTML"
+          hx-indicator="#search-results-indicator"
+          hx-include="#search-page-input"
+          hx-vals='{"page":"1"}'>
+    {% for value, label in search_scope_choices.items %}
+      <option value="{{ value }}" {% if search_scope == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endif %}

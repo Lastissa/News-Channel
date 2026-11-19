@@ -122,6 +122,13 @@ def get_category_choices():
         return []
 
 
+class LiveBlogManager(models.Manager):
+    """Stories of a soft-deleted author are hidden from readers and lists."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(author__deleted_at__isnull=True)
+
+
 class Blog(models.Model):
     image_1 = models.URLField(blank=True, null=True)
     #   THE EXACT CLOUDINARY ASSET `image_1` LIVES AT (blank when image_1 is
@@ -203,6 +210,9 @@ class Blog(models.Model):
     #   updated ..." notice on the story page keys off this field instead.
     last_edited = models.DateTimeField(blank=True, null=True, help_text="SET ONLY WHEN STAFF EDIT THE STORY AFTER PUBLISHING, NULL IF NEVER EDITED")
     date_created = models.DateTimeField(auto_now_add=True)
+
+    objects = LiveBlogManager()
+    all_objects = models.Manager()   #   includes stories of soft-deleted authors (admin screens only)
 
     class Meta:
         constraints = [
@@ -347,6 +357,13 @@ class StoryView(models.Model):
         return f"View of {self.blog_id} at {self.created_at:%Y-%m-%d %H:%M}"
 
 
+class LiveCommentManager(models.Manager):
+    """Comments written by a soft-deleted account are hidden."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(author__deleted_at__isnull=True)
+
+
 class Comment(models.Model):
     """Comment / Feedback under the blog post"""
     blog = models.ForeignKey(Blog, on_delete=models.CASCADE, related_name='comments')
@@ -354,3 +371,6 @@ class Comment(models.Model):
     content = models.TextField(blank=False, null=False)
     likes = models.PositiveIntegerField(default=0)
     date_created = models.DateTimeField(auto_now_add=True)    #   NEEDED FOR THE COMMENT TIMESTAMP ("x days ago") SHOWN IN THE UI
+
+    objects = LiveCommentManager()
+    all_objects = models.Manager()

@@ -13,6 +13,14 @@ STAFF_ROLE = [
 ]
 
 
+class LiveStaffProfileManager(models.Manager):
+    """A soft-deleted account has no public profile: no author page, no
+    editorial-team card, no directory row."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(auth__deleted_at__isnull=True)
+
+
 class StaffProfile(models.Model):
     auth = models.OneToOneField("AUTHENTICATION.Auth", on_delete=models.CASCADE, related_name="staffprofile")
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
@@ -34,6 +42,9 @@ class StaffProfile(models.Model):
     get_follower_notification = models.BooleanField(default=True, help_text="WETHER TO EMAIL THE AUTHOR WHEN SOMEONE STARTS FOLLOWING THEM")
     get_comment_notification = models.BooleanField(default=True, help_text="WETHER TO EMAIL THE AUTHOR WHEN SOMEONE COMMENTS ON THEIR STORY")
 
+    objects = LiveStaffProfileManager()
+    all_objects = models.Manager()
+
     class Meta:
         verbose_name = "Staff profile"
         verbose_name_plural = "Staff profiles"
@@ -46,7 +57,7 @@ class StaffProfile(models.Model):
         base = slugify(self.full_name) or f"staff-{self.pk}"
         candidate = base
         suffix = 2
-        while StaffProfile.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
+        while StaffProfile.all_objects.filter(slug=candidate).exclude(pk=self.pk).exists():
             candidate = f"{base}-{suffix}"
             suffix += 1
         return candidate
@@ -74,7 +85,7 @@ class StaffProfile(models.Model):
         if (is_new and not self.slug) or name_changed:
             candidate = self._build_unique_slug()
             if candidate != self.slug:
-                StaffProfile.objects.filter(pk=self.pk).update(slug=candidate)
+                StaffProfile.all_objects.filter(pk=self.pk).update(slug=candidate)
                 self.slug = candidate
 
     def __str__(self):

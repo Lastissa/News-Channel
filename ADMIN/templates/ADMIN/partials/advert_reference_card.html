@@ -1,0 +1,153 @@
+{% comment %}One reference card. The buttons talk to the server with htmx and swap
+just this card, so the page never reloads. Without JavaScript the same buttons
+still work as normal form posts (see data-fallback forms in the edit block).{% endcomment %}
+<article class="ads-desk-ref ads-desk-ref--{{ ref.status }}" id="ref-{{ ref.id }}" data-status="{{ ref.status }}"
+         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="this" hx-swap="outerHTML">
+  <header class="ads-desk-ref-head">
+    <div class="ads-desk-ref-title">
+      <code class="ads-desk-code">{{ ref.reference }}</code>
+      <h3>{{ ref.business_name }}</h3>
+      <p>{{ ref.email }}</p>
+    </div>
+    <div class="ads-desk-ref-badges">
+      <span class="ads-desk-status ads-desk-status--{{ ref.status }}">{{ ref.status_label }}</span>
+      <span class="ads-desk-plan ads-desk-plan--{{ ref.plan }}">{{ ref.plan_label }}</span>
+    </div>
+  </header>
+
+  <div class="ads-desk-time">
+    <div class="ads-desk-time-row">
+      <strong>{{ ref.time_label }}</strong>
+      <span>{% if ref.expires_at %}ends {{ ref.expires_at|date:"M d, Y H:i" }}{% else %}no end date{% endif %}</span>
+    </div>
+    <div class="ads-desk-bar" aria-hidden="true"><i style="width: {{ ref.time_percent }}%"></i></div>
+  </div>
+
+  <dl class="ads-desk-metrics">
+    <div><dd>{{ ref.view_total }}</dd><dt>Views</dt></div>
+    <div><dd>{{ ref.click_total }}</dd><dt>Clicks</dt></div>
+    <div><dd>{{ ref.ctr }}%</dd><dt>Click rate</dt></div>
+  </dl>
+
+  <ul class="ads-desk-features" aria-label="Included in the {{ ref.plan_label }} plan">
+    <li class="is-on">Banner</li>
+    <li class="{% if ref.allows_landing %}is-on{% endif %}">Landing page</li>
+    <li class="{% if ref.allows_subdomain %}is-on{% endif %}">Subdomain</li>
+    <li class="{% if ref.allows_analytics %}is-on{% endif %}">Analytics</li>
+    <li class="{% if ref.plan == 'advance' %}is-on{% endif %}">Extra pages</li>
+  </ul>
+
+  <p class="ads-desk-ref-meta">
+    <span>Advert: {% if ref.advert_label %}{{ ref.advert_label }}{% else %}not linked yet{% endif %}</span>
+    {% if ref.public_page_url %}<a href="{{ ref.public_page_url }}" target="_blank" rel="noopener noreferrer">{{ ref.public_host }}</a>
+    {% elif ref.public_target %}<a href="{{ ref.public_target }}" target="_blank" rel="noopener noreferrer">Open link</a>{% endif %}
+  </p>
+
+  <div class="ads-desk-ref-actions">
+    {% if ref.status == "live" or ref.status == "scheduled" %}
+    <button type="button" class="ads-desk-button ads-desk-button--quiet"
+            hx-post="{% url 'control:advert_reference_status' ref.id %}" hx-vals='{"action": "pause"}'>Pause</button>
+    {% elif ref.status == "paused" %}
+    <button type="button" class="ads-desk-button ads-desk-button--quiet"
+            hx-post="{% url 'control:advert_reference_status' ref.id %}" hx-vals='{"action": "resume"}'>Resume</button>
+    {% endif %}
+
+    <button type="button" class="ads-desk-button ads-desk-button--quiet"
+            hx-post="{% url 'control:advert_reference_renew' ref.id %}" hx-vals='{"days": "7"}'
+            hx-confirm="Add 7 days to {{ ref.business_name }} ({{ ref.reference }})?{% if ref.expires_at %} It currently ends {{ ref.expires_at|date:'M d, Y H:i' }}.{% endif %}">+ 7 days</button>
+
+    <button type="button" class="ads-desk-button ads-desk-button--quiet"
+            {% if not ref.can_shorten %}disabled title="The end date is missing or less than 7 days away"{% endif %}
+            hx-post="{% url 'control:advert_reference_shorten' ref.id %}" hx-vals='{"days": "7"}'
+            hx-confirm="Remove 7 days from {{ ref.business_name }} ({{ ref.reference }})?{% if ref.expires_at %} It currently ends {{ ref.expires_at|date:'M d, Y H:i' }}.{% endif %}">&minus; 7 days</button>
+
+    {% if ref.allows_pages and request.user.is_admin or ref.allows_pages and request.user.is_superuser %}
+    <a class="ads-desk-button ads-desk-button--quiet" href="{% url 'control:advert_pages' ref.id %}">Pages</a>
+    {% endif %}
+
+    {% if ref.status != "expired" %}
+    <button type="button" class="ads-desk-button ads-desk-button--danger"
+            hx-post="{% url 'control:advert_reference_status' ref.id %}" hx-vals='{"action": "expire"}'
+            hx-confirm="End {{ ref.reference }} for {{ ref.business_name }}? It stops showing straight away.">End</button>
+    {% endif %}
+  </div>
+
+  <details class="ads-desk-edit" {% if edit_error_id == ref.id %}open{% endif %}>
+    <summary>Edit plan, dates, advert, subdomain or notes</summary>
+
+    {% if edit_error_id == ref.id %}
+    <p class="ads-desk-error" role="alert">{{ edit_error }}</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'control:advert_reference_update' ref.id %}" class="ads-desk-form ads-desk-form--edit"
+          hx-boost="false">
+      {% csrf_token %}
+
+      <label class="ads-desk-field">
+        <span>Plan</span>
+        <select name="plan" required data-plan-select>
+          {% for value, label in plan_choices %}
+          <option value="{{ value }}" {% if ref.edit.plan == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="ads-desk-field">
+        <span>Business name</span>
+        <input type="text" name="business_name" maxlength="120" required value="{{ ref.edit.business_name }}">
+      </label>
+
+      <label class="ads-desk-field">
+        <span>Starts</span>
+        <input type="datetime-local" name="starts_at" value="{{ ref.edit.starts_at }}">
+      </label>
+
+      <label class="ads-desk-field">
+        <span>Ends</span>
+        <input type="datetime-local" name="expires_at" value="{{ ref.edit.expires_at }}">
+      </label>
+
+      <label class="ads-desk-field">
+        <span>Advert subdomain</span>
+        <span class="ads-desk-subdomain">
+          <input type="text" name="subdomain" maxlength="63" autocomplete="off" data-subdomain-input
+                 spellcheck="false" pattern="[a-z0-9](?:[a-z0-9_\-]{0,61}[a-z0-9])?"
+                 value="{{ ref.edit.subdomain }}" placeholder="newads">
+          <span class="ads-desk-subdomain-suffix">.{{ ads_base_host }}</span>
+        </span>
+        <small data-subdomain-hint>Pro and Advance plans only.</small>
+      </label>
+
+      <label class="ads-desk-field ads-desk-field--wide">
+        <span>Public page URL</span>
+        <input type="url" name="public_url" maxlength="500" value="{{ ref.edit.public_url }}" placeholder="https://example.com/campaign">
+        <small>The advert opens this link. It is set only here.</small>
+      </label>
+
+      <label class="ads-desk-field ads-desk-field--wide">
+        <span>Linked advert</span>
+        <select name="advert_id">
+          <option value="">No advert linked</option>
+          {% for advert in ref.advert_choices %}
+          <option value="{{ advert.id }}" {% if ref.edit.advert_id == advert.id|stringformat:"s" %}selected{% endif %} {% if not advert.allowed %}disabled{% endif %}>
+            {{ advert.label }}{% if advert.taken_by and advert.id != ref.advert_id %} - already used by {{ advert.taken_by }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="ads-desk-field ads-desk-field--wide">
+        <span>Internal notes</span>
+        <textarea name="notes" rows="3" maxlength="1000">{{ ref.edit.notes }}</textarea>
+      </label>
+
+      <div class="ads-desk-form-actions ads-desk-field--wide">
+        <button type="submit" class="ads-desk-button ads-desk-button--primary">Save changes</button>
+      </div>
+    </form>
+  </details>
+
+  {% if ref.notes %}
+  <p class="ads-desk-note"><span>Internal note</span>{{ ref.notes }}</p>
+  {% endif %}
+</article>

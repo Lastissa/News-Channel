@@ -1,0 +1,110 @@
+{% load archive_extras %}
+{% if editor_item %}
+{% firstof form_visibility editor_item.visibility as vis %}
+{% firstof form_alt editor_item.alt as alt_value %}
+<div class="studio-editor-inner" data-studio-editor>
+  <div class="studio-editor-top">
+    <button type="button" class="studio-back" data-studio-back>
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back to list
+    </button>
+    <span class="archive-eyebrow">Editing</span>
+  </div>
+
+  {% if error %}<p class="archive-modal-error" data-archive-manage-error>{{ error }}</p>{% endif %}
+  {% if notice %}<p class="archive-manage-notice" data-archive-manage-notice>{{ notice }}</p>{% endif %}
+
+  <div class="studio-preview{% if editor_item.kind == 'file' %} is-file{% endif %}">
+    {% with proxied_url=editor_item.url|cloudinary_proxy %}
+    {% if editor_item.kind == 'image' %}
+    <img src="{{ proxied_url }}" alt="{{ editor_item.alt }}" onerror="this.onerror=null;this.src='/static/404.jpg';">
+    {% else %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z M14 3v5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+    <strong>{{ editor_item.original_filename|default:"File" }}</strong>
+    {% endif %}
+    {% endwith %}
+    <span class="studio-preview-meta">{% if editor_item.kind == "image" %}{{ editor_item.quality_label }} &middot; {{ editor_item.width }}&times;{{ editor_item.height }}{% else %}{{ editor_item.file_size_label }}{% endif %} &middot; {{ editor_item.date_created|date:"j M Y" }}</span>
+  </div>
+
+  <form class="archive-manage-row-form studio-form" id="studio-form"
+        hx-post="{% url 'archive:item_edit' editor_item.id %}"
+        hx-target="#archive-manage-list" hx-swap="outerHTML"
+        hx-encoding="multipart/form-data"
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <input type="hidden" name="descr" value="{{ descr }}">
+    <input type="hidden" name="date" value="{{ date }}">
+    <input type="hidden" name="show" value="{{ show }}">
+
+    <div class="studio-field">
+      <label for="studio-alt">Description</label>
+      <textarea id="studio-alt" name="alt" rows="3" maxlength="{{ alt_max }}" minlength="{{ alt_min }}" required data-studio-alt>{{ alt_value }}</textarea>
+      <span class="studio-hint"><span data-studio-count>{{ alt_value|length }}</span>/{{ alt_max }} &middot; at least {{ alt_min }}</span>
+    </div>
+
+    {% if editor_item.kind == 'image' %}
+    <fieldset class="studio-field">
+      <legend>Quality</legend>
+      <div class="studio-seg">
+        {% for value, label in quality_choices %}
+        <label><input type="radio" name="quality" value="{{ value }}" {% if editor_item.quality == value %}checked{% endif %}><span>{{ value|title }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    {% endif %}
+
+    <fieldset class="studio-field">
+      <legend>Who can see it</legend>
+      <div class="studio-seg studio-seg-wide">
+        <label><input type="radio" name="visibility" value="public" {% if vis != 'private' %}checked{% endif %} data-studio-vis><span><strong>Public</strong><small>Listed in the archive</small></span></label>
+        <label><input type="radio" name="visibility" value="private" {% if vis == 'private' %}checked{% endif %} data-studio-vis><span><strong>Only me</strong><small>Hidden unless you are signed in</small></span></label>
+      </div>
+    </fieldset>
+
+    <div class="studio-field">
+      <label for="studio-file">Replace {% if editor_item.kind == 'image' %}picture{% else %}file{% endif %} <em>(optional)</em></label>
+      <label class="studio-drop" for="studio-file">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5m0 0-4 4m4-4 4 4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span data-studio-file-name>Choose a new {% if editor_item.kind == 'image' %}picture{% else %}file{% endif %}</span>
+      </label>
+      <input id="studio-file" class="sr-only" type="file" name="upload_file" data-studio-file
+             accept="{% if editor_item.kind == 'image' %}image/jpeg,image/png,image/webp{% endif %}">
+    </div>
+
+    <div class="archive-upload-progress" data-archive-upload-progress hidden role="progressbar" aria-label="Upload progress">
+      <div class="archive-upload-progress-fill" data-archive-upload-progress-fill></div>
+    </div>
+
+    {% if private_warning %}
+    <div class="studio-warning" role="alert" data-studio-warning>
+      <strong>Stories still use this item</strong>
+      <p>If it becomes Only me, readers will see a broken picture in:</p>
+      <ul>{% for heading in private_warning %}<li>{{ heading }}</li>{% endfor %}</ul>
+      <div class="studio-warning-actions">
+        <button type="button" class="archive-action-btn" data-studio-keep-public>Keep it public</button>
+        <button type="submit" name="confirm_private" value="1" class="archive-action-btn primary">Make private anyway</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="studio-actions">
+      <button type="button" class="studio-delete"
+              hx-post="{% url 'archive:item_delete' editor_item.id %}"
+              hx-target="#archive-manage-list" hx-swap="outerHTML"
+              hx-params="none"
+              hx-vals='{"descr": "{{ descr|escapejs }}", "date": "{{ date|escapejs }}", "show": "{{ show|escapejs }}"}'
+              hx-confirm="Delete this item and its source file from the archive? This can't be undone."
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m-6 0 .6 9.4A2 2 0 0 0 8.6 17h2.8a2 2 0 0 0 2-1.6L14 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Delete
+      </button>
+      <button type="submit" class="archive-action-btn primary studio-save">Save changes</button>
+    </div>
+  </form>
+</div>
+{% else %}
+<div class="studio-empty-editor">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.5V19h2.5L18 7.5 15.5 5 4 16.5Z M14 6.5 16.5 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  <strong>Pick an upload to edit</strong>
+  <span>Change its description, quality or visibility, swap the file, or delete it.</span>
+</div>
+{% endif %}

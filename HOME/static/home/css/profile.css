@@ -2080,3 +2080,242 @@ html.avatar-crop-open {
   .sessions-skeleton-tag,
   .sessions-skeleton-btn { animation: none; }
 }
+
+/* ==========================================================================
+   MODERN PROFILE LAYER
+   Visual refresh only: same markup hooks, same behaviour. Cards get softer
+   corners and depth, the top gets a proper toolbar, the identity card gets
+   stat tiles. Everything uses the site tokens, so light and dark both work.
+   ========================================================================== */
+.profile-shell {
+  max-width: 1240px;
+  margin-inline: auto;
+  padding: 20px clamp(14px, 3vw, 28px) 48px;
+  box-sizing: border-box;
+  --pm-radius: 16px;
+  --pm-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 28px -16px rgba(15, 23, 42, 0.22);
+}
+
+/* ---- top toolbar ---- */
+.profile-toolbar { display: grid; gap: 14px; margin: 0 0 20px; }
+.profile-toolbar-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+.profile-toolbar-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber-deep, var(--ink));
+}
+.profile-toolbar h1 { margin: 0; font-size: clamp(1.5rem, 3.4vw, 2rem); line-height: 1.1; }
+.profile-tools { display: flex; flex-wrap: wrap; gap: 6px;}
+.profile-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.profile-tool svg { width: 17px; height: 17px; flex: none; }
+.profile-tool:hover { border-color: var(--ink); }
+.profile-tool:focus-visible, .profile-jump a:focus-visible { outline: 2px solid var(--amber-alt); outline-offset: 2px; }
+.profile-tool.is-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.profile-jump {
+  position: sticky;
+  top: var(--header-h, 0px);
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  padding: 8px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--paper);
+}
+.profile-jump::-webkit-scrollbar { display: none; }
+.profile-jump a {
+  flex: none;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.profile-jump a:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.profile-shell .profile-panel { scroll-margin-top: calc(var(--header-h, 64px) + 72px); }
+
+/* ---- cards ---- */
+.profile-shell .profile-side,
+.profile-shell .profile-summary,
+.profile-shell .profile-prefs,
+.profile-shell .profile-card {
+  border-radius: var(--pm-radius);
+  box-shadow: var(--pm-shadow);
+}
+.profile-shell .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.profile-shell .panel-header h3 {
+  position: relative;
+  margin: 0;
+  padding-left: 12px;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  border: 0;
+}
+.profile-shell .panel-header h3::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  bottom: 0.15em;
+  width: 4px;
+  border-radius: 4px;
+  background: var(--amber-alt);
+}
+.profile-shell .panel-tag {
+  padding: 4px 16px 4px 10px;
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  background: var(--paper-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+/* ---- identity card ---- */
+.profile-shell .profile-identity-row { flex-direction: column; align-items: flex-start; gap: 12px; }
+.profile-shell .profile-avatar-wrap {
+  width: 84px;
+  height: 84px;
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 2px var(--amber-alt), 0 6px 16px -6px rgba(15, 23, 42, 0.4);
+}
+.profile-shell .profile-identity-copy h2 { font-size: clamp(1.25rem, 2.6vw, 1.6rem); overflow: visible; word-break: break-word; }
+.profile-shell .profile-role {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 18px 4px 12px;
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.profile-shell .profile-info-list { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+.profile-shell .profile-info-list > * {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-dim);
+}
+.profile-shell .profile-info-list span { font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.72; }
+.profile-shell .profile-info-list strong { font-size: 0.92rem; }
+.profile-shell .profile-joined-row { order: 1; }
+.profile-shell .profile-active-sessions { order: 2; grid-column: span 1; cursor: pointer; }
+.profile-shell .profile-active-sessions:hover { border-color: var(--ink); }
+.profile-shell .profile-last-login-row { order: 3; grid-column: 1 / -1; }
+.profile-shell .profile-last-login-row .profile-delete-account-btn { margin-top: 6px; }
+@media (max-width: 899.98px) {
+  .profile-shell .profile-active-sessions { grid-column: 1 / -1; }
+}
+
+/* ---- buttons inside the identity card ---- */
+.profile-shell .profile-image-actions { margin-top: 14px; }
+.profile-shell .profile-image-actions-row { display: block; flex: 1 1 100%; width: 100%; }
+.profile-shell .profile-image-actions-row .avatar-icon-btn {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 12px;
+}
+.profile-shell .profile-logout-all-block { border: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 14px; }
+.profile-shell .profile-logout-all-block .logout-all-btn,
+.profile-shell .profile-logout-all-block .view-sessions-btn {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+}
+.profile-shell .profile-logout-all-block .view-sessions-btn { background: transparent; border: 1px solid var(--line); }
+@media (min-width: 560px) and (max-width: 899.98px) {
+  .profile-shell .profile-logout-all-block { grid-template-columns: 1fr 1fr; }
+  .profile-shell .profile-logout-all-block .staff-record-feedback { grid-column: 1 / -1; }
+}
+
+/* ---- settings rows ---- */
+.profile-shell .setting-row {
+  padding: 12px 0;
+  gap: 14px;
+}
+.profile-shell .setting-label { font-weight: 700; }
+.profile-shell .setting-copy small { line-height: 1.4; opacity: 0.8; }
+
+/* ---- forms and lists in the main column ---- */
+.profile-shell .profile-card input[type="text"],
+.profile-shell .profile-card input[type="search"],
+.profile-shell .profile-card select,
+.profile-shell .profile-card textarea {
+  border-radius: 12px;
+}
+.profile-shell .profile-card button[type="submit"],
+.profile-shell .profile-card .profile-action-btn { border-radius: 12px; }
+
+@media (max-width: 640px) {
+  .profile-tools { flex-wrap: nowrap; overflow-x: scroll; width: 100%; scrollbar-width: none; padding-bottom: 2px; }
+  .profile-tools::-webkit-scrollbar { display: none; }
+  .profile-shell { --pm-radius: 14px; }
+}
+
+/* phone fixes: full-width action buttons, and no curved edge on the setting rows */
+.profile-shell .profile-setting-block { border-radius: 0; }
+.profile-shell .profile-side .upload-avatar-btn,
+.profile-shell .profile-summary .upload-avatar-btn {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  justify-content: center;
+  min-height: 44px;
+}
+.profile-shell .profile-action-btn[data-own-role-save] {
+  width: 100%;
+  min-height: 44px;
+  background: var(--paper-dim);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+@media (max-width: 899.98px) {
+  .profile-shell { padding-inline: 12px; }
+  .profile-shell .profile-card, .profile-shell .profile-summary { padding-inline: 14px; }
+}

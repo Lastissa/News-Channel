@@ -28,7 +28,7 @@ from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
-from Partner.models import AdvertLead
+from Partner.models import AdvertImage, AdvertLead, AdvertPage, AdvertReference
 from SERVICE_INTERNAL import email_single
 from SERVICE_INTERNAL.config import About
 from STAFF.models import AuthorFollow, StaffProfile
@@ -3016,3 +3016,479 @@ class PanelAdvertLeadTests(TestCase):
         self.assertContains(response, "Grace Stores")
         self.assertContains(response, "grace@example.com")
         self.assertContains(response, "We sell fabrics in Kano.")
+
+
+@override_settings(CACHES=ISOLATED_CACHE)
+class AdvertReferenceDeskTests(TestCase):
+    """The ads desk is a limited staff surface, not full PANEL access."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+        patcher = mock.patch("ADMIN.views.is_rate_limited", return_value=(0, False))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.admin = Auth.objects.create_admin(email="ads-desk-admin@example.com")
+        self.ads_staff = Auth.objects.create_user(
+            email="ads-desk-staff@example.com", is_ads_staff=True
+        )
+        self.member = Auth.objects.create_user(email="ads-desk-reader@example.com")
+        self.owner = Auth.objects.create_user(email="grace.owner@example.com")
+        self.other_owner = Auth.objects.create_user(email="other.owner@example.com")
+        self.advert = self._advert("Desk advert")
+        self.second_advert = self._advert("Second desk advert")
+
+    def _advert(self, heading):
+        return AdvertImage.objects.create(
+            author=self.admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading=heading,
+            image_url="https://cdn.example.com/ads/desk.jpg",
+            url="https://example.com/desk",
+        )
+
+    def _reference(self, advert=None, owner=None, **kwargs):
+        values = {
+            "user": owner or self.owner,
+            "plan": AdvertLead.PLAN_REGULAR,
+            "business_name": "Desk Business",
+        }
+        values.update(kwargs)
+        return AdvertReference.objects.create(advert=advert or self.advert, **values)
+
+    def _issue_payload(self, **overrides):
+        values = {
+            "email": self.owner.email,
+            "plan": AdvertLead.PLAN_PRO,
+            "business_name": "Grace Stores",
+            "starts_at": "",
+            "expires_at": "",
+            "public_url": "",
+            "advert_id": str(self.advert.pk),
+            "notes": "Paid by transfer.",
+        }
+        values.update(overrides)
+        return values
+
+    def test_create_staff_can_grant_ads_desk_access_without_admin_rights(self):
+        self.client.force_login(self.admin)
+        with mock.patch("ADMIN.views._try_send_staff_welcome_email"), mock.patch(
+            "ADMIN.views._try_send_staff_created_batch_email"
+        ):
+            response = self.client.post(
+                reverse("control:staff_create"),
+                {
+                    "email": "new-ads-staff@example.com",
+                    "password": "Str0ngPass1!",
+                    "full_name": "New Ads Staff",
+                    "gender": "F",
+                    "role": "JOURNALIST",
+                    "is_ads_staff": "on",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        account = Auth.objects.get(email__iexact="new-ads-staff@example.com")
+        self.assertTrue(account.is_ads_staff)
+        self.assertFalse(account.is_admin)
+        self.assertTrue(StaffProfile.objects.filter(auth=account).exists())
+
+    def test_staff_detail_toggle_is_admin_only_and_toggles_the_flag(self):
+        target = Auth.objects.create_staff(email="toggle-target@example.com")
+        StaffProfile.objects.create(
+            auth=target, gender="M", full_name="Toggle Target", role="JOURNALIST"
+        )
+        endpoint = reverse("control:staff_ads_access", args=[target.pk])
+
+        self.client.force_login(self.ads_staff)
+        denied = self.client.post(endpoint)
+        self.assertEqual(denied.status_code, 403)
+
+        self.client.force_login(self.admin)
+        granted = self.client.post(endpoint)
+        self.assertEqual(granted.status_code, 200)
+        self.assertTrue(granted.json()["is_ads_staff"])
+        target.refresh_from_db()
+        self.assertTrue(target.is_ads_staff)
+
+        removed = self.client.post(endpoint)
+        self.assertEqual(removed.status_code, 200)
+        self.assertFalse(removed.json()["is_ads_staff"])
+        target.refresh_from_db()
+        self.assertFalse(target.is_ads_staff)
+
+    def test_ads_staff_can_open_the_desk_but_not_panel(self):
+        self.client.force_login(self.ads_staff)
+
+        desk = self.client.get(reverse("control:advert_references"))
+        self.assertEqual(desk.status_code, 200)
+        self.assertContains(desk, "Advert references")
+
+        panel = self.client.get(reverse("control:panel"))
+        self.assertRedirects(
+            panel, reverse("home:profile"), fetch_redirect_response=False
+        )
+
+        self.client.force_login(self.member)
+        blocked = self.client.get(reverse("control:advert_references"))
+        self.assertRedirects(
+            blocked, reverse("home:profile"), fetch_redirect_response=False
+        )
+
+    def test_ads_staff_can_issue_a_reference_tied_to_the_account_email(self):
+        self.client.force_login(self.ads_staff)
+
+        response = self.client.post(
+            reverse("control:advert_references"), self._issue_payload()
+        )
+
+        self.assertEqual(response.status_code, 302)
+        reference = AdvertReference.objects.get()
+        self.assertEqual(reference.user, self.owner)
+        self.assertEqual(reference.email_used, self.owner.email)
+        self.assertEqual(reference.issued_by, self.ads_staff)
+        self.assertEqual(reference.advert, self.advert)
+        self.assertEqual(len(reference.reference), 16)
+        self.assertTrue(reference.reference.startswith("GRACE"))
+        self.owner.refresh_from_db()
+        self.assertTrue(self.owner.is_advertiser)
+
+    def test_subdomain_is_saved_and_cannot_be_reused_by_another_advert(self):
+        self.client.force_login(self.ads_staff)
+        url = reverse("control:advert_references")
+
+        first = self.client.post(url, self._issue_payload(subdomain="NewAds"))
+        self.assertEqual(first.status_code, 302)
+        self.assertEqual(AdvertReference.objects.get().subdomain, "newads")
+
+        duplicate = self.client.post(
+            url,
+            self._issue_payload(
+                email=self.other_owner.email,
+                advert_id=str(self.second_advert.pk),
+                subdomain="newads",
+            ),
+        )
+        self.assertContains(
+            duplicate, "Another advert already uses that subdomain.", status_code=400
+        )
+        self.assertEqual(AdvertReference.objects.count(), 1)
+
+    def test_reserved_or_dotted_subdomains_are_refused(self):
+        self.client.force_login(self.ads_staff)
+        url = reverse("control:advert_references")
+
+        for bad in ("ads", "www", "a.b"):
+            response = self.client.post(url, self._issue_payload(subdomain=bad))
+            self.assertEqual(response.status_code, 400, bad)
+        self.assertEqual(AdvertReference.objects.count(), 0)
+
+    def test_an_underscore_in_a_subdomain_is_saved_as_a_hyphen(self):
+        self.client.force_login(self.ads_staff)
+        self.client.post(
+            reverse("control:advert_references"),
+            self._issue_payload(plan=AdvertLead.PLAN_PRO, subdomain="my_shop"),
+        )
+        self.assertEqual(AdvertReference.objects.get().subdomain, "my-shop")
+
+    def test_regular_plan_cannot_take_a_subdomain(self):
+        self.client.force_login(self.ads_staff)
+        response = self.client.post(
+            reverse("control:advert_references"),
+            self._issue_payload(plan=AdvertLead.PLAN_REGULAR, subdomain="newads"),
+        )
+        self.assertContains(response, "does not include a custom subdomain", status_code=400)
+        self.assertEqual(AdvertReference.objects.count(), 0)
+
+    def test_button_press_from_the_page_returns_the_card_without_a_reload(self):
+        reference = self._reference(expires_at=timezone.now() + timedelta(days=10))
+        self.client.force_login(self.ads_staff)
+        response = self.client.post(
+            reverse("control:advert_reference_renew", args=[reference.pk]),
+            {"days": "7"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'id="ref-{reference.pk}"')
+        self.assertIn("adsToast", response["HX-Trigger"])
+        reference.refresh_from_db()
+        self.assertGreater(reference.expires_at, timezone.now() + timedelta(days=16))
+
+    def test_remove_seven_days_never_moves_the_end_into_the_past(self):
+        reference = self._reference(expires_at=timezone.now() + timedelta(days=20))
+        self.client.force_login(self.ads_staff)
+        url = reverse("control:advert_reference_shorten", args=[reference.pk])
+
+        self.client.post(url, {"days": "7"}, HTTP_HX_REQUEST="true")
+        reference.refresh_from_db()
+        self.assertLess(reference.expires_at, timezone.now() + timedelta(days=14))
+
+        #   13 days left: removing 7 is fine, 6 days left after that, so the next one is refused.
+        self.client.post(url, {"days": "7"}, HTTP_HX_REQUEST="true")
+        before = AdvertReference.objects.get(pk=reference.pk).expires_at
+        refused = self.client.post(url, {"days": "7"}, HTTP_HX_REQUEST="true")
+        self.assertIn("past", refused["HX-Trigger"])
+        self.assertEqual(AdvertReference.objects.get(pk=reference.pk).expires_at, before)
+
+    def test_the_link_comes_from_the_reference_and_not_from_the_panel(self):
+        self.client.force_login(self.ads_staff)
+        self.client.post(
+            reverse("control:advert_references"),
+            self._issue_payload(plan=AdvertLead.PLAN_PRO, public_url="https://shop.example.org/offer", advert_id=str(self.advert.pk)),
+        )
+        self.advert.refresh_from_db()
+        self.assertEqual(self.advert.url, "https://shop.example.org/offer")
+
+        from django.http import QueryDict
+        from ADMIN.views import _clean_image_advert
+
+        post = QueryDict("heading=Hello&body=Text&expiry_date=2030-01-01T10:00&url=https://elsewhere.example.com")
+        values, error = _clean_image_advert(post)
+        self.assertIsNone(error)
+        self.assertNotIn("url", values)
+
+    def test_extra_pages_screen_is_for_admins_and_the_advance_plan_only(self):
+        advance = self._reference(plan=AdvertLead.PLAN_ADVANCE)
+        pro = self._reference(advert=self.second_advert, owner=self.other_owner, plan=AdvertLead.PLAN_PRO)
+
+        self.client.force_login(self.ads_staff)
+        self.assertEqual(self.client.get(reverse("control:advert_pages", args=[advance.pk])).status_code, 302)
+
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse("control:advert_pages", args=[pro.pk])).status_code, 302)
+        self.assertEqual(self.client.get(reverse("control:advert_pages", args=[advance.pk])).status_code, 200)
+
+        upload = {"public_id": "abureport/advert-landing/advert_x_p_about.html", "bytes": 40, "secure_url": ""}
+        with mock.patch("ADMIN.views.upload_advert_landing_html", return_value=upload):
+            bad = self.client.post(reverse("control:advert_pages", args=[advance.pk]), {"path": "About Us!", "html": "<p>x</p>"})
+            good = self.client.post(
+                reverse("control:advert_pages", args=[advance.pk]),
+                {"path": "about", "html": "<!doctype html><p>About</p>", "is_published": "1"},
+            )
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(good.status_code, 302)
+        self.assertEqual(AdvertPage.objects.get(advert=self.advert).path, "about")
+
+    def test_unknown_email_and_a_second_reference_for_the_same_advert_are_refused(self):
+        self.client.force_login(self.admin)
+
+        unknown = self.client.post(
+            reverse("control:advert_references"),
+            self._issue_payload(
+                email="nobody@example.com", business_name="Nobody", advert_id=""
+            ),
+        )
+        self.assertEqual(unknown.status_code, 400)
+        self.assertContains(
+            unknown, "No account uses that email", status_code=400
+        )
+        self.assertEqual(AdvertReference.objects.count(), 0)
+
+        first = self._reference()
+        duplicate = self.client.post(
+            reverse("control:advert_references"), self._issue_payload()
+        )
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertContains(
+            duplicate, "That advert already has a reference", status_code=400
+        )
+        self.assertEqual(AdvertReference.objects.count(), 1)
+        self.assertEqual(AdvertReference.objects.get(), first)
+
+    def test_pause_resume_and_renew_keep_the_same_reference(self):
+        reference = self._reference(
+            expires_at=timezone.now() + timedelta(days=2)
+        )
+        self.client.force_login(self.ads_staff)
+
+        paused = self.client.post(
+            reverse("control:advert_reference_status", args=[reference.pk]),
+            {"action": "pause"},
+        )
+        self.assertEqual(paused.status_code, 302)
+        reference.refresh_from_db()
+        self.assertEqual(reference.status, AdvertReference.STATUS_PAUSED)
+        self.assertFalse(reference.is_live)
+
+        resumed = self.client.post(
+            reverse("control:advert_reference_status", args=[reference.pk]),
+            {"action": "resume"},
+        )
+        self.assertEqual(resumed.status_code, 302)
+        reference.refresh_from_db()
+        self.assertEqual(reference.status, AdvertReference.STATUS_ACTIVE)
+        self.assertTrue(reference.is_live)
+
+        old_expiry = reference.expires_at
+        old_reference = reference.reference
+        renewed = self.client.post(
+            reverse("control:advert_reference_renew", args=[reference.pk]),
+            {"days": "7"},
+        )
+        self.assertEqual(renewed.status_code, 302)
+        reference.refresh_from_db()
+        self.assertEqual(reference.reference, old_reference)
+        self.assertGreater(reference.expires_at, old_expiry + timedelta(days=6))
+        self.assertEqual(reference.status, AdvertReference.STATUS_ACTIVE)
+
+    def test_renewing_a_paused_reference_does_not_resume_it(self):
+        reference = self._reference(
+            advert=self.second_advert,
+            status=AdvertReference.STATUS_PAUSED,
+            expires_at=timezone.now() + timedelta(days=1),
+        )
+        old_expiry = reference.expires_at
+        self.client.force_login(self.ads_staff)
+
+        response = self.client.post(
+            reverse("control:advert_reference_renew", args=[reference.pk]),
+            {"days": "7"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        reference.refresh_from_db()
+        self.assertEqual(reference.status, AdvertReference.STATUS_PAUSED)
+        self.assertGreater(reference.expires_at, old_expiry + timedelta(days=6))
+
+    def test_update_can_replace_the_advert_and_never_changes_the_owner(self):
+        reference = self._reference()
+        self.client.force_login(self.ads_staff)
+        starts_at = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
+        expires_at = (timezone.localtime() + timedelta(days=14)).strftime("%Y-%m-%dT%H:%M")
+
+        response = self.client.post(
+            reverse("control:advert_reference_update", args=[reference.pk]),
+            {
+                "email": self.other_owner.email,
+                "plan": AdvertLead.PLAN_ADVANCE,
+                "business_name": "Updated Business",
+                "starts_at": starts_at,
+                "expires_at": expires_at,
+                "public_url": "https://advance.example.com/landing",
+                "advert_id": str(self.second_advert.pk),
+                "notes": "Replaced after review.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        reference.refresh_from_db()
+        self.assertEqual(reference.user, self.owner)
+        self.assertEqual(reference.advert, self.second_advert)
+        self.assertEqual(reference.plan, AdvertLead.PLAN_ADVANCE)
+        self.assertEqual(reference.business_name, "Updated Business")
+        self.assertEqual(reference.public_url, "https://advance.example.com/landing")
+        self.assertEqual(reference.notes, "Replaced after review.")
+
+    def test_desk_lists_recent_advert_leads(self):
+        AdvertLead.objects.create(
+            plan=AdvertLead.PLAN_PRO,
+            business_name="Lead Shop",
+            contact_email="lead@example.com",
+            whatsapp_number="+2348011112222",
+            business_details="We sell shoes.",
+        )
+        self.client.force_login(self.ads_staff)
+
+        response = self.client.get(reverse("control:advert_references"))
+
+        self.assertContains(response, "Lead Shop")
+        self.assertContains(response, "lead@example.com")
+
+
+class DeleteAuthorTests(TestCase):
+    """Soft delete (hidden at once, restorable for 7 days) and the permanent
+    delete an admin may press once the 7 days are over."""
+
+    def setUp(self):
+        from BLOG.models import Blog, Comment
+
+        self.admin = Auth.objects.create_user(email="del-admin@example.com", is_staff=True, is_admin=True)
+        self.superuser = Auth.objects.create_user(email="del-super@example.com", is_staff=True, is_admin=True, is_superuser=True)
+        self.author = Auth.objects.create_user(email="del-author@example.com", is_staff=True)
+        StaffProfile.objects.create(auth=self.author, gender="M", full_name="Ada Author", role="JOURNALIST")
+        self.story = Blog.objects.create(
+            heading="Ada's Story", content="Body text", author=self.author, category="x", image_1=""
+        )
+        self.comment = Comment.objects.create(blog=self.story, author=self.author, content="Nice")
+        self.client.force_login(self.admin)
+
+    def _delete(self, account=None):
+        account = account or self.author
+        return self.client.post(reverse("control:staff_delete", args=[account.pk]))
+
+    def test_delete_hides_the_account_its_stories_and_profile(self):
+        from BLOG.models import Blog, Comment
+
+        self.assertEqual(self._delete().status_code, 302)
+        self.assertIsNone(Auth.objects.filter(pk=self.author.pk).first())
+        self.assertIsNotNone(Auth.everyone.get(pk=self.author.pk).deleted_at)
+        self.assertEqual(Blog.objects.filter(pk=self.story.pk).count(), 0)
+        self.assertEqual(Comment.objects.filter(pk=self.comment.pk).count(), 0)
+        self.assertEqual(StaffProfile.objects.filter(auth_id=self.author.pk).count(), 0)
+        #   Nothing is erased yet.
+        self.assertEqual(Blog.all_objects.filter(pk=self.story.pk).count(), 1)
+
+    def test_a_signed_in_author_is_signed_out_when_deleted(self):
+        author_client = self.client_class()
+        author_client.force_login(self.author)
+        self.assertEqual(author_client.get(reverse("home:profile")).status_code, 200)
+        self._delete()
+        self.assertNotEqual(author_client.get(reverse("home:profile")).status_code, 200)
+
+    def test_restore_brings_everything_back(self):
+        from BLOG.models import Blog
+
+        self._delete()
+        self.client.post(reverse("control:staff_restore", args=[self.author.pk]))
+        self.assertIsNotNone(Auth.objects.filter(pk=self.author.pk).first())
+        self.assertEqual(Blog.objects.filter(pk=self.story.pk).count(), 1)
+
+    def test_you_cannot_delete_yourself_a_superuser_or_(self):
+        self._delete(self.admin)
+        self._delete(self.superuser)
+        self.assertIsNone(Auth.everyone.get(pk=self.admin.pk).deleted_at)
+        self.assertIsNone(Auth.everyone.get(pk=self.superuser.pk).deleted_at)
+
+        other_admin = Auth.objects.create_user(email="del-admin2@example.com", is_staff=True, is_admin=True)
+        self._delete(other_admin)
+        self.assertIsNone(Auth.everyone.get(pk=other_admin.pk).deleted_at)
+        self.client.force_login(self.superuser)
+        self._delete(other_admin)
+        self.assertIsNotNone(Auth.everyone.get(pk=other_admin.pk).deleted_at)
+
+    def test_ads_staff_without_admin_cannot_delete(self):
+        ads = Auth.objects.create_user(email="del-ads@example.com", is_staff=True, is_ads_staff=True)
+        self.client.force_login(ads)
+        self._delete()
+        self.assertIsNone(Auth.everyone.get(pk=self.author.pk).deleted_at)
+
+    def test_permanent_delete_waits_for_the_seven_days(self):
+        self._delete()
+        url = reverse("control:staff_purge", args=[self.author.pk])
+        with mock.patch("HOME.views._release_account_assets"):
+            self.client.post(url)
+            self.assertTrue(Auth.everyone.filter(pk=self.author.pk).exists())
+
+            Auth.everyone.filter(pk=self.author.pk).update(deleted_at=timezone.now() - timedelta(days=8))
+            self.client.post(url)
+        self.assertFalse(Auth.everyone.filter(pk=self.author.pk).exists())
+
+    def test_permanent_delete_needs_a_soft_delete_first(self):
+        with mock.patch("HOME.views._release_account_assets"):
+            self.client.post(reverse("control:staff_purge", args=[self.author.pk]))
+        self.assertTrue(Auth.everyone.filter(pk=self.author.pk).exists())
+
+    def test_admins_get_a_notice_when_an_account_is_due(self):
+        self._delete()
+        Auth.everyone.filter(pk=self.author.pk).update(deleted_at=timezone.now() - timedelta(days=9))
+        page = self.client.get(reverse("home:profile"))
+        self.assertContains(page, "Ada Author")
+        self.assertContains(page, "due for deletion 2 days ago")
+        self.assertContains(page, "Delete permanently")
+
+        plain = self.client_class()
+        member = Auth.objects.create_user(email="del-member@example.com")
+        plain.force_login(member)
+        self.assertNotContains(plain.get(reverse("home:profile")), "due for deletion")

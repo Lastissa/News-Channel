@@ -653,3 +653,6 @@ body.ad-landing-open { overflow: hidden; }
   .ad-landing-footer { position: relative; flex-wrap: wrap; padding: 10px 13px; }
   .ad-landing-actions { width: 100%; justify-content: flex-end; }
 }
+
+.panel-badge-staff { color: var(--ink); border: 1px solid var(--ink); background: transparent; font-weight: 700; }
+.panel-badge-user { color: inherit; border: 1px dashed var(--line); background: transparent; opacity: 0.75; }

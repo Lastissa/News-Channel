@@ -1,0 +1,9 @@
+{% comment %}
+  The answer to a search made on the search page (htmx). The results fill the
+  results box; the heading, the filter bar and the tab title are swapped in
+  beside them, so the page never reloads.
+{% endcomment %}
+<title>{% if query %}Search: {{ query|truncatechars:50 }} | {{ project_name }}{% else %}Search | {{ project_name }}{% endif %}</title>
+<h1 id="headline" hx-swap-oob="true">{% if query %}Search results for &ldquo;{{ query }}&rdquo;{% else %}Search {{ project_name }}{% endif %}</h1>
+<div id="search-filter-slot" hx-swap-oob="true">{% include "HOME/partials/search_filter.html" %}</div>
+{% include "HOME/partials/search_results.html" %}

@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block adsense %}{% endblock %}
+{% load static %}
+
+{% block title %}Ads desk | {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block content %}
+<section class="ads-desk">
+
+  <header class="ads-desk-hero">
+    <div class="ads-desk-hero-copy">
+      <p class="ads-desk-kicker">Ads desk</p>
+      <h1>Advert references and traffic.</h1>
+      <p class="ads-desk-lede">
+        Issue one permanent reference per advert, keep the paid period separate, and pause a campaign without losing its history.
+      </p>
+    </div>
+    <div class="ads-desk-hero-actions">
+      <a class="ads-desk-button ads-desk-button--quiet" href="{% url 'home:profile' %}">Back to profile</a>
+      {% if request.user.is_admin or request.user.is_superuser %}
+      <a class="ads-desk-button ads-desk-button--quiet" href="{% url 'control:panel' %}">Open PANEL</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="ads-desk-stats" aria-label="Ads desk totals">
+    <article class="ads-desk-stat">
+      <span>References</span>
+      <strong>{{ reference_total }}</strong>
+      <small>{{ live_reference_total }} live now</small>
+    </article>
+    <article class="ads-desk-stat">
+      <span>Views</span>
+      <strong>{{ view_total }}</strong>
+      <small>Across the references shown</small>
+    </article>
+    <article class="ads-desk-stat">
+      <span>Clicks</span>
+      <strong>{{ click_total }}</strong>
+      <small>Tracked link opens</small>
+    </article>
+    <article class="ads-desk-stat">
+      <span>Enquiries</span>
+      <strong>{{ advert_lead_total }}</strong>
+      <small>Business leads received</small>
+    </article>
+  </div>
+
+  <section class="ads-desk-toolbar" aria-label="Filter references">
+    <div class="ads-desk-filters" role="group" aria-label="Show references">
+      <button type="button" class="is-active" data-filter="all">All <b data-count="all">0</b></button>
+      <button type="button" data-filter="live">Live <b data-count="live">0</b></button>
+      <button type="button" data-filter="scheduled">Scheduled <b data-count="scheduled">0</b></button>
+      <button type="button" data-filter="paused">Paused <b data-count="paused">0</b></button>
+      <button type="button" data-filter="expired">Ended <b data-count="expired">0</b></button>
+    </div>
+    <a class="ads-desk-button ads-desk-button--primary" href="#issue-reference" data-open-issue>+ Issue reference</a>
+  </section>
+
+  {% if reference_rows %}
+  <div class="ads-desk-cards" id="ads-desk-cards">
+    {% for ref in reference_rows %}
+    {% include "ADMIN/partials/advert_reference_card.html" %}
+    {% endfor %}
+  </div>
+  <p class="ads-desk-empty-copy" id="ads-desk-none" hidden>Nothing matches this filter.</p>
+  {% else %}
+  <div class="ads-desk-empty">
+    <strong>No references issued yet.</strong>
+    <p>Issue the first one below after the advertiser has created an account and confirmed payment.</p>
+  </div>
+  {% endif %}
+
+  <details class="ads-desk-issue-wrap" id="issue-reference" {% if form_error %}open{% endif %}>
+    <summary>Issue a reference</summary>
+    <section class="ads-desk-card ads-desk-issue" aria-labelledby="ads-desk-issue-title">
+      <div class="ads-desk-card-head">
+        <div>
+          <h2 id="ads-desk-issue-title">Issue a reference</h2>
+          <p>The advertiser must already have an account with the email you enter.</p>
+        </div>
+      </div>
+
+      {% if form_error %}
+      <p class="ads-desk-error" role="alert">{{ form_error }}</p>
+      {% endif %}
+
+      <form method="post" action="{% url 'control:advert_references' %}" class="ads-desk-form">
+        {% csrf_token %}
+
+        <label class="ads-desk-field ads-desk-field--wide">
+          <span>Account email</span>
+          <input type="email" name="email" maxlength="254" autocomplete="off" required
+                 value="{{ form_data.email }}" placeholder="advertiser@example.com">
+          <small>The reference is tied to this signed-in account.</small>
+        </label>
+
+        <label class="ads-desk-field">
+          <span>Plan</span>
+          <select name="plan" required data-plan-select>
+            {% for value, label in plan_choices %}
+            <option value="{{ value }}" {% if form_data.plan == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="ads-desk-field">
+          <span>Business name</span>
+          <input type="text" name="business_name" maxlength="120" required
+                 value="{{ form_data.business_name }}" placeholder="Business shown in the panel">
+        </label>
+
+        <label class="ads-desk-field">
+          <span>Starts</span>
+          <input type="datetime-local" name="starts_at" value="{{ form_data.starts_at }}">
+        </label>
+
+        <label class="ads-desk-field">
+          <span>Ends</span>
+          <input type="datetime-local" name="expires_at" value="{{ form_data.expires_at }}">
+          <small>Leave empty for no end date.</small>
+        </label>
+
+        <label class="ads-desk-field">
+          <span>Advert subdomain</span>
+          <span class="ads-desk-subdomain">
+            <input type="text" name="subdomain" maxlength="63" autocomplete="off"
+                   spellcheck="false" data-subdomain-input pattern="[a-z0-9](?:[a-z0-9_\-]{0,61}[a-z0-9])?"
+                   value="{{ form_data.subdomain }}" placeholder="newads">
+            <span class="ads-desk-subdomain-suffix">.{{ ads_base_host }}</span>
+          </span>
+          <small data-subdomain-hint>Optional. Pro and Advance plans only. Each advert needs its own subdomain.</small>
+        </label>
+
+        <label class="ads-desk-field ads-desk-field--wide">
+          <span>Public page URL</span>
+          <input type="url" name="public_url" maxlength="500" inputmode="url"
+                 value="{{ form_data.public_url }}" placeholder="https://example.com/campaign">
+          <small>The advert opens this link. It is set only here.</small>
+        </label>
+
+        <label class="ads-desk-field ads-desk-field--wide">
+          <span>Link this advert</span>
+          <select name="advert_id">
+            <option value="">No advert linked yet</option>
+            {% for advert in advert_choices %}
+            <option value="{{ advert.id }}" {% if form_data.advert_id == advert.id|stringformat:"s" %}selected{% endif %} {% if not advert.allowed %}disabled{% endif %}>
+              {{ advert.label }}{% if advert.taken_by %} - already used by {{ advert.taken_by }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <small>One reference per advert. The advertiser can still be issued another reference for a different advert.</small>
+        </label>
+
+        <label class="ads-desk-field ads-desk-field--wide">
+          <span>Internal notes</span>
+          <textarea name="notes" rows="3" maxlength="1000" placeholder="Payment, brief or renewal notes for the team.">{{ form_data.notes }}</textarea>
+        </label>
+
+        <div class="ads-desk-form-actions ads-desk-field--wide">
+          <button type="submit" class="ads-desk-button ads-desk-button--primary">Issue reference</button>
+          <small>The new reference is shown in the list below and in the advertiser's dashboard.</small>
+        </div>
+      </form>
+    </section>
+  </details>
+
+  <div class="ads-desk-grid">
+    <aside class="ads-desk-side">
+      <section class="ads-desk-card" aria-labelledby="ads-desk-leads-title">
+        <div class="ads-desk-card-head">
+          <div>
+            <h2 id="ads-desk-leads-title">Recent enquiries</h2>
+            <p>Business details saved from the promote page.</p>
+          </div>
+          <span class="ads-desk-count">{{ advert_lead_total }}</span>
+        </div>
+
+        {% if advert_leads %}
+        <ul class="ads-desk-leads">
+          {% for lead in advert_leads %}
+          <li>
+            <div>
+              <strong>{{ lead.business_name }}</strong>
+              <span>{{ lead.get_plan_display }} plan &middot; {{ lead.created_at|date:"M d, Y" }}</span>
+            </div>
+            <a href="mailto:{{ lead.contact_email }}">{{ lead.contact_email }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="ads-desk-empty-copy">No enquiries yet. Business details entered on the promote page will appear here.</p>
+        {% endif %}
+      </section>
+
+      <section class="ads-desk-card ads-desk-note-card" aria-labelledby="ads-desk-format-title">
+        <h2 id="ads-desk-format-title">How the reference works</h2>
+        <p>
+          The reference is 16 characters: the first five letters of the account email, the issue date, then five random characters. It stays the same when a plan is renewed.
+        </p>
+        <p>
+          Pausing or ending a reference stops it showing in the home rail. It does not delete the advertiser's view and click history.
+        </p>
+        <p>
+          An optional advert subdomain gives one campaign a branded URL, such as <code>newads.{{ ads_base_host }}</code>. Every advert must use a different subdomain.
+        </p>
+      </section>
+    </aside>
+  </div>
+
+  <div class="ads-desk-toast" id="ads-desk-toast" role="status" aria-live="polite" hidden></div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261115-1">
+<script src="{% static 'home/js/htmx.min.js' %}" defer></script>
+<script src="{% static 'control/js/advert_references.js' %}?v=20261115-1" defer></script>
+{% endblock %}

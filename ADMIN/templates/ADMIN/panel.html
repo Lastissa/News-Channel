@@ -8,9 +8,11 @@
 {% block extra_head %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'control/css/panel.css' %}?v=20261110-2">
+  <link rel="stylesheet" href="{% static 'control/css/account_delete.css' %}?v=20261116-1">
 {% endblock %}
 
 {% block content %}
+<div class="panel-deleted-notice">{% include "ADMIN/partials/deleted_accounts_notice.html" %}</div>
 {% comment %}
   Icon sprite. Every icon on this page (here and in panel.js) is
   <svg class="ic"><use href="#i-NAME"/></svg>. Buttons that only carry an icon
@@ -195,10 +197,6 @@
               <div class="panel-field">
                 <label for="ad-body">Text <small data-ad-count-body>0 / 200</small></label>
                 <textarea id="ad-body" name="body" rows="2" maxlength="200" data-ad-body></textarea>
-              </div>
-              <div class="panel-field">
-                <label for="ad-url"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg><span class="panel-sr">Opens this link when clicked</span></label>
-                <input id="ad-url" type="url" name="url" placeholder="https://..." required>
               </div>
               <div class="panel-field">
                 <label for="ad-expiry"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg><span class="panel-sr">Stops showing on</span></label>
@@ -407,7 +405,7 @@
           {% for row in sessions_rows %}
           <div class="panel-row panel-session-row" data-session-row data-account-id="{{ row.id }}">
             <span class="panel-row-main">
-              <span class="panel-session-email">{{ row.email_masked }}{% if row.suspicious_count %} <span class="panel-badge panel-badge-danger" title="Signed in from a device this account had not used before">Unrecognised</span>{% endif %}</span>
+              <span class="panel-session-email">{{ row.email_masked }} {% if row.is_staff %}<span class="panel-badge panel-badge-staff" title="Staff account">Staff</span>{% else %}<span class="panel-badge panel-badge-user" title="Regular reader account">User</span>{% endif %}{% if row.suspicious_count %} <span class="panel-badge panel-badge-danger" title="Signed in from a device this account had not used before">Unrecognised</span>{% endif %}</span>
               <span class="panel-row-sub">{{ row.session_count }} session{{ row.session_count|pluralize }}{% if row.logged_in_at %} · last sign-in {{ row.logged_in_at }}{% endif %}</span>
             </span>
             <button type="button" class="panel-icon-btn panel-session-toggle" data-session-toggle aria-expanded="false" aria-label="Show sessions for {{ row.email_masked }}" title="Show sessions"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>

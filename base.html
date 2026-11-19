@@ -1,0 +1,131 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme_preference|default:'light' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block preload %}{% endblock %}
+    {% include "includes/splash_head.html" %}
+    {% include "includes/critical_css.html" %}
+    {% comment %} {% csrf_token %} {% endcomment %}
+    <title>{% block title %}{{ project_name }} | {{ project_cachphrase }}{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
+    {% block meta_robots %}<meta name="robots" content="index, follow">{% endblock %}
+    <meta property="og:site_name" content="{{ project_name }}">
+    <meta property="og:locale" content="en_NG">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}{{ project_name }} | {{ project_cachphrase }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
+    {% comment %}
+      Every page is self canonical by default. A page that owns a meaningful
+      query string (search results keep ?q=, for example) passes `canonical_url`
+      from its view; everything else falls back to the clean path.
+    {% endcomment %}
+    {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% else %}<link rel="canonical" href="{{ site_domain }}{{ request.path }}">{% endif %}
+    {% if canonical_url %}<meta property="og:url" content="{{ canonical_url }}">{% else %}<meta property="og:url" content="{{ site_domain }}{{ request.path }}">{% endif %}
+    {% comment %} Default Twitter card. Pages may override the three blocks below and the og:image block further down adds a matching twitter:image. {% endcomment %}
+    <meta name="twitter:card" content="{% block twitter_card %}summary{% endblock %}">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ project_name }} | {{ project_cachphrase }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ project_name }} brings verified news across many genres, with a strong focus on Nigeria and Africa, plus clear reporting and sources you can check.{% endblock %}">
+    {% comment %} Site-wide X handle for Twitter/X cards. The username comes from PANEL (SiteSettings.twitter_handle) or the About.tweeter fallback. {% endcomment %}
+    {% if twitter_username %}<meta name="twitter:site" content="@{{ twitter_username }}">{% endif %}
+    <link rel="icon" type="image/jpeg" href="{% static "logo.jpg" %}">
+    {% comment %} HOME SCREEN / BROWSER CHROME: PNG favicon (Google asks for a multiple of 48px), iOS icon, web manifest (HOME.views.ManifestView) and the address bar colour (the navbar colour of the active theme). {% endcomment %}
+    <link rel="icon" type="image/png" sizes="48x48" href="{% static 'home/icons/favicon-48.png' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'home/icons/icon-192.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'home/icons/apple-touch-icon.png' %}">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="theme-color" content="{% if theme_preference == 'dark' %}#1C2E47{% else %}#0E1B2C{% endif %}">
+    {% comment %} FEED DISCOVERY: the newest stories are syndicated as RSS 2.0 and Atom 1.0 (HOME.views.RssFeedView / AtomFeedView). Every page advertises both so readers and aggregators can auto-detect them. {% endcomment %}
+    <link rel="alternate" type="application/rss+xml" title="{{ project_name }} | Newest stories" href="{{ site_domain }}/rss.xml">
+    <link rel="alternate" type="application/atom+xml" title="{{ project_name }} | Newest stories" href="{{ site_domain }}/atom.xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script>
+        (function () {
+            /* Default initial theme is LIGHT. We only ever switch to dark when
+               the visitor has explicitly chosen it before (stored in
+               localStorage from a click on the theme toggle). We deliberately
+               do NOT fall back to the OS/browser 'prefers-color-scheme: dark'
+               media query here -- that used to silently boot dark-mode
+               visitors into dark theme on their very first visit and then
+               persist it via the cookie below, which made "light" not
+               actually be the default. */
+            try {
+                var stored = localStorage.getItem('abureport-theme');
+                var theme = (stored === 'dark' || stored === 'light') ? stored : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+                try {
+                    document.cookie = 'abureport-theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
+                } catch (e) {}
+            } catch (e) {
+                try {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                } catch (err) {}
+            }
+        })();
+    </script>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
+    <link id="base-css" rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261118-1" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="{% static 'home/css/base.css' %}?v=20261118-1"></noscript>
+    {% block extra_head %}
+    {% block og_image %}
+    <!--Default is the oficial site logo-->
+    <meta property="og:image" content="{{ site_domain }}{% static 'logo.jpg' %}">
+    <meta name="twitter:image" content="{{ site_domain }}{% static 'logo.jpg' %}">
+    {% endblock og_image %}
+    
+    {% endblock %}
+    {% comment %}
+      SITEWIDE JSON-LD ENTITY GRAPH: a NewsMediaOrganization (publisher) and a
+      WebSite with a SearchAction, built once in SERVICE_INTERNAL.schema and
+      shared by every page so the two @id values stay consistent. A page that
+      needs a DIFFERENT graph overrides this block outright; a page that only
+      needs to ADD a node (NewsArticle, Person, BreadcrumbList) leaves it
+      alone and points at `schema_organization_id` / `schema_website_id`.
+    {% endcomment %}
+    {% block structured_data %}
+    {% if site_schema_json %}<script type="application/ld+json">{{ site_schema_json|safe }}</script>{% endif %}
+    {% endblock structured_data %}
+</head>
+
+
+<body>
+    {% include "includes/splash.html" %}
+    {% include "includes/navbar.html" %}
+    {% if messages %}
+    <div id="django-message-host" style="display:none;">
+        {% for message in messages %}
+        <div class="django-message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <main id="main-content">
+    {% block content %}{% endblock %}
+    </main>
+    {% block footer %}{% include "includes/footer.html" %}{% endblock %}
+    {% block floating_social %}{% include "includes/floating_social.html" %}{% endblock %}
+    {% block newsletter_popup %}{% endblock %}
+    {% block continue_popup %}{% endblock %}
+    <script src="{% static 'home/js/app.js' %}?v=20261016-1" defer></script>
+    <script src="{% static 'home/js/carousel.js' %}?v=20261016-1" defer></script>
+    <script src="{% static 'home/js/hero-teaser.js' %}?v=20261111-4" defer></script>
+    <script src="{% static 'home/js/interactions.js' %}?v=20261110-1" defer></script>
+    <script src="{% static 'home/js/auth-gate.js' %}?v=20261016-1" defer></script>
+    {% block extra_scripts %}{% endblock %}
+    {% comment %}
+      GOOGLE ADSENSE: site-wide, production only, loaded at the end of the
+      body so it cannot compete with the first paint. Own block so a page can
+      opt out by overriding it empty -- internal surfaces (admin panel,
+      profile, auth, staff editors) do exactly that, so no ad request is ever
+      made from them. The {% if not debug %} guard keeps it off localhost/dev.
+    {% endcomment %}
+    {% block adsense %}
+    {% if not debug %}
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5391303565722259"
+         crossorigin="anonymous"></script>
+    {% endif %}
+    {% endblock %}
+</body>
+</html>

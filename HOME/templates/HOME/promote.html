@@ -15,7 +15,9 @@
   {% breadcrumb_schema "Home" breadcrumb_home_url "Advertise" %}
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&amp;display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&amp;display=swap"></noscript>
-  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}?v=20261113-10">
+  <link rel="preload" as="image" href="{{ advert_preview_poster }}" fetchpriority="high">
+  <link rel="stylesheet" href="{% static 'home/css/promote.css' %}?v=20261114-1">
+  <noscript><style>.promote-preview-play { display: none; }</style></noscript>
   <script>document.documentElement.classList.add('promote-motion');</script>
 {% endblock %}
 
@@ -64,12 +66,12 @@
           </svg>
         </a>
         {% if ads_whatsapp_url %}
-        <a class="promote-secondary" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer">
+        {% comment %} <a class="promote-secondary" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer">
           <span>Not Sure? WhatsApp Us</span>
           <svg class="promote-btn-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
             <path d="M5 15 15 5M7 5h8v8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
-        </a>
+        </a> {% endcomment %}
         {% endif %}
       </div>
 
@@ -92,20 +94,34 @@
     </div>
 
     <figure class="promote-hero-media" data-hero-media data-reveal style="--reveal-delay: 180ms">
-      <div class="promote-hero-frame">
-        <img src="{% static 'promote.jpg' %}" width="1672" height="941" fetchpriority="high" decoding="async"
-             alt="A business promoting its advert to {{ project_name }} readers">
-        <span class="promote-live-chip"><span class="promote-live-dot" aria-hidden="true"></span> Live placements</span>
+      <div class="promote-hero-frame promote-preview-frame" data-preview-frame>
+        <video class="promote-preview-video" width="1280" height="720"
+               poster="{{ advert_preview_poster }}" preload="none" playsinline controls
+               data-preview-video aria-describedby="promote-preview-caption"
+               aria-label="Preview of an advert on {{ project_name }}">
+          <source src="{{ advert_preview_video_url }}" type="video/mp4">
+          Your browser cannot play this preview video.
+        </video>
+        <button class="promote-preview-play" type="button" data-preview-play
+                aria-label="Play the {{ advert_preview_seconds }} second advert preview">
+          <span class="promote-preview-play-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M9 6.5v11l8.5-5.5z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="promote-preview-play-label">See how your advert looks</span>
+          <span class="promote-preview-play-duration">Watch {{ advert_preview_seconds }}-second preview</span>
+        </button>
+        <span class="promote-live-chip"><span class="promote-live-dot" aria-hidden="true"></span>Ad preview</span>
         <div class="promote-hero-float" aria-hidden="true">
           <span class="promote-hero-float-label">Advance</span>
           <strong>&#8358;{{ advance_plan.price }}<small>/week rate</small></strong>
           <span class="promote-hero-float-note">Launch offer</span>
         </div>
-        <figcaption class="promote-hero-caption">
-          <span>Built for readers, not interruptions.</span>
-          <span class="promote-hero-caption-mark" aria-hidden="true">&#8599;</span>
-        </figcaption>
       </div>
+      <figcaption class="promote-preview-caption" id="promote-preview-caption">
+        {% comment %} <span><strong>Real reader placement.</strong> A live advert in the {{ project_name }} rail.</span> {% endcomment %}
+      </figcaption>
       <span class="promote-hero-orbit" aria-hidden="true"><span></span></span>
     </figure>
   </header>
@@ -175,7 +191,7 @@
               {% endfor %}
             </ul>
 
-            <a class="promote-plan-cta" href="{% url 'home:promote' %}?plan={{ plan.slug }}#advertise">
+            <a class="promote-plan-cta" href="{{ promote_page_url }}?plan={{ plan.slug }}#advertise">
               <span>Choose {{ plan.name }}</span>
               <svg class="promote-btn-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                 <path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -183,14 +199,15 @@
             </a>
 
             {% if plan.featured %}
-            <p class="promote-plan-foot">Premium build, priority setup, and the launch weekly rate while it lasts.</p>
+            <p class="promote-plan-foot">rephrSE
+Premium website design - faster setup - Discount launch rate for a limited time.</p>
             {% endif %}
           </article>
           {% endfor %}
         </div>
 
         <div class="promote-plan-progress" aria-hidden="true">
-          <span class="promote-plan-progress-label">Scroll or swipe &middot; {{ plans|length }} plans &rarr;</span>
+          <span class="promote-plan-progress-label">Scroll &middot; {{ plans|length }} plans &rarr;</span>
           <span class="promote-plan-progress-bar"><i data-plan-progress></i></span>
         </div>
       </div>
@@ -217,9 +234,7 @@
         <p class="promote-kicker">The path</p>
         <h2 id="promote-how-title">From first message <em>to live advert.</em></h2>
       </div>
-      <p class="promote-section-lede">
-        No maze of settings. One brief, one WhatsApp thread, and a clear build sequence.
-      </p>
+      {% comment %} <p class="promote-section-lede">No maze of settings. One brief, one WhatsApp thread, and a clear build sequence.</p> {% endcomment %}
     </div>
 
     <div class="promote-steps-pin" data-steps-pin>
@@ -243,20 +258,20 @@
             <span aria-hidden="true">03</span>
             <div>
               <h3>Get your reference</h3>
-              <p>After payment, we issue your advert reference. Keep it: it is how we identify your advert.</p>
+              <p>After payment, we issue your advert reference. It is how we identify your advert.</p>
             </div>
           </li>
           <li data-reveal>
             <span aria-hidden="true">04</span>
             <div>
               <h3>We build and publish</h3>
-              <p>Send your picture and final copy. We set up the advert and, on Pro or Advance, the page.</p>
+              <p>Send your picture and final copy. We set up the advert and, on Pro or Advance, the link to your url.</p>
             </div>
           </li>
         </ol>
 
         <div class="promote-steps-progress" aria-hidden="true">
-          <span class="promote-plan-progress-label">Scroll or swipe &middot; 4 steps &rarr;</span>
+          <span class="promote-plan-progress-label">Scroll &middot;Simple 4 steps &rarr;</span>
           <span class="promote-plan-progress-bar"><i data-steps-progress></i></span>
         </div>
       </div>
@@ -284,7 +299,7 @@
           My business is &hellip;
         </p>
         <div class="promote-handoff-foot">
-          <span>Saved to our panel</span>
+          {% comment %} <span>Saved to our panel</span> {% endcomment %}
           <span>Opens in WhatsApp</span>
         </div>
       </aside>
@@ -308,7 +323,7 @@
       </p>
     </div>
 
-    <form class="promote-form" method="post" action="{% url 'home:promote_lead' %}" novalidate data-promote-form>
+    <form class="promote-form" method="post" action="{{ promote_lead_url }}" novalidate data-promote-form>
       {% csrf_token %}
 
       <div class="promote-form-head">
@@ -386,10 +401,10 @@
           <path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
         </svg>
       </button>
-      <p class="promote-form-foot">
+      {% comment %} <p class="promote-form-foot">
         Your enquiry is saved here before WhatsApp opens. The WhatsApp message is not sent
         until you press send.
-      </p>
+      </p> {% endcomment %}
     </form>
   </section>
 
@@ -399,7 +414,7 @@
         <p class="promote-kicker"><span class="promote-live-dot" aria-hidden="true"></span> Live now</p>
         <h2 id="promote-ads-title">Running on {{ project_name }} right now</h2>
       </div>
-      <p class="promote-ads-sub">A live look at the adverts our readers are seeing.</p>
+      {% comment %} <p class="promote-ads-sub">A live look at the adverts our readers are seeing.</p> {% endcomment %}
     </div>
 
     <div class="promote-ads-grid" id="promote-ads-grid"
@@ -428,5 +443,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{% static 'home/js/promote.js' %}?v=20261113-7" defer></script>
+<script src="{% static 'home/js/promote.js' %}?v=20261114-1" defer></script>
 {% endblock %}

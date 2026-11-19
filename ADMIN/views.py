@@ -5,29 +5,36 @@ work stays in HOME.views; this module only holds the extra authority an admin
 (or superuser) carries over the rest of the staff.
 """
 
+import json
+import math
 import logging
+import re
 from datetime import timedelta
 from urllib.parse import urlencode
 
+from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.validators import URLValidator
+from django.core.validators import URLValidator, validate_email
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.defaultfilters import title as title_case
 from django.urls import reverse
+from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views import View
 
 from AUTHENTICATION.models import Auth, UserSession
-from BLOG.models import Blog, Category, get_category_choices
+from BLOG.models import Blog, Category, Comment, get_category_choices
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, invalidate_cache, is_rate_limited
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
+from SERVICE_INTERNAL.hosts import RESERVED_SUBDOMAINS, ads_base_host, advert_host
+from Partner.plans import advert_allows, plan_allows, plan_message, time_left
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.images import (
     ADVERT_LANDING_MAX_BYTES,
@@ -38,7 +45,7 @@ from SERVICE_INTERNAL.images import (
     upload_advert_image,
     upload_advert_landing_html,
 )
-from SERVICE_INTERNAL.permissions import admin_only
+from SERVICE_INTERNAL.permissions import admin_only, ads_staff_only
 from SERVICE_INTERNAL.passwords import first_password_error
 from SERVICE_INTERNAL.sessions import (
     describe_device,
@@ -58,7 +65,15 @@ from Partner.landing import (
     render_advert_landing_document,
     strip_advert_landing_author_header,
 )
-from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead, Announcement
+from Partner.models import (
+    AdvertEvent,
+    AdvertImage,
+    AdvertPage,
+    AdvertLandingPage,
+    AdvertLead,
+    AdvertReference,
+    Announcement,
+)
 from ADMIN.models import SiteSettings
 from ADMIN.analytics import (
     AUTHOR_DEFAULT_RANGE,
@@ -229,8 +244,9 @@ class StaffDirectoryView(View):
         )
 
 
-def _staff_account_or_404(staff_id):
-    account = Auth.objects.filter(pk=staff_id).first()
+def _staff_account_or_404(staff_id, include_deleted=False):
+    accounts = Auth.everyone if include_deleted else Auth.objects
+    account = accounts.filter(pk=staff_id).first()
     if account is None or not (account.is_staff or account.is_admin or account.is_superuser):
         raise Http404("Staff member not found.")
     return account
@@ -250,7 +266,7 @@ def _published_rows(blog_list):
 
 
 def _published_page(account, page_number=1):
-    paginator = Paginator(Blog.objects.filter(author=account).order_by("-date_created"), STAFF_PAGE_SIZE)
+    paginator = Paginator(Blog.all_objects.filter(author=account).order_by("-date_created"), STAFF_PAGE_SIZE)
     if page_number > paginator.num_pages and paginator.num_pages:
         raise Http404("Page not found.")
     return paginator, paginator.get_page(page_number)
@@ -264,16 +280,16 @@ class StaffDetailView(View):
     member and no admin overrides them from here.
 
     Authority: every admin reading this page can write the controls on it,
-    the superuser no longer outranks an admin here. Nothing on this page
-    deletes an account.
+    the superuser no longer outranks an admin here. The page also holds the
+    Delete author button (a soft delete an admin can undo for 7 days).
     """
 
     def get(self, request, staff_id):
         if not admin_only(request.user):
             return admin_page_redirect(request)
 
-        account = _staff_account_or_404(staff_id)
-        profile = StaffProfile.objects.filter(auth=account).first()
+        account = _staff_account_or_404(staff_id, include_deleted=True)
+        profile = StaffProfile.all_objects.filter(auth=account).first()
 
         page_number = _resolve_page_number(request.GET.get("published_page"), default=1)
         paginator, page = _published_page(account, page_number)
@@ -325,8 +341,154 @@ class StaffDetailView(View):
                 "role_choices": StaffConfig.role_choices(),
                 "protected_roles": sorted(StaffConfig.PROTECTED_ROLES),
                 "gender_endpoint": reverse("control:staff_gender", args=[account.pk]),
+                "ads_access_endpoint": reverse("control:staff_ads_access", args=[account.pk]),
+                "has_ads_access": bool(account.is_ads_staff),
+                **_deletion_context(request.user, account),
             },
         )
+
+
+#   DELETE AUTHOR (SOFT DELETE) ----------------------------------------------
+#   1. An admin presses Delete author. The account is hidden at once: it cannot
+#      sign in, its stories, comments, uploads and profile disappear.
+#   2. For 7 days an admin can press Restore and everything comes back.
+#   3. After 7 days the account is "due". Every admin sees a notice, and may
+#      delete it for good (after three confirmations). Nothing is deleted by
+#      a timer: only an admin pressing the button removes data.
+ACCOUNT_RESTORE_DAYS = 7
+
+
+def _deleted_account_info(account):
+    """The dates and words for one soft-deleted account."""
+    now = timezone.now()
+    due_at = account.deleted_at + timedelta(days=ACCOUNT_RESTORE_DAYS)
+    if now >= due_at:
+        return {"is_due": True, "days_over": (now - due_at).days, "days_left": 0, "due_at": due_at}
+    seconds_left = (due_at - now).total_seconds()
+    return {"is_due": False, "days_over": 0, "days_left": max(1, math.ceil(seconds_left / 86400)), "due_at": due_at}
+
+
+def _delete_block_reason(actor, account):
+    """Why this account may not be deleted by this admin, or "" when it may."""
+    if account.pk == actor.pk:
+        return "You cannot delete your own account here."
+    if account.is_superuser:
+        return "A superuser account cannot be deleted here."
+    if account.is_admin and not actor.is_superuser:
+        return "Only a superuser can delete an admin account."
+    return ""
+
+
+def _deletion_context(actor, account):
+    """What the detail page needs to show the delete, restore and permanent
+    delete controls."""
+    context = {
+        "is_deleted": account.deleted_at is not None,
+        "delete_block_reason": _delete_block_reason(actor, account),
+        "stories_count": Blog.all_objects.filter(author=account).count(),
+        "comments_count": Comment.all_objects.filter(author=account).count(),
+        "restore_days": ACCOUNT_RESTORE_DAYS,
+        "purge_url": reverse("control:staff_purge", args=[account.pk]),
+    }
+    if account.deleted_at:
+        context.update(_deleted_account_info(account))
+    return context
+
+
+def deleted_accounts_notice(user):
+    """The notice every admin sees when they come in: each soft-deleted
+    account, and how long it can still be restored, or how long it has been
+    due for permanent deletion."""
+    if not admin_only(user):
+        return []
+    rows = []
+    for account in Auth.everyone.filter(deleted_at__isnull=False).order_by("deleted_at"):
+        profile = StaffProfile.all_objects.filter(auth=account).first()
+        name = (profile.full_name.strip() if profile and profile.full_name else "") or account.email
+        rows.append(
+            {
+                "id": account.pk,
+                "name": name,
+                "url": reverse("control:staff_detail", args=[account.pk]),
+                "purge_url": reverse("control:staff_purge", args=[account.pk]),
+                "stories_count": Blog.all_objects.filter(author=account).count(),
+                "comments_count": Comment.all_objects.filter(author=account).count(),
+                **_deleted_account_info(account),
+            }
+        )
+    return rows
+
+
+class StaffDeleteView(View):
+    """Soft delete: hide the account now, keep everything for 7 days."""
+
+    def post(self, request, staff_id):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+        account = _staff_account_or_404(staff_id)
+        reason = _delete_block_reason(request.user, account)
+        if reason:
+            messages.error(request, reason)
+            return redirect("control:staff_detail", account.pk)
+
+        account.deleted_at = timezone.now()
+        account.save(update_fields=["deleted_at"])
+        ended = drop_sessions_for(account)
+        info_logger(msg=f"STAFF DELETED (soft): {account.email} by {request.user.email}, {ended} session(s) ended")
+        messages.success(
+            request,
+            f"{account.email} is deleted. You can restore it for {ACCOUNT_RESTORE_DAYS} days.",
+        )
+        return redirect("control:staff_detail", account.pk)
+
+
+class StaffRestoreView(View):
+    def post(self, request, staff_id):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+        account = _staff_account_or_404(staff_id, include_deleted=True)
+        if account.deleted_at is None:
+            messages.error(request, "That account is not deleted.")
+            return redirect("control:staff_detail", account.pk)
+        account.deleted_at = None
+        account.save(update_fields=["deleted_at"])
+        info_logger(msg=f"STAFF RESTORED: {account.email} by {request.user.email}")
+        messages.success(request, f"{account.email} is restored, with its stories and uploads.")
+        return redirect("control:staff_detail", account.pk)
+
+
+class StaffPurgeView(View):
+    """Permanent delete. Only for an account that was soft-deleted and has
+    waited the full 7 days. This cannot be undone."""
+
+    def post(self, request, staff_id):
+        if not admin_only(request.user):
+            return admin_page_redirect(request)
+        account = _staff_account_or_404(staff_id, include_deleted=True)
+        if account.deleted_at is None:
+            messages.error(request, "Delete the account first. It can only be removed for good afterwards.")
+            return redirect("control:staff_detail", account.pk)
+        if not _deleted_account_info(account)["is_due"]:
+            messages.error(request, "This account can still be restored. It can be removed for good after 7 days.")
+            return redirect("control:staff_detail", account.pk)
+        reason = _delete_block_reason(request.user, account)
+        if reason:
+            messages.error(request, reason)
+            return redirect("control:staff_detail", account.pk)
+
+        #   Same clean-up as an account deleting itself: gather the Cloudinary
+        #   files first, delete the rows, then release the files.
+        from HOME.views import _collect_account_assets, _release_account_assets
+
+        email = account.email
+        assets = _collect_account_assets(account)
+        drop_sessions_for(account)
+        with transaction.atomic():
+            account.delete()
+        _release_account_assets(assets)
+        info_logger(msg=f"STAFF DELETED (permanent): {email} by {request.user.email}")
+        messages.success(request, f"{email} was deleted for good.")
+        return redirect("home:profile")
 
 
 class StaffPublishedView(View):
@@ -678,6 +840,7 @@ class StaffCreateView(View):
         gender = (request.POST.get("gender") or "").strip()
         role = (request.POST.get("role") or "").strip()
         grant_admin = request.POST.get("is_admin") == "on"
+        grant_ads = request.POST.get("is_ads_staff") == "on"
 
         error = None
         if not email or "@" not in email:
@@ -701,13 +864,18 @@ class StaffCreateView(View):
             return self._fail(request, error)
 
         with transaction.atomic():
-            account = Auth.objects.create_staff(email=email, password=password, is_admin=grant_admin)
+            account = Auth.objects.create_staff(
+                email=email,
+                password=password,
+                is_admin=grant_admin,
+                is_ads_staff=grant_ads,
+            )
             StaffProfile.objects.create(auth=account, gender=gender, full_name=full_name, role=role)
             
         _try_send_staff_welcome_email(account, password, full_name)
         role_label = dict(StaffConfig.role_choices()).get(role, role)
         _try_send_staff_created_batch_email(account, full_name, role_label, request.user.email)
-        info_logger(msg=f"STAFF CREATED: {account.email} (grant_admin={grant_admin}) by {request.user.email}")
+        info_logger(msg=f"STAFF CREATED: {account.email} (grant_admin={grant_admin}, ads_staff={grant_ads}) by {request.user.email}")
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(
@@ -743,6 +911,7 @@ class StaffCreateView(View):
                 "gender": request.POST.get("gender", ""),
                 "role": request.POST.get("role", ""),
                 "is_admin": request.POST.get("is_admin") == "on",
+                "is_ads_staff": request.POST.get("is_ads_staff") == "on",
             },
         )
 
@@ -807,6 +976,7 @@ class PanelView(View):
             "ADMIN/panel.html",
             {
                 "is_superuser": bool(request.user.is_superuser),
+                "deleted_accounts": deleted_accounts_notice(request.user),
                 "sender_full_name": own_profile.full_name.strip() if own_profile and own_profile.full_name else "",
                 "site_settings": SiteSettings.get_solo(),
                 "category_rows": _category_rows(),
@@ -1817,6 +1987,7 @@ def _active_sessions_page(page_number):
     rows = [
         {
             "id": account.pk,
+            "is_staff": bool(account.is_staff),
             "email_masked": _mask_email(account.email),
             "session_count": session_counts.get(account.pk, 0),
             #   MOST RECENT LOGIN AMONG THIS ACCOUNT'S ACTIVE SESSIONS, SHOWN ON
@@ -2392,16 +2563,8 @@ def _clean_image_advert(post):
     if len(body) > 200:
         return None, "The text can be at most 200 characters."
 
-    url = (post.get("url") or "").strip()
-    if not url:
-        return None, "Add the link this advert should open."
-    if not url.lower().startswith(("http://", "https://")):
-        return None, "The link must start with http:// or https://"
-    try:
-        URLValidator(schemes=["http", "https"])(url)
-    except ValidationError:
-        return None, "Enter a valid link."
-
+    #   There is no link here on purpose. The link an advert opens is set in
+    #   the Ads desk (the reference's public URL) and copied onto the advert.
     expiry = parse_datetime((post.get("expiry_date") or "").strip())
     if expiry is None:
         return None, "Pick when this advert should stop showing."
@@ -2409,7 +2572,7 @@ def _clean_image_advert(post):
         expiry = timezone.make_aware(expiry, timezone.get_current_timezone())
 
     is_active = (post.get("is_active") or "").lower() in ("1", "true", "on", "yes")
-    return {"heading": heading, "body": body, "url": url or None, "expiry_date": expiry, "is_active": is_active}, None
+    return {"heading": heading, "body": body, "expiry_date": expiry, "is_active": is_active}, None
 
 
 class PanelImageAdvertCreateView(View):
@@ -2625,6 +2788,10 @@ class PanelImageAdvertLandingView(View):
         values, error = _clean_advert_landing(request.POST)
         if error:
             return JsonResponse({"detail": error}, status=400)
+        #   The plan on the advert's reference decides if it may have a landing page.
+        if not advert_allows(row, "landing_page"):
+            reference = row.reference
+            return JsonResponse({"detail": plan_message(reference.plan, "landing_page")}, status=400)
 
         landing = getattr(row, "landing_page", None)
         previous_public_id = landing.html_public_id if landing else ""
@@ -2720,3 +2887,708 @@ class PanelImageAdvertLandingDeleteView(View):
             {"detail": "Landing page deleted. Advert clicks now use the advertiser link.", "item": _image_advert_item(row)},
             status=200,
         )
+
+
+"""
+------------------------------------------------------------
+#   ADVERT REFERENCES / ADS DESK
+------------------------------------------------------------
+One permanent reference is issued per advert, not per account. The ads desk
+(admin, superuser or Auth.is_ads_staff) uses this page to issue, pause, renew
+and re-point references. Nothing here exposes the staff directory, site
+settings or the rest of PANEL, so limited ads staff can do their job without
+receiving full admin authority.
+"""
+
+ADVERT_REFERENCE_LIST_LIMIT = 100
+ADVERT_REFERENCE_RENEW_DAYS = 7
+ADVERT_RESERVED_SUBDOMAINS = RESERVED_SUBDOMAINS
+
+
+def _reference_form_data(post=None, defaults=False):
+    """Values for the issue form.
+
+    ``defaults`` is only used for a fresh GET: it fills the current week so
+    staff can issue a reference without typing dates. A submitted empty date
+    stays empty, which is how staff clear an end date on an existing row.
+    """
+    post = post or {}
+    now = timezone.localtime()
+    default_start = now.strftime("%Y-%m-%dT%H:%M") if defaults else ""
+    default_end = (
+        (now + timedelta(days=ADVERT_REFERENCE_RENEW_DAYS)).strftime("%Y-%m-%dT%H:%M")
+        if defaults
+        else ""
+    )
+    return {
+        "email": (post.get("email") or "").strip(),
+        "plan": (post.get("plan") or AdvertLead.PLAN_REGULAR).strip(),
+        "business_name": (post.get("business_name") or "").strip(),
+        "starts_at": (post.get("starts_at", default_start) or "").strip(),
+        "expires_at": (post.get("expires_at", default_end) or "").strip(),
+        "public_url": (post.get("public_url") or "").strip(),
+        #   Django refuses host names with an underscore, so a typed _ becomes a hyphen.
+        "subdomain": (post.get("subdomain") or "").strip().lower().replace("_", "-"),
+        "advert_id": (post.get("advert_id") or "").strip(),
+        "notes": (post.get("notes") or "").strip(),
+    }
+
+
+def _parse_form_datetime(value):
+    value = (value or "").strip()
+    if not value:
+        return None, None
+    parsed = parse_datetime(value)
+    if parsed is None:
+        return None, "Enter a valid date and time."
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed, None
+
+
+def _validate_reference_fields(form, existing=None):
+    """Shared validation for issuing and editing a reference.
+
+    The owner is chosen once, at issuance, and is intentionally not editable
+    here: analytics are filtered by that owner, so changing it would hand one
+    advertiser's traffic to another account.
+    """
+    plan = form["plan"]
+    if plan not in {value for value, _label in AdvertLead.PLAN_CHOICES}:
+        return None, "Choose a valid plan."
+
+    business_name = " ".join(form["business_name"].split())
+    if not business_name:
+        return None, "Enter the business name."
+    if len(business_name) > 120:
+        return None, "Business name must be 120 characters or fewer."
+
+    starts_at, error = _parse_form_datetime(form["starts_at"])
+    if error:
+        return None, error
+    expires_at, error = _parse_form_datetime(form["expires_at"])
+    if error:
+        return None, error
+    if starts_at and expires_at and expires_at <= starts_at:
+        return None, "The end date must be after the start date."
+
+    public_url = form["public_url"]
+    if public_url:
+        try:
+            URLValidator(schemes=["http", "https"])(public_url)
+        except ValidationError:
+            return None, "Enter a valid http(s) public URL."
+
+    subdomain = form["subdomain"]
+    if subdomain:
+        if subdomain in ADVERT_RESERVED_SUBDOMAINS:
+            return None, "That subdomain is reserved for the site. Choose another."
+        if "." in subdomain:
+            return None, "Enter only the subdomain label, for example newads."
+        if not ads_base_host():
+            return None, "Set ALLOWED_HOSTS or ADS_HOST before assigning a subdomain."
+        if not advert_host(subdomain):
+            return None, (
+                "Use one lowercase label of 1-63 letters, numbers or hyphens, "
+                "without a leading or trailing hyphen."
+            )
+        conflict = AdvertReference.objects.filter(subdomain__iexact=subdomain)
+        if existing is not None:
+            conflict = conflict.exclude(pk=existing.pk)
+        if conflict.exists():
+            return None, "Another advert already uses that subdomain."
+        if not plan_allows(plan, "subdomain"):
+            return None, plan_message(plan, "subdomain")
+
+    advert = None
+    if form["advert_id"]:
+        try:
+            advert_id = int(form["advert_id"])
+        except (TypeError, ValueError):
+            return None, "Choose a valid advert."
+        advert = AdvertImage.objects.filter(pk=advert_id).first()
+        if advert is None:
+            return None, "That advert no longer exists."
+        conflict = AdvertReference.objects.filter(advert=advert)
+        if existing is not None:
+            conflict = conflict.exclude(pk=existing.pk)
+        if conflict.exists():
+            return None, "That advert already has a reference. Each advert has exactly one."
+
+    notes = form["notes"]
+    if len(notes) > 1000:
+        return None, "Notes must be 1,000 characters or fewer."
+
+    return {
+        "plan": plan,
+        "business_name": business_name,
+        "starts_at": starts_at,
+        "expires_at": expires_at,
+        "public_url": public_url or "",
+        "subdomain": subdomain or None,
+        "advert": advert,
+        "notes": notes,
+    }, None
+
+
+def _clean_reference_form(post):
+    form = _reference_form_data(post)
+    email = form["email"]
+    if not email or "@" not in email:
+        return form, None, "Enter the advertiser's account email."
+    try:
+        validate_email(email)
+    except ValidationError:
+        return form, None, "Enter a valid email address."
+    account = Auth.objects.filter(email__iexact=email).first()
+    if account is None:
+        return form, None, "No account uses that email. Ask the advertiser to sign up first."
+    values, error = _validate_reference_fields(form)
+    if error:
+        return form, None, error
+    return form, {"account": account, **values}, None
+
+
+def _clean_reference_update_form(post, reference):
+    form = _reference_form_data(post)
+    form["email"] = reference.user.email
+    values, error = _validate_reference_fields(form, existing=reference)
+    if error:
+        return form, None, error
+    return form, values, None
+
+
+def _reference_edit_values(reference):
+    starts_at = (
+        timezone.localtime(reference.starts_at).strftime("%Y-%m-%dT%H:%M")
+        if reference.starts_at
+        else ""
+    )
+    expires_at = (
+        timezone.localtime(reference.expires_at).strftime("%Y-%m-%dT%H:%M")
+        if reference.expires_at
+        else ""
+    )
+    return {
+        "plan": reference.plan,
+        "business_name": reference.business_name,
+        "starts_at": starts_at,
+        "expires_at": expires_at,
+        "public_url": reference.public_url,
+        "subdomain": reference.subdomain or "",
+        "advert_id": str(reference.advert_id) if reference.advert_id else "",
+        "notes": reference.notes,
+    }
+
+
+def _reference_status(reference):
+    now = timezone.now()
+    if reference.status == AdvertReference.STATUS_PAUSED:
+        return "paused", "Paused"
+    if reference.status == AdvertReference.STATUS_EXPIRED or reference.is_expired:
+        return "expired", "Expired"
+    if reference.starts_at and reference.starts_at > now:
+        return "scheduled", "Scheduled"
+    return "live", "Live"
+
+
+def _advert_choices(current_advert_id=None):
+    """Options for the advert picker. An advert already tied to another
+    reference is shown but disabled, so the one-reference-per-advert rule is
+    visible before the server rejects it."""
+    taken = {
+        row.advert_id: row.reference
+        for row in AdvertReference.objects.exclude(advert__isnull=True).select_related("advert")
+    }
+    choices = []
+    for advert in AdvertImage.objects.order_by("-date_created")[:200]:
+        taken_by = taken.get(advert.pk, "")
+        choices.append(
+            {
+                "id": advert.pk,
+                "label": advert.heading or f"Advert #{advert.pk}",
+                "taken_by": taken_by,
+                "allowed": not taken_by or advert.pk == current_advert_id,
+            }
+        )
+    return choices
+
+
+def _advert_reference_row(reference, advert_choices):
+    status_key, status_label = _reference_status(reference)
+    advert = reference.advert
+    return {
+        "id": reference.pk,
+        "reference": reference.reference,
+        "email": reference.user.email,
+        "email_used": reference.email_used,
+        "plan": reference.plan,
+        "plan_label": reference.plan_name,
+        "business_name": reference.business_name,
+        "status": status_key,
+        "status_label": status_label,
+        "is_live": reference.is_live,
+        "is_expired": reference.is_expired,
+        "starts_at": reference.starts_at,
+        "expires_at": reference.expires_at,
+        "public_url": reference.public_url,
+        "public_target": reference.public_target,
+        "subdomain": reference.subdomain or "",
+        "public_host": reference.public_host,
+        "public_page_url": reference.public_page_url,
+        "public_link": reference.public_link,
+        "advert_id": advert.pk if advert else None,
+        "advert_label": (advert.heading or f"Advert #{advert.pk}") if advert else "",
+        "notes": reference.notes,
+        "view_total": getattr(reference, "view_total", 0),
+        "click_total": getattr(reference, "click_total", 0),
+        "ctr": round(getattr(reference, "click_total", 0) / getattr(reference, "view_total", 0) * 100, 1)
+        if getattr(reference, "view_total", 0)
+        else 0,
+        "created_at": reference.created_at,
+        "issued_by": reference.issued_by.email if reference.issued_by else "",
+        "edit": _reference_edit_values(reference),
+        "allows_pages": plan_allows(reference.plan, "extra_pages") and bool(advert),
+        "allows_landing": plan_allows(reference.plan, "landing_page"),
+        "allows_subdomain": plan_allows(reference.plan, "subdomain"),
+        "allows_analytics": plan_allows(reference.plan, "analytics"),
+        **time_left(reference),
+        "advert_choices": [
+            {**choice, "allowed": choice["allowed"] or choice["id"] == reference.advert_id}
+            for choice in advert_choices
+        ],
+    }
+
+
+def _reference_queryset():
+    return AdvertReference.objects.select_related(
+        "user", "issued_by", "advert__landing_page"
+    ).annotate(
+        view_total=Count("events", filter=Q(events__event_type=AdvertEvent.EVENT_VIEW)),
+        click_total=Count("events", filter=Q(events__event_type=AdvertEvent.EVENT_CLICK)),
+    )
+
+
+def _advert_reference_rows():
+    advert_choices = _advert_choices()
+    rows = _reference_queryset().order_by("-created_at")[:ADVERT_REFERENCE_LIST_LIMIT]
+    return [_advert_reference_row(row, advert_choices) for row in rows]
+
+
+def _one_reference_row(reference_id):
+    row = _reference_queryset().filter(pk=reference_id).first()
+    return _advert_reference_row(row, _advert_choices()) if row else None
+
+
+def _copy_link_to_advert(reference, old_advert=None):
+    """The link an advert opens comes only from the Ads desk: the reference's
+    public URL is copied onto the advert, and cleared from an advert that was
+    unlinked."""
+    if old_advert is not None and old_advert.pk != reference.advert_id and old_advert.url:
+        old_advert.url = None
+        old_advert.save(update_fields=["url"])
+    if reference.advert_id:
+        advert = reference.advert
+        advert.url = reference.public_url or None
+        advert.save(update_fields=["url"])
+
+
+def _card_reply(request, reference_id, text, ok=True):
+    """The answer to a button on one reference card.
+
+    From the page (htmx) the answer is the fresh card plus a small message, so
+    nothing reloads. Without JavaScript it is the old redirect with a message.
+    """
+    if request.headers.get("HX-Request") != "true":
+        (messages.success if ok else messages.error)(request, text)
+        return redirect("control:advert_references")
+    row = _one_reference_row(reference_id)
+    if row is None:
+        response = HttpResponse("")
+    else:
+        response = render(
+            request,
+            "ADMIN/partials/advert_reference_card.html",
+            {
+                "ref": row,
+                "plan_choices": AdvertLead.PLAN_CHOICES,
+                "ads_base_host": ads_base_host(),
+            },
+        )
+    response["HX-Trigger"] = json.dumps({"adsToast": {"text": text, "ok": ok}})
+    return response
+
+
+def _days_from_post(request):
+    try:
+        days = int(request.POST.get("days") or ADVERT_REFERENCE_RENEW_DAYS)
+    except (TypeError, ValueError):
+        days = ADVERT_REFERENCE_RENEW_DAYS
+    return max(1, min(days, 365))
+
+
+def _ads_control_context(form_data=None, form_error=""):
+    rows = _advert_reference_rows()
+    return {
+        "reference_rows": rows,
+        "reference_total": AdvertReference.objects.count(),
+        "live_reference_total": sum(1 for row in rows if row["is_live"]),
+        "view_total": sum(row["view_total"] for row in rows),
+        "click_total": sum(row["click_total"] for row in rows),
+        "advert_choices": _advert_choices(),
+        "plan_choices": AdvertLead.PLAN_CHOICES,
+        "ads_base_host": ads_base_host(),
+        "advert_leads": AdvertLead.objects.select_related("user").order_by("-created_at")[:12],
+        "advert_lead_total": AdvertLead.objects.count(),
+        "form_data": form_data or _reference_form_data(defaults=True),
+        "form_error": form_error,
+    }
+
+
+class AdvertReferencesView(View):
+    """The ads desk: issue references and see their lifecycle at a glance."""
+
+    def get(self, request):
+        if not ads_staff_only(request.user):
+            return admin_page_redirect(request)
+        return render(request, "ADMIN/advert_references.html", _ads_control_context())
+
+    def post(self, request):
+        if not ads_staff_only(request.user):
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"detail": "Ads access is required."}, status=403)
+            return admin_page_redirect(request)
+
+        remaining_seconds, limited = is_rate_limited(
+            request, 60, 10, scope="advert-reference-issue"
+        )
+        if limited:
+            return render(
+                request,
+                "ADMIN/advert_references.html",
+                _ads_control_context(
+                    form_data=_reference_form_data(request.POST),
+                    form_error=f"Wait {remaining_seconds} seconds before issuing another reference.",
+                ),
+                status=429,
+            )
+
+        form, values, error = _clean_reference_form(request.POST)
+        if error:
+            return render(
+                request,
+                "ADMIN/advert_references.html",
+                _ads_control_context(form_data=form, form_error=error),
+                status=400,
+            )
+
+        reference = AdvertReference.objects.create(
+            user=values["account"],
+            plan=values["plan"],
+            business_name=values["business_name"],
+            starts_at=values["starts_at"],
+            expires_at=values["expires_at"],
+            public_url=values["public_url"],
+            subdomain=values["subdomain"],
+            advert=values["advert"],
+            notes=values["notes"],
+            issued_by=request.user,
+        )
+        _copy_link_to_advert(reference)
+        if not values["account"].is_advertiser:
+            values["account"].is_advertiser = True
+            values["account"].save(update_fields=["is_advertiser"])
+        info_logger(
+            msg=(
+                f"ADS DESK: reference {reference.reference} issued to "
+                f"{values['account'].email} by {request.user.email}"
+            )
+        )
+        messages.success(
+            request,
+            f"Reference {reference.reference} issued to {values['account'].email}.",
+        )
+        return redirect("control:advert_references")
+
+
+class AdvertReferenceStatusView(View):
+    """Pause, resume or end one reference. This is the commercial switch: a
+    paused reference stops the home rail and tracked clicks immediately."""
+
+    ACTIONS = {
+        "pause": AdvertReference.STATUS_PAUSED,
+        "resume": AdvertReference.STATUS_ACTIVE,
+        "activate": AdvertReference.STATUS_ACTIVE,
+        "expire": AdvertReference.STATUS_EXPIRED,
+    }
+
+    def post(self, request, reference_id):
+        if not ads_staff_only(request.user):
+            return admin_page_redirect(request)
+        row = AdvertReference.objects.filter(pk=reference_id).first()
+        if row is None:
+            return _card_reply(request, reference_id, "That advert reference no longer exists.", ok=False)
+
+        action = (request.POST.get("action") or "").strip().lower()
+        status = self.ACTIONS.get(action)
+        if status is None:
+            return _card_reply(request, reference_id, "Unknown reference action.", ok=False)
+
+        row.status = status
+        row.save(update_fields=["status", "updated_at"])
+        info_logger(msg=f"ADS DESK: reference {row.reference} set to {status} by {request.user.email}")
+        return _card_reply(request, reference_id, f"{row.reference} is now {row.get_status_display().lower()}.")
+
+
+class AdvertReferenceRenewView(View):
+    """Add days to the paid period. Expired rows restart from now; live rows
+    extend from their current end date."""
+
+    def post(self, request, reference_id):
+        if not ads_staff_only(request.user):
+            return admin_page_redirect(request)
+        row = AdvertReference.objects.filter(pk=reference_id).first()
+        if row is None:
+            return _card_reply(request, reference_id, "That advert reference no longer exists.", ok=False)
+
+        days = _days_from_post(request)
+        now = timezone.now()
+        base = row.expires_at if row.expires_at and row.expires_at > now else now
+        row.expires_at = base + timedelta(days=days)
+        #   Renewing pays for more time; it must not silently lift a pause.
+        update_fields = ["expires_at", "updated_at"]
+        if row.status != AdvertReference.STATUS_PAUSED:
+            row.status = AdvertReference.STATUS_ACTIVE
+            update_fields.append("status")
+        row.save(update_fields=update_fields)
+        info_logger(msg=f"ADS DESK: reference {row.reference} renewed {days} day(s) by {request.user.email}")
+        return _card_reply(request, reference_id, f"{row.reference} renewed for {days} day(s).")
+
+
+class AdvertReferenceShortenView(View):
+    """Take days off the current end date (for a mistaken renewal). It never
+    moves the end into the past: use End reference for that."""
+
+    def post(self, request, reference_id):
+        if not ads_staff_only(request.user):
+            return admin_page_redirect(request)
+        row = AdvertReference.objects.filter(pk=reference_id).first()
+        if row is None:
+            return _card_reply(request, reference_id, "That advert reference no longer exists.", ok=False)
+        if not row.expires_at:
+            return _card_reply(request, reference_id, "This reference has no end date to shorten.", ok=False)
+
+        days = _days_from_post(request)
+        new_end = row.expires_at - timedelta(days=days)
+        if new_end <= timezone.now():
+            return _card_reply(
+                request, reference_id,
+                "That would put the end date in the past. Use End reference instead.", ok=False,
+            )
+        if row.starts_at and new_end <= row.starts_at:
+            return _card_reply(request, reference_id, "That would end the reference before it starts.", ok=False)
+
+        row.expires_at = new_end
+        row.save(update_fields=["expires_at", "updated_at"])
+        info_logger(msg=f"ADS DESK: reference {row.reference} shortened {days} day(s) by {request.user.email}")
+        return _card_reply(request, reference_id, f"Removed {days} day(s) from {row.reference}.")
+
+
+class AdvertReferenceUpdateView(View):
+    """Edit the advert a reference points at, its plan, dates, URL or notes."""
+
+    def post(self, request, reference_id):
+        if not ads_staff_only(request.user):
+            return admin_page_redirect(request)
+        row = (
+            AdvertReference.objects.select_related("user", "advert")
+            .filter(pk=reference_id)
+            .first()
+        )
+        if row is None:
+            messages.error(request, "That advert reference no longer exists.")
+            return redirect("control:advert_references")
+
+        form, values, error = _clean_reference_update_form(request.POST, row)
+        if error:
+            context = _ads_control_context()
+            for reference_row in context["reference_rows"]:
+                if reference_row["id"] == row.pk:
+                    reference_row["edit"] = form
+                    break
+            context.update({"edit_error": error, "edit_error_id": row.pk})
+            return render(request, "ADMIN/advert_references.html", context, status=400)
+
+        old_advert = row.advert
+        for field in (
+            "plan",
+            "business_name",
+            "starts_at",
+            "expires_at",
+            "public_url",
+            "subdomain",
+            "advert",
+            "notes",
+        ):
+            setattr(row, field, values[field])
+        row.save()
+        _copy_link_to_advert(row, old_advert)
+        info_logger(
+            msg=f"ADS DESK: reference {row.reference} updated by {request.user.email}"
+        )
+        messages.success(request, f"{row.reference} updated.")
+        return redirect("control:advert_references")
+
+
+class StaffAdsAccessToggleView(_SuperuserWriteView):
+    """Give one staff account the limited ads-desk flag, or take it away.
+
+    This is deliberately separate from ``is_admin``: ads staff can issue and
+    renew references but cannot open the staff directory, site settings or the
+    rest of PANEL.
+    """
+
+    def post(self, request, staff_id):
+        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        if limited:
+            return JsonResponse(
+                {"detail": f"Permission Denied, Wait {remaining_seconds} seconds"},
+                status=403,
+            )
+        resolved, error = self._guard(request, staff_id)
+        if error:
+            return error
+        account, _profile = resolved
+
+        new_state = not account.is_ads_staff
+        account.is_ads_staff = new_state
+        account.save(update_fields=["is_ads_staff"])
+        info_logger(
+            msg=(
+                f"ADS ACCESS: {account.email} set to "
+                f"{'ads staff' if new_state else 'no ads access'} by {request.user.email}"
+            )
+        )
+        return JsonResponse(
+            {
+                "detail": "Ads desk access granted." if new_state else "Ads desk access removed.",
+                "is_ads_staff": new_state,
+            },
+            status=200,
+        )
+
+
+#   EXTRA PAGES (ADVANCE PLAN) --------------------------------------------
+#   Pages are HTML code, so only active admins can write them (the same rule
+#   as the landing page). Ads staff manage the rest of the desk but not this.
+PAGE_PATH_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*$")
+
+
+def _page_public_url(request, reference, page):
+    path = page.path
+    if reference.public_host:
+        return f"{request.scheme}://{reference.public_host}/{path}/"
+    return reverse("partner:advert_page", kwargs={"slug": slugify(page.advert.heading or "") or "advert", "pk": page.advert_id, "path": path})
+
+
+def _pages_context(request, reference, form=None, error=""):
+    pages = list(AdvertPage.objects.filter(advert=reference.advert))
+    return {
+        "reference": reference,
+        "pages": [
+            {"page": page, "url": _page_public_url(request, reference, page), "live": page.is_deliverable}
+            for page in pages
+        ],
+        "form": form or {"path": "", "html": "", "is_published": True},
+        "error": error,
+    }
+
+
+def _pages_reference(request, reference_id):
+    """The reference whose pages are edited, or a redirect to say why not."""
+    if not admin_only(request.user) or not request.user.is_active:
+        return None, admin_page_redirect(request)
+    reference = AdvertReference.objects.select_related("advert__landing_page").filter(pk=reference_id).first()
+    if reference is None or reference.advert is None:
+        messages.error(request, "Link an advert to this reference before adding pages.")
+        return None, redirect("control:advert_references")
+    if not plan_allows(reference.plan, "extra_pages"):
+        messages.error(request, plan_message(reference.plan, "extra_pages"))
+        return None, redirect("control:advert_references")
+    return reference, None
+
+
+class AdvertPagesView(View):
+    """List, add, edit and remove the extra pages of one Advance advert."""
+
+    def get(self, request, reference_id):
+        reference, denied = _pages_reference(request, reference_id)
+        if denied:
+            return denied
+        form = None
+        edit_path = (request.GET.get("edit") or "").strip()
+        page = AdvertPage.objects.filter(advert=reference.advert, path=edit_path).first() if edit_path else None
+        if page:
+            try:
+                html = strip_advert_landing_author_header(fetch_advert_landing_html(page.html_public_id))
+            except ImageUploadError:
+                html = ""
+            form = {"path": page.path, "html": html, "is_published": page.is_published}
+        return render(request, "ADMIN/advert_pages.html", _pages_context(request, reference, form))
+
+    def post(self, request, reference_id):
+        reference, denied = _pages_reference(request, reference_id)
+        if denied:
+            return denied
+        path = (request.POST.get("path") or "").strip().strip("/").lower()
+        html = strip_advert_landing_author_header((request.POST.get("html") or "").strip())
+        form = {"path": path, "html": html, "is_published": request.POST.get("is_published") == "1"}
+
+        error = ""
+        if not path or len(path) > 80 or not PAGE_PATH_RE.match(path):
+            error = "Use lowercase letters, numbers and hyphens, like about or about/team."
+        elif not html:
+            error = "Paste the page HTML first."
+        elif len(html.encode("utf-8")) > ADVERT_LANDING_MAX_BYTES:
+            error = f"The page is too large. The limit is {ADVERT_LANDING_MAX_BYTES // (1024 * 1024)}MB."
+        if error:
+            return render(request, "ADMIN/advert_pages.html", _pages_context(request, reference, form, error), status=400)
+
+        try:
+            uploaded = upload_advert_landing_html(
+                add_advert_landing_author_header(html, reference.advert, request.user),
+                reference.advert.pk,
+                page_path=path,
+            )
+        except ImageUploadError as exc:
+            return render(request, "ADMIN/advert_pages.html", _pages_context(request, reference, form, str(exc)), status=400)
+
+        AdvertPage.objects.update_or_create(
+            advert=reference.advert,
+            path=path,
+            defaults={
+                "html_public_id": uploaded["public_id"],
+                "html_bytes": uploaded["bytes"],
+                "is_published": form["is_published"],
+                "author": request.user,
+            },
+        )
+        info_logger(msg=f"ADS DESK: page /{path}/ of reference {reference.reference} saved by {request.user.email}")
+        messages.success(request, f"Page /{path}/ saved.")
+        return redirect("control:advert_pages", reference_id=reference.pk)
+
+
+class AdvertPageDeleteView(View):
+    def post(self, request, reference_id):
+        reference, denied = _pages_reference(request, reference_id)
+        if denied:
+            return denied
+        page = AdvertPage.objects.filter(advert=reference.advert, path=(request.POST.get("path") or "")).first()
+        if page is None:
+            messages.error(request, "That page no longer exists.")
+        else:
+            destroy_advert_landing_html(page.html_public_id)
+            page.delete()
+            info_logger(msg=f"ADS DESK: page /{page.path}/ of reference {reference.reference} removed by {request.user.email}")
+            messages.success(request, f"Page /{page.path}/ removed.")
+        return redirect("control:advert_pages", reference_id=reference.pk)

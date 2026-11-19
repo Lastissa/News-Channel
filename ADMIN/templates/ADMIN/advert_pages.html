@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block adsense %}{% endblock %}
+{% load static %}
+
+{% block title %}Pages for {{ reference.business_name }} | {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block content %}
+<section class="ads-desk">
+  <header class="ads-desk-hero">
+    <div class="ads-desk-hero-copy">
+      <p class="ads-desk-kicker">Advance plan</p>
+      <h1>Extra pages for {{ reference.business_name }}</h1>
+      <p class="ads-desk-lede">
+        Each page opens at its own path, such as <code>/about/</code>
+        {% if reference.public_host %}on <code>{{ reference.public_host }}</code>{% endif %}
+        and under the advert page on the main site. Write the whole HTML document. The same tokens as the landing page work here.
+      </p>
+    </div>
+    <div class="ads-desk-hero-actions">
+      <a class="ads-desk-button ads-desk-button--quiet" href="{% url 'control:advert_references' %}">Back to the Ads desk</a>
+    </div>
+  </header>
+
+  {% if messages %}
+  {% for message in messages %}<p class="ads-desk-error" role="status">{{ message }}</p>{% endfor %}
+  {% endif %}
+
+  <div class="ads-desk-grid">
+    <section class="ads-desk-card">
+      <div class="ads-desk-card-head"><div><h2>Pages</h2><p>Every page of this advert, no limit.</p></div><span class="ads-desk-count">{{ pages|length }}</span></div>
+      {% if pages %}
+      <ul class="ads-pages-list">
+        {% for item in pages %}
+        <li>
+          <div>
+            <strong>/{{ item.page.path }}/</strong>
+            <small>{% if item.live %}Live{% elif not item.page.is_published %}Draft{% else %}Not showing{% endif %} &middot; {{ item.page.html_bytes }} bytes</small>
+          </div>
+          <div>
+            <a class="ads-desk-button ads-desk-button--quiet" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">Open</a>
+            <a class="ads-desk-button ads-desk-button--quiet" href="?edit={{ item.page.path|urlencode }}">Edit</a>
+            <form method="post" action="{% url 'control:advert_page_delete' reference.id %}" onsubmit="return confirm('Remove /{{ item.page.path|escapejs }}/ for good?');">
+              {% csrf_token %}
+              <input type="hidden" name="path" value="{{ item.page.path }}">
+              <button type="submit" class="ads-desk-button ads-desk-button--danger">Remove</button>
+            </form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="ads-desk-empty-copy">No extra pages yet. Add the first one.</p>
+      {% endif %}
+    </section>
+
+    <section class="ads-desk-card">
+      <div class="ads-desk-card-head"><div><h2>{% if form.path %}Edit /{{ form.path }}/{% else %}Add a page{% endif %}</h2><p>Saving a path that exists replaces that page.</p></div></div>
+      {% if error %}<p class="ads-desk-error" role="alert">{{ error }}</p>{% endif %}
+      <form method="post" class="ads-desk-form">
+        {% csrf_token %}
+        <label class="ads-desk-field ads-desk-field--wide">
+          <span>Path</span>
+          <input type="text" name="path" maxlength="80" required value="{{ form.path }}" placeholder="about" autocomplete="off" spellcheck="false">
+          <small>Lowercase letters, numbers and hyphens. Use a slash for a deeper page, like about/team.</small>
+        </label>
+        <label class="ads-desk-field ads-desk-field--wide">
+          <span>HTML document</span>
+          <textarea class="ads-pages-code" name="html" required spellcheck="false">{{ form.html }}</textarea>
+        </label>
+        <label class="ads-desk-field ads-desk-field--wide">
+          <span><input type="checkbox" name="is_published" value="1" {% if form.is_published %}checked{% endif %}> Published</span>
+        </label>
+        <div class="ads-desk-form-actions ads-desk-field--wide">
+          <button type="submit" class="ads-desk-button ads-desk-button--primary">Save page</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261115-1">
+{% endblock %}

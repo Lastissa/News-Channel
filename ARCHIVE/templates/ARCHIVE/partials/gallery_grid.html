@@ -20,6 +20,7 @@
     {% with absolute_url=proxied_url|archive_absolute_url:request %}
     <article class="archive-card" id="archive-card-{{ image.id }}" style="--i: {{ forloop.counter0 }}">
       <div class="archive-card-media{% if image.kind == 'file' %} archive-card-media-file{% endif %}{% if image.is_video %} archive-card-media-video{% endif %}">
+        {% if image.is_private %}<span class="archive-private-badge" title="Only you can see this">Only me</span>{% endif %}
         {% if image.kind == 'image' %}
         <button type="button" class="archive-card-open" data-archive-open
                 data-view-src="{{ proxied_url }}"

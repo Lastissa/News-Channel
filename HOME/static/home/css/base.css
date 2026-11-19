@@ -361,6 +361,14 @@ html[data-theme="dark"] .icon-moon { display: block; }
 }
 
 
+/* Very small phones (under 350px): the brand name and the three header icons
+   together are wider than the screen, which widened the whole page and made
+   the browser zoom out. Keep the logo, drop the word. */
+@media (max-width: 349.98px) {
+  .brand-word { display: none; }
+  .header-bar { padding-inline: 12px; }
+}
+
 @media (max-width: 899.98px) {
   .primary-nav {
     position: fixed; inset: var(--header-h) 0 0 0; background: var(--paper);
@@ -620,12 +628,12 @@ html.auth-gate-locked { overflow: hidden; }
 
 /* ---------- Hero advert rail ---------- */
 /* A separate block from .hero that shares .hero-row's flex line on desktop
-   and stands completely on its own on mobile. It is a reader-driven,
-   horizontally scrollable rail with scroll snapping: swipe, trackpad,
-   shift+wheel, the keyboard arrows or the two buttons move one advert at a
-   time. Nothing auto-advances, so the reader can stop on the advert they
-   want. The controls are only painted after hero-teaser.js has wired them
-   up; without JS the track still scrolls natively. */
+   and stands completely on its own on mobile. It is a horizontally scrollable
+   rail with scroll snapping: swipe, trackpad, shift+wheel, keyboard arrows or
+   the two buttons move one advert at a time. hero-teaser.js also advances it
+   on a timer, but pauses while the reader is interacting and then resumes.
+   The controls are only painted after the script has wired them up; without JS
+   the track still scrolls natively. */
 .hero-teaser {
   position: relative; width: 30vw; overflow: hidden;
   background: transparent; border-left: 2px solid var(--brand-deep);
@@ -646,7 +654,7 @@ html.auth-gate-locked { overflow: hidden; }
 .teaser-slide {
   position: relative; inset: auto;
   flex: 0 0 100%; height: 100%;
-  scroll-snap-align: start; scroll-snap-stop: always;
+  scroll-snap-align: start;
   display: flex; align-items: center; justify-content: center;
   text-align: center; padding: 10px; background-size: cover; background-position: center;
   background-color: var(--nav-bg-dynamic); background-image: var(--teaser-image, none);
@@ -3268,4 +3276,26 @@ body.video-theatre-open { overflow: hidden; }
   .nav-footer-list { flex-direction: row; flex-wrap: wrap; gap: 4px 18px; }
   .nav-footer-list a { padding: 8px 0; color: var(--ink); font-size: 0.88rem; font-weight: 500; opacity: 0.85; }
   .nav-footer-list a:hover { opacity: 1; color: var(--amber-deep); }
+}
+
+/* ---- Image loading shimmer -------------------------------------------------
+   While a photo is still on its way, its box shows a soft moving shimmer
+   instead of a flat dark block. The photo paints over it on arrival.
+   img_shimmer.js adds .is-loaded (stops the shimmer) or .is-failed (hides the
+   broken image so the branded stand-in underneath shows). */
+img.hero-slide-img:not(.is-loaded),
+img[loading="lazy"]:not(.is-loaded) {
+  background-color: color-mix(in srgb, var(--ink) 8%, var(--paper));
+  background-image: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ink) 9%, transparent) 50%, transparent 70%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: imgShimmer 1.3s linear infinite;
+}
+img.is-failed { visibility: hidden; }
+@keyframes imgShimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  img.hero-slide-img:not(.is-loaded), img[loading="lazy"]:not(.is-loaded) { animation: none; }
 }

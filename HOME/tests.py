@@ -9,7 +9,7 @@ from xml.etree import ElementTree
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.db import connection
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.templatetags.static import static
 from django.urls import reverse
@@ -20,7 +20,7 @@ from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, Category, get_category_choices, refresh_category_cache
 from HOME.models import ReadingHistory, CategorySubscription, CategorySubscription
-from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead
+from Partner.models import AdvertEvent, AdvertImage, AdvertLandingPage, AdvertLead, AdvertReference
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.cache_keys import HOME_PAGE_HTML_CACHE_KEY
 from SERVICE_INTERNAL.config import About, custom_context_processors
@@ -801,13 +801,14 @@ class HomeAdvertTeaserTests(QuietTestCase):
 class AdSurfaceLabellingTests(QuietTestCase):
     """Segment 6 (ad & traffic policy hygiene): the paid/promotional surfaces on
     the home page must be labelled and must not point anywhere dead. The
-    hero-teaser advert rail carries an "Adverts" label and every advert link
-    carries rel="sponsored"; the top bar is now an announcement strip, so its
-    house fallback must still land on the promote page rather than a broken URL."""
+    hero-teaser advert rail carries an "Adverts" label, advances on a timer and
+    still supports native scrolling plus arrows; every advert link carries
+    rel="sponsored". The top bar is now an announcement strip, so its house
+    fallback must still land on the promote page rather than a broken URL."""
 
-    def test_advert_rail_is_reader_driven_and_scrollable(self):
-        """The rail must not auto-advance: readers get native scrolling plus
-        prev/next controls so they can choose the advert they want."""
+    def test_advert_rail_auto_advances_but_stays_manually_scrollable(self):
+        """The rail advances itself, but native scrolling and the arrows still
+        work and pause the timer so a reader can choose any advert."""
         response = self.client.get(reverse("home:home"))
 
         self.assertEqual(response.status_code, 200)
@@ -815,8 +816,9 @@ class AdSurfaceLabellingTests(QuietTestCase):
         self.assertContains(response, 'data-teaser-prev')
         self.assertContains(response, 'data-teaser-next')
         self.assertContains(response, 'teaser-spacer')
+        self.assertContains(response, 'data-autoplay="6000"')
+        self.assertContains(response, 'data-resume-after="4500"')
         self.assertNotContains(response, 'data-teaser-count')
-        self.assertNotContains(response, 'aria-label="Adverts" data-autoplay')
 
     def test_ad_surfaces_are_labelled_and_the_ticker_fallback_is_live(self):
         response = self.client.get(reverse("home:home"))
@@ -866,6 +868,17 @@ class PromotePageViewTests(QuietTestCase):
         self.assertContains(response, "data-promote-ads")
         self.assertContains(response, 'data-ads-url="' + reverse("home:promote_ads") + '"')
         self.assertContains(response, '<meta name="robots" content="index, follow">')
+        #   The hero is a real, click-to-play preview of an AbuReport advert.
+        self.assertContains(response, "data-preview-video")
+        self.assertContains(response, "data-preview-play")
+        self.assertContains(response, 'preload="none"')
+        self.assertContains(
+            response,
+            "https://res.cloudinary.com/brop3jeq/raw/upload/v1794655970/"
+            "abureport/archive/AbuReport-ad-preview-video_g4dmnb.mp4",
+        )
+        self.assertContains(response, "advert-preview-poster")
+        self.assertContains(response, "no autoplay")
 
     def test_promote_page_falls_back_to_default_whatsapp_without_a_mailbox(self):
         row = SiteSettings.get_solo()
@@ -968,6 +981,55 @@ class PromotePageViewTests(QuietTestCase):
         self.assertContains(response, "Same Email Shop")
         self.assertNotContains(response, "Other Shop")
         self.assertContains(response, "Views, clicks and traffic")
+
+    def test_dashboard_shows_profile_picture_when_available(self):
+        advertiser = Auth.objects.create_user(
+            email="avatar@example.com",
+            is_advertiser=True,
+            profile_img="https://cdn.example.com/avatars/advertiser.jpg",
+        )
+        self.client.force_login(advertiser)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="ads-dash-avatar-img"')
+        self.assertContains(
+            response, 'src="https://cdn.example.com/avatars/advertiser.jpg"'
+        )
+
+    def test_dashboard_uses_name_initial_svg_without_profile_picture(self):
+        advertiser = Auth.objects.create_user(
+            email="initial@example.com", is_advertiser=True
+        )
+        StaffProfile.objects.create(auth=advertiser, full_name="Ngozi Okafor")
+        self.client.force_login(advertiser)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="ads-dash-avatar-initial"')
+        self.assertContains(response, 'dominant-baseline="central">N</text>')
+        self.assertNotContains(response, 'class="ads-dash-avatar-img"')
+
+    def test_dashboard_uses_business_name_for_the_avatar_initial(self):
+        advertiser = Auth.objects.create_user(
+            email="business@example.com", is_advertiser=True
+        )
+        StaffProfile.objects.create(auth=advertiser, full_name="Ngozi Okafor")
+        AdvertLead.objects.create(
+            user=advertiser,
+            plan="pro",
+            business_name="Zaria Stores",
+            contact_email=advertiser.email,
+            business_details="A shop with a business name.",
+        )
+        self.client.force_login(advertiser)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'dominant-baseline="central">Z</text>')
 
     def test_dashboard_redirects_accounts_without_the_advertiser_tag(self):
         reader = Auth.objects.create_user(email="reader@example.com")
@@ -1148,6 +1210,101 @@ class PromotePageViewTests(QuietTestCase):
         self.assertContains(response, "Example")
         self.assertContains(response, static("partner/ad_demo_1.jpg"))
         self.assertEqual(response["Cache-Control"], "no-store")
+
+
+@override_settings(
+    ADS_HOST="ads.example.com",
+    ALLOWED_HOSTS=["example.com", "ads.example.com"],
+    DEBUG=False,
+)
+class AdsSubdomainRoutingTests(QuietTestCase):
+    """The ads page has a host of its own, while the news site keeps its URLs.
+
+    These tests use an isolated host pair rather than the local env, so they
+    also prove the canonical/meta URL and the form endpoint follow the ads host
+    instead of the first ALLOWED_HOSTS entry.
+    """
+
+    def test_ads_host_root_serves_the_promote_page(self):
+        response = self.client.get("/", HTTP_HOST="ads.example.com")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Advertise on")
+        self.assertContains(
+            response,
+            '<link rel="canonical" href="https://ads.example.com/">',
+        )
+        self.assertContains(
+            response,
+            '<meta property="og:url" content="https://ads.example.com/">',
+        )
+        self.assertContains(response, 'action="/enquiry/"')
+        self.assertContains(response, 'href="/?plan=pro#advertise"')
+
+    def test_ads_host_enquiry_path_reaches_the_lead_view(self):
+        response = self.client.get(
+            "/enquiry/",
+            {"plan": "advance"},
+            HTTP_HOST="ads.example.com",
+        )
+
+        self.assertRedirects(
+            response,
+            "/?plan=advance",
+            fetch_redirect_response=False,
+        )
+
+    @override_settings(ALLOWED_HOSTS=["example.com", "ads.example.com", ".example.com"])
+    def test_advert_subdomain_redirects_to_its_target_and_unknown_labels_404(self):
+        owner = Auth.objects.create_user(email="sub-owner@example.com")
+        AdvertReference.objects.create(
+            user=owner,
+            plan=AdvertLead.PLAN_PRO,
+            business_name="Sub Business",
+            subdomain="newads",
+            public_url="https://shop.example.org/",
+        )
+
+        live = self.client.get(
+            "/",
+            HTTP_HOST="newads.example.com",
+            HTTP_USER_AGENT="Mozilla/5.0 (TestBrowser)",
+        )
+        self.assertEqual(live.status_code, 302)
+        self.assertTrue(live["Location"].startswith("https://shop.example.org/"))
+        self.assertEqual(AdvertEvent.objects.filter(reference__subdomain="newads").count(), 1)
+
+        unknown = self.client.get("/", HTTP_HOST="nothere.example.com")
+        self.assertEqual(unknown.status_code, 404)
+
+    @override_settings(ALLOWED_HOSTS=["example.com", "ads.example.com", ".example.com"])
+    def test_regular_plan_reference_never_answers_on_a_subdomain(self):
+        owner = Auth.objects.create_user(email="regular-sub@example.com")
+        AdvertReference.objects.create(
+            user=owner, plan=AdvertLead.PLAN_REGULAR, business_name="Regular Business",
+            subdomain="regularsub", public_url="https://shop.example.org/",
+        )
+        response = self.client.get("/", HTTP_HOST="regularsub.example.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_old_main_domain_promote_url_redirects_to_the_ads_host(self):
+        response = self.client.get(
+            "/promote-your-bussiness/",
+            {"plan": "pro"},
+            HTTP_HOST="example.com",
+        )
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response["Location"],
+            "https://ads.example.com/?plan=pro",
+        )
+
+    def test_ads_host_navigation_returns_to_the_news_site(self):
+        response = self.client.get("/about/", HTTP_HOST="ads.example.com")
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], "https://example.com/about/")
 
 
 class AdvertInquiryViewTests(QuietTestCase):
@@ -2458,3 +2615,187 @@ class ImageLinkSafetyTests(QuietTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+
+class AdvertiserReferenceDashboardTests(QuietTestCase):
+    """Ownership, not the advertiser tag or a verified email, opens the data."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = Auth.objects.create_user(
+            email="reference-dashboard-admin@example.com", is_staff=True, is_admin=True
+        )
+
+    def _advert(self, heading="Dashboard advert"):
+        return AdvertImage.objects.create(
+            author=self.admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading=heading,
+            image_url="https://cdn.example.com/ads/dashboard.jpg",
+            url="https://example.com/dashboard",
+        )
+
+    def _reference(self, owner, advert=None, **kwargs):
+        values = {"user": owner, "plan": "pro", "business_name": "Dashboard Business"}
+        values.update(kwargs)
+        return AdvertReference.objects.create(advert=advert or self._advert(), **values)
+
+    def test_reference_owner_can_open_analytics_without_the_advertiser_tag(self):
+        owner = Auth.objects.create_user(email="reference-owner@example.com")
+        reference = self._reference(owner)
+        self.client.force_login(owner)
+
+        dashboard = self.client.get(reverse("home:advertise_dashboard"))
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertContains(dashboard, reference.reference)
+        self.assertContains(dashboard, "Dashboard Business")
+
+        profile = self.client.get(reverse("home:profile"))
+        self.assertRedirects(
+            profile,
+            reverse("home:advertise_dashboard"),
+            fetch_redirect_response=False,
+        )
+
+    def test_dashboard_only_counts_the_signed_in_owners_references(self):
+        owner = Auth.objects.create_user(email="owner@example.com")
+        other = Auth.objects.create_user(email="other@example.com")
+        own = self._reference(owner, business_name="Own Shop")
+        other_reference = self._reference(
+            other, advert=self._advert("Other advert"), business_name="Other Shop"
+        )
+        AdvertEvent.objects.create(
+            reference=own, event_type=AdvertEvent.EVENT_VIEW, source=AdvertEvent.SOURCE_ABUREPORT
+        )
+        AdvertEvent.objects.create(
+            reference=other_reference,
+            event_type=AdvertEvent.EVENT_VIEW,
+            source=AdvertEvent.SOURCE_ABUREPORT,
+        )
+        self.client.force_login(owner)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertEqual(len(response.context["references"]), 1)
+        self.assertEqual(response.context["view_total"], 1)
+        self.assertContains(response, "Own Shop")
+        self.assertNotContains(response, "Other Shop")
+        self.assertContains(response, own.reference)
+        self.assertNotContains(response, other_reference.reference)
+
+    def test_dashboard_separates_abureport_clicks_from_other_sources(self):
+        owner = Auth.objects.create_user(email="sources@example.com")
+        reference = self._reference(owner)
+        for _ in range(2):
+            AdvertEvent.objects.create(
+                reference=reference,
+                event_type=AdvertEvent.EVENT_CLICK,
+                source=AdvertEvent.SOURCE_ABUREPORT,
+            )
+        AdvertEvent.objects.create(
+            reference=reference,
+            event_type=AdvertEvent.EVENT_CLICK,
+            source=AdvertEvent.SOURCE_EXTERNAL,
+        )
+        for _ in range(4):
+            AdvertEvent.objects.create(
+                reference=reference,
+                event_type=AdvertEvent.EVENT_VIEW,
+                source=AdvertEvent.SOURCE_ABUREPORT,
+            )
+        self.client.force_login(owner)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertEqual(response.context["view_total"], 4)
+        self.assertEqual(response.context["click_total"], 3)
+        self.assertEqual(response.context["click_rate"], 75.0)
+        self.assertEqual(
+            response.context["source_rows"],
+            [
+                {"name": "From Abureport", "count": 2, "width": 100},
+                {"name": "Other sources", "count": 1, "width": 50},
+            ],
+        )
+
+    def test_home_rail_uses_tracked_click_and_view_urls(self):
+        from HOME.views import _teaser_items
+
+        owner = Auth.objects.create_user(email="rail-owner@example.com")
+        reference = self._reference(owner)
+
+        item = _teaser_items()[0]
+
+        self.assertEqual(
+            item["url"],
+            reverse("partner:advert_click", args=[reference.reference]),
+        )
+        self.assertEqual(
+            item["view_url"],
+            reverse("partner:advert_view", args=[reference.reference]),
+        )
+
+    def test_paused_reference_is_hidden_from_the_home_rail(self):
+        from HOME.views import _teaser_items
+
+        owner = Auth.objects.create_user(email="paused-rail@example.com")
+        reference = self._reference(owner)
+        reference.status = AdvertReference.STATUS_PAUSED
+        reference.save(update_fields=["status"])
+
+        self.assertFalse(
+            any(
+                reference.reference in item.get("view_url", "")
+                for item in _teaser_items()
+            )
+        )
+
+
+class AdvertiserDashboardPlanTests(TestCase):
+    """Analytics belong to Pro and Advance. A Regular reference shows no numbers."""
+
+    def setUp(self):
+        self.owner = Auth.objects.create_user(email="dash-owner@example.com")
+        self.client.force_login(self.owner)
+
+    def _make(self, plan, business):
+        reference = AdvertReference.objects.create(user=self.owner, plan=plan, business_name=business)
+        AdvertEvent.objects.create(
+            reference=reference, event_type=AdvertEvent.EVENT_VIEW, source=AdvertEvent.SOURCE_ABUREPORT, ip_hash="a" * 64
+        )
+        return reference
+
+    def test_regular_reference_gets_an_upgrade_note_and_no_totals(self):
+        self._make(AdvertLead.PLAN_REGULAR, "Regular Co")
+        response = self.client.get(reverse("home:advertise_dashboard"))
+        self.assertContains(response, "Analytics come with Pro")
+        self.assertFalse(response.context["has_analytics"])
+        self.assertEqual(response.context["view_total"], 0)
+        self.assertEqual(list(response.context["recent_events"]), [])
+
+    def test_pro_reference_counts_toward_the_totals(self):
+        self._make(AdvertLead.PLAN_REGULAR, "Regular Co")
+        self._make(AdvertLead.PLAN_PRO, "Pro Co")
+        response = self.client.get(reverse("home:advertise_dashboard"))
+        self.assertTrue(response.context["has_analytics"])
+        self.assertEqual(response.context["view_total"], 1)
+
+
+class SearchPageAjaxTests(TestCase):
+    """A search made on the search page is an ajax request, not a page reload."""
+
+    def test_page_form_and_header_search_are_wired_for_ajax(self):
+        page = self.client.get(reverse("home:search"), {"q": "jamb"})
+        self.assertContains(page, 'class="search-page-form"')
+        self.assertContains(page, 'hx-push-url="true"')
+        self.assertContains(page, "home/js/search_page")
+        self.assertContains(page, 'id="search-filter-slot"')
+
+    def test_ajax_answer_carries_results_heading_filter_and_title_without_the_page_shell(self):
+        response = self.client.get(reverse("home:search"), {"q": "jamb", "scope": "all"}, HTTP_HX_REQUEST="true")
+        html = response.content.decode()
+        self.assertNotIn("<!DOCTYPE", html)
+        self.assertIn('hx-swap-oob="true"', html)
+        self.assertIn("Search results for", html)
+        self.assertIn("<title>Search: jamb", html)
+        self.assertIn('id="search-scope"', html)

@@ -9,6 +9,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class AuthManager(BaseUserManager):
+    def get_queryset(self):
+        #   A soft-deleted account is invisible to every normal lookup: login,
+        #   sessions, lists, searches. Use Auth.everyone to reach it.
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
     def _blueprint(self, email, password=None, **extra_fields):
         if not email:raise ValueError('Users must have an email is req')
         user = self.model(email=email.upper(), **extra_fields)
@@ -50,6 +55,13 @@ class Auth(AbstractBaseUser):
     #   Advertisers are still normal reader accounts; this flag only changes
     #   the default profile destination and unlocks the advertiser dashboard.
     is_advertiser = models.BooleanField(default=False)
+    #   Limited staff authority for the advertising desk: issue/renew advert
+    #   references, see advert enquiries and advert rows. It never grants the
+    #   full PANEL, staff directory, site settings or Django admin.
+    is_ads_staff = models.BooleanField(default=False)
+    #   Soft delete. Set by an admin; the account is hidden at once, can be
+    #   restored, and an admin may delete it for good once 7 days have passed.
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     is_active = models.BooleanField(default=True)
     receive_email_login_alert = models.BooleanField(default=True)#  login alert sent every time user login
     send_newsletter = models.BooleanField(default=False)    #   permission to send news alert
@@ -63,6 +75,7 @@ class Auth(AbstractBaseUser):
     REQUIRED_FIELDS = []
      
     objects = AuthManager()
+    everyone = models.Manager()   #   includes soft-deleted accounts (admin screens only)
 
     #   DJANGO ADMIN (/_admin/) IS FOR SUPERUSERS ONLY. These two answers are what
     #   the admin asks for every model, so staff / admin accounts that are not

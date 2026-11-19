@@ -1,0 +1,26 @@
+{% load static %}
+{% if deleted_accounts %}
+<section class="acct-notice" role="alert" aria-label="Deleted accounts">
+  <h2>Deleted accounts</h2>
+  <ul>
+    {% for item in deleted_accounts %}
+    <li class="{% if item.is_due %}is-due{% endif %}">
+      <p>
+        {% if item.is_due %}
+        This <strong>{{ item.name }}</strong> account is due for deletion {% if item.days_over %}{{ item.days_over }} day{{ item.days_over|pluralize }} ago{% else %}today{% endif %}.
+        {% else %}
+        <strong>{{ item.name }}</strong> is deleted. It can be restored for {{ item.days_left }} more day{{ item.days_left|pluralize }}.
+        {% endif %}
+      </p>
+      <div class="acct-notice-actions">
+        <a class="acct-btn" href="{{ item.url }}">{% if item.is_due %}Review{% else %}Restore{% endif %}</a>
+        {% if item.is_due %}
+        {% include "ADMIN/partials/purge_button.html" with purge_url=item.purge_url purge_name=item.name purge_id=item.id stories_count=item.stories_count comments_count=item.comments_count %}
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+<script src="{% static 'control/js/account_delete.js' %}?v=20261116-1" defer></script>
+{% endif %}

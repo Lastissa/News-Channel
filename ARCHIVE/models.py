@@ -20,6 +20,21 @@ class ArchiveKind:
     )
 
 
+class ArchiveVisibility:
+    """Who can see an item. PUBLIC is the original behaviour (listed in the
+    gallery, served to everyone). PRIVATE ("Only me") is listed and served
+    only while its uploader is signed in -- see ARCHIVE.views._visible_to
+    and CloudinaryProxyView."""
+
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+    CHOICES = (
+        (PUBLIC, "Public"),
+        (PRIVATE, "Only me"),
+    )
+
+
 class ArchiveImage(models.Model):
     """One item in the public /archive/ gallery -- either a picture or a
     plain file (see `kind`). Any signed in user can add one (see
@@ -55,6 +70,13 @@ class ArchiveImage(models.Model):
     public_id = models.CharField(max_length=255, blank=True, default="")
     resource_type = models.CharField(max_length=10, default="image")
     author = models.ForeignKey('AUTHENTICATION.Auth', on_delete=models.CASCADE, related_name='archive_images')
+    #   "ONLY ME": a private item is hidden from the gallery, search and
+    #   filters for everyone but its uploader, and our /archive/cdn/ route
+    #   refuses it to anyone else. Indexed because the proxy asks "is this
+    #   asset private?" on every request.
+    visibility = models.CharField(
+        max_length=7, choices=ArchiveVisibility.CHOICES, default=ArchiveVisibility.PUBLIC, db_index=True
+    )
     date_created = models.DateTimeField(auto_now_add=True)
 
     class Meta:

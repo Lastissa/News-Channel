@@ -218,16 +218,12 @@ class CSPReportView(View):
             logger.warning("CSP report rejected: invalid JSON")
             return HttpResponse(status=400)
 
-        reports = [
-            _normalize_csp_report(report)
-            for report in _iter_csp_reports(payload)
-            if isinstance(report, dict)
-        ]
+        reports = [_normalize_csp_report(report) for report in _iter_csp_reports(payload) if isinstance(report, dict)]
         if not reports:
             return HttpResponse(status=204)
 
         dedupe_seconds = int(getattr(settings, "CSP_REPORT_DEDUPE_SECONDS", 6 * 60 * 60))
-        max_emails = int(getattr(settings, "CSP_REPORT_MAX_EMAILS_PER_HOUR", 20))
+        max_emails = int(getattr(settings, "CSP_REPORT_MAX_EMAILS_PER_HOUR", 10))
         hour_key = f"csp-report-emails:{timezone.now():%Y%m%d%H}"
         email_count = int(cache.get(hour_key, 0) or 0)
 

@@ -167,6 +167,7 @@ def render_advert_landing_document(
     meta_description: str = "",
     og_image: str = "",
     robots: str = ROBOTS_DEFAULT,
+    canonical_url: str = "",
 ) -> str:
     """Substitute every known token and return the complete HTML document.
 
@@ -177,12 +178,17 @@ def render_advert_landing_document(
     heading = (getattr(advert, "heading", "") or "Advert").strip()
     body = (getattr(advert, "body", "") or "").strip()
     ad_image = (getattr(advert, "image_url", "") or "").strip()
-    ad_url = (getattr(advert, "url", "") or "").strip()
+    #   Every link the landing page renders from {{ad_url}} leaves with our
+    #   source marker, so the advertiser can separate Abureport traffic in
+    #   their own analytics. An explicitly set utm_source is left alone.
+    from .tracking import append_utm_source
+
+    ad_url = append_utm_source((getattr(advert, "url", "") or "").strip())
 
     title = (meta_title or heading).strip()
     description = (meta_description or body).strip()
     share_image = (og_image or ad_image).strip()
-    canonical = request.build_absolute_uri(advert_landing_url(advert))
+    canonical = canonical_url or request.build_absolute_uri(advert_landing_url(advert))
 
     values = {
         "page_title": escape(heading),

@@ -4,7 +4,8 @@
 {% url 'auth:register' as default_signup_path %}
 <header class="site-header" id="site-header">
   <div class="header-bar">
-    <a href="{% url 'home:home' %}" class="brand">
+    {% comment %} <a href="{% url "home:home" %}" class="brand"> {% endcomment %}
+    <a href="{{site_domain}}" class="brand">
       <!-- Optimized 1x/2x assets generated from the 1080px source; the logo is displayed at 36px in the header. -->
       <img src="{% static 'home/icons/logo-72.png' %}"
            srcset="{% static 'home/icons/logo-72.png' %} 1x, {% static 'home/icons/logo-144.png' %} 2x"
@@ -15,7 +16,8 @@
 
     <nav class="primary-nav" id="primary-nav-mobile" aria-label="Primary">
       <ul>
-        <li><a href="{{ home_url }}"{% if request.path == home_url %} class="is-current" aria-current="page"{% endif %}>Home</a></li>
+        {% comment %} <li><a href="{{ home_url }}"{% if request.path == home_url %} class="is-current" aria-current="page"{% endif %}>Home</a></li> {% endcomment %}
+        <li><a href="{{ site_domain }}"{% if request.path == home_url %} class="is-current" aria-current="page"{% endif %}>Home</a></li>
         <li><a href="{{ archive_url }}"{% if request.path == archive_url %} class="is-current" aria-current="page"{% endif %}>Archive</a></li>
         <li class="editorial-team-tag"><a href="{% url 'editorial_team' %}"{% if request.resolver_match.url_name == "editorial_team" %} class="is-current" aria-current="page"{% endif %}>Editorial team</a></li>
         <li class="has-dropdown">
@@ -44,6 +46,7 @@
             {% else %}
             <li><a href="{% url 'home:profile' %}">Profile home</a></li>
             {% endif %}
+            {% if request.user.is_ads_staff or request.user.is_admin %}<li><a href="{% url 'control:advert_references' %}">Ads desk</a></li>{% endif %}
             {% if request.user.is_staff %}<li><a href="{% url 'home:profile' %}?view=profile#publish-stories">Published stories</a></li>{% endif %}
             <li><a href="{% url 'home:profile' %}?view=profile#recent-bookmarks">Bookmarks</a></li>
             <li><a href="{% url 'home:profile' %}?view=profile#reading-history">Stories history</a></li>

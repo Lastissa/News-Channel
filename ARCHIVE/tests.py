@@ -9,7 +9,7 @@ from django.test import TestCase, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from ARCHIVE.models import ArchiveImage, ArchiveKind
+from ARCHIVE.models import ArchiveImage, ArchiveKind, ArchiveVisibility
 from ARCHIVE.views import _masked_email
 
 
@@ -772,4 +772,127 @@ class CloudinaryProxyViewTests(TestCase):
             response = self.client.get(self.RAW, {"filename": "report.pdf"})
 
         self.assertEqual(response.status_code, 502)
+
+
+@override_settings(CLOUDINARY_CLOUD_NAME="test-cloud")
+class ArchiveOnlyMeTests(TestCase):
+    """"Only me": a private item is hidden from the gallery and refused by the
+    /archive/cdn/ route for everyone but its uploader."""
+
+    PRIVATE_PATH = "image/upload/v1/abureport/archive/secret.jpg"
+    PUBLIC_PATH = "image/upload/v1/abureport/archive/open.jpg"
+
+    def setUp(self):
+        self.owner = Auth.objects.create_user(email="only-me-owner@example.com")
+        self.other = Auth.objects.create_user(email="only-me-other@example.com")
+        self.secret = ArchiveImage.objects.create(
+            kind=ArchiveKind.IMAGE, url=f"/archive/cdn/{self.PRIVATE_PATH}", alt="Hidden family photo",
+            width=100, height=100, public_id="abureport/archive/secret", author=self.owner,
+            visibility=ArchiveVisibility.PRIVATE,
+        )
+        self.open = ArchiveImage.objects.create(
+            kind=ArchiveKind.IMAGE, url=f"/archive/cdn/{self.PUBLIC_PATH}", alt="Open sunrise photo",
+            width=100, height=100, public_id="abureport/archive/open", author=self.owner,
+        )
+
+    def _login(self, user):
+        with mock.patch("AUTHENTICATION.signals._try_send_login_email"):
+            self.client.force_login(user)
+
+    def test_gallery_hides_private_items_from_visitors_and_other_members(self):
+        for viewer in (None, self.other):
+            self.client.logout()
+            if viewer:
+                self._login(viewer)
+            page = self.client.get(reverse("archive:gallery"))
+            self.assertContains(page, "Open sunrise photo")
+            self.assertNotContains(page, "Hidden family photo")
+            search = self.client.get(reverse("archive:gallery"), {"descr": "Hidden family photo"})
+            self.assertNotContains(search, "archive-card-%d" % self.secret.id)
+
+    def test_owner_sees_their_private_item_with_a_badge(self):
+        self._login(self.owner)
+        page = self.client.get(reverse("archive:gallery"))
+        self.assertContains(page, "Hidden family photo")
+        self.assertContains(page, "archive-private-badge")
+
+    def test_proxy_refuses_private_assets_to_everyone_but_the_owner(self):
+        url = reverse("archive:cdn_proxy", kwargs={"cloud_path": self.PRIVATE_PATH})
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self._login(self.other)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.head(url).status_code, 404)
+
+        self.client.logout()
+        self._login(self.owner)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+
+        #   A resized copy of the same asset is covered too.
+        resized = reverse("archive:cdn_proxy", kwargs={"cloud_path": "image/upload/w_200/v1/abureport/archive/secret.jpg"})
+        self.client.logout()
+        self.assertEqual(self.client.get(resized).status_code, 404)
+
+    def test_public_assets_are_still_served_to_everyone(self):
+        url = reverse("archive:cdn_proxy", kwargs={"cloud_path": self.PUBLIC_PATH})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("public", response["Cache-Control"])
+
+    def test_upload_can_be_marked_only_me(self):
+        self._login(self.owner)
+        result = {
+            "secure_url": "https://res.cloudinary.com/test-cloud/image/upload/v2/abureport/archive/new.jpg",
+            "public_id": "abureport/archive/new", "resource_type": "image", "width": 640, "height": 480,
+        }
+        with (
+            mock.patch("ARCHIVE.views.is_rate_limited", return_value=(0, False)),
+            mock.patch("ARCHIVE.views.upload_archive_image", return_value=result),
+        ):
+            response = self.client.post(reverse("archive:upload"), {
+                "alt": "Private upload sample", "quality": "medium", "width": "800", "height": "600",
+                "visibility": "private",
+                "upload_file": SimpleUploadedFile("new.jpg", b"image", content_type="image/jpeg"),
+            })
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(ArchiveImage.objects.get(public_id="abureport/archive/new").visibility, ArchiveVisibility.PRIVATE)
+
+    def test_editor_pane_is_only_for_the_owner(self):
+        url = reverse("archive:item_edit", args=[self.open.id])
+        self._login(self.owner)
+        self.assertContains(self.client.get(url), "data-studio-editor")
+        self.client.logout()
+        self._login(self.other)
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_making_an_item_private_saves_and_manage_filter_finds_it(self):
+        self._login(self.owner)
+        response = self.client.post(
+            reverse("archive:item_edit", args=[self.open.id]),
+            {"alt": "Open sunrise photo", "quality": "medium", "visibility": "private"},
+        )
+        self.assertContains(response, "Now visible only to you.")
+        self.open.refresh_from_db()
+        self.assertEqual(self.open.visibility, ArchiveVisibility.PRIVATE)
+        listing = self.client.post(reverse("archive:manage_list"), {"show": "private"})
+        self.assertContains(listing, "Open sunrise photo")
+        self.assertContains(listing, "Hidden family photo")
+
+    def test_owner_is_warned_before_hiding_an_item_a_story_uses(self):
+        self._login(self.owner)
+        payload = {"alt": "Open sunrise photo", "quality": "medium", "visibility": "private"}
+        with mock.patch("ARCHIVE.views._posts_using", return_value=["Big Story Headline"]):
+            warned = self.client.post(reverse("archive:item_edit", args=[self.open.id]), payload)
+            self.assertContains(warned, "Big Story Headline")
+            self.assertEqual(warned["HX-Retarget"], "#archive-editor")
+            self.open.refresh_from_db()
+            self.assertEqual(self.open.visibility, ArchiveVisibility.PUBLIC)
+
+            confirmed = self.client.post(
+                reverse("archive:item_edit", args=[self.open.id]), {**payload, "confirm_private": "1"}
+            )
+            self.assertContains(confirmed, "Now visible only to you.")
+        self.open.refresh_from_db()
+        self.assertEqual(self.open.visibility, ArchiveVisibility.PRIVATE)
 

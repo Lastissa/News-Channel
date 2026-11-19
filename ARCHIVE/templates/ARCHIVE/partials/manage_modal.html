@@ -1,16 +1,22 @@
-<div class="archive-modal-layer" data-archive-modal role="presentation">
+<div class="archive-modal-layer archive-studio-layer" data-archive-modal role="presentation">
   <div class="archive-modal-backdrop" data-archive-modal-close></div>
-  <div class="archive-modal-card archive-manage-card" role="dialog" aria-modal="true" aria-labelledby="archive-manage-title">
-    <div class="archive-modal-head">
-      <div>
+  <div class="archive-studio" data-studio role="dialog" aria-modal="true" aria-labelledby="archive-manage-title">
+    <header class="studio-head">
+      <div class="studio-head-text">
         <span class="archive-eyebrow">Your uploads</span>
         <h3 id="archive-manage-title">Manage my uploads</h3>
       </div>
       <button type="button" class="archive-modal-close" data-archive-modal-close aria-label="Close">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       </button>
+    </header>
+    <div class="studio-body">
+      <section class="studio-list" aria-label="Your uploads">
+        {% include "ARCHIVE/partials/manage_list.html" %}
+      </section>
+      <section class="studio-editor" id="archive-editor" aria-live="polite">
+        {% include "ARCHIVE/partials/manage_editor.html" %}
+      </section>
     </div>
-    <p class="archive-manage-hint">Only items you uploaded can be edited or deleted here. Search by name or pick a date to narrow the list.</p>
-    {% include "ARCHIVE/partials/manage_list.html" %}
   </div>
 </div>

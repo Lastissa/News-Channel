@@ -1,28 +1,35 @@
 <div class="archive-manage-list" id="archive-manage-list">
+  {% if not editor_item %}
   {% if error %}<p class="archive-modal-error" data-archive-manage-error>{{ error }}</p>{% endif %}
   {% if notice %}<p class="archive-manage-notice" data-archive-manage-notice>{{ notice }}</p>{% endif %}
-  {% comment %} Name + date search. Submits through htmx (live as you type, and on
-     Enter/the button); only #archive-manage-rows is swapped, so the inputs
-     keep focus. Values ride along on each row's edit/delete form and on
-     "Load more", so the current search survives them.  {% endcomment %}
-  <form class="archive-manage-filters"
+  {% endif %}
+  {% comment %} Search, type chips and date. Submits through htmx (live as you type and on
+     every chip change); only #archive-manage-rows is swapped, so the inputs keep focus.
+     The chosen chip rides along on each tile, "Load more", Save and Delete. {% endcomment %}
+  <form class="archive-manage-filters studio-filters"
         hx-post="{% url 'archive:manage_list' %}"
         hx-target="#archive-manage-rows" hx-swap="innerHTML"
         hx-trigger="submit, input delay:350ms"
         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
     <input type="hidden" name="page" value="1">
-    <label class="archive-manage-filter">
+    <label class="archive-manage-filter studio-search">
       <span class="sr-only">Search by name</span>
-      <input type="search" name="descr" value="{{ descr }}" placeholder="Search by name" autocomplete="off">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m13.5 13.5 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input type="search" name="descr" value="{{ descr }}" placeholder="Search your uploads" autocomplete="off">
     </label>
-    <label class="archive-manage-filter">
+    <label class="archive-manage-filter studio-date">
       <span class="sr-only">Filter by date added</span>
       <input type="date" name="date" value="{{ date }}">
     </label>
-    <button type="submit" class="archive-action-btn">Search</button>
     <button type="button" class="archive-manage-filter-clear" data-archive-manage-clear hidden>Clear</button>
+    <div class="studio-chips" role="radiogroup" aria-label="Show">
+      <label class="studio-chip"><input type="radio" name="show" value="" {% if not show %}checked{% endif %}><span>All</span></label>
+      <label class="studio-chip"><input type="radio" name="show" value="image" {% if show == 'image' %}checked{% endif %}><span>Pictures</span></label>
+      <label class="studio-chip"><input type="radio" name="show" value="file" {% if show == 'file' %}checked{% endif %}><span>Files</span></label>
+      <label class="studio-chip"><input type="radio" name="show" value="private" {% if show == 'private' %}checked{% endif %}><span>Only me</span></label>
+    </div>
   </form>
-  <div class="archive-manage-rows" id="archive-manage-rows">
+  <div class="archive-manage-rows studio-grid" id="archive-manage-rows">
     {% include "ARCHIVE/partials/manage_rows_page.html" %}
   </div>
 </div>

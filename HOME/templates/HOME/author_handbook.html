@@ -56,14 +56,14 @@
   <article class="doc-main">
     <section class="doc-section" id="workflow">
       <h2>The publishing workflow</h2>
-      <p class="doc-lead">Every story should follow the same path. This helps our story reach far wider audience online 
+      <p class="doc-lead">Every story should follow the same path as this helps our story reach far wider audience online 
         & skipping a step is what usually causes rejected articles or a warning while writing articles.</p>
       <ol class="hb-steps">
         <li><strong>Check what we have already published:</strong> Open <a href="https://abureport.com.ng" target="_blank" rel="noopener noreferrer">abureport.com.ng</a> and read today's news first. If we have not published that story yet, go ahead and write it. If we already have, do not publish it again.</li>
         <li><strong>Open the editor:</strong> Use the '+ news' button in the header. Every author. </li>
-        <li><strong>Write a headline that matches the article:</strong> Currently limited to 100 characters and you <b>CANNOT</b> change it later.</li>
+        <li><strong>Write a headline that matches the article:</strong> Currently limited to 100 characters and you <strong>CANNOT</strong> change it later so think before choosing an headling - you can delete and recreate though.</li>
         <li><strong>Add a banner:</strong> Paste an image link, upload a file, or pick one from the archive. Add an image description so the picture is accessible and explained - avoid vague unrelated banner explanation.</li>
-        <li><strong>Write the body:</strong> The first paragraph should be a quick overview for readers in a hurry. Then add the detail in sections with headings. You can also just use paragraphs, but the first one must be a quick overview. A story must have at least 300 words of real content (anything under 100 words is blocked).</li>
+        <li><strong>Write the body:</strong> The first paragraph should be a quick overview for readers in a hurry <strong>(it should only reveal critical information and not the full story).</strong> Then add the detail in sections with headings (heading is optional though but its advisable as without sectioning & heading, the table of content will not work) . You can also just use paragraphs, but the first one must be a quick preview. A story must have at least 300 words of genuine content (anything under 100 words is blocked).</li>
         <li><strong>Pick a category:</strong> It decides where the story is listed and which similar stories readers are offered. The list of categories is set by the admins, so choose the one that best matches your article{% if support_email and "@" in support_email %} or email <a href="mailto:{{ support_email }}">{{ support_email }}</a> if you have a category in mind that we should add{% endif %}.</li>
         <li><strong>Choose a table of contents (optional):</strong> Under "Table of contents" in the editor, you can choose Off, Title only, Top sections, or Fully open. If your story has headings (#, ##, ###), a jumpable contents list will appear at the top of the published page to help readers scan quickly.</li>
         <li><strong>Review before you publish:</strong> The editor runs the checks below and blocks a story that cannot does nt align it its guidelines. If a story can still be published but may reach fewer readers, you get a warning to read and confirm before proceding but that is at your own risk.</li>
@@ -77,7 +77,7 @@
       <ul class="doc-list">
         <li><strong>Save a draft:</strong> In the editor, open <strong>Drafts</strong> (Your drafts) to save the story on your screen into an available draft slot. You can keep unfinished stories there and load them back into the editor later.</li>
         <li><strong>Share/transfer a draft:</strong> In <strong>Your drafts</strong>, use the <strong>Share</strong> button on a saved draft to export it as a JSON file. On supported devices this can use the system share sheet; otherwise the file is downloaded. You can send that file to yourself (for example, phone to laptop) or to another author to continue the same story.</li>
-        <li><strong>Load a transferred draft:</strong> In the editor, use the icon-only <strong>Load news</strong> button right after <strong>Browse archive</strong> to pick a shared draft JSON file. The file’s content is loaded into the current editor. If you already have work on screen, the editor asks before replacing it—save your current work as a draft first if you still need it.</li>
+        <li><strong>Load a transferred draft:</strong> In the editor, use the icon-only <strong>Load news</strong> button right after <strong>Browse archive</strong> to pick a shared draft JSON file. The file’s content is loaded into the current editor. If you already have work on screen, the editor asks before replacing it— <strong>save your current work as a draft first if you still need it.</strong></li>
         <li><strong>Important:</strong> A loaded or saved draft is still a draft. It only counts as published once you publish it from the editor.</li>
       </ul>
     </section>
@@ -93,7 +93,7 @@
             <li>Check today's news on <a href="https://abureport.com.ng" target="_blank" rel="noopener noreferrer">abureport.com.ng</a> before you write. If we have not published that news yet, go ahead. If we already have, do not publish it again. If it is an update to the older one, say so clearly.</li>
             <li>Check every fact, name, date and figure before you publish.</li>
             <li>Avoid claims we cannot independently verify while writing news.</li>
-            <li>Write at least 300 words of real content, and always name your source with a <span class="hb-code">Source:</span> line or a link. Anything under 100 words is blocked.</li>
+            <li>Write at least 300 words of real content, and always name your source with a <span class="hb-code">Source:</span> line or a link at the bottom of your story. Anything under 100 words is blocked.</li>
             <li>Open with new information. The first paragraph should not repeat the headline AND the first paragraph should be a quick overview of the entire report.</li>
             <li>Say each fact once, then move on. Repetition affects trust and reach.</li>
             <li>Use sections with real headings so readers can scan (optional).</li>
@@ -114,7 +114,7 @@
             <li>Do not bloat the first paragraph , it should be a quick summary not soyinka's novel</li>
             <li>Do not separate sections with lines of symbols such as <span class="hb-code">------</span> or <span class="hb-code">=====</span>. Use a blank line or a real heading.</li>
             <li>Do not leave empty headings such as a lone <span class="hb-code">#</span>.</li>
-            <li>Do not pass off an AI generated image as a real news photograph.</li>
+            <li>Do not pass off an AI generated image as a real news photograph unless there is a real cause for it.</li>
           </ul>
         </div>
       </div>
@@ -199,8 +199,8 @@
         <li>A banner can be a pasted image link, an uploaded file, or a picture from the archive.</li>
         <li>An uploaded file gets a quality setting. Low loads fastest; high shows the most detail and is the heaviest.</li>
         <li>The image description (<span class="hb-code">image_info</span>) is shown under the picture. Write what the picture shows, not a copy of the headline.</li>
-        <li>Replacing an uploaded banner overwrites the same stored file, so a swapped picture does not leave a duplicate behind.</li>
-        <li>Pasted links stay exactly as you typed them. The site does not take ownership of, or delete, an image that only lives on someone else's server.</li>
+        {% comment %} <li>Replacing an uploaded banner overwrites the same stored file, so a swapped picture does not leave a duplicate behind.</li> {% endcomment %}
+        {% comment %} <li>Pasted links stay exactly as you typed them. The site does not take ownership of, or delete, an image that only lives on someone else's server.</li> {% endcomment %}
       </ul>
       <div class="hb-example">
         <p class="hb-example-title">Copy an example</p>
@@ -230,7 +230,7 @@
       <ul class="doc-list">
         <li><strong>The headline is locked.</strong> Changing it after publishing would break the story's link, so it is not editable. Get it right the first time or delete the entire story and then rewrite. read <a href="#deleting">impact of delect</a></li>
         <li><strong>A category or body change is a real update.</strong> It refreshes the "last updated" notice readers see and the date search engines are told about.</li>
-        <li><strong>A fix within 5 minutes of publishing is not an update.</strong> If you edit the body or category in that window, the change is saved but the "last updated" date does not move. Wait out the 5 minutes for a real update to refresh it.</li>
+        <li><strong>A fix within 5 minutes of publishing is not an update.</strong> If you edit the body or category in that window, the change is saved but the "last updated" date does not move. This is useful if you make a mistake you need to quickly fix.</li>
         <li><strong>A picture or caption change is cosmetic.</strong> It updates the banner on the page but leaves the "last updated" date exactly where it was.</li>
         <li><strong>Switching from an uploaded picture to a pasted link</strong> releases the old uploaded file, unless another story still shares it.</li>
       </ul>
@@ -241,7 +241,7 @@
       <p class="doc-lead">Deleting a story removes it from the site for good. Do it from your profile's published list, and treat it as final.</p>
       <ul class="doc-list">
         <li>The story page, its comments and its bookmarks go with it.</li>
-        <li>An <strong>uploaded banner is released from storage</strong> at the same time, so deleting a story no longer leaves its picture behind forever.</li>
+        <li>An <strong>uploaded banner is released from storage</strong> at the same time.</li>
         <li>A <strong>pasted external link is never touched.</strong> The file was never ours to delete.</li>
         <li>If <strong>another story still shares</strong> the same uploaded picture, the picture is kept so the surviving story does not lose its banner.</li>
         <li>Deleting your whole account cleans up every story banner the same way.</li>

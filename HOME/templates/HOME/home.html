@@ -142,22 +142,26 @@
 {% comment %}
   Advert rail. A block of its own, not nested inside .hero - it just shares
   .hero-row's flex line on desktop (70vw/30vw split, divider between them).
-  The rail is driven by the reader: swipe, trackpad, keyboard or the arrow
-  buttons, with scroll snapping so one advert lands cleanly at a time. It no
-  longer auto-advances, so a reader can stop and choose the advert they want.
+  The rail advances itself, but the reader stays in control: swipe, trackpad,
+  keyboard or the arrow buttons work at any time, with scroll snapping so one
+  advert lands cleanly at a time. Deliberate input pauses the timer, then it
+  resumes from the advert left on screen.
 
   teaser_items comes from HomeView (see HOME/views.py, _teaser_items()):
   the live image adverts an admin manages in PANEL, as dicts with
   heading/body/image/url keys (placeholder slides until one exists).
 {% endcomment %}
-<aside class="hero-teaser" id="teaser-carousel" aria-label="Adverts">
+<aside class="hero-teaser" id="teaser-carousel" aria-label="Adverts"
+       data-autoplay="6000" data-resume-after="4500">
   <div class="teaser-track" data-teaser-track tabindex="0"
-       aria-label="Advert carousel. Scroll or use the arrow buttons to choose an advert.">
+       aria-label="Advert carousel. It advances automatically; scroll or use the arrow buttons to choose an advert.">
     {% for item in teaser_items %}
     {% if item.url %}<a class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}{% if forloop.last %} is-last{% endif %}" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %} aria-label="{{ item.heading|default:'Advert' }}"
          data-index="{{ forloop.counter0 }}"
+         data-ad-view="{{ item.view_url }}"
          {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% else %}<div class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}{% if forloop.last %} is-last{% endif %}"
          data-index="{{ forloop.counter0 }}"
+         data-ad-view="{{ item.view_url }}"
          {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% endif %}
       {% comment %} Mobile: picture plus a compact caption bar (CSS); desktop: caption bar at the bottom in paper/ink. {% endcomment %}
       {% if item.heading or item.body or not item.image %}

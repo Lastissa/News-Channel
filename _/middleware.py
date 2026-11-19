@@ -1,8 +1,20 @@
 
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponsePermanentRedirect,
+    HttpResponseRedirect,
+)
 from django.urls import reverse
 from SERVICE_INTERNAL.config import About
+from SERVICE_INTERNAL.hosts import (
+    ads_host,
+    ads_origin,
+    advert_subdomain_from_host,
+    canonical_origin,
+    request_host,
+)
 
 
 class SecurityHeadersMiddleware:
@@ -27,14 +39,12 @@ class SecurityHeadersMiddleware:
         "https://*.doubleclick.net https://*.adtrafficquality.google; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "img-src 'self' data: blob: https: "
-        "https://*.google.com https://*.gstatic.com https://*.googlesyndication.com "
-        "https://*.doubleclick.net https://*.adtrafficquality.google; "
         "font-src 'self' data: https://fonts.gstatic.com; "
         "connect-src 'self' https://*.google-analytics.com "
         "https://*.googlesyndication.com https://*.doubleclick.net "
         "https://*.google.com https://*.adtrafficquality.google; "
         "frame-src 'self' https://abureport.com.ng https://www.abureport.com.ng "
-        "https://googleads.g.doubleclick.net https://*.doubleclick.net "
+        "https://*.doubleclick.net "
         "https://*.google.com https://*.adtrafficquality.google "
         "https://fundingchoicesmessages.google.com "
         "https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com "
@@ -69,6 +79,169 @@ class SecurityHeadersMiddleware:
         if not response.has_header("Content-Security-Policy-Report-Only"):
             response["Content-Security-Policy-Report-Only"] = policy
         return response
+
+
+class AdsSubdomainMiddleware:
+    """Serve the ads page at ``ads.<domain>/`` and route per-advert hosts.
+
+    The ads host is a real host, not a cosmetic redirect: the root of the ads
+    host resolves the existing promote view, ``/enquiry/`` posts to its lead
+    endpoint, and the old main-domain promote URL permanently redirects here.
+    Navigation on the ads host (about, categories, stories, the account
+    dashboard) belongs on the news host, so those paths bounce back to the
+    canonical domain instead of turning the ads host into a second copy of the
+    site.
+
+    A manager can also give one advert a subdomain such as
+    ``newads.<base>``. That host is a tracked short link: the root resolves the
+    reference and redirects to its public target, while unknown or non-advert
+    labels never resolve. Because ``ADS_HOST`` is also derived on localhost,
+    development uses ``ads.localhost`` and ``newads.localhost`` exactly the way
+    production uses the real hosts.
+    """
+
+    _PROMOTE_PATHS = {
+        "/promote-your-bussiness/",
+        "/promote-your-bussiness/enquiry/",
+    }
+    _ADS_PREFIXES = (
+        "/static/",
+        "/media/",
+        "/auth/",
+        "/promote-ads/",
+        "/ads/view/",
+        "/ads/click/",
+        "/csp-report/",
+    )
+    _ADS_PATHS = {
+        "/promote-your-bussiness/",
+        "/promote-your-bussiness/enquiry/",
+        "/enquiry/",
+        "/favicon.ico",
+        "/favicon.svg",
+        "/apple-touch-icon.png",
+        "/site.webmanifest",
+        "/robots.txt",
+        "/ads.txt",
+        "/health",
+        "/health/",
+    }
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def _ads_path_allowed(self, path):
+        return path in self._ADS_PATHS or path.startswith(self._ADS_PREFIXES)
+
+    def _serve_advert_host(self, request, label):
+        """Resolve one manager-assigned advert subdomain as a tracked link.
+
+        The custom host is a branded entry point, not a second copy of the
+        site. Its root records a click and redirects to the reference's public
+        target (the main-domain landing page or the advertiser's own URL).
+        """
+        from Partner.models import AdvertEvent, AdvertReference
+        from Partner.tracking import append_utm_source, record_advert_click
+
+        from Partner.plans import plan_allows
+        from Partner.views import serve_extra_page
+
+        row = (
+            AdvertReference.objects.select_related("advert__landing_page")
+            .filter(subdomain__iexact=label)
+            .first()
+        )
+        if row is None:
+            raise Http404("No advert uses this subdomain.")
+        #   A plan without subdomains (Regular) never answers on one.
+        if not plan_allows(row.plan, "subdomain"):
+            raise Http404("No advert uses this subdomain.")
+
+        request.advert_subdomain = label
+        path = request.path_info
+        if path != "/":
+            #   A valid advert host still needs its own assets and icons. Every
+            #   other path is not part of this one-advert site.
+            if path.startswith(("/static/", "/media/")) or path in {
+                "/favicon.ico",
+                "/favicon.svg",
+                "/apple-touch-icon.png",
+                "/site.webmanifest",
+            }:
+                return self.get_response(request)
+            #   Any other path is one of the advert's extra pages, if it has one.
+            if row.advert_id:
+                return serve_extra_page(request, row.advert, path.strip("/"))
+            raise Http404("Not found on this advert host.")
+
+        if not row.is_live:
+            origin = ads_origin(request)
+            return HttpResponseRedirect(
+                f"{origin}/" if origin else reverse("home:promote")
+            )
+
+        target = row.public_target
+        if not target:
+            raise Http404("This advert has no destination yet.")
+        if target.startswith("/"):
+            origin = canonical_origin(request)
+            target = f"{origin}{target}" if origin else target
+        target = append_utm_source(target, AdvertEvent.SOURCE_ABUREPORT)
+        record_advert_click(row, request, target)
+        return HttpResponseRedirect(target)
+
+    def __call__(self, request):
+        host = request_host(request)
+        configured_ads_host = ads_host()
+        if not configured_ads_host:
+            return self.get_response(request)
+
+        if host == configured_ads_host:
+            request.is_ads_subdomain = True
+            path = request.path_info
+
+            #   The public page is the root of the ads host. Resolve it to the
+            #   existing view without changing request.path, so templates and
+            #   login return URLs see "/" while Django still matches the view.
+            if path in ("", "/"):
+                request.path_info = "/promote-your-bussiness/"
+                request.META["PATH_INFO"] = request.path_info
+                return self.get_response(request)
+            if path == "/enquiry/":
+                request.path_info = "/promote-your-bussiness/enquiry/"
+                request.META["PATH_INFO"] = request.path_info
+                return self.get_response(request)
+            if self._ads_path_allowed(path):
+                return self.get_response(request)
+
+            main_origin = canonical_origin(request)
+            if main_origin:
+                return HttpResponsePermanentRedirect(
+                    f"{main_origin}{request.get_full_path()}"
+                )
+            return self.get_response(request)
+
+        custom_label = advert_subdomain_from_host(host)
+        if custom_label:
+            return self._serve_advert_host(request, custom_label)
+
+        #   The old main-domain URL is a permanent invite to the new home of
+        #   the ads page. Only safe methods are redirected here; a legacy form
+        #   POST still reaches the lead view and is not turned into a GET.
+        if (
+            host != "testserver"
+            and request.path_info in self._PROMOTE_PATHS
+            and request.method in {"GET", "HEAD"}
+        ):
+            origin = ads_origin(request)
+            if origin:
+                query = request.META.get("QUERY_STRING", "")
+                location = f"{origin}/"
+                if query:
+                    location = f"{location}?{query}"
+                return HttpResponsePermanentRedirect(location)
+
+        return self.get_response(request)
 
 
 class MaintenanceModeMiddleware:

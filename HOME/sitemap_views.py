@@ -11,6 +11,7 @@ from django.views import View
 
 from BLOG.models import Blog, Category, get_category_choices
 from SERVICE_INTERNAL.config import About
+from SERVICE_INTERNAL.hosts import promote_public_url
 from STAFF.models import StaffProfile
 from ARCHIVE.models import ArchiveImage, ArchiveKind
 from ARCHIVE.templatetags.archive_extras import cloudinary_proxy
@@ -164,10 +165,10 @@ class PagesSitemapView(View):
         domain = About.domain.rstrip('/')
         today = timezone.localdate()
         
-        from ARCHIVE.models import ArchiveImage, ArchiveKind
+        from ARCHIVE.models import ArchiveImage, ArchiveKind, ArchiveVisibility
         from ARCHIVE.templatetags.archive_extras import cloudinary_proxy
         
-        newest_item = ArchiveImage.objects.order_by("-date_created").only("date_created").first()
+        newest_item = ArchiveImage.objects.filter(visibility=ArchiveVisibility.PUBLIC).order_by("-date_created").only("date_created").first()
         archive_lastmod = (
             newest_item.date_created.date().isoformat()
             if newest_item and newest_item.date_created
@@ -177,7 +178,7 @@ class PagesSitemapView(View):
         # Image sitemap entries for archive
         archive_images = []
         for item in (
-            ArchiveImage.objects.filter(kind=ArchiveKind.IMAGE)
+            ArchiveImage.objects.filter(kind=ArchiveKind.IMAGE, visibility=ArchiveVisibility.PUBLIC)
             .only("url", "alt", "date_created")
             .order_by("-date_created")[:2000]
         ):
@@ -198,7 +199,7 @@ class PagesSitemapView(View):
             {"loc": f"{domain}{reverse('home:about')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
             {"loc": f"{domain}{reverse('editorial_team')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
             {"loc": f"{domain}{reverse('home:privacy_policy')}", "lastmod": today.isoformat(), "changefreq": "yearly", "priority": "0.3"},
-            {"loc": f"{domain}{reverse('home:promote')}", "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
+            {"loc": promote_public_url(), "lastmod": today.isoformat(), "changefreq": "monthly", "priority": "0.5"},
             {"loc": f"{domain}{reverse('archive:gallery')}", "lastmod": archive_lastmod or today.isoformat(), "changefreq": "daily", "priority": "0.6", "images": archive_images},
             {"loc": f"{domain}/most-viewed/", "lastmod": today.isoformat(), "changefreq": "daily", "priority": "0.6"},
         ]

@@ -1203,7 +1203,7 @@
      request), so replacing a file here feels exactly like the Add modal's
      upload above instead of just sitting there with no feedback. ---------- */
   document.body.addEventListener("htmx:beforeRequest", function (event) {
-    var form = event.target.closest && event.target.closest(".archive-manage-row-form");
+    var form = event.target.matches && event.target.matches(".archive-manage-row-form") ? event.target : null;
     if (!form) return;
     var btn = form.querySelector("button[type='submit']");
     if (btn) {
@@ -1215,7 +1215,7 @@
   });
 
   document.body.addEventListener("htmx:xhr:progress", function (event) {
-    var form = event.target.closest && event.target.closest(".archive-manage-row-form");
+    var form = event.target.matches && event.target.matches(".archive-manage-row-form") ? event.target : null;
     if (!form) return;
     var fill = form.querySelector("[data-archive-upload-progress-fill]");
     if (fill && event.detail && event.detail.lengthComputable) {
@@ -1224,7 +1224,7 @@
   });
 
   document.body.addEventListener("htmx:afterRequest", function (event) {
-    var form = event.target.closest && event.target.closest(".archive-manage-row-form");
+    var form = event.target.matches && event.target.matches(".archive-manage-row-form") ? event.target : null;
     if (!form) return;
     /* on success (2xx, including a validation-error response -- the view
        always re-renders #archive-manage-list either way) the whole list,
@@ -1241,5 +1241,63 @@
     hideUploadProgress(form);
     var responseText = event.detail && event.detail.xhr ? event.detail.xhr.responseText : "";
     toast(extractDetail(responseText, "Could not save. Please try again."), "error");
+  });
+
+  /* ---------- Manage my uploads: split-view editor ----------
+     Picking a tile loads that item into #archive-editor (htmx). On a phone
+     the editor is a sheet: .is-editing on the workspace slides it in, Back
+     slides it out. Save/Delete re-render the list and swap the editor out of
+     band, so this just keeps the sheet and the highlighted tile in step. */
+  function syncStudio() {
+    var studio = document.querySelector("[data-studio]");
+    if (!studio) return;
+    var editing = !!studio.querySelector("[data-studio-editor]");
+    studio.classList.toggle("is-editing", editing);
+    if (!editing) {
+      studio.querySelectorAll(".studio-tile.is-selected").forEach(function (t) { t.classList.remove("is-selected"); });
+    }
+  }
+  document.body.addEventListener("htmx:afterSettle", syncStudio);
+  document.body.addEventListener("htmx:oobAfterSwap", syncStudio);
+
+  document.body.addEventListener("click", function (event) {
+    var tile = event.target.closest && event.target.closest("[data-studio-tile]");
+    if (tile) {
+      var studio = tile.closest("[data-studio]");
+      if (studio) studio.querySelectorAll(".studio-tile.is-selected").forEach(function (t) { t.classList.remove("is-selected"); });
+      tile.classList.add("is-selected");
+      return;
+    }
+    var back = event.target.closest && event.target.closest("[data-studio-back]");
+    if (back) {
+      var host = back.closest("[data-studio]");
+      if (host) host.classList.remove("is-editing");
+      return;
+    }
+    var keep = event.target.closest && event.target.closest("[data-studio-keep-public]");
+    if (keep) {
+      var form = keep.closest("form");
+      var pub = form && form.querySelector('input[name="visibility"][value="public"]');
+      if (pub) pub.checked = true;
+      var warning = keep.closest("[data-studio-warning]");
+      if (warning) warning.remove();
+    }
+  });
+
+  document.body.addEventListener("input", function (event) {
+    var alt = event.target.closest && event.target.closest("[data-studio-alt]");
+    if (!alt) return;
+    var counter = alt.closest("form").querySelector("[data-studio-count]");
+    if (counter) counter.textContent = alt.value.length;
+  });
+
+  document.body.addEventListener("change", function (event) {
+    var input = event.target.closest && event.target.closest("[data-studio-file]");
+    if (!input) return;
+    var label = input.closest("form").querySelector("[data-studio-file-name]");
+    var zone = input.closest("form").querySelector(".studio-drop");
+    var picked = input.files && input.files[0];
+    if (label && picked) label.textContent = picked.name;
+    if (zone) zone.classList.toggle("has-file", !!picked);
   });
 })();

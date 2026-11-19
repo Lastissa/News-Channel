@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
+
 import dj_database_url
 from dotenv import load_dotenv
 
@@ -10,16 +12,18 @@ AUTH_USER_MODEL = "AUTHENTICATION.Auth"
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 CSRF_FAILURE_VIEW = "AUTHENTICATION.views.csrf_failure"
-CSRF_TRUSTED_ORIGINS = [f"https://{i}" for i in (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')]
 
 SECRET_KEY = os.getenv('DJANGO_SECRET')
 
 DEBUG = os.getenv("DEBUG", 'False').upper() in ['TRUE']
 # DEBUG = False
 
-if not DEBUG:
+if DEBUG:
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+else:
     SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 #   HTTPS / SECURITY HEADERS. The site is served through a proxy (Cloudflare
 #   in front of Render), so Django has to trust a request with its header containing X-Forwarded-Proto before
@@ -40,9 +44,108 @@ CSP_REPORT_ENABLED = os.getenv("CSP_REPORT_ENABLED", "False" if DEBUG else "True
 CSP_REPORT_EMAIL = os.getenv("CSP_REPORT_EMAIL", "lastissa11@gmail.com")
 CSP_REPORT_MAX_BYTES = 16 * 1024
 CSP_REPORT_DEDUPE_SECONDS = 6 * 60 * 60
-CSP_REPORT_MAX_EMAILS_PER_HOUR = 20
+CSP_REPORT_MAX_EMAILS_PER_HOUR = 10
 
-ALLOWED_HOSTS = (os.getenv("ALLOWED_HOSTS") or "localhost,127.0.0.1").split(',')
+def _clean_public_host(value):
+    """Return a bare lowercase hostname from an env-style host value."""
+    value = (value or "").strip().lower()
+    if not value:
+        return ""
+    if "://" in value:
+        value = urlsplit(value).hostname or ""
+    else:
+        value = value.split("/", 1)[0].split(":", 1)[0]
+    return value.strip().rstrip(".").lstrip(".")
+
+
+def _first_usable_host(hosts):
+    for value in hosts:
+        host = _clean_public_host(value)
+        if host and "*" not in host:
+            return host
+    return ""
+
+
+def _derive_ads_host(host):
+    """``ads.<host>`` for the first allowed host, including localhost.
+
+    The ads flow is a real subdomain even while developing. If the first
+    allowed host is ``www.example.com`` the ``www`` is dropped so the result is
+    ``ads.example.com`` rather than ``ads.www.example.com``.
+    """
+    host = _clean_public_host(host)
+    if not host:
+        return ""
+    if host.startswith("www."):
+        host = host[4:]
+    if host.startswith("ads."):
+        return host
+    return f"ads.{host}"
+
+
+def _cookie_domain(host):
+    """Parent domain for cross-subdomain sessions, or None for local/IP hosts."""
+    host = _clean_public_host(host)
+    if not host or host in {"localhost", "127.0.0.1", "0.0.0.0", "testserver"}:
+        return None
+    if host.startswith(("www.", "ads.")):
+        host = host.split(".", 1)[1]
+    return f".{host}" if "." in host else None
+
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+]
+
+#   The ads page always gets its own host. ``ADS_HOST`` wins when set;
+#   otherwise it is derived from the first usable ALLOWED_HOSTS entry, including
+#   localhost (ads.localhost) so development matches production routing.
+ADS_HOST = _clean_public_host(os.getenv("ADS_HOST", ""))
+if not ADS_HOST or "*" in ADS_HOST:
+    ADS_HOST = _derive_ads_host(_first_usable_host(ALLOWED_HOSTS))
+
+if ADS_HOST:
+    if ADS_HOST not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(ADS_HOST)
+    #   A manager may give one advert its own subdomain (newads.<base>). The
+    #   wildcard lets that host reach Django; the middleware only serves a host
+    #   when an AdvertReference actually owns it.
+    ads_base = ADS_HOST[4:] if ADS_HOST.startswith("ads.") else ""
+    if ads_base and f".{ads_base}" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(f".{ads_base}")
+
+CSRF_TRUSTED_ORIGINS = []
+for host in ALLOWED_HOSTS:
+    if not host or host == "*" or host.startswith("*."):
+        continue
+    if host.startswith("."):
+        CSRF_TRUSTED_ORIGINS.append(f"https://*{host}")
+        if DEBUG:
+            CSRF_TRUSTED_ORIGINS.append(f"http://*{host}")
+    else:
+        CSRF_TRUSTED_ORIGINS.append(f"https://{host}")
+        if DEBUG:
+            CSRF_TRUSTED_ORIGINS.append(f"http://{host}")
+CSRF_TRUSTED_ORIGINS = sorted(set(CSRF_TRUSTED_ORIGINS))
+
+#   Session and CSRF cookies are shared by the root domain and every subdomain
+#   (news, ads and any advert subdomain), so a login on one host holds on all
+#   of them. The shared domain is the ads base, the same domain the wildcard
+#   ALLOWED_HOSTS entry covers. Locally the cookies stay host-only because
+#   browsers may reject a Domain for localhost or a raw IP; set COOKIE_DOMAIN
+#   (for example ".localhost") to try sharing there. An explicit value wins in
+#   every mode.
+_explicit_cookie_domain = (os.getenv("COOKIE_DOMAIN", "") or "").strip().lower()
+if _explicit_cookie_domain:
+    SESSION_COOKIE_DOMAIN = _explicit_cookie_domain
+elif DEBUG:
+    SESSION_COOKIE_DOMAIN = None
+else:
+    SESSION_COOKIE_DOMAIN = _cookie_domain(
+        ADS_HOST[4:] if ADS_HOST.startswith("ads.") else _first_usable_host(ALLOWED_HOSTS)
+    )
+CSRF_COOKIE_DOMAIN = SESSION_COOKIE_DOMAIN
 
 #   TEMPORARY IP DIAGNOSTIC -- COMMENTED OUT (14 Oct 2026).
 #   When True this flag switched on SERVICE_INTERNAL.abstract.log_forwarded_headers,
@@ -76,6 +179,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     '_.middleware.SecurityHeadersMiddleware',
+    '_.middleware.AdsSubdomainMiddleware',
     '_.middleware.MaintenanceModeMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -209,10 +313,8 @@ IMAGE_UPLOAD_MAX_MB = int(os.getenv('image_upload_max_mb', 5))
 #   Advert landing pages are full HTML documents stored as Cloudinary raw
 #   assets. They are code, so keep the ceiling small. ADVERT_LANDING_MAX_BYTES
 #   wins when set; otherwise the friendlier MB value is used.
-ADVERT_LANDING_MAX_MB = int(os.getenv('advert_landing_max_mb', 2))
-ADVERT_LANDING_MAX_BYTES = int(
-    os.getenv('advert_landing_max_bytes', ADVERT_LANDING_MAX_MB * 1024 * 1024)
-)
+ADVERT_LANDING_MAX_MB = int(os.getenv('advert_landing_max_mb', 5))
+ADVERT_LANDING_MAX_BYTES = int(ADVERT_LANDING_MAX_MB * 1024 * 1024)
 #   NON-IMAGE FILE uploads to the /archive/ gallery (see
 #   SERVICE_INTERNAL.images.upload_archive_file). Two ceilings:
 #   videos (mp4/mov) get ARCHIVE_VIDEO_UPLOAD_MAX_MB (default 5 -- kept
@@ -227,13 +329,9 @@ RESEND_API_KEY = os.getenv('resend_api_key')
 #   ARCHIVE UPLOAD ALERTS: when the superuser turns the toggle on
 #   (ADMIN.models.SiteSettings.archive_upload_alerts), every new item added to
 #   the /archive/ gallery emails this address who uploaded it and what kind of
-#   file it was (see ARCHIVE.views.ArchiveUploadView and
-#   SERVICE_INTERNAL.email_single._try_send_archive_upload_alert_email).
+#   file it was/
 ARCHIVE_UPLOAD_ALERT_EMAIL = os.getenv('archive_upload_alert_email', 'lastissa11@gmail.com')
 
 #   STORY VIEW ALERTS: staff with StaffProfile.get_blog_notification on get
-#   an email every N views their own story crosses (see BLOG.views.StoryDetailView
-#   and SERVICE_INTERNAL.email_single._try_send_story_views_alert_email).
-#   Ten views, not five: a story that crossed five reads was barely warmed up,
-#   and the mail was landing before the story had found a reader at all.
+#   an email every N views their own story crosses
 STORY_VIEWS_ALERT_INTERVAL = int(os.getenv('story_views_alert_interval', 10))

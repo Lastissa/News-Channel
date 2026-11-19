@@ -72,11 +72,19 @@
         </select>
       </div>
 
-      {% comment %} AUTHORITY: a single whitelisted flag. Granting admin here tops outat is_admin=True; {% endcomment %}
+      {% comment %} AUTHORITY: whitelisted flags only. is_admin tops out at
+            admin; is_ads_staff is the limited ads-desk flag and never grants
+            PANEL, the staff directory, settings or site administration. {% endcomment %}
       <label class="staff-create-check staff-field-wide" for="staff-create-admin">
         <input id="staff-create-admin" type="checkbox" name="is_admin" {% if form_data.is_admin %}checked{% endif %}>
         <span>Grant admin access</span>
         <small>Do Not Tick This If You Are Only Creating A Staff Account That Shouldn't Have Access Like You Do.</small>
+      </label>
+
+      <label class="staff-create-check staff-field-wide" for="staff-create-ads">
+        <input id="staff-create-ads" type="checkbox" name="is_ads_staff" {% if form_data.is_ads_staff %}checked{% endif %}>
+        <span>Grant ads desk access</span>
+        <small>Issue and renew advert references and see advert enquiries.</small>
       </label>
 
       <div class="staff-form-actions staff-field-wide">

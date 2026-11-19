@@ -12,7 +12,7 @@
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}?v=20261111-1">
+<link rel="stylesheet" href="{% static 'archive/css/archive.css' %}?v=20261115-1">
 <script>document.documentElement.classList.add("archive-js");</script>
 {# Structured data so a crawler reads /archive/ as a browsable collection #}
 {# rather than a loose list of links. The sitewide NewsMediaOrganization #}
@@ -218,5 +218,5 @@
 {% block extra_scripts %}
 {{ block.super }}
 <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'archive/js/archive.js' %}?v=20261111-1" defer></script>
+<script src="{% static 'archive/js/archive.js' %}?v=20261115-1" defer></script>
 {% endblock %}

@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead, Announcement
+from Partner.models import (
+    AdvertEvent,
+    AdvertImage,
+    AdvertLandingPage,
+    AdvertLead,
+    AdvertPage,
+    AdvertReference,
+    Announcement,
+)
 from SERVICE_INTERNAL.images import destroy_archive_asset
 
 
@@ -46,7 +54,60 @@ class AdvertLeadAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
 
+class AdvertReferenceAdmin(admin.ModelAdmin):
+    """Inspection/recovery for superusers. Issuance and lifecycle actions are
+    in PANEL's ads control page so the normal ads team never needs _admin/."""
+
+    list_display = (
+        "reference",
+        "email_used",
+        "plan",
+        "status",
+        "expires_at",
+        "created_at",
+    )
+    list_filter = ("plan", "status")
+    search_fields = (
+        "reference",
+        "email_used",
+        "business_name",
+        "user__email",
+        "issued_by__email",
+    )
+    readonly_fields = ("reference", "created_at", "updated_at")
+
+
+class AdvertEventAdmin(admin.ModelAdmin):
+    list_display = ("reference", "event_type", "source", "created_at")
+    list_filter = ("event_type", "source")
+    search_fields = ("reference__reference", "reference__email_used")
+    readonly_fields = (
+        "reference",
+        "event_type",
+        "source",
+        "target_url",
+        "path",
+        "referrer",
+        "ip_hash",
+        "user_agent",
+        "session_key",
+        "created_at",
+    )
+
+
 admin.site.register([Announcement])
 admin.site.register(AdvertImage, AdvertImageAdmin)
 admin.site.register(AdvertLandingPage, AdvertLandingPageAdmin)
 admin.site.register(AdvertLead, AdvertLeadAdmin)
+admin.site.register(AdvertReference, AdvertReferenceAdmin)
+admin.site.register(AdvertEvent, AdvertEventAdmin)
+
+
+class AdvertPageAdmin(admin.ModelAdmin):
+    list_display = ("advert", "path", "is_published", "author", "date_updated")
+    list_filter = ("is_published",)
+    search_fields = ("path", "advert__heading")
+    raw_id_fields = ("advert", "author")
+
+
+admin.site.register(AdvertPage, AdvertPageAdmin)

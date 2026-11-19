@@ -8,6 +8,7 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'home/js/htmx.min.js' %}?v=20261106-1" defer></script>
+  <script src="{% static 'home/js/search_page.js' %}?v=20261118-1" defer></script>
 {% endblock %}
 
 {% comment %}
@@ -22,32 +23,16 @@
     <h1 id="headline">{% if query %}Search results for &ldquo;{{ query }}&rdquo;{% else %}Search {{ project_name }}{% endif %}</h1>
   </div>
 
-  <form class="search-page-form" action="{% url 'home:search' %}" method="get" role="search">
+  <form class="search-page-form" action="{% url 'home:search' %}" method="get" role="search"
+        hx-get="{% url 'home:search' %}" hx-target="#search-results" hx-swap="innerHTML"
+        hx-push-url="true" hx-indicator="#search-results-indicator">
     <label class="visually-hidden" for="search-page-input">Search stories</label>
     <input id="search-page-input" type="search" name="q" value="{{ query }}" placeholder="Search stories" autocomplete="off" required>
-    <input type="hidden" name="scope" value="{{ search_scope|default:'headline' }}">
+    <input type="hidden" name="scope" id="search-scope-hidden" value="{{ search_scope|default:'headline' }}">
     <button type="submit">Search</button>
   </form>
 
-  {% if query %}
-  <div class="search-filter-bar" aria-label="Search filters">
-    <label class="search-filter-label" for="search-scope">Filter</label>
-    <select id="search-scope"
-            name="scope"
-            class="search-filter-select"
-            hx-get="{% url 'home:search' %}"
-            hx-trigger="change"
-            hx-target="#search-results"
-            hx-swap="innerHTML"
-            hx-indicator="#search-results-indicator"
-            hx-include="#search-page-input"
-            hx-vals='{"page":"1"}'>
-      {% for value, label in search_scope_choices.items %}
-        <option value="{{ value }}" {% if search_scope == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  {% endif %}
+  <div id="search-filter-slot">{% include "HOME/partials/search_filter.html" %}</div>
 
   <div id="search-results-indicator" class="htmx-indicator search-skeleton-wrap" aria-hidden="true">
     <div class="search-skeleton-grid">

@@ -576,7 +576,12 @@
 
         var email = document.createElement("span");
         email.className = "panel-session-email";
-        email.textContent = row.email_masked;
+        email.textContent = row.email_masked + " ";
+        var kind = document.createElement("span");
+        kind.className = "panel-badge " + (row.is_staff ? "panel-badge-staff" : "panel-badge-user");
+        kind.title = row.is_staff ? "Staff account" : "Regular reader account";
+        kind.textContent = row.is_staff ? "Staff" : "User";
+        email.appendChild(kind);
         if (row.suspicious_count) {
           var badge = document.createElement("span");
           badge.className = "panel-badge panel-badge-danger";
@@ -1150,17 +1155,13 @@
       heading.type = "text"; heading.name = "heading"; heading.maxLength = 90; heading.value = item.heading;
       var body = el("textarea");
       body.name = "body"; body.rows = 2; body.maxLength = 200; body.value = item.body;
-      var url = el("input");
-      url.type = "url"; url.name = "url"; url.value = item.url; url.placeholder = "https://..."; url.required = true;
       var expiry = el("input");
       expiry.type = "datetime-local"; expiry.name = "expiry_date"; expiry.required = true; expiry.value = item.expiry_input;
 
+      //  The link is set in the Ads desk, so there is no link field here.
       row.appendChild(field("Heading", heading, key + "h"));
       row.appendChild(field("Text", body, key + "b"));
-      var pair = el("div", "ta-pair");
-      pair.appendChild(field("Link", url, key + "u"));
-      pair.appendChild(field("Ends", expiry, key + "e"));
-      row.appendChild(pair);
+      row.appendChild(field("Ends", expiry, key + "e"));
 
       var activeWrap = el("label", "ta-check");
       var active = el("input");

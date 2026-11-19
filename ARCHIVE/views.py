@@ -11,6 +11,7 @@ import requests
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import IntegrityError
+from django.db.models import Q
 from django.http import (
     Http404,
     HttpResponse,
@@ -44,7 +45,7 @@ from SERVICE_INTERNAL.images import (
 from SERVICE_INTERNAL.email_single import _try_send_archive_upload_alert_email
 from SERVICE_INTERNAL.permissions import is_authenticated
 
-from ARCHIVE.models import ArchiveImage, ArchiveKind
+from ARCHIVE.models import ArchiveImage, ArchiveKind, ArchiveVisibility
 
 #   HOW MANY ITEMS LOAD AT ONCE, BOTH FIRST PAINT AND EVERY HTMX PAGE. 12 divides
 #   evenly into the 1, 2 and 3 column grids (archive.css), so no page ends on a
@@ -218,6 +219,8 @@ def _serialize_images(images):
             "file_size_label": _human_file_size(image.file_size),
             "uploader_email": _masked_email(image.author.email),
             "date_created": image.date_created,
+            "visibility": image.visibility,
+            "is_private": image.visibility == ArchiveVisibility.PRIVATE,
         }
         for image in images
     ]
@@ -259,7 +262,18 @@ def _descr_score(query_words, description):
     return total / len(query_words)
 
 
-def _descr_ranked_ids(descr, kind="", category="", uploader=""):
+def _visible_to(viewer):
+    """The "who may see this" filter every public listing applies: public
+    items for everyone, plus a signed-in viewer's OWN private items. An
+    anonymous viewer, or anyone else, never gets a private item back."""
+    #   Uploads of a soft-deleted account are hidden from everyone.
+    alive = Q(author__deleted_at__isnull=True)
+    if is_authenticated(viewer):
+        return (Q(visibility=ArchiveVisibility.PUBLIC) | Q(author_id=viewer.pk)) & alive
+    return Q(visibility=ArchiveVisibility.PUBLIC) & alive
+
+
+def _descr_ranked_ids(descr, kind="", category="", uploader="", viewer=None):
     """Ids of every item whose description matches `descr` (fuzzy, see above),
     best match first, newest first among equal matches. Only the fields the
     comparison needs are read from the database. `kind` ("" or an
@@ -269,7 +283,7 @@ def _descr_ranked_ids(descr, kind="", category="", uploader=""):
     query_words = _descr_words(descr)
     if not query_words:
         return []
-    candidates = ArchiveImage.objects.order_by("-date_created")
+    candidates = ArchiveImage.objects.filter(_visible_to(viewer)).order_by("-date_created")
     if kind:
         candidates = candidates.filter(kind=kind)
     if uploader:
@@ -329,12 +343,12 @@ def _file_category(name):
     return _EXT_TO_FAMILY.get(_file_extension(name), "other")
 
 
-def _category_scan_ids(category, kind="", uploader=""):
+def _category_scan_ids(category, kind="", uploader="", viewer=None):
     """Ids of every item that belongs to `category` (quality for pictures,
     file-type family for files), newest first. Reading only the handful of
     fields the comparison needs keeps the scan light, the same pattern
     _descr_ranked_ids uses for the fuzzy search."""
-    candidates = ArchiveImage.objects.order_by("-date_created")
+    candidates = ArchiveImage.objects.filter(_visible_to(viewer)).order_by("-date_created")
     if kind:
         candidates = candidates.filter(kind=kind)
     if uploader:
@@ -353,7 +367,7 @@ def _clean_category(raw_value):
     return value if value in VALID_CATEGORY_KEYS else ""
 
 
-def _clean_uploader(raw_value):
+def _clean_uploader(raw_value, viewer=None):
     """The pk of an uploader who actually has items in the gallery, or ""
     for anything else. A stale or hand-typed pk is therefore harmless: it
     simply shows the same empty result a filter that matches nothing
@@ -362,16 +376,17 @@ def _clean_uploader(raw_value):
     if not value.isdigit():
         return ""
     pk = int(value)
-    return value if ArchiveImage.objects.filter(author_id=pk).exists() else ""
+    return value if ArchiveImage.objects.filter(_visible_to(viewer), author_id=pk).exists() else ""
 
 
-def _uploader_options():
+def _uploader_options(viewer=None):
     """Uploaders with at least one item, ordered by their email, each shown
     by the same masked public email the cards use. Only the primary key
     travels in the query string, so a full email address never leaks
     through a shared link or the address bar."""
     rows = (
-        ArchiveImage.objects.select_related("author")
+        ArchiveImage.objects.filter(_visible_to(viewer))
+        .select_related("author")
         .order_by("author__email")
         .values_list("author_id", "author__email")
         .distinct()
@@ -449,7 +464,7 @@ def _public_id_from_url(url, resource_type):
     return public_id
 
 
-def _paginate(page_number, descr="", kind="", category="", uploader=""):
+def _paginate(page_number, descr="", kind="", category="", uploader="", viewer=None):
     #   THE VIDEOS TAB: `kind` stays "video" in the answer (so the tab lights up
     #   and the address bar keeps it), but the rows come from the FILE kind
     #   narrowed to the Video category. A different category picked on top of the
@@ -459,12 +474,14 @@ def _paginate(page_number, descr="", kind="", category="", uploader=""):
         kind = ArchiveKind.FILE
         category = category or "video"
     if descr:
-        ranked_ids = _descr_ranked_ids(descr, kind, category, uploader)
+        ranked_ids = _descr_ranked_ids(descr, kind, category, uploader, viewer)
         paginator = Paginator(ranked_ids, PAGE_SIZE)
     elif category:
-        paginator = Paginator(_category_scan_ids(category, kind, uploader), PAGE_SIZE)
+        paginator = Paginator(_category_scan_ids(category, kind, uploader, viewer), PAGE_SIZE)
     else:
-        queryset = ArchiveImage.objects.select_related("author").order_by("-date_created")
+        queryset = (
+            ArchiveImage.objects.filter(_visible_to(viewer)).select_related("author").order_by("-date_created")
+        )
         if kind:
             queryset = queryset.filter(kind=kind)
         if uploader:
@@ -503,13 +520,47 @@ def _paginate(page_number, descr="", kind="", category="", uploader=""):
     }
 
 
-def _paginate_own(user, page_number, descr="", on_date=None):
+MANAGE_SHOW_FILTERS = ("image", "file", "private")
+
+
+def _clean_show(raw_value):
+    """The manage workspace's filter chip: "" (everything), "image", "file"
+    or "private" (only the "Only me" items). Anything else means everything."""
+    value = (raw_value or "").strip().lower()
+    return value if value in MANAGE_SHOW_FILTERS else ""
+
+
+def _clean_visibility(raw_value, default=ArchiveVisibility.PUBLIC):
+    value = (raw_value or "").strip().lower()
+    return value if value in (ArchiveVisibility.PUBLIC, ArchiveVisibility.PRIVATE) else default
+
+
+def _posts_using(item):
+    """Up to five blog posts whose text or headline picture points at this
+    archive item, so the owner can be warned before hiding something a story
+    still shows. Matches on the item's own path (no query string), which is
+    how the imgl/imgr/imgc tokens and the headline image store it."""
+    path = (item.url or "").split("?", 1)[0]
+    if not path:
+        return []
+    from BLOG.models import Blog
+
+    return list(
+        Blog.objects.filter(Q(content__contains=path) | Q(image_1__contains=path)).values_list("heading", flat=True)[:5]
+    )
+
+
+def _paginate_own(user, page_number, descr="", on_date=None, show=""):
     """Same shape as _paginate above, but scoped to *this* user's own
     uploads only, and with its own (smaller) page size -- backs the "Edit
     Added Images" htmx list (see ArchiveManageModalView). `descr` filters by
     the item's description and `on_date` (a date) by the day it was added,
     both narrowing the same newest-first queryset."""
     qs = ArchiveImage.objects.filter(author=user).order_by("-date_created")
+    if show == "private":
+        qs = qs.filter(visibility=ArchiveVisibility.PRIVATE)
+    elif show in ("image", "file"):
+        qs = qs.filter(kind=show)
     if descr:
         qs = qs.filter(alt__icontains=descr)
     if on_date:
@@ -522,6 +573,8 @@ def _paginate_own(user, page_number, descr="", on_date=None):
         "items": _serialize_images(page.object_list),
         "quality_choices": ImageQuality.CHOICES,
         "descr": descr,
+        "show": show,
+        "total": paginator.count,
         "date": on_date.isoformat() if on_date else "",
         "page": page.number,
         "num_pages": paginator.num_pages,
@@ -547,15 +600,18 @@ class ArchiveGalleryView(View):
         descr = _clean_descr(request.GET.get("descr"))
         kind = _clean_kind(request.GET.get("kind"))
         category = _clean_category(request.GET.get("category"))
-        uploader = _clean_uploader(request.GET.get("uploader"))
+        uploader = _clean_uploader(request.GET.get("uploader"), request.user)
+        viewer = request.user
         try:
             page_number = _resolve_page_number(request.GET.get("page"), default=1)
-            context = _paginate(page_number=page_number, descr=descr, kind=kind, category=category, uploader=uploader)
+            context = _paginate(
+                page_number=page_number, descr=descr, kind=kind, category=category, uploader=uploader, viewer=viewer
+            )
         except Http404:
-            context = _paginate(page_number=1, descr=descr, kind=kind, category=category, uploader=uploader)
+            context = _paginate(page_number=1, descr=descr, kind=kind, category=category, uploader=uploader, viewer=viewer)
         context["can_upload"] = is_authenticated(request.user)
         context["categories"] = ARCHIVE_CATEGORIES
-        context["uploaders"] = _uploader_options()
+        context["uploaders"] = _uploader_options(viewer)
         return render(request, "ARCHIVE/gallery.html", context)
 
     def post(self, request):
@@ -565,7 +621,8 @@ class ArchiveGalleryView(View):
             descr=_clean_descr(request.POST.get("descr")),
             kind=_clean_kind(request.POST.get("kind")),
             category=_clean_category(request.POST.get("category")),
-            uploader=_clean_uploader(request.POST.get("uploader")),
+            uploader=_clean_uploader(request.POST.get("uploader"), request.user),
+            viewer=request.user,
         )
         context["can_upload"] = is_authenticated(request.user)
         return render(request, "ARCHIVE/partials/gallery_grid.html", context)
@@ -717,6 +774,7 @@ class ArchiveUploadView(View):
                 author=request.user,
                 public_id=uploaded.get("public_id", ""),
                 resource_type=uploaded.get("resource_type", "image"),
+                visibility=_clean_visibility(request.POST.get("visibility")),
                 **row_kwargs,
             )
         except IntegrityError:
@@ -760,7 +818,8 @@ class ArchiveManageModalView(View):
         page_number = _resolve_page_number(request.GET.get("page"), default=1)
         descr = _clean_descr(request.GET.get("descr"))
         _date_value, on_date = _clean_date(request.GET.get("date"))
-        context = _paginate_own(request.user, page_number, descr=descr, on_date=on_date)
+        show = _clean_show(request.GET.get("show"))
+        context = _paginate_own(request.user, page_number, descr=descr, on_date=on_date, show=show)
         return render(request, "ARCHIVE/partials/manage_modal.html", context)
 
 
@@ -775,8 +834,24 @@ class ArchiveManageListView(View):
         page_number = _resolve_page_number(request.POST.get("page"), default=1)
         descr = _clean_descr(request.POST.get("descr"))
         _date_value, on_date = _clean_date(request.POST.get("date"))
-        context = _paginate_own(request.user, page_number, descr=descr, on_date=on_date)
+        show = _clean_show(request.POST.get("show"))
+        context = _paginate_own(request.user, page_number, descr=descr, on_date=on_date, show=show)
         return render(request, "ARCHIVE/partials/manage_rows_page.html", context)
+
+
+def _editor_context(request, item, with_list=True):
+    """Everything manage_editor.html needs for one item, plus the filters the
+    list was showing so Save/Delete re-render that same list."""
+    context = {
+        "editor_item": _serialize_images([item])[0],
+        "quality_choices": ImageQuality.CHOICES,
+        "descr": _clean_descr(request.POST.get("descr") or request.GET.get("descr")),
+        "date": _clean_date(request.POST.get("date") or request.GET.get("date"))[0] or "",
+        "show": _clean_show(request.POST.get("show") or request.GET.get("show")),
+        "alt_min": ALT_MIN_LENGTH,
+        "alt_max": ALT_MAX_LENGTH,
+    }
+    return context
 
 
 class ArchiveItemEditView(View):
@@ -802,12 +877,22 @@ class ArchiveItemEditView(View):
     above the same list. On success, `HX-Trigger` tells archive.js to
     also refresh the public gallery grid behind the popup."""
 
+    def get(self, request, pk):
+        """The editor pane for one of this user's own items."""
+        if not is_authenticated(request.user):
+            return JsonResponse({"detail": "Please sign in to manage your uploads."}, status=401)
+        item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
+        context = _editor_context(request, item)
+        return render(request, "ARCHIVE/partials/manage_editor.html", context)
+
     def post(self, request, pk):
         if not is_authenticated(request.user):
             return JsonResponse({"detail": "Please sign in to manage your uploads."}, status=401)
 
         item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
         alt = (request.POST.get("alt") or "").strip()
+        requested_visibility = _clean_visibility(request.POST.get("visibility"), default=item.visibility)
+        show = _clean_show(request.POST.get("show"))
         replacement_file = request.FILES.get("upload_file")
         requested_quality = (request.POST.get("quality") or item.quality).strip().lower()
         descr = _clean_descr(request.POST.get("descr"))
@@ -820,6 +905,28 @@ class ArchiveItemEditView(View):
             error = f"The description needs at least {ALT_MIN_LENGTH} characters."
         elif len(alt) > ALT_MAX_LENGTH:
             error = f"The description is limited to {ALT_MAX_LENGTH} characters."
+
+        #   HIDING SOMETHING A STORY STILL SHOWS: nothing is saved or uploaded
+        #   yet. The editor comes back with the list of stories and a "make it
+        #   private anyway" button, which re-sends the form with
+        #   confirm_private=1 (readers of those stories would see a broken
+        #   picture, so the owner decides knowingly).
+        if (
+            not error
+            and requested_visibility == ArchiveVisibility.PRIVATE
+            and item.visibility != ArchiveVisibility.PRIVATE
+            and request.POST.get("confirm_private") != "1"
+        ):
+            used_in = _posts_using(item)
+            if used_in:
+                context = _editor_context(request, item)
+                context["private_warning"] = used_in
+                context["form_alt"] = alt
+                context["form_visibility"] = requested_visibility
+                response = render(request, "ARCHIVE/partials/manage_editor.html", context)
+                response["HX-Retarget"] = "#archive-editor"
+                response["HX-Reswap"] = "innerHTML"
+                return response
 
         #   ONLY SET WHEN A REPLACEMENT UPLOAD ACTUALLY SUCCEEDED, so the
         #   dedupe check and the save below both know whether `item.url`
@@ -900,11 +1007,15 @@ class ArchiveItemEditView(View):
             if ArchiveImage.objects.filter(url__iexact=dedupe_url, alt__iexact=alt).exclude(pk=item.pk).exists():
                 error = "Another item already uses this exact description."
 
+        visibility_changed = requested_visibility != item.visibility
         if not error:
             item.alt = alt
+            item.visibility = requested_visibility
             if new_url:
                 item.url = new_url
             update_fields = ["alt"]
+            if visibility_changed:
+                update_fields.append("visibility")
             if new_url:
                 update_fields += ["url", "quality", "width", "height", "public_id", "original_filename", "file_size"]
             elif quality_changed:
@@ -914,13 +1025,23 @@ class ArchiveItemEditView(View):
             except IntegrityError:
                 error = "Another item already uses this exact description."
 
-        context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date)
+        context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date, show=show)
         context["error"] = error
         if not error:
-            context["notice"] = "Picture/file updated." if replacement_file else (
-                "Description and image quality updated." if quality_changed else "Description updated."
-            )
-        response = render(request, "ARCHIVE/partials/manage_list.html", context)
+            if visibility_changed:
+                context["notice"] = (
+                    "Now visible only to you." if requested_visibility == ArchiveVisibility.PRIVATE else "Now public."
+                )
+            else:
+                context["notice"] = "Picture/file updated." if replacement_file else (
+                    "Description and image quality updated." if quality_changed else "Description updated."
+                )
+            item.refresh_from_db()
+        context.update(_editor_context(request, item, with_list=False))
+        if error:
+            context["form_alt"] = alt
+            context["form_visibility"] = requested_visibility
+        response = render(request, "ARCHIVE/partials/manage_edit_response.html", context)
         if not error:
             response["HX-Trigger"] = "archive:refresh"
         return response
@@ -939,15 +1060,18 @@ class ArchiveItemDeleteView(View):
         item = get_object_or_404(ArchiveImage, pk=pk, author=request.user)
         descr = _clean_descr(request.POST.get("descr"))
         _date_value, on_date = _clean_date(request.POST.get("date"))
+        show = _clean_show(request.POST.get("show"))
         public_id = item.public_id or _public_id_from_url(item.url, item.resource_type)
         if not public_id or not destroy_archive_asset(public_id, item.resource_type):
-            context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date)
+            context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date, show=show)
             context["error"] = "The Cloudinary image could not be deleted, so the archive item was kept. Please try again."
-            return render(request, "ARCHIVE/partials/manage_list.html", context)
+            context.update(_editor_context(request, item, with_list=False))
+            return render(request, "ARCHIVE/partials/manage_edit_response.html", context)
         item.delete()
-        context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date)
+        context = _paginate_own(request.user, page_number=1, descr=descr, on_date=on_date, show=show)
         context["notice"] = "Item deleted."
-        response = render(request, "ARCHIVE/partials/manage_list.html", context)
+        context["editor_item"] = None
+        response = render(request, "ARCHIVE/partials/manage_edit_response.html", context)
         response["HX-Trigger"] = "archive:refresh"
         return response
 
@@ -1016,9 +1140,40 @@ class CloudinaryProxyView(View):
         requested_filename = (query_params.pop("filename", [""])[0] or "").strip()
         return query_params, requested_filename
 
+    def _guard_private(self, request, cloud_path):
+        """"ONLY ME" ITEMS: True when this asset belongs to a private archive
+        item and the viewer is not its uploader -- the caller then answers 404,
+        exactly as if the file did not exist. The lookup is by Cloudinary
+        public id (so a resized or re-quality'd copy of the same asset is
+        covered too) and only ever touches the few private rows. Returns
+        "owner" for the uploader (answered with no-store headers) and ""
+        for a public asset."""
+        public_id = _public_id_from_url(f"/cdn/{cloud_path}", cloud_path.split("/", 1)[0])
+        if not public_id:
+            return ""
+        private_rows = ArchiveImage.objects.filter(visibility=ArchiveVisibility.PRIVATE).filter(
+            Q(public_id=public_id) | Q(public_id="", url__contains=public_id)
+        )
+        if not private_rows.exists():
+            return ""
+        viewer = request.user
+        if is_authenticated(viewer) and private_rows.filter(author_id=viewer.pk).exists():
+            return "owner"
+        raise Http404("Image not found.")
+
+    def _mark_private(self, response):
+        response["Cache-Control"] = "private, no-store"
+        response["Vary"] = "Cookie"
+        return response
+
     def get(self, request, cloud_path):
+        private_owner = self._guard_private(request, cloud_path)
         query_params, requested_filename = self._split_query()
         real_url = self._real_url(cloud_path, query_params)
+        if private_owner:
+            if cloud_path.startswith(self.REDIRECTABLE_PREFIXES) and not requested_filename:
+                return self._mark_private(HttpResponseRedirect(real_url))
+            return self._mark_private(self._stream(real_url, requested_filename, cloud_path))
 
         if cloud_path.startswith(self.REDIRECTABLE_PREFIXES) and not requested_filename:
             response = HttpResponseRedirect(real_url)
@@ -1031,13 +1186,14 @@ class CloudinaryProxyView(View):
         """Answer a HEAD with Cloudinary's own headers and no body, so a bot
         (or a browser checking for a resumable download) never makes this
         server pull a whole file just to describe it."""
+        private_owner = self._guard_private(request, cloud_path)
         query_params, requested_filename = self._split_query()
         real_url = self._real_url(cloud_path, query_params)
 
         if cloud_path.startswith(self.REDIRECTABLE_PREFIXES) and not requested_filename:
             response = HttpResponseRedirect(real_url)
             response["Cache-Control"] = self.CACHE_CONTROL
-            return response
+            return self._mark_private(response) if private_owner else response
 
         try:
             upstream = requests.head(real_url, timeout=8, allow_redirects=True)
@@ -1055,7 +1211,7 @@ class CloudinaryProxyView(View):
             if header in upstream.headers:
                 response[header] = upstream.headers[header]
         response["Cache-Control"] = upstream.headers.get("Cache-Control") or self.CACHE_CONTROL
-        return response
+        return self._mark_private(response) if private_owner else response
 
     def _stream(self, real_url, requested_filename, cloud_path):
         """Relay the asset a chunk at a time, forwarding the client's Range

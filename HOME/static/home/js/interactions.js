@@ -2055,6 +2055,39 @@
     });
   }
 
+  /*  ADS DESK ACCESS. Limited flag only; it opens /control/ads/ and never the
+      rest of PANEL. The admin detail page is the only place it is changed. */
+  var adsAccessToggle = shell.querySelector("[data-ads-access-toggle]");
+  var adsAccessLabel = shell.querySelector("[data-ads-access-label]");
+  var adsAccessFeedback = shell.querySelector("[data-ads-access-feedback]");
+
+  if (adsAccessToggle && !adsAccessToggle.disabled) {
+    adsAccessToggle.addEventListener("click", function () {
+      adsAccessToggle.disabled = true;
+      say(adsAccessFeedback, "Working...", false);
+
+      post(shell.dataset.adsAccessEndpoint, {})
+        .then(function (result) {
+          if (result.ok) {
+            adsAccessToggle.classList.toggle("is-on", !!result.data.is_ads_staff);
+            adsAccessToggle.setAttribute("aria-pressed", result.data.is_ads_staff ? "true" : "false");
+            if (adsAccessLabel) {
+              adsAccessLabel.textContent = result.data.is_ads_staff
+                ? "Can manage advert references"
+                : "No ads desk access";
+            }
+          }
+          say(adsAccessFeedback, result.data.detail || (result.ok ? "Ads access updated." : "Could not update ads access."), !result.ok);
+        })
+        .catch(function () {
+          say(adsAccessFeedback, "Connection issue. Ads access was not changed.", true);
+        })
+        .finally(function () {
+          adsAccessToggle.disabled = false;
+        });
+    });
+  }
+
   /*  SEND MAIL. One email to THIS staff member. The recipient is decided by the
       server from the staff id in the endpoint, nothing here can change it. */
   var mailBlock = shell.querySelector("[data-mail-block]");

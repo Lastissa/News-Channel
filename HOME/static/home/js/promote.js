@@ -49,6 +49,67 @@
   var finePointer =
     window.matchMedia && window.matchMedia("(pointer: fine)").matches;
 
+  /* ---------- advert preview video ---------- */
+  //   The poster is local, so the page paints without fetching the MP4. The
+  //   button is the only way to start playback: no autoplay, no muted loop, and
+  //   native controls take over as soon as the visitor chooses to watch.
+  var previewVideo = page.querySelector("[data-preview-video]");
+  var previewButton = page.querySelector("[data-preview-play]");
+  var previewFrame = page.querySelector("[data-preview-frame]");
+
+  if (previewVideo && previewButton && previewFrame) {
+    var previewLabel = previewButton.querySelector(".promote-preview-play-label");
+
+    var hidePreviewCover = function () {
+      previewFrame.classList.add("is-preview-playing");
+      previewButton.setAttribute("aria-hidden", "true");
+      previewButton.tabIndex = -1;
+    };
+
+    var showPreviewCover = function (label) {
+      previewFrame.classList.remove("is-preview-playing");
+      previewButton.removeAttribute("aria-hidden");
+      previewButton.tabIndex = 0;
+      if (label && previewLabel) previewLabel.textContent = label;
+    };
+
+    previewButton.addEventListener("click", function () {
+      if (typeof previewVideo.play !== "function") return;
+
+      var playResult;
+      try {
+        playResult = previewVideo.play();
+      } catch (error) {
+        showPreviewCover();
+        return;
+      }
+
+      hidePreviewCover();
+      if (playResult && typeof playResult.catch === "function") {
+        playResult.catch(function () {
+          showPreviewCover();
+          previewFrame.classList.remove("is-preview-playing");
+        });
+      }
+      if (typeof previewVideo.focus === "function") {
+        try {
+          previewVideo.focus({ preventScroll: true });
+        } catch (error) {
+          // Older browsers do not accept the options object; focus is optional.
+        }
+      }
+    });
+
+    previewVideo.addEventListener("play", hidePreviewCover);
+    previewVideo.addEventListener("ended", function () {
+      showPreviewCover("Watch the preview again");
+    });
+    previewVideo.addEventListener("error", function () {
+      showPreviewCover("Preview unavailable");
+      previewButton.disabled = true;
+    });
+  }
+
   /* ---------- scroll reveal ---------- */
   var revealItems = Array.prototype.slice.call(
     page.querySelectorAll("[data-reveal]")
