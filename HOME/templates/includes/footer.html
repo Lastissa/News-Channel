@@ -7,7 +7,7 @@
         <img src="{% static 'home/icons/logo-72.png' %}"
              srcset="{% static 'home/icons/logo-72.png' %} 1x, {% static 'home/icons/logo-144.png' %} 2x"
              alt="{{ project_name }} logo" width="32" height="32" loading="lazy" decoding="async">
-        <span class="brand-word">{{ project_name }}</span>
+        <span class="brand-word mh">{{ project_name|slice:":3" }}<b>{{ project_name|slice:"3:" }}</b></span>
       </div>
       <p class="footer-tagline">{{ project_cachphrase }}</p>
       {% if not request.user.is_authenticated %}

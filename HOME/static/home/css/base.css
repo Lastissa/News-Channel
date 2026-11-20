@@ -239,14 +239,39 @@ button { font-family: inherit; cursor: pointer; }
   border-bottom: 1px solid var(--slate);
 }
 .header-bar {
-  max-width: 1180px; margin: 0 auto; padding: 0 20px;
-  height: var(--header-h);
+  max-width: 1180px; margin: 0 auto; padding: 8px 20px;
+  min-height: var(--header-h);
+  height: auto;
   display: flex;
   align-items: center; gap: 16px;
 }
 .brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .brand-mark { border-radius: var(--radius-s); }
-.brand-word { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--nav-fg); letter-spacing: 0.01em; }
+.brand-word.mh {
+  --mh-ink: #fff;
+  --mh-red: #ff2f3b;
+  display: inline-block;
+  font: 900 clamp(1.15rem, 2.2vw, 1.85rem)/1 "Playfair Display", Georgia, serif;
+  color: var(--mh-ink);
+  text-align: center;
+  padding: .14em .4em .12em;
+  border-block: .09em double var(--mh-ink);
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+.brand-word.mh b {
+  color: var(--mh-red);
+  font-weight: inherit;
+}
+.brand-word.mh::after {
+  content: "NEWS  •  2026";
+  display: block;
+  margin-top: .3em;
+  font: 800 .2em/1 "Montserrat", Arial, sans-serif;
+  letter-spacing: .55em;
+  padding-left: .55em;
+  color: var(--mh-ink);
+}
 
 .primary-nav { display: none; flex: 1; }
 .primary-nav ul { list-style: none; display: flex; align-items: center; gap: 24px; margin: 0; padding: 0; }
@@ -352,24 +377,26 @@ html[data-theme="dark"] .icon-moon { display: block; }
   #search-toggle { display: none; }
 }
 
-/* Narrow desktops (900px to 1099px): the full link row plus the search bar
-   no longer fit beside the brand name, so the wordmark steps aside and the
-   logo mark alone keeps the brand link. */
+/* Narrow desktops (900px to 1099px): keep the full masthead visible but
+   scale it down so it fits beside the link row and search bar. */
 @media (min-width: 900px) and (max-width: 1099.98px) {
-  .brand-word { display: none; }
-  .header-bar { padding: 0 14px; }
+  .brand-word.mh { font-size: clamp(1rem, 1.5vw, 1.35rem); padding: .12em .3em .1em; }
+  .brand-word.mh::after { letter-spacing: .35em; padding-left: .35em; }
+  .header-bar { padding: 6px 14px; }
 }
 
 
-/* Very small phones (under 350px): the brand name and the three header icons
-   together are wider than the screen, which widened the whole page and made
-   the browser zoom out. Keep the logo, drop the word. */
+/* Very small phones (under 350px): scale the masthead down so it still fits
+   beside the header icons without widening the page. */
 @media (max-width: 349.98px) {
-  .brand-word { display: none; }
+  .brand-word.mh { font-size: .95rem; padding: .1em .22em .08em; }
+  .brand-word.mh::after { font-size: .18em; letter-spacing: .2em; padding-left: .2em; }
   .header-bar { padding-inline: 12px; }
 }
 
 @media (max-width: 899.98px) {
+  .brand-word.mh { font-size: 1.05rem; padding: .12em .3em .1em; }
+  .brand-word.mh::after { letter-spacing: .3em; padding-left: .3em; }
   .primary-nav {
     position: fixed; inset: var(--header-h) 0 0 0; background: var(--paper);
     padding: 20px; overflow-y: auto; transform: translateX(100%); transition: transform 0.24s ease;
@@ -1018,7 +1045,7 @@ a.tag:hover, a.tag:focus-visible { opacity: 0.82; color: var(--nav-fg); }
 
 .footer-newsletter-inner { max-width: 1180px; margin: 0 auto; padding: 32px 20px 20px; text-align: center; }
 .footer-brand { justify-content: center; margin-bottom: 10px; }
-.footer-brand .brand-word { color: var(--nav-fg); }
+.footer-brand .brand-word.mh { color: #fff; }
 .footer-tagline { color: var(--nav-fg-light); margin-bottom: 16px; font-style: italic;}
 .newsletter-form { display: flex; gap: 8px; max-width: 420px; margin: 0 auto; flex-wrap: wrap; justify-content: center; }
 @media (min-width: 720px) {

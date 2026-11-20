@@ -20,10 +20,12 @@ p{margin:0 0 16px}a{color:inherit;text-decoration:none}img{max-width:100%;displa
 :focus-visible{outline:1.5px solid var(--amber-deep);outline-offset:2px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .site-header{position:sticky;top:0;z-index:100;background:var(--nav-bg);border-bottom:1px solid var(--slate)}
-.header-bar{max-width:1180px;margin:0 auto;padding:0 20px;height:var(--header-h);display:flex;align-items:center;gap:16px}
+.header-bar{max-width:1180px;margin:0 auto;padding:8px 20px;min-height:var(--header-h);height:auto;display:flex;align-items:center;gap:16px}
 .brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .brand-mark{border-radius:var(--radius-s)}
-.brand-word{font-family:var(--font-display);font-weight:700;font-size:1.15rem;color:var(--nav-fg);letter-spacing:.01em}
+.brand-word.mh{--mh-ink:#fff;--mh-red:#ff2f3b;display:inline-block;font:900 clamp(1.15rem,2.2vw,1.85rem)/1 "Playfair Display",Georgia,serif;color:var(--mh-ink);text-align:center;padding:.14em .4em .12em;border-block:.09em double var(--mh-ink);white-space:nowrap}
+.brand-word.mh b{color:var(--mh-red);font-weight:inherit}
+.brand-word.mh::after{content:"NEWS  •  2026";display:block;margin-top:.3em;font:800 .2em/1 "Montserrat",Arial,sans-serif;letter-spacing:.55em;padding-left:.55em;color:var(--mh-ink)}
 .primary-nav{display:none;flex:1}
 .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
 .hero-row{display:flex;align-items:stretch;width:100%}
@@ -64,6 +66,9 @@ p{margin:0 0 16px}a{color:inherit;text-decoration:none}img{max-width:100%;displa
 .skeleton-media{aspect-ratio:16/10}.skeleton-line{height:14px;border-radius:4px}
 @keyframes skeleton-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
 @media (max-width:899px){.hero-row{flex-direction:column}.hero{width:100%;height:45vh;min-height:0;max-height:none}}
+@media (min-width:900px) and (max-width:1099.98px){.brand-word.mh{font-size:clamp(1rem,1.5vw,1.35rem);padding:.12em .3em .1em}.brand-word.mh::after{letter-spacing:.35em;padding-left:.35em}.header-bar{padding:6px 14px}}
+@media (max-width:899.98px){.brand-word.mh{font-size:1.05rem;padding:.12em .3em .1em}.brand-word.mh::after{letter-spacing:.3em;padding-left:.3em}}
+@media (max-width:349.98px){.brand-word.mh{font-size:.95rem;padding:.1em .22em .08em}.brand-word.mh::after{font-size:.18em;letter-spacing:.2em;padding-left:.2em}.header-bar{padding-inline:12px}}
 @media (max-width:640px){.hero-headline{font-size:clamp(1.5rem,7vw,1.9rem);line-height:1.16}}
 @media (min-width:640px){.story-grid{grid-template-columns:repeat(2,1fr)}}
 @media (min-width:900px){.hero-content{padding:40px 60px 110px}}
