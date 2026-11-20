@@ -1,26 +1,36 @@
-{% load static %}
-{% if deleted_accounts %}
-<section class="acct-notice" role="alert" aria-label="Deleted accounts">
-  <h2>Deleted accounts</h2>
-  <ul>
-    {% for item in deleted_accounts %}
-    <li class="{% if item.is_due %}is-due{% endif %}">
-      <p>
-        {% if item.is_due %}
-        This <strong>{{ item.name }}</strong> account is due for deletion {% if item.days_over %}{{ item.days_over }} day{{ item.days_over|pluralize }} ago{% else %}today{% endif %}.
-        {% else %}
-        <strong>{{ item.name }}</strong> is deleted. It can be restored for {{ item.days_left }} more day{{ item.days_left|pluralize }}.
-        {% endif %}
-      </p>
-      <div class="acct-notice-actions">
-        <a class="acct-btn" href="{{ item.url }}">{% if item.is_due %}Review{% else %}Restore{% endif %}</a>
-        {% if item.is_due %}
-        {% include "ADMIN/partials/purge_button.html" with purge_url=item.purge_url purge_name=item.name purge_id=item.id stories_count=item.stories_count comments_count=item.comments_count %}
-        {% endif %}
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
+{% if deleted_accounts or account_action_logs %}
+<section class="acct-notice" role="region" aria-label="Account lifecycle">
+  {% if deleted_accounts %}
+    <h2>Deactivated accounts</h2>
+    <ul>
+      {% for item in deleted_accounts %}
+      <li>
+        <p>
+          <strong>{{ item.name }}</strong> ({{ item.email }}) was deactivated
+          {% if item.days_ago %}{{ item.days_ago }} day{{ item.days_ago|pluralize }} ago{% else %}today{% endif %}.
+          Public content is anonymized and can only be restored by an admin.
+        </p>
+        <div class="acct-notice-actions">
+          <a class="acct-btn" href="{{ item.url }}">Review / Restore</a>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if account_action_logs %}
+    <h3>Account action log</h3>
+    <ul class="acct-log-list">
+      {% for log in account_action_logs %}
+      <li>
+        <strong>{{ log.get_action_display }}</strong>:
+        {{ log.account_email|default:"Unknown account" }}
+        {% if log.actor_name or log.actor_email %}by {{ log.actor_name|default:log.actor_email }}{% endif %}
+        {% if log.created_at %}<time datetime="{{ log.created_at|date:'c' }}">({{ log.created_at|date:"M d, Y H:i" }})</time>{% endif %}
+        {% if log.details %}<div class="acct-log-details">{{ log.details|linebreaksbr }}</div>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 </section>
-<script src="{% static 'control/js/account_delete.js' %}?v=20261116-1" defer></script>
 {% endif %}

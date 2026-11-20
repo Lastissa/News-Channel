@@ -126,7 +126,7 @@
           <span>Advert subdomain</span>
           <span class="ads-desk-subdomain">
             <input type="text" name="subdomain" maxlength="63" autocomplete="off"
-                   spellcheck="false" data-subdomain-input pattern="[a-z0-9](?:[a-z0-9_\-]{0,61}[a-z0-9])?"
+                   spellcheck="false" data-subdomain-input pattern="[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?" minlength="1" maxlength="63" autocapitalize="none"
                    value="{{ form_data.subdomain }}" placeholder="newads">
             <span class="ads-desk-subdomain-suffix">.{{ ads_base_host }}</span>
           </span>
@@ -135,7 +135,7 @@
 
         <label class="ads-desk-field ads-desk-field--wide">
           <span>Public page URL</span>
-          <input type="url" name="public_url" maxlength="500" inputmode="url"
+          <input type="url" name="public_url" maxlength="500" inputmode="url" data-public-url-input
                  value="{{ form_data.public_url }}" placeholder="https://example.com/campaign">
           <small>The advert opens this link. It is set only here.</small>
         </label>
@@ -145,7 +145,7 @@
           <select name="advert_id">
             <option value="">No advert linked yet</option>
             {% for advert in advert_choices %}
-            <option value="{{ advert.id }}" {% if form_data.advert_id == advert.id|stringformat:"s" %}selected{% endif %} {% if not advert.allowed %}disabled{% endif %}>
+            <option value="{{ advert.id }}" data-has-url="{{ advert.has_url|yesno:'true,false' }}" {% if form_data.advert_id == advert.id|stringformat:"s" %}selected{% endif %} {% if not advert.allowed %}disabled{% endif %}>
               {{ advert.label }}{% if advert.taken_by %} - already used by {{ advert.taken_by }}{% endif %}
             </option>
             {% endfor %}
@@ -215,7 +215,7 @@
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261115-1">
+<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261120-1">
 <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'control/js/advert_references.js' %}?v=20261115-1" defer></script>
+<script src="{% static 'control/js/advert_references.js' %}?v=20261120-1" defer></script>
 {% endblock %}

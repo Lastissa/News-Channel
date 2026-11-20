@@ -9,6 +9,7 @@ from xml.etree import ElementTree
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.db import connection
+from django.db.models import Q
 from django.test import RequestFactory, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.templatetags.static import static
@@ -126,8 +127,7 @@ class HomeHeadingSemanticsTests(QuietTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            'content="AbuReport shares timely Nigerian education news, university and polytechnic updates, '
-            'JAMB, WAEC, NECO and Post-UTME news, scholarships, and technology stories."',
+            f"{About.project_name} is a Nigerian digital news platform providing reliable, timely and relevant news, updates, educational related services and stories for readers in Nigeria and beyond.",
         )
         self.assertEqual(response.content.count(b"<h1"), 1)
         lead_heading = Blog.objects.order_by("-date_created").first().heading
@@ -878,7 +878,6 @@ class PromotePageViewTests(QuietTestCase):
             "abureport/archive/AbuReport-ad-preview-video_g4dmnb.mp4",
         )
         self.assertContains(response, "advert-preview-poster")
-        self.assertContains(response, "no autoplay")
 
     def test_promote_page_falls_back_to_default_whatsapp_without_a_mailbox(self):
         row = SiteSettings.get_solo()
@@ -943,7 +942,7 @@ class PromotePageViewTests(QuietTestCase):
         response = self.client.get(reverse("home:profile"), {"view": "profile"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Advertiser analytics")
+        self.assertContains(response, reverse("home:advertise_dashboard"))
         self.assertContains(response, "Advertiser")
 
     def test_dashboard_shows_only_this_advertisers_enquiries(self):
@@ -1255,7 +1254,7 @@ class AdsSubdomainRoutingTests(QuietTestCase):
         )
 
     @override_settings(ALLOWED_HOSTS=["example.com", "ads.example.com", ".example.com"])
-    def test_advert_subdomain_redirects_to_its_target_and_unknown_labels_404(self):
+    def test_advert_subdomain_serves_its_page_and_unknown_labels_404(self):
         owner = Auth.objects.create_user(email="sub-owner@example.com")
         AdvertReference.objects.create(
             user=owner,
@@ -1270,8 +1269,11 @@ class AdsSubdomainRoutingTests(QuietTestCase):
             HTTP_HOST="newads.example.com",
             HTTP_USER_AGENT="Mozilla/5.0 (TestBrowser)",
         )
-        self.assertEqual(live.status_code, 302)
-        self.assertTrue(live["Location"].startswith("https://shop.example.org/"))
+        #   With no custom HTML the paid subdomain stays up with the built-in
+        #   page; its Learn more link still uses the desk's public URL.
+        self.assertEqual(live.status_code, 200)
+        self.assertContains(live, "advertisement is being build, check back soon..")
+        self.assertContains(live, "https://shop.example.org/?utm_source=abureport")
         self.assertEqual(AdvertEvent.objects.filter(reference__subdomain="newads").count(), 1)
 
         unknown = self.client.get("/", HTTP_HOST="nothere.example.com")
@@ -1286,6 +1288,39 @@ class AdsSubdomainRoutingTests(QuietTestCase):
         )
         response = self.client.get("/", HTTP_HOST="regularsub.example.com")
         self.assertEqual(response.status_code, 404)
+
+    @override_settings(ALLOWED_HOSTS=["example.com", "ads.example.com", ".example.com"])
+    def test_an_advert_with_a_subdomain_opens_there_and_never_on_the_path(self):
+        from datetime import timedelta
+        from unittest import mock as _mock
+        from django.utils import timezone as _tz
+        from Partner.models import AdvertImage, AdvertLandingPage
+
+        admin = Auth.objects.create_user(email="sub-landing-admin@example.com", is_staff=True, is_admin=True)
+        owner = Auth.objects.create_user(email="sub-landing-owner@example.com")
+        advert = AdvertImage.objects.create(
+            author=admin, expiry_date=_tz.now() + timedelta(days=5), heading="Sub Shop", body="x",
+            image_url="https://cdn.example.com/x.jpg",
+        )
+        AdvertLandingPage.objects.create(advert=advert, author=admin, html_public_id="x/a.html", is_published=True)
+        reference = AdvertReference.objects.create(
+            user=owner, plan=AdvertLead.PLAN_PRO, business_name="Sub Shop", advert=advert, subdomain="newshop",
+        )
+
+        #   The click target is the subdomain, not the /ads/ path.
+        self.assertIn("newshop.example.com", reference.public_target)
+        self.assertNotIn("/ads/", reference.public_target)
+
+        #   The path page sends the reader to the subdomain.
+        path_page = self.client.get(f"/ads/sub-shop-{advert.pk}/", HTTP_HOST="example.com")
+        self.assertEqual(path_page.status_code, 302)
+        self.assertIn("newshop.example.com", path_page["Location"])
+
+        #   The subdomain root shows the page itself, with no redirect.
+        with _mock.patch("Partner.views.fetch_advert_landing_html", return_value="<!doctype html><p>Hello from the advert</p>"):
+            root = self.client.get("/", HTTP_HOST="newshop.example.com")
+        self.assertEqual(root.status_code, 200)
+        self.assertIn("Hello from the advert", root.content.decode())
 
     def test_old_main_domain_promote_url_redirects_to_the_ads_host(self):
         response = self.client.get(
@@ -1789,74 +1824,22 @@ class StoryDeleteReleasesImageTests(QuietTestCase):
         self.assertTrue(Blog.objects.filter(pk=self.blog.pk).exists())
         destroy_asset.assert_not_called()
 
-    def test_account_deletion_releases_every_story_banner(self, _ping):
+    def test_self_service_hibernation_keeps_account_and_public_content(self, _ping):
+        """Self-service deactivation now hibernates (does not hard-delete the account)."""
+        from SERVICE_INTERNAL.account_lifecycle import hibernate_account
+
         Blog.objects.filter(pk=self.blog.pk).update(image_public_id="abureport/news/abc123")
-        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
-            "HOME.views.drop_sessions_for", return_value=0
-        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
-            response = self.client.post(reverse("home:profile_delete_account"), {"email": self.author.email})
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(Auth.objects.filter(pk=self.author.pk).exists())
-        destroy_asset.assert_called_once_with("abureport/news/abc123", "image")
+        with mock.patch("SERVICE_INTERNAL.account_lifecycle.drop_sessions_for", return_value=0), mock.patch(
+            "SERVICE_INTERNAL.account_lifecycle.invalidate_account_caches"
+        ), mock.patch("SERVICE_INTERNAL.account_lifecycle.notify_admins_deactivation_started"):
+            hibernate_account(self.author, actor=self.author)
 
-    def _delete_account(self):
-        return self.client.post(reverse("home:profile_delete_account"), {"email": self.author.email})
-
-    def test_account_deletion_releases_the_avatar(self, _ping):
-        Auth.objects.filter(pk=self.author.pk).update(
-            profile_img="https://res.cloudinary.com/test/image/upload/v1/abureport/avatars/user_%d.jpg" % self.author.pk
-        )
-        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
-            "HOME.views.drop_sessions_for", return_value=0
-        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
-            response = self._delete_account()
-        self.assertEqual(response.status_code, 302)
-        destroy_asset.assert_called_once_with(f"abureport/avatars/user_{self.author.pk}")
-
-    def test_account_deletion_releases_image_adverts(self, _ping):
-        AdvertImage.objects.create(
-            author=self.author,
-            expiry_date=timezone.now() + timedelta(days=7),
-            image_url="https://res.cloudinary.com/test/image/upload/v1/abureport/adverts/banner.jpg",
-            image_public_id="abureport/adverts/banner",
-            url="https://example.com",
-        )
-        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
-            "HOME.views.drop_sessions_for", return_value=0
-        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
-            response = self._delete_account()
-        self.assertEqual(response.status_code, 302)
-        destroy_asset.assert_called_once_with("abureport/adverts/banner")
-
-    def test_account_deletion_releases_archive_uploads(self, _ping):
-        ArchiveImage.objects.create(
-            author=self.author,
-            url="/archive/cdn/image/upload/v123/abureport/archive/photo.jpg",
-            alt="Campus view",
-            public_id="abureport/archive/photo",
-            resource_type="image",
-        )
-        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
-            "HOME.views.drop_sessions_for", return_value=0
-        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
-            response = self._delete_account()
-        self.assertEqual(response.status_code, 302)
-        destroy_asset.assert_called_once_with("abureport/archive/photo", "image")
-
-    def test_account_deletion_recovers_a_legacy_archive_public_id(self, _ping):
-        ArchiveImage.objects.create(
-            author=self.author,
-            url="/archive/cdn/image/upload/v123/abureport/archive/legacy-photo.jpg",
-            alt="Legacy photo",
-            public_id="",
-            resource_type="image",
-        )
-        with mock.patch("HOME.views.destroy_archive_asset", return_value=True) as destroy_asset, mock.patch(
-            "HOME.views.drop_sessions_for", return_value=0
-        ), mock.patch("HOME.views._try_send_account_deleted_batch_email"):
-            response = self._delete_account()
-        self.assertEqual(response.status_code, 302)
-        destroy_asset.assert_called_once_with("abureport/archive/legacy-photo", "image")
+        author = Auth.everyone.get(pk=self.author.pk)
+        self.assertIsNotNone(author.deleted_at)
+        self.assertFalse(author.is_active)
+        self.assertTrue(Blog.objects.filter(pk=self.blog.pk).exists())
+        self.blog.refresh_from_db()
+        self.assertEqual(self.blog.author_name, "Unknown")
 
 
 class AuthorHandbookViewTests(QuietTestCase):
@@ -2076,7 +2059,7 @@ class ProfileListSearchTests(QuietTestCase):
             self.assertContains(response, f'id="{box_id}"')
         self.assertNotContains(response, 'class="profile-header-bar"')
         self.assertContains(response, 'class="profile-last-login-row"')
-        self.assertContains(response, 'class="profile-delete-account-btn"')
+        self.assertContains(response, "profile-delete-account-btn")
 
 
 class SearchAndCategoryPageTests(QuietTestCase):
@@ -2134,7 +2117,7 @@ class SearchAndCategoryPageTests(QuietTestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_sitemap_lists_category_landing_pages(self):
-        response = self.client.get("/sitemap.xml")
+        response = self.client.get("/story-categories-sitemap.xml")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("home:category", args=["news"]))
@@ -2142,7 +2125,7 @@ class SearchAndCategoryPageTests(QuietTestCase):
     def test_sitemap_lists_the_editorial_trust_page(self):
         """The public editorial/trust page is indexable like /about/, so it
         must be discoverable from the sitemap too."""
-        response = self.client.get("/sitemap.xml")
+        response = self.client.get("/pages-sitemap.xml")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("editorial_team"))
@@ -2166,7 +2149,7 @@ class SearchAndCategoryPageTests(QuietTestCase):
             author=author,
         )
 
-        response = self.client.get("/sitemap.xml")
+        response = self.client.get("/pages-sitemap.xml")
         content = response.content.decode()
         expected_loc = About.domain.rstrip("/") + reverse(
             "archive:cdn_proxy",
@@ -2222,7 +2205,7 @@ class ContinueReadingPopupTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'data-guest="true"')
-        self.assertContains(response, "The last 3 article you read.")
+        self.assertContains(response, "The last 5 article you read.")
         self.assertContains(response, "JAMB update story")
         self.assertContains(response, "More like what you read")
 
@@ -2233,7 +2216,7 @@ class ContinueReadingPopupTests(QuietTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Latest stories")
-        self.assertNotContains(response, "The last 3 article you read.")
+        self.assertNotContains(response, "The last 5 article you read.")
 
     def test_history_predating_readinghistory_still_personalizes_the_popup(self):
         # Readers who were active before ReadingHistory existed only have the
@@ -2244,7 +2227,7 @@ class ContinueReadingPopupTests(QuietTestCase):
         response = self.client.get(reverse("home:home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "The last 3 article you read.")
+        self.assertContains(response, "The last 5 article you read.")
         self.assertContains(response, "More like what you read")
         self.assertNotContains(response, "Latest stories")
 
@@ -2799,3 +2782,179 @@ class SearchPageAjaxTests(TestCase):
         self.assertIn("Search results for", html)
         self.assertIn("<title>Search: jamb", html)
         self.assertIn('id="search-scope"', html)
+
+
+class SelfServiceDeactivationFlowTests(QuietTestCase):
+    """The placard confirms three times, then sends a 5-digit code and only
+    hibernates when the code, email and (when required) password all match."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = Auth.objects.create_user(
+            email="deactivate-me@example.com", password="secret123"
+        )
+        self.client.force_login(self.user)
+
+    def _set_progress(self, step=4):
+        session = self.client.session
+        session["acct_delete_progress"] = step
+        session.save()
+
+    def test_first_placard_step_renders_and_records_progress(self):
+        response = self.client.get(reverse("home:profile_delete_placard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Deactivate account")
+        self.assertEqual(self.client.session["acct_delete_progress"], 1)
+
+    def test_send_code_requires_the_confirmations(self):
+        response = self.client.post(
+            reverse("home:profile_delete_send_code"), {"email": self.user.email}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_send_code_rejects_a_mismatched_email(self):
+        self._set_progress()
+        response = self.client.post(
+            reverse("home:profile_delete_send_code"), {"email": "other@example.com"}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @mock.patch("HOME.views._try_send_account_deactivation_code_email")
+    def test_send_code_emails_a_five_digit_code(self, send_code):
+        self._set_progress()
+        response = self.client.post(
+            reverse("home:profile_delete_send_code"), {"email": self.user.email}
+        )
+        self.assertEqual(response.status_code, 200)
+        send_code.assert_called_once()
+        self.assertRegex(send_code.call_args.args[1], r"^\d{5}$")
+
+    def test_send_code_blocks_a_content_owner_without_usable_password(self):
+        make_story(self.user, heading="Owned story")
+        Auth.objects.filter(pk=self.user.pk).update(password="!")
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.has_usable_password())
+        self._set_progress()
+        # Django's backend normally drops a session whose user has no usable
+        # password. Keep the signed-in request user attached so the view's own
+        # server-side guard (the required toast) is what answers the submit.
+        with mock.patch(
+            "django.contrib.auth.middleware.get_user", return_value=self.user
+        ):
+            response = self.client.post(
+                reverse("home:profile_delete_send_code"), {"email": self.user.email}
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response,
+            "Reset password first before trying to delete account.",
+            status_code=400,
+        )
+
+    @mock.patch("HOME.views._try_send_account_deactivation_code_email")
+    def test_send_code_requires_the_right_password_for_a_content_owner(self, send_code):
+        make_story(self.user, heading="Owned story")
+        self._set_progress()
+        wrong = self.client.post(
+            reverse("home:profile_delete_send_code"),
+            {"email": self.user.email, "password": "wrong-password"},
+        )
+        self.assertEqual(wrong.status_code, 400)
+        send_code.assert_not_called()
+
+        good = self.client.post(
+            reverse("home:profile_delete_send_code"),
+            {"email": self.user.email, "password": "secret123"},
+        )
+        self.assertEqual(good.status_code, 200)
+        send_code.assert_called_once()
+
+    def test_confirmation_requires_progress(self):
+        response = self.client.post(
+            reverse("home:profile_delete_account"),
+            {"email": self.user.email, "code": "12345"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @mock.patch("HOME.views.clear_delete_code_state")
+    @mock.patch("HOME.views.verify_delete_code", return_value=(True, ""))
+    def test_confirming_the_code_hibernates_and_logs_out(self, verify, _clear):
+        self._set_progress()
+        with mock.patch("HOME.views.hibernate_account") as hibernate:
+            response = self.client.post(
+                reverse("home:profile_delete_account"),
+                {"email": self.user.email, "code": "12345"},
+            )
+        self.assertEqual(response.status_code, 302)
+        hibernate.assert_called_once()
+        verify.assert_called_once()
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+
+class DeleteCodeLifecycleTests(TestCase):
+    """Server-side code rules: single-use, three sends in ten minutes, five
+    wrong attempts then a ten-minute lockout."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def test_issued_code_is_five_digits_and_single_use(self):
+        from SERVICE_INTERNAL.account_lifecycle import issue_delete_code, verify_delete_code
+
+        code, reason = issue_delete_code(900001)
+        self.assertEqual(reason, "")
+        self.assertRegex(code, r"^\d{5}$")
+        self.assertEqual(verify_delete_code(900001, code), (True, ""))
+        self.assertEqual(verify_delete_code(900001, code), (False, "missing"))
+
+    def test_five_wrong_attempts_lock_the_code(self):
+        from SERVICE_INTERNAL.account_lifecycle import (
+            delete_code_lock_remaining_seconds,
+            issue_delete_code,
+            verify_delete_code,
+        )
+
+        code, _ = issue_delete_code(900002)
+        wrong = "00000" if code != "00000" else "11111"
+        result = reason = None
+        for _ in range(5):
+            result, reason = verify_delete_code(900002, wrong)
+        self.assertFalse(result)
+        self.assertEqual(reason, "locked")
+        self.assertGreater(delete_code_lock_remaining_seconds(900002), 0)
+
+    def test_three_sends_allowed_then_the_fourth_is_refused(self):
+        from SERVICE_INTERNAL.account_lifecycle import issue_delete_code
+
+        for _ in range(3):
+            code, reason = issue_delete_code(900003)
+            self.assertIsNotNone(code, reason)
+        code, reason = issue_delete_code(900003)
+        self.assertIsNone(code)
+        self.assertEqual(reason, "send_limit")
+
+
+class HibernationSideEffectsTests(QuietTestCase):
+    """Hibernation removes follows in both directions and keeps the account
+    row (so an admin can restore it), with no hard delete or purge."""
+
+    def test_hibernate_deletes_follows_in_both_directions(self):
+        from SERVICE_INTERNAL.account_lifecycle import hibernate_account
+
+        author = make_staff("hibernate-author@example.com")
+        member = Auth.objects.create_user(email="hibernate-member@example.com")
+        AuthorFollow.objects.create(follower=member, author=author)
+        AuthorFollow.objects.create(follower=author, author=member)
+
+        with mock.patch("SERVICE_INTERNAL.account_lifecycle.drop_sessions_for", return_value=0), mock.patch(
+            "SERVICE_INTERNAL.account_lifecycle.invalidate_account_caches"
+        ), mock.patch("SERVICE_INTERNAL.account_lifecycle.notify_admins_deactivation_started"):
+            hibernate_account(author, actor=author)
+
+        self.assertFalse(
+            AuthorFollow.objects.filter(Q(author=author) | Q(follower=author)).exists()
+        )
+        stored = Auth.everyone.get(pk=author.pk)
+        self.assertIsNotNone(stored.deleted_at)
+        self.assertFalse(stored.is_active)

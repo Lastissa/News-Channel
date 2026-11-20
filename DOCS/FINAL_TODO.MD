@@ -48,10 +48,13 @@ Special Launch promo: as we just launch - we are offering advance plan for just 
 - [x] Keep the Home advert rail reader-driven: add autoplay, no numeric counter, and always horizontally scrollable.
 - [x] Add a 32-second click-to-play advert preview to the promote page, with a local poster, native controls, and no autoplay.
 - [x] Serve the promote flow from `ads.<domain>/` and 301 the old `/promote-your-bussiness/` URLs there, with ads-host canonical/social URLs and news-site links returning to the main domain.
+- [x] Show `AdvertReference.subdomain` in Django admin list/search for ads staff review.
 
 The ads desk lives at `/control/ads/` (admin, superuser or `Auth.is_ads_staff`). Tracking routes live under `/ads/view/<reference>/` and `/ads/click/<reference>/`; paused or expired references stop showing in the home rail and stop sending readers to the advertiser. Views are deduplicated per session/IP for an hour and clicks for five seconds, and raw IPs are never stored.
 
 The public page is served from `https://ads.<domain>/` when `ADS_HOST` is set, or derived from the first public `ALLOWED_HOSTS` entry in production. Local, ngrok and test hosts keep the path until `ADS_HOST` is set explicitly. DNS and TLS for the ads subdomain still need to be added at the domain/hosting provider before the production host can resolve.
+
+Follow-ups: targeted subdomain/ads-host/desk tests and any remaining advertiser analytics/dashboard gaps should be added or updated as the ads product scope is finalized.
 
 ### Analytics for advertiser
 

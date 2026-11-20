@@ -108,6 +108,19 @@ def _auth_context(request, **context):
 
 
 class LoginView(View):
+    def _hibernation_hold_message(self):
+        # Site support contact details; prefer configured values where available.
+        support_email = getattr(About, "support_email", None) or getattr(About, "contact_email", "") or "support@abureport.com.ng"
+        whatsapp = getattr(About, "whatsapp_dm", None) or getattr(About, "customer_support_mobile", "") or getattr(About, "whatsapp", "")
+        contact_bits = [f"Email: {support_email}"]
+        if whatsapp:
+            contact_bits.append(f"WhatsApp: {whatsapp}")
+        return (
+            "Your account is currently on hold (deactivated). "
+            "If you need help restoring access, please contact support. "
+            + " | ".join(contact_bits)
+        )
+
     def get(self, request):
         # TEMPORARY IP DIAGNOSTIC -- disabled; logged masked proxy/IP headers.
         # log_forwarded_headers(request, "login:get")
@@ -142,26 +155,35 @@ class LoginView(View):
             if is_ajax:
                 return _response({"detail": "Email and password are required."}, status=400)
             return render(request, "auth/login.html", _auth_context(request, error="Email and password are required."), status=400)
-        user = get_user_model().objects.filter(email__iexact = email).first()
+
+        User = get_user_model()
+        # Include hibernated accounts (default manager excludes deleted_at) so we can
+        # detect a valid login attempt and show the hold message.
+        user = User.everyone.filter(email__iexact=email).first()
         if user is None or not user.check_password(password):
             if is_ajax:
                 return _response({"detail": "Invalid Email Or Password!"}, status=401)
             return render(request, "auth/login.html", _auth_context(request, error="Invalid email or password."), status=401)
 
+        # Hibernated/deactivated accounts: account is on hold (not suspended).
+        if getattr(user, "deleted_at", None) is not None:
+            detail = self._hibernation_hold_message()
+            if is_ajax:
+                return _response({"detail": detail, "toast_duration_ms": 10000}, status=403)
+            messages.error(request, detail)
+            return render(request, "auth/login.html", _auth_context(request, error=detail), status=403)
 
-        if user is not None and user.is_active:
+        if user.is_active:
             login(request, user)
             return_to = _return_to(request)
             if is_ajax:
                 return _response({"detail": "Signed in.", "redirect_to": return_to}, status=200)
             return redirect(return_to)
-        if user is not None and not user.is_active:
-            if is_ajax:
-                return _response({"detail": "Account Have Been Suspended."}, status=403)
-            return render(request, "auth/login.html", _auth_context(request, error="Account Have Been Suspended."), status=403)
+
+        # Suspended (not hibernated)
         if is_ajax:
-            return _response({"detail": "Invalid email or password."}, status=401)
-        return render(request, "auth/login.html", _auth_context(request, error="Invalid email or password."), status=401)
+            return _response({"detail": "Account Have Been Suspended."}, status=403)
+        return render(request, "auth/login.html", _auth_context(request, error="Account Have Been Suspended."), status=403)
 
 
 @method_decorator(xframe_options_sameorigin, name="dispatch")

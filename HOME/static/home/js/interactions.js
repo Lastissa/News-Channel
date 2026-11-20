@@ -156,12 +156,21 @@
   /* The quiet "bottom toast": an Android/iOS-style pill that sits at the
      bottom of the screen with small padding and simply fades out. It is
      meant for notices that don't need to scream (success / info). It takes
-     exactly the same (message, tone, placement) arguments as the up toast,
-     so any call site can switch flavours just by swapping the function name:
-       toast("Copied.")          -> top-right, icon/close/progress
-       bottomToast("Copied.")    -> bottom pill, small padding, fades out  */
-  function bottomToast(message, tone, placement) {
-    var isTop = placement === "top";
+     (message, tone, placement, durationMs). placement may be "top" or
+     "bottom"; for backward compatibility a numeric 3rd arg is treated as
+     duration. durationMs overrides the default timing when provided. */
+  function bottomToast(message, tone, placement, durationMs) {
+    var resolvedPlacement = placement;
+    var resolvedDuration = durationMs;
+    if (typeof placement === "number") {
+      resolvedDuration = placement;
+      resolvedPlacement = "bottom";
+    }
+    if (typeof durationMs === "string" && (durationMs === "top" || durationMs === "bottom")) {
+      resolvedPlacement = durationMs;
+      resolvedDuration = undefined;
+    }
+    var isTop = resolvedPlacement === "top";
     var host = isTop ? topToastHost : bottomToastHost;
     if (!host) {
       host = document.createElement("div");
@@ -176,8 +185,10 @@
     trimToastStack(host, ".site-bottomtoast");
 
     var isError = tone === "error";
-    var isPersistentNotice = placement === "top";
-    var duration = isPersistentNotice ? 8000 : (isError ? 3000 : 2500);
+    var isPersistentNotice = isTop;
+    var duration = typeof resolvedDuration === "number" && resolvedDuration > 0
+      ? resolvedDuration
+      : (isPersistentNotice ? 8000 : (isError ? 3000 : 2500));
 
     var node = document.createElement("div");
     node.className = "site-bottomtoast" + (isError ? " site-bottomtoast--error" : "") + " is-entering";
@@ -2775,4 +2786,28 @@
     });
   })();
 })();
+
+  /* Advert rail: ask the click endpoint first so a paid advert that was saved
+     without a subdomain (a legacy/setup error) reports JSON instead of
+     dumping raw JSON in the browser. The toast keeps the reader on this page. */
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest && event.target.closest("a[data-ad-click]");
+    if (!link || event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    var url = link.getAttribute("href") || "";
+    if (!url || url.charAt(0) === "#" || url.slice(0, 4) === "http") return;
+    event.preventDefault();
+    var checkUrl = url + (url.indexOf("?") === -1 ? "?" : "&") + "check=1";
+    fetch(checkUrl, { credentials: "same-origin", headers: { "Accept": "application/json" } })
+      .then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (data) {
+          if (!response.ok || !data || !data.ok) {
+            window.bottomtoast((data && data.detail) || "this ads was not set properly", "error");
+            return;
+          }
+          window.location.assign(data.target || url);
+        });
+      })
+      .catch(function () { window.location.assign(url); });
+  });
 })();

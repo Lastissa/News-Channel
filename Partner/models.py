@@ -372,20 +372,35 @@ class AdvertReference(models.Model):
     def public_target(self):
         """Where a tracked click should send the reader.
 
-        A staff-entered public URL wins because Advance adverts can live on
-        their own domain. Otherwise use the advert's published landing page,
-        then the advertiser link saved on the advert.
+        Pro/Advance adverts open on their own subdomain first; the "Learn more"
+        link on that page carries the destination (Public page URL, else the
+        advert link). A paid reference with neither a subdomain nor a public
+        URL is a setup error: the click endpoint reports it instead of guessing.
+
+        Regular adverts open their /ads/ page first. An empty string is only
+        returned for a misconfigured paid reference -- the on-site click
+        handler turns that into a toast, never a raw JSON page.
         """
+        from Partner.landing import advert_landing_url
+        from Partner.plans import plan_allows
+
         public_url = (self.public_url or "").strip()
-        if public_url:
-            return public_url
-        advert = self.advert
-        if not advert:
+        if plan_allows(self.plan, "subdomain"):
+            if self.public_page_url:
+                return self.public_page_url
+            #   Legacy/external-only paid adverts are allowed to skip the
+            #   subdomain, but only when a destination link exists. The ads
+            #   desk Public page URL outranks the advert's own link.
+            if public_url:
+                return public_url
+            advert = self.advert
+            if advert and (advert.url or "").strip():
+                return advert.url.strip()
             return ""
-        landing = getattr(advert, "landing_page", None)
-        if landing and landing.is_deliverable:
-            return landing.get_absolute_url()
-        return (advert.url or "").strip()
+        advert = self.advert
+        if advert:
+            return advert_landing_url(advert)
+        return public_url
 
     @property
     def public_host(self):
@@ -397,8 +412,10 @@ class AdvertReference(models.Model):
     @property
     def public_page_url(self):
         """Absolute URL for the advert's own subdomain, when one is set."""
+        from Partner.plans import plan_allows
+
         host = self.public_host
-        if not host:
+        if not host or not plan_allows(self.plan, "subdomain"):
             return ""
         from SERVICE_INTERNAL.hosts import advert_origin
 

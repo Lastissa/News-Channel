@@ -1,5 +1,5 @@
-/* Delete author controls: open a confirmation box, and walk the permanent
-   delete through three questions. Plain buttons and <dialog>. */
+/* Deactivation controls: open the confirmation dialog and, where the dialog
+   carries steps, walk through them. Plain buttons and <dialog>. */
 (function () {
   if (window.__acctDeleteBound) return;
   window.__acctDeleteBound = true;

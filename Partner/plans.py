@@ -70,3 +70,13 @@ def time_left(reference, shorten_days=7):
     #   Removing 7 days must still leave the end in the future.
     can_shorten = (end - timedelta(days=shorten_days)) > now
     return {"time_label": label, "time_percent": percent, "can_shorten": can_shorten}
+
+
+def advert_subdomain_url(advert):
+    """The advert's own subdomain address (like https://new.example.com/), or ""
+    when it has none or its plan does not include one. Every public link to an
+    advert uses this when it exists, so the path page is never the way in."""
+    reference = getattr(advert, "reference", None)
+    if reference is None or not plan_allows(reference.plan, "subdomain"):
+        return ""
+    return reference.public_page_url

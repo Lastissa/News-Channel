@@ -18,7 +18,7 @@
         </div>
         <h3 class="nf-card-title"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h3>
         <p class="nf-card-excerpt">{{ post.content|truncatewords:20 }}</p>
-        {% with name=post.author.staffprofile.full_name %}{% if name %}<span class="nf-card-by">{{ name }}</span>{% endif %}{% endwith %}
+        <span class="nf-card-by">{{ post.author_name }}</span>
       </div>
     </article>
     {% endfor %}

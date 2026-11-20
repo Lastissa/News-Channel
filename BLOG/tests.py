@@ -451,6 +451,10 @@ __Please note:__ deadlines are strict.
         session = self.client.session
         session.save()
 
+        first = json.loads(self._like(blog).content)
+        self.assertEqual(first["likes"], 1)
+        self.assertTrue(first["liked"])
+
         response = self._like(blog)
 
         self.assertEqual(json.loads(response.content)["likes"], 0)
@@ -823,7 +827,7 @@ class StoryReportTests(TestCase):
             reverse("blog:story_detail", kwargs={"blog_slug": self.blog.slug})
         )
         self.assertContains(page, "data-story-report-form")
-        self.assertContains(page, "Your account email will be included.")
+        self.assertContains(page, "Your email will be included for feedback.")
 
         response = self._submit_report()
 
@@ -1231,8 +1235,7 @@ class StoryHeroImageFallbackTests(TestCase):
         self.assertNotIn('src="None"', content)
         self.assertIn(
             f'<img src="{static("404.jpg")}" alt="{story.heading}" '
-            'loading="eager" decoding="async" '
-            'onload="if(!this.getAttribute(\'width\')){this.width=this.naturalWidth;this.height=this.naturalHeight;}">',
+            'loading="eager">',
             content,
         )
 
@@ -1901,10 +1904,10 @@ class StoryTableOfContentsTests(TestCase):
         #   the parser produced.
         self.assertNotIn('id="section-section-one"', content)
 
-    def test_whatsapp_share_text_still_reads_only_the_first_paragraph(self):
-        #   The share button runs blog_content_html through filter_copy_btn_text,
-        #   which keeps just the first line -- the TOC (a later block) must not
-        #   end up pasted into a reader's message or preview card.
+    def test_whatsapp_share_text_is_intentionally_disabled(self):
+        #   filter_copy_btn_text currently returns an empty string on purpose:
+        #   sharing the first paragraph was switched off. The TOC must still
+        #   never leak into a reader's message if that behaviour is restored.
         from HOME.templatetags.format_copy_btn import filter_copy_btn_text
 
         body = enhance_story_body(
@@ -1913,4 +1916,4 @@ class StoryTableOfContentsTests(TestCase):
         )
         share_text = filter_copy_btn_text(body)
 
-        self.assertEqual(share_text, "** JUST IN **\n\nThe lead paragraph.")
+        self.assertEqual(share_text, "")

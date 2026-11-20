@@ -1222,26 +1222,40 @@ class StoryDetailView(View):
             and BlogLike.objects.filter(blog=blog, user=request.user).exists()
         )
 
+        #   `blog` can arrive from a 100s Redis cache, so refresh mutable
+        #   author/account state before rendering public identity.
+        try:
+            blog.author.refresh_from_db(fields=["deleted_at", "is_active", "profile_img"])
+        except Exception:
+            pass
+        blog.__dict__.pop("author_name", None)
+        is_author_hibernated = bool(getattr(blog.author, "deleted_at", None))
+
         #   `blog` can arrive from a 100s Redis cache, so a row pickled just
         #   before this field shipped would not carry `toc_mode`. getattr keeps
         #   that first request from 500-ing; the cache self-heals in 100s.
-        blog_content = enhance_story_body(parse_story_content(blog.content, blog.slug), getattr(blog, "toc_mode", 0), getattr(blog, "author_name", "") or "")
+        blog_content = enhance_story_body(
+            parse_story_content(blog.content, blog.slug),
+            getattr(blog, "toc_mode", 0),
+            getattr(blog, "author_name", "") or "",
+        )
         ticker_text = build_ticker_text(blog.content)
 
-        comments = blog.comments.select_related("author__staffprofile").order_by("id")
-        
-        
+        comments = blog.comments.select_related("author", "author__staffprofile").order_by("id")
+
         try:
-            author_profile = blog.author.staffprofile or ""
-        except StaffProfile.DoesNotExist as e:
-            info_logger(msg=f"MISSING STAFFPROFILE: story for {blog.author.email} was found with no staff profile")
-            author_profile = StaffProfile()
+            author_profile = blog.author.staffprofile
+        except Exception:
+            author_profile = None
+
+        if not author_profile and not is_author_hibernated:
+            info_logger(msg=f"MISSING STAFFPROFILE: story for author_id={blog.author_id} was found with no staff profile")
             #   The page renders normally, but with a real 404 status so search
             #   engines never index a story whose author has no profile.
-            return render(request, 'blog/staffprofile_404.html', {'blog': blog}, status=404)
-            
+            return render(request, "blog/staffprofile_404.html", {"blog": blog}, status=404)
+
         author_tags = []
-        if author_profile and isinstance(author_profile.speciality, list):
+        if not is_author_hibernated and author_profile and isinstance(author_profile.speciality, list):
             author_tags = [str(tag).strip() for tag in author_profile.speciality if str(tag).strip()]
 
         #   The author's latest stories for the sidebar rail, newest first, the
@@ -1292,7 +1306,13 @@ class StoryDetailView(View):
                     error_logger(msg=f"STORY VIEW LOG FAILED: blog={blog.pk} error={exc}")
 
                 alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 10)
-                if author_profile.get_blog_notification and blog.views > 0 and blog.views % alert_interval == 0:
+                if (
+                    not is_author_hibernated
+                    and author_profile
+                    and getattr(author_profile, "get_blog_notification", False)
+                    and blog.views > 0
+                    and blog.views % alert_interval == 0
+                ):
                     _try_send_story_views_alert_email(blog.author, blog)
 
         if request.user.is_authenticated:
@@ -1316,15 +1336,14 @@ class StoryDetailView(View):
 
         is_bookmarked = request.user.is_authenticated and blog.bookmarked_by.filter(user=request.user).exists()
 
-        #   AUTHOR PORTFOLIO + FOLLOW: only staff level accounts own a
-        #   portfolio, so the follow button and the profile links only appear
-        #   when the author actually has a page to point at.
-        author_has_portfolio = blog.author.is_active and (
+        #   AUTHOR PORTFOLIO + FOLLOW: hibernated authors are anonymized and
+        #   must not expose follow controls or real identity links.
+        author_has_portfolio = (not is_author_hibernated) and blog.author.is_active and (
             blog.author.is_staff or blog.author.is_admin or blog.author.is_superuser
         )
         author_portfolio_url = (
             reverse("staff:portfolio", args=[author_profile.slug])
-            if author_has_portfolio and author_profile and author_profile.slug
+            if author_has_portfolio and author_profile and getattr(author_profile, "slug", "")
             else ""
         )
         is_following_author = bool(
@@ -1356,16 +1375,32 @@ class StoryDetailView(View):
         from SERVICE_INTERNAL.schema import dumps, news_article_node, person_node
         from STAFF.views import _portfolio_socials
 
-        author_schema = person_node(
-            name=blog.author_name,
-            slug=author_profile.slug or "",
-            url=f"{About.domain}{author_portfolio_url}" if author_portfolio_url else "",
-            image=blog.author.profile_img or "",
-            description=(author_profile.bio or "").strip()[:300],
-            job_title=StaffConfig.role_label(author_profile.role) if author_profile.role else "",
-            same_as=[social["url"] for social in _portfolio_socials(author_profile, blog.author_name)],
-            knows_about=author_tags,
-        )
+        if is_author_hibernated:
+            author_schema = person_node(
+                name="Unknown",
+                slug="",
+                url="",
+                image="",
+                description="",
+                job_title="",
+                same_as=[],
+                knows_about=[],
+            )
+        else:
+            author_schema = person_node(
+                name=blog.author_name,
+                slug=(author_profile.slug if author_profile else "") or "",
+                url=f"{About.domain}{author_portfolio_url}" if author_portfolio_url else "",
+                image=blog.author.profile_img or "",
+                description=((author_profile.bio or "").strip()[:300] if author_profile else ""),
+                job_title=StaffConfig.role_label(author_profile.role) if author_profile and author_profile.role else "",
+                same_as=[
+                    social["url"]
+                    for social in (_portfolio_socials(author_profile, blog.author_name) if author_profile else [])
+                ],
+                knows_about=author_tags,
+            )
+
         article_image = ""
         if blog.image_1:
             proxied = cloudinary_proxy(blog.image_1)
@@ -1391,12 +1426,12 @@ class StoryDetailView(View):
 
         context = {
             "blog": blog,
-            'excerp': og_descr,
+            "excerp": og_descr,
             "article_schema_json": article_schema_json,
             "blog_content_html": blog_content,
             "ticker_text": ticker_text,
             "comments": comments,
-            "author_profile": author_profile,
+            "author_profile": None if is_author_hibernated else author_profile,
             "author_tags": author_tags,
             "author_latest_stories": author_latest_stories,
             "is_bookmarked": is_bookmarked,
@@ -1409,10 +1444,13 @@ class StoryDetailView(View):
             ),
             "is_following_author": is_following_author,
             "author_follower_count": author_follower_count,
-            "social_links": [
-                ("Twitter", author_profile.twitter_handle if author_profile else "#"),
-                ("Facebook", author_profile.facebook_handle if author_profile else "#"),
-                ("WhatsApp", author_profile.whatsapp_handle if author_profile else "#"),
+            "is_author_hibernated": is_author_hibernated,
+            "social_links": []
+            if is_author_hibernated
+            else [
+                ("Twitter", getattr(author_profile, "twitter_handle", "#") if author_profile else "#"),
+                ("Facebook", getattr(author_profile, "facebook_handle", "#") if author_profile else "#"),
+                ("WhatsApp", getattr(author_profile, "whatsapp_handle", "#") if author_profile else "#"),
             ],
         }
 

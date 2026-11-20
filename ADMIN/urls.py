@@ -11,7 +11,6 @@ urlpatterns = [
     path("staff/<int:staff_id>/", views.StaffDetailView.as_view(), name="staff_detail"),
     path("staff/<int:staff_id>/delete/", views.StaffDeleteView.as_view(), name="staff_delete"),
     path("staff/<int:staff_id>/restore/", views.StaffRestoreView.as_view(), name="staff_restore"),
-    path("staff/<int:staff_id>/purge/", views.StaffPurgeView.as_view(), name="staff_purge"),
     path("staff/<int:staff_id>/published/", views.StaffPublishedView.as_view(), name="staff_published"),
     path("staff/<int:staff_id>/tribute/", views.StaffTributeUpdateView.as_view(), name="staff_tribute"),
     path("staff/<int:staff_id>/speciality/", views.StaffSpecialityUpdateView.as_view(), name="staff_speciality"),

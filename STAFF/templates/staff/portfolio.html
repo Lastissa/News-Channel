@@ -2,18 +2,22 @@
 {% load static l10n archive_extras seo_tags %}
 
 {% block adsense %}{% endblock %}
-{% block title %}{{ display_name }} | {{ role_label }} | Portfolio | {{ project_name }}{% endblock %}
+{% block title %}{% if is_anonymized %}Unknown | Portfolio | {{ project_name }}{% else %}{{ display_name }} | {{ role_label }} | Portfolio | {{ project_name }}{% endif %}{% endblock %}
 {% block meta_description %}{{ meta_description }}{% endblock %}
+{% block meta_robots %}{% if is_anonymized %}<meta name="robots" content="noindex, nofollow">{% else %}{{ block.super }}{% endif %}{% endblock %}
 {% block og_type %}profile{% endblock %}
-{% block og_title %}{{ display_name }} | {{ role_label }} at {{ project_name }}{% endblock %}
-{% block og_description %}{{ meta_description }}. {{ stats.story_count }} stories. {{ stats.total_views }} views.{% endblock %}
-{% block twitter_title %}{{ display_name }} | {{ role_label }} at {{ project_name }}{% endblock %}
+{% block og_title %}{% if is_anonymized %}Unknown | {{ project_name }}{% else %}{{ display_name }} | {{ role_label }} at {{ project_name }}{% endif %}{% endblock %}
+{% block og_description %}{% if is_anonymized %}{{ meta_description }}{% else %}{{ meta_description }}. {{ stats.story_count }} stories. {{ stats.total_views }} views.{% endif %}{% endblock %}
+{% block twitter_title %}{% if is_anonymized %}Unknown | {{ project_name }}{% else %}{{ display_name }} | {{ role_label }} at {{ project_name }}{% endif %}{% endblock %}
 {% block twitter_description %}{{ meta_description }}{% endblock %}
 
 {% block og_image %}
-  {% if staff_image %}
+  {% if staff_image and not is_anonymized %}
     <meta property="og:image" content="{{ staff_image }}">
     <meta name="twitter:image" content="{{ staff_image }}">
+  {% elif is_anonymized %}
+    <meta property="og:image" content="{% static '404.jpg' %}">
+    <meta name="twitter:image" content="{% static '404.jpg' %}">
   {% else %}
     {{ block.super }}
   {% endif %}
@@ -21,8 +25,7 @@
 
 {% block extra_head %}
   {{ block.super }}
-  {% comment %} canonical + og:url already come from base.html via site_domain + request.path {% endcomment %}
-  <meta name="author" content="{{ display_name }} ({{ author.email }})">
+  {% if not is_anonymized %}<meta name="author" content="{{ display_name }} ({{ author.email }})">{% else %}<meta name="author" content="Unknown">{% endif %}
   <meta property="profile:username" content="{{ display_name }}">
   <script type="application/ld+json">{{ person_schema_json | safe }}</script>
   {% url 'home:home' as breadcrumb_home_url %}
@@ -31,18 +34,8 @@
   <link rel="stylesheet" href="{% static 'staff/css/portfolio.css' %}?v=20261013-1">
 {% endblock %}
 
-{% comment %}
-  The floating buttons on this page belong to the author, not the project:
-  the email plus every social the author filled in. A social left empty on
-  the profile is never drawn.
-{% endcomment %}
 {% block floating_social %}
-{% comment %}
-  Author dock. Opens showing the author's actual links (with a name tag so it
-  is clear they belong to the author), then folds into a launcher button that
-  carries the author's picture. author-dock.js drives the fold; without JS the
-  links simply stay open. Every link keeps its aria-label.
-{% endcomment %}
+{% if not is_anonymized %}
 <div class="author-dock is-intro" data-author-dock aria-label="Contact {{ display_name }}">
   <div class="author-dock-links" id="author-dock-links">
     <span class="author-dock-tag" style="--i: {{ socials|length|add:1 }}">{{ display_name }}</span>
@@ -67,16 +60,18 @@
     {% endif %}
   </button>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block content %}
 <section class="portfolio-shell">
 
-  {# ---------- PLACARD: picture and follow on the left, identity on the right ---------- #}
   <header class="portfolio-placard">
     <div class="portfolio-placard-aside">
       <div class="portfolio-placard-media">
-        {% if author.profile_img %}
+        {% if is_anonymized %}
+          <img src="{% static '404.jpg' %}" alt="Unknown author">
+        {% elif author.profile_img %}
           <img src="{{ author.profile_img }}" alt="{{ display_name }} profile picture"
                onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">
           <span class="portfolio-initial" hidden aria-hidden="true">{{ display_name|slice:":1"|upper }}</span>
@@ -85,6 +80,7 @@
         {% endif %}
       </div>
 
+      {% if not is_anonymized and follow_endpoint %}
       <form method="post" action="{{ follow_endpoint }}" class="portfolio-follow-form"
             data-follow-author-form data-endpoint="{{ follow_endpoint }}">
         {% csrf_token %}
@@ -102,38 +98,28 @@
           <span data-follow-label>{% if is_following %}Following{% else %}Follow{% endif %}</span>
         </button>
       </form>
+      {% endif %}
     </div>
 
     <div class="portfolio-placard-copy">
       <p class="portfolio-kicker">
-        <span class="tag portfolio-role">{{ role_label }}</span>
+        {% if role_label %}<span class="tag portfolio-role">{{ role_label }}</span>{% endif %}
         <span class="portfolio-kicker-project">{{ project_name }}</span>
       </p>
       <h1>{{ display_name }}</h1>
 
+      {% if not is_anonymized %}
       <div class="portfolio-contact" id="portfolio-contact">
         <p class="portfolio-email"><a href="mailto:{{ author.email }}">{{ author.email }}</a></p>
-        {% comment %} I COMMENT IT OUT BCOS THE FLOATING ALREADY CARRIESS STAFF SOCIALS {% endcomment %}
-        {% comment %} {% if socials %}
-          <ul class="portfolio-contact-icons" aria-label="Contact {{ display_name }}">
-            {% for social in socials %}
-              <li>
-                <a class="portfolio-icon-link fab-{{ social.key }}" href="{{ social.url }}" target="_blank"
-                   rel="noopener noreferrer" aria-label="{{ social.aria }}" title="{{ social.label }}">
-                  {% include "staff/partials/social_icon.html" with key=social.key %}
-                </a>
-              </li>
-            {% endfor %}
-          </ul>
-        {% endif %} {% endcomment %}
       </div>
+      {% endif %}
 
       <dl class="portfolio-facts" aria-label="About {{ display_name }}">
-        {% if sex_label %}
+        {% if sex_label and not is_anonymized %}
           <div><dt>Sex</dt><dd>{{ sex_label }}</dd></div>
         {% endif %}
-        <div><dt>Author Since</dt><dd>{{ author.date_joined|date:"F Y" }}</dd></div>
-        {% if staff_profile.last_promotion %}
+        {% if not is_anonymized %}<div><dt>Author Since</dt><dd>{{ author.date_joined|date:"F Y" }}</dd></div>{% endif %}
+        {% if staff_profile.last_promotion and not is_anonymized %}
           <div><dt>Last promoted</dt><dd>{{ staff_profile.last_promotion|date:"F Y" }}</dd></div>
         {% endif %}
         {% if top_category %}
@@ -147,12 +133,14 @@
       <p class="portfolio-summary">
         <span><strong>{{ stats.story_count }}</strong> published stor{{ stats.story_count|pluralize:"y,ies" }}</span>
         <span><strong>{{ stats.total_views|floatformat:"0g" }}</strong> story view{{ stats.total_views|pluralize }}</span>
+        {% if not is_anonymized %}
         <span><strong data-follow-count>{{ follower_count }}</strong> <span data-follow-count-noun>follower{{ follower_count|pluralize }}</span></span>
         <span><strong>{{ following_count|default:"0" }}</strong> following</span>
+        {% endif %}
       </p>
-      <small class="follow-note">Follow to receive email whenever this author makes a post.</small>
+      {% if not is_anonymized %}<small class="follow-note">Follow to receive email whenever this author makes a post.</small>{% endif %}
 
-      {% if speciality %}
+      {% if speciality and not is_anonymized %}
         <div class="portfolio-specialities">
           <span class="portfolio-specialities-label">Editorial focus</span>
           <ul>{% for item in speciality %}<li class="portfolio-speciality">{{ item }}</li>{% endfor %}</ul>
@@ -161,12 +149,7 @@
     </div>
   </header>
 
-  {% comment %}
-    Author bio, shown for transparency and E-E-A-T: it is the on-page version of
-    the Person node's `description` in the JSON-LD above, and the view already
-    feeds `bio` for the meta description.
-  {% endcomment %}
-  {% if bio %}
+  {% if bio and not is_anonymized %}
   <div class="portfolio-content-layout portfolio-about">
     <div class="portfolio-grid" style="grid-column: 1 / -1;">
       <article class="portfolio-card span-12" id="portfolio-bio">
@@ -246,100 +229,10 @@
     {% endif %}
   </div>
 </section>
-
-{% if False %}
-  Previous analytics dashboard retired in favor of the author post feed.
-  {# ---------- KEY NUMBERS: six totals ---------- #}
-  <dl class="portfolio-stats-strip" aria-label="Editorial statistics">
-    {% comment %} <div>
-      <dt>Total story views</dt>
-      <dd>{{ stats.total_views|floatformat:"0g" }}</dd>
-      <small>All published work</small>
-    </div> {% endcomment %}
-    <div>
-      <dt>Total likes</dt>
-      <dd>{{ stats.total_likes|floatformat:"0g" }}</dd>
-      <small>Reader reactions</small>
-    </div>
-    <div>
-      <dt> Following </dt>
-      <dd> {{ following_count|default:"0" }} </dd>
-      <small>Author is Following</small>
-      {% comment %} <dt>Published stories</dt> {% endcomment %}
-      {% comment %} <dd>{{ stats.story_count }}</dd> {% endcomment %}
-      {% comment %} <small>Editorial output</small> {% endcomment %}
-    </div>
-    <div>
-      <dt>Followers</dt>
-      <dd data-follow-count>{{ follower_count }}</dd>
-      <small>Newsletter audience</small>
-    </div>
-    <div>
-      <dt>Average views</dt>
-      <dd>{{ stats.average_views|floatformat:"0g" }}</dd>
-      <small>Per published story</small>
-    </div>
-    <div>
-      <dt>Average likes</dt>
-      <dd>{{ stats.average_likes|floatformat:"0g" }}</dd>
-      <small>Per published story</small>
-    </div>
-  </dl>
-
-  <nav class="portfolio-tabs" aria-label="Portfolio sections">
-    {% if bio %}<a href="#portfolio-bio">Profile</a>{% endif %}
-    {% if tribute %}<a href="#portfolio-tribute">Endorsement</a>{% endif %}
-    {% if stories %}
-      <a href="#portfolio-work">Story reach</a>
-    {% endif %}
-    <a href="#portfolio-contact">Contact</a>
-  </nav>
-
-  <div class="portfolio-grid">
-
-    {% if stories %}
-      {# ---- recent story reach ---- #}
-      <section class="portfolio-card span-12" id="portfolio-work">
-        <header class="portfolio-card-head">
-          <div>
-            <h2>Recent story reach</h2>
-            <p>Views across the latest {{ stories|length }} published stor{{ stories|length|pluralize:"y,ies" }}.</p>
-          </div>
-          <span class="tag portfolio-section-tag">Latest work</span>
-        </header>
-        <ul class="reach-list">
-          {% for story in stories %}
-            <li>
-              <div class="reach-copy">
-                <a href="{% url 'blog:story_detail' story.slug %}" class="portfolio-story-link">{{ story.heading }}</a>
-                <small><span class="tag tag-mini">{{ story.get_category_display|title }}</span><time datetime="{{ story.date_created|date:'Y-m-d' }}">{{ story.date_created|date:"M d, Y" }}</time></small>
-              </div>
-              <div class="reach-metrics">
-                <span class="reach-track" role="img" aria-label="{{ story.heading }} has {{ story.views }} views, {{ story.reach_share }} percent of the highest viewed recent story">
-                  <span class="reach-fill" style="width: {{ story.reach_share }}%"></span>
-                </span>
-                <span class="reach-nums"><strong>{{ story.views|floatformat:"0g" }}</strong> view{{ story.views|pluralize }}<span class="reach-likes">{{ story.likes }} like{{ story.likes|pluralize }}</span></span>
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      </section>
-
-    {% else %}
-      <section class="portfolio-card span-12">
-        <header class="portfolio-card-head">
-          <div><h2>Published work</h2></div>
-          <span class="tag portfolio-section-tag">Latest work</span>
-        </header>
-        <p class="portfolio-empty">No stories published yet. The reach chart appears here after the first story goes live.</p>
-      </section>
-    {% endif %}
-  </div>
-{% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
   {{ block.super }}
-  <script src="{% static 'staff/js/author-dock.js' %}?v=20261009-1" defer></script>
+  {% if not is_anonymized %}<script src="{% static 'staff/js/author-dock.js' %}?v=20261009-1" defer></script>{% endif %}
   <script src="{% static 'staff/js/portfolio-feed.js' %}?v=20261027-1" defer></script>
 {% endblock %}

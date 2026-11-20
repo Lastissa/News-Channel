@@ -38,6 +38,16 @@ from SERVICE_INTERNAL.abstract import (
     invalidate_cache,
     is_rate_limited,
 )
+from SERVICE_INTERNAL.account_lifecycle import (
+    NO_PASSWORD_MESSAGE,
+    clear_delete_code_state,
+    delete_code_lock_remaining_seconds,
+    hibernate_account,
+    issue_delete_code,
+    user_requires_password_for_delete,
+    verify_delete_code,
+)
+from SERVICE_INTERNAL.email_single import _try_send_account_deactivation_code_email
 from SERVICE_INTERNAL.config import About, StaffConfig, custom_context_processors
 from SERVICE_INTERNAL.cache_keys import (
     HOME_BLOGS_CACHE_KEY,
@@ -48,7 +58,6 @@ from SERVICE_INTERNAL.cache_keys import (
     STORY_FEED_CACHE_TTL,
 )
 from SERVICE_INTERNAL.email_batch import (
-    _try_send_account_deleted_batch_email,
     _try_send_new_story_batch_email,
     _try_send_partnership_inquiry_batch_email,
     new_story_alert_counts_for,
@@ -384,12 +393,7 @@ class _FeedView(View):
                     f"<img src={quoteattr(image)} alt={quoteattr(title)}> {description_html}"
                 )
 
-            profile = getattr(story.author, "staffprofile", None)
-            author = (
-                profile.full_name
-                if profile and profile.full_name
-                else story.author.email.split("@")[0].title()
-            )
+            author = getattr(story, "author_name", None) or "Unknown"
 
             items.append(
                 {
@@ -776,13 +780,14 @@ def _teaser_items():
         if reference:
             #   The pixel records a view when the slide becomes focused; the
             #   click URL records the outbound click and adds our utm_source.
+            #   It is always a link, even for a misconfigured paid reference:
+            #   that endpoint answers with the JSON the on-site toast reads.
             view_url = reverse(
                 "partner:advert_view", kwargs={"reference": reference.reference}
             )
-            if target:
-                click_url = reverse(
-                    "partner:advert_click", kwargs={"reference": reference.reference}
-                )
+            click_url = reverse(
+                "partner:advert_click", kwargs={"reference": reference.reference}
+            )
         rows.append(
             {
                 "heading": row.heading,
@@ -2749,31 +2754,44 @@ def _mask_email(email):
 
 
 def _author_label(auth, names):
-    """Full name when the account has one, else the part of the email before @."""
+    """Public label for follow lists; hibernated accounts are anonymized."""
+    if getattr(auth, "deleted_at", None):
+        return "Unknown"
     return (names.get(auth.pk) or "").strip() or auth.email.partition("@")[0]
 
 
 def _following_page(user, search_query, page_number):
-    """Authors `user` follows, newest follow first (5 per page). Returns the
-    paginator page plus display rows for the template."""
-    qs = AuthorFollow.objects.filter(follower=user).select_related("author").order_by("-created_at", "-id")
+    """Authors `user` follows, newest follow first (5 per page)."""
+    qs = (
+        AuthorFollow.objects.filter(follower=user)
+        .select_related("author")
+        .order_by("-created_at", "-id")
+    )
     if search_query:
-        qs = qs.filter(Q(author__email__icontains=search_query) | Q(author__staffprofile__full_name__icontains=search_query))
+        qs = qs.filter(
+            Q(author__email__icontains=search_query)
+            | Q(author__staffprofile__full_name__icontains=search_query)
+        ).exclude(author__deleted_at__isnull=False)
     paginator = Paginator(qs, 5)
     page = paginator.get_page(page_number)
     rows = list(page.object_list)
     profiles = {
         sp.auth_id: sp
-        for sp in StaffProfile.objects.filter(auth_id__in=[row.author_id for row in rows]).only("auth_id", "full_name", "slug")
+        for sp in StaffProfile.objects.filter(auth_id__in=[row.author_id for row in rows]).only(
+            "auth_id", "full_name", "slug"
+        )
     }
     items = []
     for row in rows:
         sp = profiles.get(row.author_id)
+        author = row.author
+        is_hibernated = bool(getattr(author, "deleted_at", None))
+        name = "Unknown" if is_hibernated else _author_label(author, {row.author_id: sp.full_name if sp else ""})
         items.append(
             {
                 "author_id": row.author_id,
-                "name": _author_label(row.author, {row.author_id: sp.full_name if sp else ""}),
-                "portfolio_url": reverse("staff:portfolio", args=[sp.slug]) if sp and sp.slug else "",
+                "name": name,
+                "portfolio_url": "" if is_hibernated else (reverse("staff:portfolio", args=[sp.slug]) if sp and sp.slug else ""),
                 "since": row.created_at,
                 "unfollow_url": reverse("home:profile_unfollow", args=[row.author_id]),
             }
@@ -2782,11 +2800,15 @@ def _following_page(user, search_query, page_number):
 
 
 def _followers_page(user, page_number):
-    """Accounts following `user` (an author), newest first, emails masked."""
+    """Accounts following `user` (an author), newest first, identities masked."""
     qs = AuthorFollow.objects.filter(author=user).select_related("follower").order_by("-created_at", "-id")
     paginator = Paginator(qs, 5)
     page = paginator.get_page(page_number)
-    items = [{"email": _mask_email(row.follower.email), "since": row.created_at} for row in page.object_list]
+    items = []
+    for row in page.object_list:
+        follower = row.follower
+        label = "Unknown" if getattr(follower, "deleted_at", None) else _mask_email(follower.email)
+        items.append({"email": label, "since": row.created_at})
     return page, paginator, items
 
 
@@ -3084,11 +3106,21 @@ def _release_story_image(public_id):
 
 
 def _deleted_accounts_for(user):
-    """The "deleted accounts" notice, for admins only (ADMIN imports this
-    module, so the import has to wait until it is called)."""
+    """The hibernated accounts notice, for admins only."""
     from ADMIN.views import deleted_accounts_notice
 
     return deleted_accounts_notice(user)
+
+
+def account_action_logs_for(user):
+    """Admin-visible account lifecycle audit log."""
+    try:
+        from ADMIN.views import account_action_logs
+        if not admin_only(user):
+            return []
+        return account_action_logs()
+    except Exception:
+        return []
 
 
 def _collect_account_assets(account):
@@ -3282,6 +3314,7 @@ class ProfileView(View):
             "followers_page_range": list(followers_paginator.get_elided_page_range(followers_page.number, on_each_side=1, on_ends=1)) if followers_paginator else [],
 
             "deleted_accounts": _deleted_accounts_for(request.user),
+            "account_action_logs": (account_action_logs_for(request.user) if is_admin else []),
             "is_staff_user": staff_only(request.user),
             "is_admin_user": is_admin,
             "is_advertiser_user": is_advertiser,
@@ -3301,22 +3334,52 @@ class ProfileView(View):
         return render(request, "HOME/profile.html", context)
 
 
-DELETE_PLACARD_STEPS = 4  #   THREE "ARE YOU SURE" CONFIRMS + THE FINAL STEP
+DELETE_PLACARD_STEPS = 4  #   THREE "ARE YOU SURE" CONFIRMS + THE FINAL VERIFICATION STEP
+
+
+def _delete_step_progress(request):
+    return int(request.session.get("acct_delete_progress") or 0)
+
+
+def _set_delete_step_progress(request, step):
+    request.session["acct_delete_progress"] = int(step)
+
+
+def _delete_placard_context(request, step=DELETE_PLACARD_STEPS, **extra):
+    profile = StaffProfile.objects.filter(auth=request.user).first()
+    requires_password = user_requires_password_for_delete(request.user)
+    has_usable_password = request.user.has_usable_password()
+    context = {
+        "step": step,
+        "total_steps": DELETE_PLACARD_STEPS,
+        "steps_remaining": max(0, DELETE_PLACARD_STEPS - step),
+        "placard_endpoint": reverse("home:profile_delete_placard"),
+        "delete_endpoint": reverse("home:profile_delete_account"),
+        "send_code_endpoint": reverse("home:profile_delete_send_code"),
+        "account_email": request.user.email,
+        "stories_count": Blog.objects.filter(author=request.user).count(),
+        "comments_count": Comment.objects.filter(author=request.user).count(),
+        "bookmarks_count": Bookmark.objects.filter(user=request.user).count(),
+        "has_staff_profile": profile is not None,
+        "is_staff_user": staff_only(request.user),
+        "requires_password": requires_password,
+        "has_usable_password": has_usable_password,
+        "code_sent": False,
+    }
+    context.update(extra)
+    return context
+
+
+def _delete_requires_final_progress(request):
+    return _delete_step_progress(request) >= DELETE_PLACARD_STEPS
 
 
 class ProfileDeletePlacardView(View):
-    """Serve the delete-account placard fragments for the htmx overlay.
-
-    The placard is fetched lazily: nothing about it ships with the profile
-    page until the Delete account button is pressed. Step 1 to 3 are the
-    "are you sure" confirms, step 4 lists everything the deletion destroys
-    and carries the type-your-email-to-finalize form.
-    """
+    """Serve the account deactivation placard steps for the htmx overlay."""
 
     def get(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in first."}, status=401)
-        #   THE ONE ACCOUNT THAT CAN NEVER DELETE ITSELF FROM THE UI
         if request.user.is_superuser:
             return JsonResponse({"detail": "The superuser account cannot be deleted from here."}, status=403)
 
@@ -3327,137 +3390,193 @@ class ProfileDeletePlacardView(View):
         if step < 1 or step > DELETE_PLACARD_STEPS:
             step = 1
 
-        context = {
-            "step": step,
-            "total_steps": DELETE_PLACARD_STEPS,
-            "steps_remaining": DELETE_PLACARD_STEPS - step,
-            "placard_endpoint": reverse("home:profile_delete_placard"),
-            "delete_endpoint": reverse("home:profile_delete_account"),
-            "account_email": request.user.email,
-        }
+        if step == 1:
+            _set_delete_step_progress(request, 1)
+        else:
+            _set_delete_step_progress(request, max(_delete_step_progress(request), step))
 
-        #   THE CONSEQUENCES LIST IS ONLY COMPUTED FOR THE FINAL STEP
-        if step == DELETE_PLACARD_STEPS:
-            profile = StaffProfile.objects.filter(auth=request.user).first()
-            context.update(
-                {
-                    "stories_count": Blog.objects.filter(author=request.user).count(),
-                    "comments_count": Comment.objects.filter(author=request.user).count(),
-                    "bookmarks_count": Bookmark.objects.filter(user=request.user).count(),
-                    "has_staff_profile": profile is not None,
-                    "is_staff_user": staff_only(request.user),
-                }
-            )
-
-        return render(request, "HOME/partials/delete_account_placard.html", context)
+        return render(
+            request,
+            "HOME/partials/delete_account_placard.html",
+            _delete_placard_context(request, step=step),
+        )
 
 
-class ProfileDeleteAccountView(View):
-    """Delete the signed in account entirely, staff or member.
-
-    The placard asked "are you sure" three times and made the user type
-    their email to finalize; this endpoint re-checks that email against the
-    signed in account before anything is deleted. Deletion cascades through
-    every table the account touches (stories, comments, bookmarks, staff
-    profile, follow relationships, reset keys), every session is dropped,
-    all active admins get a batch email alert, and the visitor lands on
-    the home page with a django message.
-    """
+class ProfileDeleteSendCodeView(View):
+    """Issue the one-time deactivation code after password/email checks."""
 
     def post(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"detail": "Please sign in first."}, status=401)
         if request.user.is_superuser:
             return JsonResponse({"detail": "The superuser account cannot be deleted from here."}, status=403)
+        if not _delete_requires_final_progress(request):
+            return render(
+                request,
+                "HOME/partials/delete_account_placard.html",
+                _delete_placard_context(request, step=1, error="Please confirm all steps first."),
+                status=400,
+            )
 
-        remaining_time, is_limited = is_rate_limited(request, 30, 3)
+        typed_email = (request.POST.get("email") or "").strip()
+        if not typed_email or typed_email.upper() != request.user.email.upper():
+            return render(
+                request,
+                "HOME/partials/delete_account_placard.html",
+                _delete_placard_context(request, error="That email does not match this account."),
+                status=400,
+            )
+
+        requires_password = user_requires_password_for_delete(request.user)
+        password = request.POST.get("password") or ""
+        if requires_password:
+            if not request.user.has_usable_password():
+                return render(
+                    request,
+                    "HOME/partials/delete_account_placard.html",
+                    _delete_placard_context(
+                        request,
+                        toast_message=NO_PASSWORD_MESSAGE,
+                        toast_duration_ms=10000,
+                    ),
+                    status=400,
+                )
+            if not password or not request.user.check_password(password):
+                return render(
+                    request,
+                    "HOME/partials/delete_account_placard.html",
+                    _delete_placard_context(request, error="Incorrect password."),
+                    status=400,
+                )
+
+        code, reason = issue_delete_code(request.user.pk)
+        if not code:
+            if reason == "locked":
+                remaining = delete_code_lock_remaining_seconds(request.user.pk)
+                error = f"Too many wrong attempts. Try again in {remaining} seconds."
+            elif reason == "send_limit":
+                error = "You have reached the maximum number of code sends. Try again later."
+            else:
+                error = "Could not send a verification code right now."
+            return render(
+                request,
+                "HOME/partials/delete_account_placard.html",
+                _delete_placard_context(request, error=error),
+                status=429 if reason in ("locked", "send_limit") else 400,
+            )
+
+        try:
+            _try_send_account_deactivation_code_email(request.user, code)
+        except Exception:
+            info_logger(msg=f"DEACTIVATION CODE: failed sending to {request.user.email}")
+            return render(
+                request,
+                "HOME/partials/delete_account_placard.html",
+                _delete_placard_context(request, error="Could not send the verification code. Please try again."),
+                status=500,
+            )
+
+        return render(
+            request,
+            "HOME/partials/delete_account_placard.html",
+            _delete_placard_context(request, code_sent=True, success="A 5-digit code was sent to your email."),
+        )
+
+
+class ProfileDeleteAccountView(View):
+    """Verify the one-time code and hibernate the signed-in account."""
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Please sign in first."}, status=401)
+        if request.user.is_superuser:
+            return JsonResponse({"detail": "The superuser account cannot be deleted from here."}, status=403)
+        if not _delete_requires_final_progress(request):
+            return render(
+                request,
+                "HOME/partials/delete_account_placard.html",
+                _delete_placard_context(request, step=1, error="Please confirm all steps first."),
+                status=400,
+            )
+
+        remaining_time, is_limited = is_rate_limited(request, 30, 5)
         if is_limited:
             return render(
                 request,
                 "HOME/partials/delete_account_placard.html",
-                self._final_context(request, error=f"Too frequent requests. Try again in {remaining_time} seconds."),
+                _delete_placard_context(request, error=f"Too frequent requests. Try again in {remaining_time} seconds."),
                 status=429,
             )
 
         typed_email = (request.POST.get("email") or "").strip()
-        if not typed_email:
+        if not typed_email or typed_email.upper() != request.user.email.upper():
             return render(
                 request,
                 "HOME/partials/delete_account_placard.html",
-                self._final_context(request, error="Enter your email address to finalize."),
+                _delete_placard_context(request, error="That email does not match this account."),
                 status=400,
             )
-        if typed_email.upper() != request.user.email.upper():
+
+        requires_password = user_requires_password_for_delete(request.user)
+        password = request.POST.get("password") or ""
+        if requires_password:
+            if not request.user.has_usable_password():
+                return render(
+                    request,
+                    "HOME/partials/delete_account_placard.html",
+                    _delete_placard_context(
+                        request,
+                        toast_message=NO_PASSWORD_MESSAGE,
+                        toast_duration_ms=10000,
+                    ),
+                    status=400,
+                )
+            if not password or not request.user.check_password(password):
+                return render(
+                    request,
+                    "HOME/partials/delete_account_placard.html",
+                    _delete_placard_context(request, error="Incorrect password."),
+                    status=400,
+                )
+
+        code = (request.POST.get("code") or "").strip()
+        if not code:
             return render(
                 request,
                 "HOME/partials/delete_account_placard.html",
-                self._final_context(request, error="That email does not match this account."),
+                _delete_placard_context(request, error="Enter the 5-digit verification code."),
                 status=400,
             )
 
-        account = request.user
-        deleted_email = account.email
-        if account.is_admin:
-            deleted_account_type = "Admin"
-        elif staff_only(account):
-            deleted_account_type = "Staff"
-        else:
-            deleted_account_type = "Member"
+        ok, reason = verify_delete_code(request.user.pk, code)
+        if not ok:
+            if reason == "locked":
+                remaining = delete_code_lock_remaining_seconds(request.user.pk)
+                error = f"Too many wrong attempts. Try again in {remaining} seconds."
+            elif reason == "missing":
+                error = "That code is missing or expired. Send a new code."
+            else:
+                error = "That verification code is incorrect."
+            return render(
+                request,
+                "HOME/partials/delete_account_placard.html",
+                _delete_placard_context(request, error=error),
+                status=400,
+            )
 
-        #   THE STAFF PROFILE DIES WITH THE ACCOUNT, SO THE FULL NAME HAS TO BE READ FIRST
-        deleted_full_name = ""
-        if staff_only(account):
-            deleted_profile = StaffProfile.objects.filter(auth=account).only("full_name").first()
-            deleted_full_name = deleted_profile.full_name.strip() if deleted_profile else ""
-        deleted_at = timezone.now()
+        clear_delete_code_state(request.user.pk)
+        hibernate_account(request.user, actor=request.user)
+        _set_delete_step_progress(request, 0)
 
-        #   CLOUDINARY CLEANUP: gather every uploaded asset the cascade is about to
-        #   orphan BEFORE it runs, then release them after it commits (see the
-        #   _collect_account_assets / _release_account_assets helpers above).
-        account_assets = _collect_account_assets(account)
-
-        dropped = drop_sessions_for(account)
-        with transaction.atomic():
-            account.delete()
-        _release_account_assets(account_assets)
-
-        #   EVERY ACTIVE ADMIN GETS THE BATCH MAIL (ACCOUNT TYPE, EMAIL, STAFF FULL NAME, DATETIME)
-        _try_send_account_deleted_batch_email(deleted_email, deleted_account_type, deleted_full_name, deleted_at)
-        info_logger(
-            msg=f"ACCOUNT DELETED: {deleted_email} ({deleted_account_type}) deleted their own account, {dropped} session(s) ended"
-        )
-
-        #   logout AFTER the deletion: it flushes the request session, then
-        #   the message is stored on the fresh session the redirect reads.
         auth_logout(request)
-        messages.success(request, "Account successfully deleted")
+        messages.success(request, "Account deactivation started.")
         home_url = reverse("home:home")
 
-        #   htmx callers get HX-Redirect so the browser does a full navigation
-        #   (the toast with the django message renders on the home page); a
-        #   non htmx post falls back to the classic redirect.
         if request.headers.get("HX-Request") == "true":
             response = HttpResponse(status=204)
             response["HX-Redirect"] = home_url
             return response
         return redirect(home_url)
-
-    def _final_context(self, request, error=None):
-        profile = StaffProfile.objects.filter(auth=request.user).first()
-        context = {
-            "step": DELETE_PLACARD_STEPS,
-            "total_steps": DELETE_PLACARD_STEPS,
-            "placard_endpoint": reverse("home:profile_delete_placard"),
-            "delete_endpoint": reverse("home:profile_delete_account"),
-            "account_email": request.user.email,
-            "stories_count": Blog.objects.filter(author=request.user).count(),
-            "comments_count": Comment.objects.filter(author=request.user).count(),
-            "bookmarks_count": Bookmark.objects.filter(user=request.user).count(),
-            "has_staff_profile": profile is not None,
-            "is_staff_user": staff_only(request.user),
-            "error": error,
-        }
-        return context
 
 #   EVERY `type` THE FOOTER UNSUBSCRIBE LINK OF AN EMAIL CAN CARRY (see the
 #   unsubscribe_query values in SERVICE_INTERNAL/email_single.py and

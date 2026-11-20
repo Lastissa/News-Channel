@@ -82,7 +82,7 @@
         <h2 class="hero-headline"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h2>
         {% endif %}
         {% comment %} i comment it out bcos its good for only by email@domain.com  not staff full name {% endcomment %}
-          <p class="hero-byline">By {{ post.author.staffprofile.full_name|cut:"@"|default:"Staff writer"|slice:":24" }} </p>
+          <p class="hero-byline">By {{ post.author_name|slice:":24" }} </p>
         <div class="hero-actions">
           <a class="glass-btn" href="{% url 'blog:story_detail' post.slug %}" target="_self">Read story</a>
           <button type="button" class="glass-btn glass-btn-outline glass-btn-icon"
@@ -156,7 +156,7 @@
   <div class="teaser-track" data-teaser-track tabindex="0"
        aria-label="Advert carousel. It advances automatically; scroll or use the arrow buttons to choose an advert.">
     {% for item in teaser_items %}
-    {% if item.url %}<a class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}{% if forloop.last %} is-last{% endif %}" href="{{ item.url }}" rel="sponsored noopener"{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %} aria-label="{{ item.heading|default:'Advert' }}"
+    {% if item.url %}<a class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}{% if forloop.last %} is-last{% endif %}" href="{{ item.url }}" rel="sponsored noopener" data-ad-click{% if item.url|slice:":4" == "http" %} target="_blank"{% endif %} aria-label="{{ item.heading|default:'Advert' }}"
          data-index="{{ forloop.counter0 }}"
          data-ad-view="{{ item.view_url }}"
          {% if item.image %}style="--teaser-image: url('{{ item.image|css_url }}');"{% endif %}>{% else %}<div class="teaser-slide{% if item.image %} has-image{% endif %}{% if forloop.first %} is-active{% endif %}{% if forloop.last %} is-last{% endif %}"

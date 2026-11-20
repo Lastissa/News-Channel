@@ -1,0 +1,579 @@
+# 20-14-26-BUG-LOG — Deep bug scan
+
+Project: `C:\Users\Grace\Desktop\SaaS\django-SaaS\NoName` (AbuReport Django SaaS)
+Scan date: 20 Nov 2026
+Branch: `main` (working tree heavily modified/uncommitted before this scan; left untouched)
+
+## Method and rules
+
+- Read-only source audit across every app (`_`, `AUTHENTICATION`, `BLOG`, `HOME`, `STAFF`, `ADMIN`, `ARCHIVE`, `Partner`, `SERVICE_INTERNAL`, `NoName` settings/urls), templates, static JS/CSS, docs and tests.
+- No `makemigrations`, `migrate`, git write command, or file edit was performed during the audit (the only file written is this log).
+- Static checks: `python manage.py check`, `python manage.py check --deploy`, `python -m compileall`, `git diff --check`.
+- Dynamic checks: full Django test suite, isolated re-runs of failing tests, and read-only `manage.py shell` / Django test-client probes by the auditors.
+- Six parallel focused audits were run (ads/landing, account lifecycle, admin/staff, blog/archive, infrastructure, frontend). Every finding below was re-verified against the current working tree before being recorded.
+
+## Severity legend
+
+| Level | Meaning |
+|---|---|
+| **CRITICAL** | Exploitable now, or catastrophic data/account compromise; immediate action. |
+| **HIGH** | Serious security/reliability defect or a broken core user path. |
+| **MEDIUM** | Wrong behaviour with a clear workaround, or a defect mainly affecting correctness/maintainability. |
+| **LOW** | Cosmetic, dead code, stale test/docs, or a low-likelihood edge case. |
+
+**Totals:** 73 findings — 2 CRITICAL, 14 HIGH, 27 MEDIUM, 30 LOW.
+
+---
+
+## 1. Executive summary
+
+The full suite runs **712 tests** and finishes with **3 failures**. Two of the failures reproduce in isolation (one stale test assertion, one over-strict rate limit); the third is cross-test pollution from a module-level email thread pool.
+
+The highest-risk verified issues are:
+
+1. **DEBUG=True and a Django-generated `SECRET_KEY` in the shipped `.env`**, plus missing production transport hardening (`check --deploy` warnings W004/W008/W009/W012/W016/W018).
+2. **Shared cache is effectively disabled** (`LocMemCache` fallback because `use_redis` is absent) and Redis failures are configured to be ignored, so every Gunicorn worker has its own rate-limit state.
+3. **CSP report URL reflects the untrusted `Host` header** under a wildcard `ALLOWED_HOSTS` entry, allowing CSP telemetry to be redirected to an attacker-controlled subdomain.
+4. **The create-superuser backdoor is still routed at `/sy/_admin/<email>/<password>/<secret>/`**, logs the submitted plaintext password, and emails every superuser on each log call.
+5. **`/health` returns 500 for any POST body** because raw bytes are converted to a dict.
+6. **The new ad-click interceptor hijacks the placeholder “advertise with us” slide** (`/advertise/` and `mailto:`), so a fresh installation cannot reach its only advertising enquiry CTA.
+7. **Maintenance mode is bypassed by the ads-subdomain middleware**, and static assets/health are blocked by the maintenance middleware itself.
+8. **Auth GET throttle keys on `REMOTE_ADDR` behind Cloudflare/Render**, so all users share one bucket and any user can block auth pages for everyone.
+9. **Django admin still offers a hard account purge** (`AUTHENTICATION/admin.py`), bypassing the off-grid-only delete path and leaving advert assets orphaned.
+10. **Hibernation leaves cached story pages stale** and shows an invalid support address on the login hold.
+11. **Four stored-XSS sinks** — three in frontend JS (new comments, analytics story titles, profile/admin JSON pagers) and one in server-rendered story tokens (`javascript:` URLs in `filel`/`btn`) — allow same-origin script execution, including in admin sessions.
+12. **“Only me” archive files are public in Cloudinary**; the Django proxy guard does not protect direct storage URLs.
+
+> Note: several “risk” items (notably the true-delete URL shape and logging the target password to `info_logger`) were explicit product decisions in the prior work scope. They are recorded in section 5 as accepted design risks, not re-litigated as accidental bugs.
+
+---
+
+## 2. Validation results
+
+| Command | Result |
+|---|---|
+| `python manage.py check` | `System check identified no issues (0 silenced).` |
+| `python manage.py check --deploy` | 6 warnings: `security.W004`, `W008`, `W009`, `W012`, `W016`, `W018` (all under current `DEBUG=True`; production guard missing). |
+| `python -m compileall -q ...` | All app packages compile (`COMPILEALL OK`). |
+| `python manage.py test --verbosity 0` | **Ran 712 tests in 501.834s — FAILED (failures=3)**. |
+| `git diff --check` | No whitespace errors; only LF→CRLF warnings for 6 templates/modules. |
+| Targeted re-run of the 3 failing tests | 2 still fail in isolation; the email assertion passes in isolation (pollution). |
+| `_.tests` (infrastructure auditor) | `Ran 13 tests — OK`. |
+| `collectstatic --noinput` (previous validation) | 3 copied, 3,209 unchanged, 545 post-processed. |
+
+### The three full-suite failures
+
+| Test | Isolated? | Root cause |
+|---|---|---|
+| `ADMIN.tests.AuthorLyticsTests.test_the_compare_board_needs_two_different_authors` | **Fails** | The view rate-limits a read-only htmx compare fragment to 2 requests / 3s; the test makes 3 requests and the third gets `429`. |
+| `ADMIN.tests.PanelCategoryTests.test_panel_page_lists_categories_with_story_counts` | **Fails** | Stale assertion: template now renders `{{ category_rows\|length }}` with no `active` suffix, but the test still expects the literal `10 active`. |
+| `ADMIN.tests.StaffMailTests.test_a_display_name_cannot_break_the_from_header` | Passes alone | `self.params()` asserts exactly one `resend.Emails.send` call; in the full suite queued work from the module-level `ThreadPoolExecutor` lands in this test's patch and `call_count == 68`. |
+
+---
+
+## 3. Verified findings
+
+### 3.1 Security and configuration
+
+#### BUG-001 — CRITICAL — Development DEBUG and generated secret are the shipped defaults
+- **Location:** `.env:1,3` (`DJANGO_SECRET="django-insecure-…"`, `DEBUG = True`); `NoName/settings.py:16`; `NoName/settings.py:18-27`.
+- **Evidence:** `check --deploy` reports W004 (no HSTS), W008 (no SSL redirect), W009 (weak/generated `SECRET_KEY`), W012/W016/W018. Debug-only cookie settings are active. The secret value is intentionally not reproduced in this log.
+- **Impact:** If this `.env` is deployed, Django tracebacks, debug tooling and insecure cookies are exposed and sessions can be forged.
+- **Fix:** Fail fast in production when `DEBUG` is true or `SECRET_KEY` starts with `django-insecure-`; set HSTS/SSL redirect/secure cookies from environment parsed as strict booleans; ship an example env with safe placeholders.
+
+#### BUG-002 — HIGH — Shared cache disabled; Redis exceptions silently ignored
+- **Location:** `NoName/settings.py:283-303`; `.env` has `redis_url` but no `use_redis`.
+- **Evidence:** Runtime startup prints `i no use redis`; `CACHES["default"]` is `LocMemCache`. Redis branch sets `"IGNORE_EXCEPTIONS": True`.
+- **Impact:** Rate limits, verification-code throttles, CSP dedupe, backdoor throttles and cache invalidation are per-process. With Gunicorn, clients can multiply every limit by the worker count; a Redis outage would also be silent.
+- **Fix:** Require Redis in production, parse `use_redis` strictly, remove `IGNORE_EXCEPTIONS` (or log/alert on failure), and assert at startup that production is not using LocMem.
+
+#### BUG-003 — HIGH — CSP `report-uri` reflects the request `Host`
+- **Location:** `NoName/settings.py:96-116` (wildcard `.example.com` appended to `ALLOWED_HOSTS` for advert subdomains); `_.middleware.py:60-81` (report URL built with `request.build_absolute_uri(reverse("csp_report"))`).
+- **Evidence:** Auditor probe with `Host: evil.example.com` produced `report-uri http://evil.example.com/csp-report/` and the matching `Reporting-Endpoints` header.
+- **Impact:** Browser CSP violation reports (document URI, blocked source, inline script samples) can be exfiltrated to an attacker-controlled subdomain; the real report stream can be poisoned.
+- **Fix:** Build the report endpoint from `canonical_origin()`/`About.domain`, never from the request host; restrict wildcard host acceptance at middleware level.
+
+#### BUG-004 — HIGH — `/health` returns 500 for non-empty POST bodies
+- **Location:** `NoName/urls.py:31-41`, specifically line 38 (`post = dict(request.body) or {}`).
+- **Evidence:** `Client().get('/health')` → 200; `Client().post('/health', data={'x':'1'})` → 500 (`TypeError: cannot convert dictionary update sequence element #0 to a sequence`). Line 40 also logs GET/POST/form contents with malformed `%{get}` / `%{ip}` formatting.
+- **Impact:** POST-based liveness checks fail; request body contents can leak into logs.
+- **Fix:** Return a static JSON payload (optionally with the client IP); do not parse or log bodies. If body data is needed, parse JSON explicitly with a size cap.
+
+#### BUG-005 — HIGH — Create-superuser backdoor is still exposed and logs plaintext passwords
+- **Location:** `NoName/urls.py:71` (`path('sy/', include("_.urls"))`), `_/urls.py:7`, `_/views.py:28-59`.
+- **Evidence:** `GET /sy/_admin/<email>/<password>/<secret>/` creates a superuser (`_.views.py:52`) and returns its serialized data (`:56`). `_.views.py:41-45` builds a dict containing the plaintext password and passes it to `superuser_logger`, which emails every active superuser (`_.views.py:63-105`). The email-keyed rate limit (`admin-create:{email}`) is bypassed by varying the email.
+- **Impact:** Superuser creation by anyone who learns/leaks `SY_SECRET`; credential disclosure in logs; unauthenticated mail amplification and Resend quota exhaustion.
+- **Fix:** Remove the endpoint entirely (or require an authenticated superuser session + CSRF + POST body). Never log or URL-encode passwords. Keep alerts out of the request path and aggregate them.
+
+#### BUG-006 — HIGH — Auth GET throttle uses `REMOTE_ADDR` instead of the real client IP
+- **Location:** `AUTHENTICATION/middleware.py:9-47` (key at lines 23-25).
+- **Evidence:** With Cloudflare/Render in front, `REMOTE_ADDR` is the proxy address. Auditor probe: two clients with different `CF-Connecting-IP` values but the same `REMOTE_ADDR` share the 3-requests/4-second bucket.
+- **Impact:** Unrelated users trip each other's `429`; one actor can keep all auth pages blocked.
+- **Fix:** Use a trusted-proxy-aware IP resolver (only trust forwarded headers when the immediate peer is a known proxy) and a shared cache.
+
+#### BUG-007 — HIGH — `get_client_ip()` trusts spoofable proxy headers
+- **Location:** `SERVICE_INTERNAL/abstract.py:19-47`.
+- **Evidence:** No validation that `REMOTE_ADDR` is a trusted proxy before accepting `CF-Connecting-IP` or the first `X-Forwarded-For` entry. `GET /health` with a forged `CF-Connecting-IP: 9.9.9.9` returns that value. `is_rate_limited()` (`abstract.py:193`) and session tracking (`AUTHENTICATION/middleware.py:143-153`) inherit it.
+- **Impact:** Rate-limit bypass, forged audit/session IPs.
+- **Fix:** Validate immediate peer against a trusted proxy list (or use `django-ipware`), validate/normalize IP literals.
+
+#### BUG-008 — MEDIUM — Maintenance middleware ordering and fail-closed default
+- **Location:** `NoName/settings.py:179-195` (`MaintenanceModeMiddleware` before WhiteNoise, and after `AdsSubdomainMiddleware`); `_.middleware.py:255-293` (`getattr(settings, "MAINTENANCE_MODE", "TRUE")` at line 261).
+- **Evidence:** With `MAINTENANCE_MODE='TRUE'`, `/health` and `/static/ads.txt` both return 503. Ads-subdomain short-circuits (see BUG-012) never reach the maintenance middleware.
+- **Impact:** Maintenance page cannot load its own CSS/JS; health checks cannot distinguish maintenance from outage; ads pages remain live during the outage.
+- **Fix:** Put WhiteNoise before maintenance, exempt `/health` and static paths, default the setting to `"FALSE"`, add `Retry-After`, and place maintenance before `AdsSubdomainMiddleware`.
+
+#### BUG-009 — MEDIUM — `.env` maintenance key name mismatch
+- **Location:** `.env:7` (`maintenance_mode = "false"`); `NoName/settings.py:281` (`os.getenv('MAINTENANCE_MODE', "FALSE")`).
+- **Impact:** On case-sensitive Linux the env value is ignored; operators cannot enable maintenance mode via the documented key.
+- **Fix:** Read both spellings with strict boolean parsing and log the effective value.
+
+#### BUG-010 — MEDIUM — `is_rate_limited(reset_timeout=True)` slides TTL and grows the timestamp list
+- **Location:** `SERVICE_INTERNAL/abstract.py:181-220`, especially 206-215; callers include `HOME/views.py:1229` and `HOME/views.py:2418`.
+- **Evidence:** Every call resets the cache TTL to the full window and appends to a list that is never pruned in this branch.
+- **Impact:** Continued attempts keep a user locked out indefinitely and grow the cached value without bound. The `remaining_time` calculation also uses `max(elapsed, 1)`, so it can go negative.
+- **Fix:** Prune old timestamps, set expiry from the oldest surviving attempt, and do not refresh TTL while blocked.
+
+#### BUG-011 — MEDIUM — Unbounded background executors; DEBUG inconsistency in single-email sender
+- **Location:** `SERVICE_INTERNAL/email_single.py:22-24` and `:114-128`; `SERVICE_INTERNAL/indexnow.py:20-28,84-87`; batch sender short-circuits at `email_batch.py:173-178,385-390`.
+- **Evidence:** Module-level `ThreadPoolExecutor(max_workers=4)` with unbounded queues and no shutdown hook. `_dispatch_email()` still calls `resend.Emails.send()` in DEBUG (only the `from` address changes) while batch senders skip sending entirely.
+- **Impact:** Memory growth and lost work on restart; tests/development can attempt real outbound email. Also the source of the full-suite mail mock pollution.
+- **Fix:** Use a bounded task queue with a shutdown hook and move the DEBUG short-circuit into `_dispatch_email()`.
+
+#### BUG-012 — MEDIUM — Maintenance mode is bypassed for ads-subdomain traffic
+- **Location:** `NoName/settings.py:182-183`; `_.middleware.py:137-252`.
+- **Evidence:** `AdsSubdomainMiddleware` returns responses directly for disallowed ads paths, all advert-subdomain pages, legacy promote redirects and 404s, so `MaintenanceModeMiddleware` never runs for them.
+- **Impact:** Advert landing pages stay live during planned downtime.
+- **Fix:** Reorder middleware so maintenance runs first, or apply the same maintenance check at the top of `AdsSubdomainMiddleware`.
+
+#### BUG-013 — MEDIUM — Blank `SiteSettings` fields do not fall back as documented
+- **Location:** `SERVICE_INTERNAL/config.py:78-103`; `ADMIN/models.py:46-52`; `NoName/settings.py:205-210` (global context processor).
+- **Evidence:** `get_solo()` uses `get_or_create(pk=1)`; the config comment promises fallback to `About` defaults when fields are blank, but only `tweeter` uses `or About.tweeter`. A freshly created empty row yields empty social/contact links. The first render or even a 404 (`HOME/views.py:159-162`) can write the row.
+- **Impact:** Broken footer/contact links; write-on-read in 404/email paths; indefinite cache lifetime.
+- **Fix:** Create the singleton in a data migration, use `get()` with safe defaults, apply `or About.<field>` to every field, and give the cache a finite TTL.
+
+#### BUG-014 — MEDIUM — Hardcoded/invalid contact and alert addresses
+- **Location:** `SERVICE_INTERNAL/config.py:30,33` (`contact_email`/`email` are `@shaefalaap.resend.app`, i.e. missing a local part); `NoName/settings.py:44,333`; `SERVICE_INTERNAL/email_single.py:97`; `AUTHENTICATION/templates/auth/password_reset.html:101`.
+- **Evidence:** Password reset page renders `mailto:@shaefalaap.resend.app`; security/archive alerts fall back to personal-looking addresses when env vars are absent.
+- **Impact:** Broken support contact link; misdirected security/archive notifications; brand inconsistency.
+- **Fix:** Source public contact addresses from validated `SiteSettings`/env, use `security@<domain>` defaults, and fail fast in production for required addresses.
+
+#### BUG-015 — MEDIUM — External DB configuration uses truthy strings and forced SSL
+- **Location:** `NoName/settings.py:217-227`.
+- **Evidence:** `if os.getenv('use_external'):` treats `"False"`/`"0"` as true; `dj_database_url.config(...)` can raise if no URL is set; `OPTIONS` is overwritten with `{"sslmode": "require"}`.
+- **Impact:** Accidental external DB selection, opaque startup crash, connection failures for non-SSL Postgres.
+- **Fix:** Strict boolean parsing, explicit error for missing URL, merge rather than replace options, make `sslmode` configurable.
+
+#### BUG-016 — MEDIUM — Upload validation trusts client metadata; no landing-page size cap
+- **Location:** `SERVICE_INTERNAL/images.py:102-116,310-325,382-415`; `NoName/settings.py:317`.
+- **Evidence:** Image validation checks only client-supplied `content_type`/size (no magic bytes); the error text mentions only JPEG/PNG although WEBP is allowed at `images.py:46`; `fetch_advert_landing_html()` reads the whole raw object into memory despite `ADVERT_LANDING_MAX_BYTES` being configured; archive validation trusts the original filename extension.
+- **Impact:** Mislabeled/malicious content can reach Cloudinary; oversized raw pages can spike memory/latency; misleading errors.
+- **Fix:** Validate real file signatures, stream with a byte cap, fix the error message, set safe content types/disposition.
+
+#### BUG-017 — LOW — Dead `handler404` in `_/urls.py` returns 200
+- **Location:** `_.urls.py:10-11`. Root handler is correctly set at `NoName/urls.py:27`, so this one is unused.
+- **Fix:** Remove it, or pass `status=404`.
+
+#### BUG-018 — LOW — `About.domain` uses raw `ALLOWED_HOSTS[0]`
+- **Location:** `SERVICE_INTERNAL/config.py:19-22`; compare `SERVICE_INTERNAL/hosts.py:68-74` which already skips wildcards.
+- **Evidence:** `ALLOWED_HOSTS=['.example.com','example.com']` produces `About.domain == 'https://.example.com'`.
+- **Impact:** Broken canonical tags, social previews, JSON-LD and sitemap entries.
+- **Fix:** Use `canonical_origin()`.
+
+#### BUG-019 — LOW — Manual `?v=` cache busters with hashed static storage
+- **Location:** `HOME/templates/base.html:70-71,111-116`; `HOME/templates/HOME/promote.html:19,446`; `NoName/settings.py:273-277`.
+- **Impact:** Redundant cache variants and hand-maintained versions that can drift from the manifest hash.
+- **Fix:** Rely on `CompressedManifestStaticFilesStorage`; keep manual versioning only for external assets.
+
+#### BUG-020 — LOW — No fail-fast validation for `DJANGO_SECRET`
+- **Location:** `NoName/settings.py:16`; `.env:1`.
+- **Fix:** Raise `ImproperlyConfigured` when the variable is missing in production.
+
+---
+
+### 3.2 Ads, landing pages and home rail
+
+#### BUG-021 — HIGH — Placeholder “advertise with us” CTA is intercepted by the click-toast handler
+- **Location:** `HOME/templates/HOME/home.html:159` (`data-ad-click` added to every linked teaser slide); `HOME/static/home/js/interactions.js:2793-2813`; `HOME/views.py:800-819` (placeholder slides use `/advertise/` or `mailto:`); `HOME/views.py:2242-2273` (HTML enquiry page).
+- **Evidence:** The handler intercepts any relative `a[data-ad-click]`, fetches `?check=1`, and on non-JSON shows the bottom toast and returns without navigating. `/advertise/?check=1` returns HTML 200, so `response.json()` fails and the visitor is stuck. Placeholder slides have `data-ad-view=""` but still carry `data-ad-click`.
+- **Impact:** On a fresh/unconfigured site the only advertising enquiry CTA is unusable; readers see a misleading “this ads was not set properly” error.
+- **Fix:** Gate the handler on `a[data-ad-click][data-ad-view]` with a non-empty value and skip `mailto:`/external links; or add `data-ad-click` only to real referenced-advert slides in the template.
+
+#### BUG-022 — MEDIUM — Misconfigured advert click returns raw JSON on a normal browser click
+- **Location:** `Partner/views.py:297-314`; `Partner/tests.py:834-847`.
+- **Evidence:** `AdvertClickView.get()` returns the JSON 400 error regardless of `check`. The module docstring (`:303-305`) says only the on-site preflight should read JSON, but a direct navigation to `/ads/click/<ref>/` with a paid reference that has no subdomain/destination shows the raw JSON page. The test named `…but_direct_pages_do_not` never exercises a direct click link.
+- **Impact:** Ugly raw JSON page for legacy/misconfigured adverts instead of the intended bottom toast or friendly destination.
+- **Note:** Requirement Q3 forbade JSON on direct `/ads/<title>-<id>/` and subdomain-root opens, which are unaffected. This finding concerns the separate tracked click endpoint.
+- **Fix:** Return JSON only when `check` is true; otherwise redirect to a friendly HTML page. Update the test accordingly.
+
+#### BUG-023 — MEDIUM — WhatsApp in-app browser traffic is classified as bot traffic
+- **Location:** `SERVICE_INTERNAL/abstract.py:123-158` (bare `"whatsapp"` marker); `Partner/tracking.py:123-126`.
+- **Evidence:** The WhatsApp in-app browser UA contains `WhatsApp/2.x`, so `is_bot_request()` is true and `record_advert_event()` drops the event. Only Googlebot is covered by tests (`Partner/tests.py:516-524`).
+- **Impact:** Human clicks/views from the primary distribution channel are systematically undercounted, skewing advertiser analytics and CTR.
+- **Fix:** Match only the link-preview fetcher (or use `Sec-Fetch-*` headers); remove the bare `whatsapp` marker.
+
+#### BUG-024 — LOW — Paid advert redirects drop the port in DEBUG
+- **Location:** `Partner/models.py:413-422` (`advert_origin(self.subdomain)` called without a request); `SERVICE_INTERNAL/hosts.py:140-165` (port appended only when `request is not None`); `Partner/views.py:145-147,187-189,252-254`.
+- **Evidence:** With `DEBUG=True` on port 8000, `/ads/<slug>-<id>/` redirects to `http://newads.localhost/` (port 80). Tests run with `DEBUG=False` so they do not catch it.
+- **Impact:** Paid adverts cannot be opened in local development.
+- **Fix:** Pass the request through `public_page_url`/`public_target` or build redirects with `advert_origin(label, request)`.
+
+#### BUG-025 — LOW — `AdvertPage` Cloudinary assets leak when deleted outside the ads desk
+- **Location:** `Partner/models.py:488-497` (signal only for `AdvertLandingPage`); `Partner/admin.py:108-115`; `ADMIN/views.py:3565-3577` (manual delete call).
+- **Impact:** Deleting an extra page via Django admin, or cascading from advert deletion, leaves the raw HTML object in Cloudinary.
+- **Fix:** Add a mirrored `post_delete` receiver for `AdvertPage`; remove the redundant manual call or make both paths idempotent.
+
+#### BUG-026 — LOW — Tracking dedup, docs and tests disagree; double view counting
+- **Location:** `Partner/models.py:430-436` (docstring claims one hour per session/IP and a five-second click window); `Partner/tracking.py:32-35,96-110` (actual 3 seconds, `ip_hash` only); `Partner/views.py:57-58,103-104,217`.
+- **Impact:** Refresh after 4 seconds counts a new view, users behind one NAT collapse into one event, and the rail pixel plus landing page each record a view. The `_recent_event_exists()` + `create()` pair races under concurrency.
+- **Fix:** Either implement the documented session+IP/hour dedup (with a DB-level guard) or correct the docs/tests and document the intentional double view.
+
+#### BUG-027 — LOW — Failed landing-page fetch still records a view
+- **Location:** `Partner/views.py:52-71` (`record_advert_view()` at line 58 before the Cloudinary fetch at line 61), same pattern at `:217-226`.
+- **Impact:** Advertisers are billed/reported for views of a 502 error page.
+- **Fix:** Move `record_advert_view()` after a successful fetch.
+
+---
+
+### 3.3 Test suite defects
+
+#### BUG-028 — MEDIUM — Author-compare test fails because a read-only fragment is rate-limited to 2 requests
+- **Location:** `ADMIN/tests.py:2846-2864`; `ADMIN/views.py:1690-1703` (`is_rate_limited(..., max_requests=2, timeout_window=3, reset_timeout=False, scope=f"{get_client_ip(request)}{3}")`).
+- **Evidence:** Isolated re-run fails on the third GET with `{"detail": "Rate limit exceeded. Please wait 2 seconds and try again."}`. The scope expression also appends a literal `3` to the IP, which is meaningless and collision-prone.
+- **Impact:** Normal panel use (rapidly trying different author pairs) shows a rate-limit page; the permanent test failure hides other regressions.
+- **Fix:** Raise/remove the limit for this read-only fragment, give it a proper scope label, and keep the test.
+
+#### BUG-029 — LOW — Stale panel-category assertion expects `10 active`
+- **Location:** `ADMIN/tests.py:206-223`; `ADMIN/templates/ADMIN/panel.html:490` (`{{ category_rows|length }}` with no `active` text).
+- **Impact:** Permanent test failure; no product defect.
+- **Fix:** Update the assertion to the rendered value (or add the intended label to the template, if the UI contract is the label).
+
+#### BUG-030 — MEDIUM — Full-suite mail mock pollution from module-level executor
+- **Location:** `ADMIN/tests.py:238-274` (`mock.patch("resend.Emails.send")`, `params()` asserts `call_count == 1`); `SERVICE_INTERNAL/email_single.py:22-24`.
+- **Evidence:** Full suite fails with `call_count == 68`; the same test passes in isolation. Queued async work from earlier tests executes while the later patch is active.
+- **Impact:** Flaky suite and false confidence in email assertions; mirrors a real production lack of backpressure/shutdown control.
+- **Fix:** Reset the mock in `setUp()` and drain/wait for the executor between tests; add a test helper that shuts down and recreates the executor.
+
+---
+
+### 3.4 Account lifecycle, verification and hibernation
+
+#### BUG-031 — CRITICAL — Django admin exposes a second, unrestricted permanent-delete path
+- **Location:** `AUTHENTICATION/admin.py:6-28`; enabled by `NoName/urls.py:73`.
+- **Evidence:** `AuthAdmin.delete_model()` and `delete_queryset()` call `super()` (real hard delete). Any active superuser with an admin session can permanently delete one or many accounts at `/_admin/AUTHENTICATION/auth/` with no password re-entry, no `SY_SECRET`, no 400 failure semantics and no audit row. This path also uses `HOME.views._collect_account_assets` (`:3126-3175`), which does **not** collect reference-owned advert images or advert landing/page HTML, unlike the off-grid `true_delete_account` path (`account_lifecycle.py:84-127`).
+- **Impact:** Directly contradicts “no purge” / “true delete only off-grid”; a hijacked or careless superuser can destroy accounts outside the controlled endpoint and orphan Cloudinary assets.
+- **Fix:** Set `has_delete_permission = False` on `AuthAdmin`, remove bulk delete, and route any admin removal through `hibernate_account()`.
+
+#### BUG-032 — HIGH — Backdoor logs the raw password at ERROR level and emails it to every superuser
+- **Location:** `_/views.py:41-48,63-105` (expands BUG-005).
+- **Evidence:** `data = {'email': email, 'password': password}` is embedded in the `superuser_logger` message; `superuser_logger` unconditionally calls `logger.error(msg)` and `send_alert(msg)`, which emails the same plaintext-containing message to every active superuser. The call at `_.views.py:32` happens before the rate-limit check, so every hit generates the alert.
+- **Impact:** Credentials persist in error logs and inboxes; attacker-triggerable mail flood.
+- **Fix:** Remove the password from all log/alert messages; use `info_logger` only for security events; redact before `send_alert()` and deduplicate alerts.
+
+#### BUG-033 — HIGH — Unscoped IP rate limits share one counter across login, reset-confirm and delete-confirm
+- **Location:** `SERVICE_INTERNAL/abstract.py:181-220`; `AUTHENTICATION/views.py:145` (login), `AUTHENTICATION/views.py:432` (reset confirm), `HOME/views.py:3502` (delete confirm).
+- **Evidence:** `is_rate_limited()` documents that `scope=` is required to separate endpoints, but only the password-reset **request** (`AUTHENTICATION/views.py:384-389`) and a few HOME endpoints pass one. The three listed call sites all use the bare client-IP cache key.
+- **Impact:** Three login POSTs produce a 429 on password reset or deactivation confirmation from the same IP, and vice versa; the limiter is bypassable by header spoofing (BUG-007).
+- **Fix:** Pass a unique `scope=` at every call site and use an atomic shared-counter implementation.
+
+#### BUG-034 — MEDIUM — Story-detail cache is never invalidated on hibernation
+- **Location:** `SERVICE_INTERNAL/account_lifecycle.py:178-188`; cached reader `BLOG/views.py:1198` (`blog-<slug>`, 100s TTL).
+- **Evidence:** The invalidation code checks `hasattr(cache._cache, "_cache")`, but on this project LocMemCache's underlying store is an `OrderedDict` with keys like `:1:blog-abc`; the condition is false and the loop never runs. Redis has no `_cache` at all. `hibernate_account()` calls this at `account_lifecycle.py:381`.
+- **Impact:** For up to 100 seconds after hibernation, cached story pages still show the real author name/avatar instead of `Unknown` / `/static/404.jpg`.
+- **Fix:** Track and delete explicit `blog-<slug>` keys, or bump a cache version; for Redis scan and strip the key prefix correctly.
+
+#### BUG-035 — MEDIUM — Hibernation login hold shows an unusable support address
+- **Location:** `AUTHENTICATION/views.py:111-122`; `SERVICE_INTERNAL/config.py:9-35,71-138`.
+- **Evidence:** `About` has no `support_email`; `About.contact_email` is `@shaefalaap.resend.app` (no local part). Runtime message reads `Email: @shaefalaap.resend.app | WhatsApp: …`.
+- **Impact:** The required support contact on the hibernation hold is invalid.
+- **Fix:** Read `SiteSettings.get_solo().support_email` through the existing cached site-settings flow; fall back to a real configured address.
+
+#### BUG-036 — MEDIUM — Deactivation confirmation steps are bypassable with `?step=4`
+- **Location:** `HOME/views.py:3380-3396`; `HOME/partials/delete_account_placard.html:93-95`.
+- **Evidence:** `ProfileDeletePlacardView.get()` takes `step` directly from the query string and stores `max(current, step)` in the session; `_delete_requires_final_progress()` only checks `>= 4`. No per-step acknowledgement is recorded.
+- **Impact:** The “three are you sure confirms” control is cosmetic.
+- **Fix:** Store per-step booleans set only by explicit POST/acknowledgement and reject jumps greater than current+1.
+
+#### BUG-037 — MEDIUM — Cloudinary deletions run inside the hibernation DB transaction
+- **Location:** `SERVICE_INTERNAL/account_lifecycle.py:358-382` (atomic block calls `_delete_author_adverts_for_user` at `:373`, which destroys remote assets); contrast `true_delete_account` at `:417-428`.
+- **Impact:** If a later DB statement fails, advert/follow rows roll back but remote assets are already gone; sessions are also dropped before the transaction.
+- **Fix:** Collect public IDs inside the transaction and release them with `transaction.on_commit(...)`.
+
+#### BUG-038 — MEDIUM — Email send failure is invisible; user is told the code was sent
+- **Location:** `SERVICE_INTERNAL/email_single.py:105-134,171-193`; `HOME/views.py:3468-3483`.
+- **Evidence:** Async `_dispatch_email()` returns `None` and swallows worker exceptions; `_try_send_account_deactivation_code_email()` then unconditionally logs “sent”. The view's `try/except` can never fire and returns success.
+- **Impact:** Code send quota is consumed and the user waits for an email that never arrives, with no recovery path in the UI.
+- **Fix:** For this transactional message call `_dispatch_email(..., no_async=True)` and branch on the returned bool; do not count the send or claim success on failure.
+
+#### BUG-039 — MEDIUM — `cache.ttl()` does not exist on LocMem; the 3-sends/10-min window slides
+- **Location:** `SERVICE_INTERNAL/account_lifecycle.py:481-495`; `NoName/settings.py:283-303`.
+- **Evidence:** `cache.ttl(sends_key)` raises `AttributeError` on LocMemCache; the `except` branch passes the full 600s timeout on every send, so the window restarts from the last send. Redis `IGNORE_EXCEPTIONS` also makes counters fail open.
+- **Impact:** The documented “3 sends total in 10 minutes” contract is wrong in development and under Redis outages.
+- **Fix:** Store an absolute window-expiry timestamp in the cached value and compute remaining time from it; require a working shared cache in production.
+
+#### BUG-040 — LOW — Lockout returns inconsistent HTTP status
+- **Location:** `HOME/views.py:3452-3466` (429 for `locked`/`send_limit`) vs `HOME/views.py:3551-3565` (400 for all reasons).
+- **Fix:** Return 429 for `locked` in the confirm view too.
+
+#### BUG-041 — LOW — Unescaped identity injected into the admin HTML notification
+- **Location:** `SERVICE_INTERNAL/account_lifecycle.py:329-345`.
+- **Evidence:** `real_name` and `user.email` are interpolated raw into `<br>`-joined HTML passed to `_build_email_html`.
+- **Impact:** HTML injection into editorial-admin mail.
+- **Fix:** `escape()` both values for the HTML version; keep plain text for the audit row.
+
+#### BUG-042 — LOW — `CreateSYAcc` returns 200 on every failure and leaks exception text
+- **Location:** `_/views.py:39-59`.
+- **Evidence:** Missing `SY_SECRET` → 200 `Tampered Project`; bad secret → 200 `ERROR; missing params…`; exception → 200 `{'detail': str(e)}`. `hmac.compare_digest()` can also receive `None` outside the try block.
+- **Fix:** Return 400 for all failures, coerce operands to `str`, avoid echoing raw exceptions.
+
+#### BUG-043 — LOW — DB audit log is editable/deletable from Django admin
+- **Location:** `ADMIN/admin.py:5` (plain `admin.site.register([AccountActionLog, SiteSettings])`).
+- **Impact:** The hibernation/restore audit trail can be erased by a superuser.
+- **Fix:** Register with a read-only `ModelAdmin` (no add/delete, all fields readonly).
+
+#### BUG-044 — LOW — Tests mock away the exact behavior they claim to verify
+- **Location:** `HOME/tests.py:2822-2830,2879-2891,2950-2953`; `AUTHENTICATION/tests.py:534-547`; `ADMIN/tests.py:3466-3469`.
+- **Evidence:** The code-email test patches the sender; the hibernation test patches `verify_delete_code`, `clear_delete_code_state` and `hibernate_account`; the true-delete tests patch `true_delete_account`; one ADMIN patch targets a nonexistent attribute with `create=True` and is a no-op; side-effect tests patch `invalidate_account_caches`, hiding BUG-034.
+- **Impact:** All 24 targeted tests pass while the underlying behaviors are broken.
+- **Fix:** Add integration tests using real code issue/verify/hibernate/cache paths with only the transport mocked.
+
+#### BUG-045 — LOW — Passwords are stripped on login/register/reset
+- **Location:** `AUTHENTICATION/views.py:153,233,237,448-449`.
+- **Impact:** Accounts whose password contains leading/trailing whitespace cannot log in; silent credential mutation.
+- **Fix:** Never `.strip()` password fields.
+
+#### BUG-046 — LOW — Restore re-activates every paused advert
+- **Location:** `SERVICE_INTERNAL/account_lifecycle.py:220-236`.
+- **Evidence:** `_resume_adverts_for_user()` flips all `PAUSED` references to `ACTIVE`, including references paused for unrelated reasons before hibernation.
+- **Fix:** Store the prior status/pause reason and restore only hibernation-paused references.
+
+---
+
+### 3.5 Frontend JavaScript and templates
+
+#### BUG-047 — HIGH — Stored XSS in AJAX comment insertion
+- **Location:** `HOME/static/home/js/interactions.js:1765-1769` (sink); `BLOG/views.py:1772-1793` (source).
+- **Evidence:** `CommentCreateView` stores the raw trimmed comment and returns it unchanged as `content` in the AJAX `JsonResponse` (`BLOG/views.py:1793`). The client builds the new comment with `article.innerHTML = … '<p>' + (payload.content || value) + '</p>'` (`interactions.js:1768`). A comment `<img src=x onerror=alert(1)>` executes immediately. A page reload does **not** execute it because `BLOG/templates/blog/story_detail.html:314` autoescapes the stored value, confirming the sink is the AJAX path.
+- **Impact:** Any signed-in commenter can run same-origin script in the browser of readers who see the fresh comment, including admin sessions — session-riding, DOM defacement and data exfiltration.
+- **Fix:** Build the body paragraph as a DOM node and set `textContent`; never concatenate comment text into `innerHTML`.
+
+#### BUG-048 — HIGH — Stored XSS from story heading in the analytics search fragment
+- **Location:** `ADMIN/templates/ADMIN/partials/analytics_story_search.html:13` (source); `ADMIN/static/control/js/analytics.js:932` (sink).
+- **Evidence:** Django escapes the heading into `data-story-title`, but `getAttribute()` decodes it; `analytics.js:932` then writes `chosen.innerHTML = "Showing <strong>" + button.getAttribute("data-story-title") + "</strong>"`. A heading such as `</strong><img src=x onerror=alert(1)>` breaks out and executes when an admin clicks the search result.
+- **Impact:** Stored script execution in the admin surface with the admin's origin privileges and CSRF token.
+- **Fix:** Use `textContent` and append a `<strong>` text node, or escape the decoded attribute before any `innerHTML` assignment.
+
+#### BUG-049 — HIGH — Stored XSS in profile/admin JSON pager rendering
+- **Location:** `HOME/static/home/js/interactions.js:1158-1203` (renderer), `:1469` (`list.innerHTML = …`); `HOME/views.py:2949-2956` and `ADMIN/views.py:257-265` (raw JSON fields); live pagers at `HOME/templates/HOME/profile.html:498-518` and `ADMIN/templates/ADMIN/staff_detail.html:267-287`.
+- **Evidence:** `renderProfileItems()` concatenates attacker-influenced `item.heading`, `item.excerpt`/`detail`, `item.url`, `item.edit_url` and `item.blog_id` into an HTML string without escaping (`:1182`, `:1193`, `:1196`, `:1201`). Clicking page 2 replaces the server-escaped DOM with this unsafe HTML.
+- **Impact:** Stored script execution on profile and admin pages; the admin variant can reach protected endpoints with admin privileges.
+- **Fix:** Build list items with DOM nodes and `textContent`, or add and consistently apply `escapeHtml`/`escapeAttr` to every interpolated field and validate URLs before putting them in `href`.
+
+#### BUG-050 — MEDIUM — Hero carousel double-advances on touch devices
+- **Location:** `HOME/static/home/js/carousel.js:65-83` (pointer handlers) and `:93-108` (touch handlers).
+- **Evidence:** Both handler pairs call `next()`/`prev()` and `start()` for the same swipe. On touch browsers `pointerdown`/`pointerup` and `touchstart`/`touchend` both fire, so a >60px swipe advances twice (pointer threshold 60, touch threshold 50). `suppressClick` only blocks the synthetic link click.
+- **Impact:** A single mobile swipe skips a featured story and restarts autoplay twice.
+- **Fix:** Use Pointer Events only, or register the touch handlers only when `window.PointerEvent` is unavailable / add a shared gesture guard.
+
+#### BUG-051 — MEDIUM — Edit-page inline-image preview differs from published markup
+- **Location:** `HOME/static/home/js/edit-news-editor.js:308-312,339-343`; correct add-page renderer `HOME/static/home/js/add-news-editor.js:1027-1041`; server renderer `BLOG/views.py:623-670`.
+- **Evidence:** The edit preview renders a bare `<img class="story-inline-img story-inline-img-*">` and treats trailing token text only as `alt`; the published/add path renders `<figure class="story-inline-fig story-inline-fig-*">` with `<figcaption>`. `HOME/static/home/css/base.css:1424` documents that the plain rules exist only for the edit preview.
+- **Impact:** Authors see a preview that does not match the published article: captions, framing, sizing and accessibility semantics differ.
+- **Fix:** Port `renderInlineImage()` from `add-news-editor.js` and align the class map and caption handling with `BLOG/views.py`.
+
+#### BUG-052 — LOW — Auth-gate fallback message is ignored
+- **Location:** `HOME/static/home/js/interactions.js:215-220`; `HOME/static/home/js/auth-gate.js:80-84`.
+- **Evidence:** `openAuthGate(kind, fallbackMessage)` passes only `kind` to `window.AbuAuthGate.open()`; `AbuAuthGate.open(kind)` accepts no message. Server-specific 401 details are discarded. One call site passes the placeholder `"GGGGGGGGGGGGGG."` as its fallback.
+- **Impact:** Contextual sign-in reasons are lost; an unfinished placeholder can appear if the gate script fails to load.
+- **Fix:** Extend `AbuAuthGate.open()` to accept and render the message with `textContent`, or remove the dead parameter and placeholders.
+
+#### BUG-053 — LOW — Several cache-buster versions predate their asset changes
+- **Location:** `HOME/templates/base.html:112-113,116` (`app.js`, `carousel.js`, `auth-gate.js` at `?v=20261016-1`); `HOME/templates/HOME/home.html:274` (`continue-popup.js?v=20261012-1`); `ADMIN/templates/ADMIN/panel.html:10,544` (`panel.css`/`panel.js` at `?v=20261110-2`).
+- **Evidence:** Read-only `git log` dates for the referenced files are 2026-11-02, 2026-10-27, 2026-11-05, 2026-11-05 and 2026-11-19 respectively — all later than the embedded version. Related to BUG-019.
+- **Impact:** Returning browsers/CDN edges may keep executing stale JS/CSS after deployment.
+- **Fix:** Bump the versions to at least the last change date/hash, or drop manual query strings in favour of hashed static filenames and add a CI check.
+
+---
+
+### 3.6 Admin and staff surfaces
+
+#### BUG-054 — MEDIUM — Ads desk card actions have no no-JS fallback despite claiming one
+- **Location:** `ADMIN/templates/ADMIN/partials/advert_reference_card.html:1-5,50-76`; `ADMIN/views.py:3180-3203`.
+- **Evidence:** The partial comment says “Without JavaScript the same buttons still work as normal form posts (see data-fallback forms in the edit block)”, but no `data-fallback` forms exist. Pause / Resume / +7 days / −7 days / End are plain `<button type="button">` elements whose only action is `hx-post`. `_card_reply()` has a non-HTMX redirect branch, but it is unreachable for these buttons.
+- **Impact:** All commercial reference lifecycle controls are unusable with JavaScript disabled; the comment actively misleads maintainers.
+- **Fix:** Wrap each action in a real `<form method="post">` with hidden `action`/`days` and CSRF token, keep the visible button as `type="submit"`, and layer htmx on top. Or remove the no-JS claim if out of scope.
+
+#### BUG-055 — MEDIUM — Deactivated-account notice links non-staff hibernations to a staff-only 404
+- **Location:** `ADMIN/views.py:396-416`; `ADMIN/templates/ADMIN/partials/deleted_accounts_notice.html:13-15`; `ADMIN/views.py:249-254`.
+- **Evidence:** `deleted_accounts_notice()` builds a `control:staff_detail` URL for **every** hibernated `Auth` row, including plain members who self-deactivated via `HOME/views.py:3568`. `_staff_account_or_404()` rejects accounts that are not staff/admin/superuser with `Http404("Staff member not found.")`.
+- **Impact:** Admins see broken “Review / Restore” actions for member hibernations and have no restore path from the notice.
+- **Fix:** Filter the notice to staff-level accounts, or add a generic account-lifecycle detail/restore endpoint for any `Auth`.
+
+#### BUG-056 — LOW — htmx ads actions answer permission denial with a 302 full-page redirect
+- **Location:** `ADMIN/views.py:147-158,3310-3311,3332-3333,3357-3358,3385-3386`; `advert_reference_card.html:4-5`.
+- **Evidence:** Denied `ads_staff_only()` calls `admin_page_redirect()` (302 to profile/login). The card has `hx-target="this" hx-swap="outerHTML"`, so htmx follows the redirect and swaps the returned full HTML document into the card. `AdvertReferencesView.post()` at least returns JSON 403 for AJAX requests.
+- **Impact:** UI corruption and a confusing error; no authorization bypass, but users cannot tell the action was denied.
+- **Fix:** Return a 403 (empty body or small message) for htmx requests, optionally with `HX-Redirect` for full navigation; keep the redirect for normal form posts.
+
+#### BUG-057 — LOW — Rate-limit failures use inconsistent status codes across ADMIN/STAFF
+- **Location:** `ADMIN/views.py:503,524,553,598,635,684,733,3439` (403 “Permission Denied, Wait N seconds”), `:788-790,861-863` (400 via `_fail()`), `:3246-3258` (429); `STAFF/views.py:482-484` (429). Related to BUG-040 and BUG-033.
+- **Impact:** Clients cannot distinguish throttling from permission errors, show wrong toasts and cannot back off reliably.
+- **Fix:** Standardise on 429 with a consistent “Too many requests. Wait N seconds.” message.
+
+#### BUG-058 — LOW — Ads desk silently caps references at 100 with no pagination or server-side filter
+- **Location:** `ADMIN/views.py:3156-3159` (`ADVERT_REFERENCE_LIST_LIMIT`), `:3218-3221`; `ADMIN/templates/ADMIN/advert_references.html:27-47,50-57`.
+- **Evidence:** `_advert_reference_rows()` slices to 100 newest rows. The stats card shows the total `AdvertReference.objects.count()`, but Views/Clicks are computed only over the displayed 100. Filter buttons hide loaded cards client-side; there is no pager.
+- **Impact:** Older references become operationally invisible and cannot be paused, renewed, shortened, edited or opened from the UI.
+- **Fix:** Add real pagination or server-side status/date/search filters, and label stats as total vs current page.
+
+#### BUG-059 — LOW — Additional stale or missing static cache-busters
+- **Location:** `ADMIN/templates/ADMIN/panel.html:10,544` (`panel.css`/`panel.js` at `?v=20261110-2`); `STAFF/templates/staff/portfolio.html:34` (`portfolio.css?v=20261013-1`); `ADMIN/templates/ADMIN/analytics.html:242,244` (`analytics_apex.js` and `analytics_members.js` loaded with no version). Extends BUG-053.
+- **Impact:** Returning browsers may keep stale PANEL/portfolio styling and analytics JS after deployment.
+- **Fix:** Bump versions to the last asset-change date and add `?v=` to the analytics scripts, or generate versions from a manifest/hash.
+
+---
+
+### 3.7 Blog and archive content
+
+#### BUG-060 — HIGH — Stored XSS via `javascript:` URLs in `filel` / `btn` story tokens
+- **Location:** `BLOG/views.py:88-98` (`tag_outbound_url`), `:690-698` (`_render_inline_file`), `:712-719` (`_render_inline_button`); preview-only guard at `:497-509`; `BLOG/tests.py:232-236`.
+- **Evidence:** `tag_outbound_url()` deliberately returns non-http(s) URLs unchanged. The file and button renderers only `html.escape()` that value before placing it in `href`. A read-only render of `filel javascript:alert(1) Bad file` produced `<a class="story-inline-file" href="javascript:alert(1)" …>`, and `btn javascript:alert(document.domain) Click me` produced an executable button anchor. The existing test checks only that no `<iframe>` preview is created.
+- **Impact:** A story authoring account (or pasted untrusted content) can plant click-triggered same-origin script execution for readers.
+- **Fix:** Add a single `safe_href()` helper used by every author-supplied anchor renderer; allow only http/https (and relative paths/mailto/tel where intended), reject `javascript:`, `data:`, `vbscript:`, backslashes and control characters. Add tests asserting no `href="javascript:` for both tokens.
+
+#### BUG-061 — HIGH — “Only me” archive files remain public Cloudinary assets
+- **Location:** `SERVICE_INTERNAL/images.py:139-146,443-448,503-509,549-563` (uploads/destroy use default public delivery); `ARCHIVE/views.py:1163-1203` (proxy redirects owner to the raw public URL); contrast signed/authenticated advert landing handling at `images.py:262-266,300-302,334-337`.
+- **Evidence:** `visibility=private` is enforced only by the Django `/archive/cdn/` proxy. On owner access the view issues `HttpResponseRedirect(real_url)` to a plain public Cloudinary URL; anyone with that URL (history, referrer, shared link, guessed public ID) can fetch the bytes without Django.
+- **Impact:** “Only me” is not a privacy boundary; private photos/files are publicly accessible at the storage layer.
+- **Fix:** Upload private archive assets with `type="authenticated"` (or `private`), generate per-request signed delivery URLs in the proxy, pass the same `type=` to `destroy_archive_asset()`, migrate existing private rows and add tests that the redirected target is signed and unsigned access fails.
+
+#### BUG-062 — MEDIUM — Stale htmx pages cause 404s on gallery/manage pagination POSTs
+- **Location:** `ARCHIVE/views.py:510-511,589-590` (`_paginate`/`_paginate_own` raise Http404), `:619-635` (GET catches it), `:637-648` (POST does not), `:838-859` (manage modal/list do not).
+- **Evidence:** The gallery docstring promises a stale page falls back to page 1, but only `get()` wraps `_paginate()` in `try/except Http404`. htmx pager POSTs send the current `page`; after filtering reduces the result set, the next POST raises 404 and replaces the grid with an error.
+- **Impact:** Broken gallery/manage UI instead of a corrected first page.
+- **Fix:** Put the fallback inside `_paginate()`/`_paginate_own()` or wrap every GET and POST caller, preserving filters while resetting only `page`.
+
+#### BUG-063 — MEDIUM — “Unknown” uploader filter only filters one hibernated account
+- **Location:** `ARCHIVE/views.py:377-386` (`_clean_uploader` accepts only a digit PK), `:389-409` (`_uploader_options` collapses hibernated uploaders into one option tied to the first PK), `:419-432`, `:623-634`.
+- **Evidence:** All hibernated uploaders are shown as a single “Unknown” option whose `pk` is the first one encountered; selecting it filters by that one `author_id`.
+- **Impact:** Users cannot find uploads from all anonymized accounts; result counts and filter chips are misleading.
+- **Fix:** Use an explicit `uploader=unknown` sentinel and filter `author__deleted_at__isnull=False` across paginating/ranking helpers.
+
+#### BUG-064 — MEDIUM — Story cache keeps stale author profile data
+- **Location:** `BLOG/views.py:1198` (100s cache with `select_related("author__staffprofile")`), `:1227-1231` (refreshes only `Auth` fields and pops `author_name`), `:1246-1247`, `:1378-1402` (JSON-LD author data); `BLOG/signals.py:37-45`; `STAFF/signals.py:12-17`; `HOME/views.py:1643-1649`. Expands BUG-034.
+- **Evidence:** The cached reverse `staffprofile` object is not refreshed, so `full_name`, `slug`, `bio`, `role`, `speciality` and socials remain stale on the story page and structured data until TTL expiry. Hibernation is partly protected by the `deleted_at` refresh, but the Redis bulk key cleanup is ineffective (BUG-034).
+- **Impact:** Wrong byline, stale bio/social/portfolio URLs and stale SEO metadata; possible 404 links.
+- **Fix:** Invalidate `blog-<slug>` whenever `StaffProfile` or the Blog row changes (Redis-aware pattern delete for hibernation), or fetch the profile fresh in `StoryDetailView`.
+
+#### BUG-065 — MEDIUM — Sitemap and feeds advertise story URLs that render 404
+- **Location:** `BLOG/views.py:1251-1255` (story returns 404 when author has no `StaffProfile`); `HOME/sitemap_views.py:32-39,88-90,117-119`; `HOME/views.py:372-377` (RSS/Atom).
+- **Evidence:** Sitemap/feed querysets filter on slug only; the story view applies an additional `StaffProfile` visibility rule. There is no shared “published/visible” queryset.
+- **Impact:** Search engines and feed readers receive URLs that 404; crawl budget and index quality suffer.
+- **Fix:** Introduce one canonical `published_stories()` queryset used by the story page, sitemap, feeds and 404 suggestions; at minimum add `.filter(author__staffprofile__isnull=False)` to sitemap/feed queries.
+
+#### BUG-066 — LOW — Visible debug `<hr>` rules in story pages
+- **Location:** `BLOG/templates/blog/story_detail.html:194` (`color:red;height:4px`) and `:386` (`color:var(--ink);height:4px`).
+- **Impact:** Leftover debug separators make every story page look unfinished.
+- **Fix:** Remove them or replace with a semantic CSS class.
+
+#### BUG-067 — LOW — Category recommendation images bypass the same-origin CDN proxy
+- **Location:** `BLOG/views.py:1576` (returns `story.image_1` raw); `BLOG/static/blog/js/category-recommendations.js:76` (assigns directly to `img.src`); contrast `BLOG/templates/blog/story_detail.html:413` uses `{{ story.image_1|cloudinary_proxy }}`.
+- **Impact:** Inconsistent asset policy, possible CSP/referrer issues, and breakage if an image is ever moved to authenticated delivery.
+- **Fix:** Return `cloudinary_proxy(story.image_1)` from the JSON endpoint.
+
+#### BUG-068 — LOW — View dedupe trusts spoofable headers; test misstates TTL
+- **Location:** `SERVICE_INTERNAL/abstract.py:37-45`; `BLOG/views.py:1281-1288`; `BLOG/tests.py:1006`. Related to BUG-007 and BUG-026.
+- **Evidence:** The dedupe key is derived from the spoofable `get_client_ip()`; the test named “…deduplicated_for_five_seconds” never advances time and the implementation uses `timeout=10`.
+- **Fix:** Restrict header trust to known proxies, lock down direct origin access, and rename/extend the test to cover both sides of the real TTL.
+
+#### BUG-069 — LOW — `check_sitemap.py` scans the wrong test range
+- **Location:** `check_sitemap.py:1-5` (hardcoded `lines[1600:1800]`); actual sitemap tests are around `HOME/tests.py:2119-2161`.
+- **Impact:** The diagnostic prints nothing useful and gives a false signal.
+- **Fix:** Scan the whole file or accept a path/range argument.
+
+#### BUG-070 — LOW — Stale root `robots.txt` contradicts the live dynamic view
+- **Location:** `robots.txt:8-10` (“Sitemap: https://abureport.com/sitemap.xml” and “# NOT THE REAL ONE , JUST FOR UNIT TEST”); `NoName/urls.py:47` serves `RobotsTxtView`.
+- **Impact:** Developer confusion and SEO misconfiguration risk if a web server ever serves the static file instead of the dynamic view; domain also contradicts the canonical `.com.ng`.
+- **Fix:** Delete the root file or keep it as an exact generated copy.
+
+#### BUG-071 — LOW — WhatsApp share excerpt is dead code
+- **Location:** `HOME/templatetags/format_copy_btn.py:7-10` (returns `""` immediately; all following code unreachable); `BLOG/templates/blog/story_detail.html:150-159`; `BLOG/tests.py:1907-1919`.
+- **Impact:** Degraded share UX and a large dead block that silently does nothing if edited.
+- **Fix:** Remove the dead code or restore the intended behavior and update the test.
+
+#### BUG-072 — LOW — Comment-like toggle is non-atomic and can double count
+- **Location:** `BLOG/views.py:1829-1840`.
+- **Evidence:** Unlike `BlogLikeView`, it reads `session['liked_comments']`, increments with `F()` and writes the session at the end without a transaction or row lock. Two concurrent requests can both see “not liked” and both increment.
+- **Impact:** Occasional inflated comment like counts on double-clicks/retries.
+- **Fix:** Use a transaction with `select_for_update()` on the `Comment` row, or a DB table with a unique `(user, comment)` constraint.
+
+#### BUG-073 — LOW — `/story/` can redirect to `/story/None/`
+- **Location:** `BLOG/views.py:1183-1187`; `BLOG/models.py:150` (`slug` allows null/blank).
+- **Evidence:** `StoryHome` takes `Blog.objects.order_by("-date_created").first()` without excluding slugless rows; `reverse(..., blog_slug=None)` resolves to `/story/None/`, which then 404s.
+- **Impact:** Pointless redirect-to-404 if a slugless row ever becomes newest.
+- **Fix:** Reuse the published-story eligibility rule and exclude null/blank slugs.
+
+---
+
+## 4. Areas checked with no confirmed bug
+
+- `AUTHENTICATION/models.py:86-93` — `has_perm()`/`has_module_perms()` now return true only for active superusers (prior critical C4 is fixed).
+- ADMIN/STAFF permission helpers — `admin_only()` excludes `is_ads_staff`, and `ads_staff_only()` admits admin/superuser/`is_ads_staff` but not plain staff. No authorization bypass was found in the ads desk or staff surfaces (the issues found are error-handling/UX, recorded above).
+- `BLOG/views.py:1255` — missing staff profile now renders `staffprofile_404.html` with HTTP 404 (prior F2 fixed).
+- `AUTHENTICATION/templates/auth/endpoint_rate_limit.html:6` — duplicate `meta_robots` block removed (prior F3 fixed).
+- `SERVICE_INTERNAL/hosts.py` — canonical host helper correctly skips wildcard/leading-dot entries.
+- `ADMIN/views.py` ads desk queries are filtered by signed-in user; no cross-account leak found.
+- `Partner/landing.py` and `Partner/models.py` consistently apply `public_url` before advert `url`, with `utm_source=abureport`.
+- `interactions.js` parses cleanly (`node --check`); cache-busters were bumped for the recent JS/CSS changes.
+- No URL name collisions other than benign Django auth/DRF names.
+- `_.tests` passes (13 tests).
+- Blog/archive checked clean: `SiteSettings.support_email` uses an `EmailField` with `default=""` so `.strip()` is safe; `site_settings_socials` invalidation exists (`ADMIN/signals.py:12-22`, `ADMIN/views.py:2071`); category cache invalidation exists (`BLOG/signals.py:27-34`, `BLOG/models.py:94-102`); per-story cache is cleared by `EditNewsView` (`HOME/views.py:1643-1649`) — the gap is that other mutation paths do not do the same (BUG-064).
+- `check_sitemap.py` aside (BUG-069), no broken developer diagnostic with runtime side effects was found.
+
+## 5. Explicit decisions that are NOT being reported as accidental bugs
+
+These were required by the prior agreed scope and are recorded so a future scan does not “fix” them:
+
+- `/_admin/<email>/<password>/<sy_secret_incoming>/delete/` uses the target superuser's password and an `SY_SECRET`-style guard; all failures are 400; raw password is logged **only** to `info_logger`; no admin notice or DB audit log. The residual risk of putting credentials in a URL/log is an **accepted design risk**, noted for awareness (see BUG-002 for the shared-cache aspect that affects its rate limit).
+- Self-service deletion is soft hibernation with `deleted_at`, no purge timer, and admin-only restore with no email to the user. Password confirmation is intentionally required **only** for accounts with preservable content (story/comment/draft/archive/advert), so the absence of a password check for content-free accounts is not reported as a bug; BUG-031 is a bug because it creates a *hard* purge path outside the agreed off-grid endpoint.
+- On-site click misconfiguration uses JSON only for the `?check=1` preflight and a bottom toast; direct `/ads/<title>-<id>/` and subdomain-root opens stay HTML. BUG-022 is about the separate click endpoint only.
+- Pro/Advance references without a subdomain or external link are invalid and surface the fixed setup-error message.
+
+## 6. Prior `FULL_REPORT_V2.MD` baseline status
+
+| Prior ID | Status in this scan |
+|---|---|
+| C1 `DEBUG=True` in `.env` | **Still open** (BUG-001) |
+| C2 insecure `SECRET_KEY` | **Still open** (BUG-001) |
+| C3 public superuser-create backdoor / mail amplification | **Still open** (BUG-005) |
+| C4 `has_perm()` always true | **Fixed** (section 4) |
+| C5 transport/session hardening | **Still open** under current config (BUG-001) |
+| H1 missing story returns 500 | **Fixed** (blog audit; status 404 path) |
+| H2 `X-Forwarded-For` trusted unconditionally | **Still open** (BUG-007) |
+| H3 weak password policy / validators bypassed | **Fixed** — `SERVICE_INTERNAL/passwords.py:26` calls `validate_password`, used by `AUTHENTICATION/views.py:27` and `ADMIN/views.py:51`; validators configured at `settings.py:237-255` |
+| H4 plaintext passwords in logs | **Still open in `CreateSYAcc`** (BUG-005); true-delete logging is an accepted decision |
+| H5 arbitrary file upload | **Partially open** (BUG-016) |
+| M1 Cloudinary open proxy | **Not reproduced** — `ARCHIVE/views.py:1153-1156` builds URLs on the fixed `res.cloudinary.com/<cloud>/` host; residual risk is arbitrary Cloudinary query-parameter forwarding and unbounded upstream streaming, worth hardening |
+| M2 home/load-more cache mismatch | Not reproduced in current `HOME/views.py` (centralised keys imported at lines 52-59); pending final blog/archive audit confirmation |
+| F2 staff profile soft-404 | **Fixed** (section 4) |
+| F3 duplicate `meta_robots` | **Fixed** (section 4) |
+| F4 maintenance env case mismatch | **Still open** (BUG-009) |
+| F5 orphaned duplicate templates | **Fixed** — no top-level `templates/ARCHIVE/` exists in the working tree |
+| F6 malformed brand config | **Partially fixed** (`mobile`/WhatsApp now set; `contact_email` still invalid — BUG-014) |
+
+## 7. Recommended fix order
+
+1. BUG-001 (production config guard), BUG-005/BUG-032 (remove create backdoor and stop logging/emailing passwords), BUG-031 (remove admin hard-delete), BUG-002 (shared cache), BUG-047/048/049/060 (stored XSS), BUG-061 (private archive assets) — highest security impact.
+2. BUG-003, BUG-004, BUG-006, BUG-007, BUG-033 — externally reachable reliability/security defects.
+3. BUG-021 and BUG-028/029/030/044 — restore the broken CTA and a trustworthy test suite.
+4. BUG-034/035/036/037/038/039, BUG-062/063/064/065 — privacy, lifecycle and SEO correctness.
+5. BUG-008/012/009, BUG-010/011, BUG-013/014/015/016.
+6. Ads desk/notification issues BUG-054/055 and BUG-058; ads data-quality items BUG-022 through BUG-027; frontend UX BUG-050/051.
+7. Low-severity consistency/hygiene items BUG-040, BUG-042/043/045/046, BUG-052/053/056/057/059, BUG-066 through BUG-073.
+
+## Appendix — commands and caveats
+
+- All findings were derived from the working tree as of 20 Nov 2026; no network/deployment/browser E2E verification was performed against live production.
+- Runtime probes were read-only except for the normal view-counter side effect inherent in a few GET requests; no migration or git history change was made.
+- Secret values from `.env` are deliberately not reproduced; only key names and problem patterns are described.
+- All six focused audits are included: infrastructure/config, ads/landing, tests, account lifecycle, frontend/templates, admin/staff and blog/archive. Findings are grouped by subsystem in section 3 and cross-referenced where they overlap.

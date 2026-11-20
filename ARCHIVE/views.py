@@ -196,34 +196,39 @@ def _preview_kind(image):
 
 
 def _serialize_images(images):
-    return [
-        {
-            "id": image.id,
-            "kind": image.kind,
-            "url": image.url,
-            "width": image.width,
-            "height": image.height,
-            "alt": image.alt,
-            "quality": image.quality,
-            "quality_label": QUALITY_LABELS.get(image.quality, image.quality.title()),
-            "original_filename": image.original_filename,
-            "file_extension": _file_extension(image.original_filename),
-            #   A plain file whose extension is a video one (mp4/mov) is
-            #   drawn as an inline autoplaying player, not the generic file
-            #   sheet (see ARCHIVE/templates/ARCHIVE/partials/gallery_grid.html).
-            "is_video": image.kind == ArchiveKind.FILE
-            and _file_extension(image.original_filename).lower() in VIDEO_FILE_EXTENSIONS,
-            #   HOW (AND WHETHER) THE BROWSER CAN SHOW THIS FILE, so the card
-            #   can offer a preview that actually opens something.
-            "preview_kind": _preview_kind(image),
-            "file_size_label": _human_file_size(image.file_size),
-            "uploader_email": _masked_email(image.author.email),
-            "date_created": image.date_created,
-            "visibility": image.visibility,
-            "is_private": image.visibility == ArchiveVisibility.PRIVATE,
-        }
-        for image in images
-    ]
+    rows = []
+    for image in images:
+        author = getattr(image, "author", None)
+        is_hibernated = bool(author and getattr(author, "deleted_at", None))
+        uploader_email = "Unknown" if is_hibernated else _masked_email(author.email if author else "")
+        rows.append(
+            {
+                "id": image.id,
+                "kind": image.kind,
+                "url": image.url,
+                "width": image.width,
+                "height": image.height,
+                "alt": image.alt,
+                "quality": image.quality,
+                "quality_label": QUALITY_LABELS.get(image.quality, image.quality.title()),
+                "original_filename": image.original_filename,
+                "file_extension": _file_extension(image.original_filename),
+                #   A plain file whose extension is a video one (mp4/mov) is
+                #   drawn as an inline autoplaying player, not the generic file
+                #   sheet (see ARCHIVE/templates/ARCHIVE/partials/gallery_grid.html).
+                "is_video": image.kind == ArchiveKind.FILE
+                and _file_extension(image.original_filename).lower() in VIDEO_FILE_EXTENSIONS,
+                #   HOW (AND WHETHER) THE BROWSER CAN SHOW THIS FILE, so the card
+                #   can offer a preview that actually opens something.
+                "preview_kind": _preview_kind(image),
+                "file_size_label": _human_file_size(image.file_size),
+                "uploader_email": uploader_email,
+                "date_created": image.date_created,
+                "visibility": image.visibility,
+                "is_private": image.visibility == ArchiveVisibility.PRIVATE,
+            }
+        )
+    return rows
 
 
 def _descr_words(text):
@@ -265,12 +270,14 @@ def _descr_score(query_words, description):
 def _visible_to(viewer):
     """The "who may see this" filter every public listing applies: public
     items for everyone, plus a signed-in viewer's OWN private items. An
-    anonymous viewer, or anyone else, never gets a private item back."""
-    #   Uploads of a soft-deleted account are hidden from everyone.
-    alive = Q(author__deleted_at__isnull=True)
+    anonymous viewer, or anyone else, never gets a private item back.
+
+    Uploads of hibernated accounts remain visible; uploader identity is
+    anonymized at render time.
+    """
     if is_authenticated(viewer):
-        return (Q(visibility=ArchiveVisibility.PUBLIC) | Q(author_id=viewer.pk)) & alive
-    return Q(visibility=ArchiveVisibility.PUBLIC) & alive
+        return Q(visibility=ArchiveVisibility.PUBLIC) | Q(author_id=viewer.pk)
+    return Q(visibility=ArchiveVisibility.PUBLIC)
 
 
 def _descr_ranked_ids(descr, kind="", category="", uploader="", viewer=None):
@@ -380,18 +387,26 @@ def _clean_uploader(raw_value, viewer=None):
 
 
 def _uploader_options(viewer=None):
-    """Uploaders with at least one item, ordered by their email, each shown
-    by the same masked public email the cards use. Only the primary key
-    travels in the query string, so a full email address never leaks
-    through a shared link or the address bar."""
+    """Uploaders with at least one item. Hibernated uploaders are grouped as
+    Unknown so public surfaces never reveal their real identity."""
     rows = (
         ArchiveImage.objects.filter(_visible_to(viewer))
         .select_related("author")
         .order_by("author__email")
-        .values_list("author_id", "author__email")
+        .values_list("author_id", "author__email", "author__deleted_at")
         .distinct()
     )
-    return [{"pk": str(pk), "masked": _masked_email(email)} for pk, email in rows]
+    options = []
+    unknown_seen = False
+    for pk, email, deleted_at in rows:
+        if deleted_at:
+            if not unknown_seen:
+                options.append({"pk": str(pk), "masked": "Unknown"})
+                unknown_seen = True
+            continue
+        if email:
+            options.append({"pk": str(pk), "masked": _masked_email(email)})
+    return options
 
 
 def _category_label(category):
@@ -404,11 +419,16 @@ def _category_label(category):
 def _uploader_label(uploader):
     if not uploader:
         return ""
-    email = (
+    row = (
         ArchiveImage.objects.filter(author_id=int(uploader))
-        .values_list("author__email", flat=True)
+        .values_list("author__email", "author__deleted_at")
         .first()
     )
+    if not row:
+        return ""
+    email, deleted_at = row
+    if deleted_at:
+        return "Unknown"
     return _masked_email(email) if email else ""
 
 

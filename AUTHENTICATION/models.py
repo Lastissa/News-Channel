@@ -59,8 +59,10 @@ class Auth(AbstractBaseUser):
     #   references, see advert enquiries and advert rows. It never grants the
     #   full PANEL, staff directory, site settings or Django admin.
     is_ads_staff = models.BooleanField(default=False)
-    #   Soft delete. Set by an admin; the account is hidden at once, can be
-    #   restored, and an admin may delete it for good once 7 days have passed.
+    #   Hibernation / legacy soft-delete marker. Hibernated accounts keep their
+    #   data for admin restore (no auto-purge): stories/comments/archive stay
+    #   public but anonymized. Existing soft-deleted accounts are treated as
+    #   hibernated. NULL = live account.
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     is_active = models.BooleanField(default=True)
     receive_email_login_alert = models.BooleanField(default=True)#  login alert sent every time user login
@@ -89,6 +91,32 @@ class Auth(AbstractBaseUser):
 
     def has_module_perm(self, app_label):
         return self.has_module_perms(app_label)
+
+    @property
+    def is_hibernated(self):
+        return bool(self.deleted_at)
+
+    @property
+    def public_display_name(self):
+        if self.is_hibernated:
+            return "Unknown"
+        try:
+            from STAFF.models import StaffProfile
+
+            profile = StaffProfile.objects.filter(auth=self).first()
+            if profile and profile.full_name:
+                return profile.full_name
+        except Exception:
+            pass
+        email = self.email or ""
+        local = email.split("@")[0] if "@" in email else email
+        return local.title() if local else "Unknown"
+
+    @property
+    def public_avatar_url(self):
+        if self.is_hibernated:
+            return "/static/404.jpg"
+        return self.profile_img or ""
 
     def __str__(self):
         staff_type = "Member"

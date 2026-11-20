@@ -60,6 +60,7 @@ class AdvertReferenceAdmin(admin.ModelAdmin):
 
     list_display = (
         "reference",
+        "subdomain",
         "email_used",
         "plan",
         "status",
@@ -69,6 +70,7 @@ class AdvertReferenceAdmin(admin.ModelAdmin):
     list_filter = ("plan", "status")
     search_fields = (
         "reference",
+        "subdomain",
         "email_used",
         "business_name",
         "user__email",

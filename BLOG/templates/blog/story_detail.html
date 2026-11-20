@@ -85,7 +85,7 @@
       <div class="story-meta-row">
         <div class="author-pill">
           <a href="{{ author_portfolio_url|default:'#' }}" class="author-avatar" aria-label="Author profile">
-              <img src="{{ blog.author.profile_img|default:image_fallback }}" alt="{{ blog.author_name }} profile picture" loading="lazy" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+              <img src="{{ blog.author_avatar }}" alt="{{ blog.author_name }} profile picture" loading="lazy" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
           </a>
           <div>
             <p class="meta-label">By</p>
@@ -282,22 +282,13 @@ full details 👇
 
       <div class="comment-list" data-comment-list>
         {% for comment in comments %}
-          {% with author_profile_data=comment.author.staffprofile %}
           <article class="comment-item" data-comment-item data-comment-id="{{ comment.id }}">
             <div class="comment-header">
               <div class="comment-author-block">
-                {% if comment.author.profile_img %}
-                  <img src="{{ comment.author.profile_img }}" alt="{{ comment.author.email }} profile picture" class="comment-avatar" loading="lazy" onerror="this.onerror=null; this.src='{% static '404.jpg' %}'">
-                {% elif author_profile_data and author_profile_data.full_name %}
-                  <span class="comment-avatar">{{ author_profile_data.full_name|slice:':1'|upper }}</span>
-                {% else %}
-                  <span class="comment-avatar">{{ comment.author.email|slice:':1'|upper }}</span>
-                {% endif %}
+                <img src="{{ comment.author_avatar_url }}" alt="{{ comment.author_display_name }} profile picture" class="comment-avatar" loading="lazy" onerror="this.onerror=null; this.src='{% static '404.jpg' %}'">
                 <strong>
-                  {% comment %} {{comment.author_id}} {% endcomment %}
-                  {% if request.user.is_authenticated and comment.author_id == request.user.id %} Me
-                  {% elif author_profile_data and author_profile_data.full_name %}{{ author_profile_data.full_name }}
-                  {% else %}{{ comment.author.email|before_at }}{% endif %}</strong>
+                  {% if request.user.is_authenticated and comment.author_id == request.user.id %}Me{% else %}{{ comment.author_display_name }}{% endif %}
+                </strong>
                 <time class="comment-date" datetime="{{ comment.date_created|date:'c' }}" title="{{ comment.date_created|date:'j M Y, H:i' }}">{{ comment.date_created|date:"M d, Y" }}</time>
               </div>
               <div class="comment-toolbar">
@@ -323,7 +314,6 @@ full details 👇
             <p>{{ comment.content }}</p>
             <small data-comment-like-summary>{{ comment.likes }} like{{ comment.likes|pluralize }}</small>
           </article>
-          {% endwith %}
         {% empty %}
           <p class="empty-comments" data-empty-comment-state>No comments yet. Be the first to share your thoughts.</p>
         {% endfor %}
@@ -334,7 +324,7 @@ full details 👇
       <a href="{{ author_portfolio_url|default:'#' }}" class="author-card-main" aria-label="View {{ blog.author_name }} profile">
         <div class="author-card-inner">
           <div class="author-card-image-wrap">
-              <img src="{{ blog.author.profile_img|default:image_fallback }}" alt="{{ blog.author_name }}" class="author-card-image" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
+              <img src="{{ blog.author_avatar }}" alt="{{ blog.author_name }}" class="author-card-image" onerror="this.onerror=null; this.src='{% static "404.jpg" %}'">
           </div>
           <div class="author-card-copy">
             <p class="author-card-label">Author profile</p>

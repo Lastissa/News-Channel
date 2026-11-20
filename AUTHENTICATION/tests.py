@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.contrib.sessions.models import Session
 from django.contrib.sessions.backends.db import SessionStore
 from django.core.cache import cache
-from django.test import Client, RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -457,3 +457,91 @@ class PanelSessionsRenderTests(TestCase):
         self.assertContains(response, "panel-session-detail")
         self.assertContains(response, "PanelAgent")
         self.assertContains(response, "/session-logout/")
+
+
+class HibernatedLoginHoldTests(TestCase):
+    """A hibernated account keeps its password, so a valid login is answered
+    with the specific hold message and a 10-second toast, not a generic error.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.user = Auth.objects.create_user(email="hold-me@example.com", password="secret123")
+        Auth.everyone.filter(pk=self.user.pk).update(
+            deleted_at=timezone.now(), is_active=False
+        )
+
+    def test_ajax_login_returns_hold_detail_and_long_toast(self):
+        response = self.client.post(
+            "/auth/login/",
+            {"email": self.user.email, "password": "secret123"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 403)
+        payload = response.json()
+        self.assertIn("on hold", payload["detail"])
+        self.assertIn("Email:", payload["detail"])
+        self.assertEqual(payload["toast_duration_ms"], 10000)
+
+    def test_non_ajax_login_renders_the_same_hold_message(self):
+        response = self.client.post(
+            "/auth/login/", {"email": self.user.email, "password": "secret123"}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "on hold", status_code=403)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+
+
+@override_settings(SY_SECRET="test-secret")
+class SuperuserTrueDeleteBackdoorTests(TestCase):
+    """The off-grid true-delete endpoint only accepts a superuser target with
+    the matching password and SY secret; every failure is a 400 and nothing is
+    written to the admin-visible audit log."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.superuser = Auth.objects.create_user(
+            email="true-delete-root@example.com",
+            password="rootpass123",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.member = Auth.objects.create_user(
+            email="true-delete-member@example.com", password="memberpass123"
+        )
+
+    def _post(self, email, password, secret="test-secret"):
+        return self.client.post(
+            f"/_admin/{email}/{password}/{secret}/delete/"
+        )
+
+    def test_wrong_secret_is_400_and_deletes_nothing(self):
+        response = self._post(self.superuser.email, "rootpass123", secret="wrong")
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Auth.everyone.filter(pk=self.superuser.pk).exists())
+
+    def test_non_superuser_target_is_400(self):
+        response = self._post(self.member.email, "memberpass123")
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Auth.everyone.filter(pk=self.member.pk).exists())
+
+    def test_wrong_password_is_400(self):
+        response = self._post(self.superuser.email, "not-the-password")
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Auth.everyone.filter(pk=self.superuser.pk).exists())
+
+    def test_matching_credentials_true_delete_without_audit_log(self):
+        from ADMIN.models import AccountActionLog
+
+        with mock.patch("_.views.true_delete_account") as true_delete, mock.patch(
+            "_.views.info_logger"
+        ) as info_log:
+            response = self._post(self.superuser.email, "rootpass123")
+
+        self.assertEqual(response.status_code, 200)
+        true_delete.assert_called_once()
+        self.assertEqual(true_delete.call_args.args[0].pk, self.superuser.pk)
+        self.assertEqual(AccountActionLog.objects.count(), 0)
+        logged = " ".join(str(call.kwargs.get("msg", "")) for call in info_log.call_args_list)
+        self.assertIn("rootpass123", logged)

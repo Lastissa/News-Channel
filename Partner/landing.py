@@ -34,7 +34,7 @@ ADVERT_LANDING_TOKENS = (
     ("robots", "The selected robots value, e.g. noindex, nofollow."),
     ("ad_heading", "The advert heading."),
     ("ad_body", "The advert text."),
-    ("ad_url", "The advertiser link saved on the advert."),
+    ("ad_url", "The destination: the ads desk Public page URL when set, otherwise the advert link. Always carries utm_source=abureport."),
     ("ad_image", "The advert picture URL."),
     ("ad_id", "The numeric advert id."),
     ("year", "The current four-digit year."),
@@ -105,6 +105,20 @@ DEFAULT_ADVERT_LANDING_TEMPLATE = """<!doctype html>
 </html>
 """
 
+#   A paid Pro/Advance advert with no custom HTML still has a real page while
+#   the landing file is being prepared. It is the same responsive document,
+#   with one honest line saying it is under construction.
+ADVERT_BUILDING_MESSAGE = "advertisement is being build, check back soon.."
+DEFAULT_ADVERT_BUILDING_TEMPLATE = DEFAULT_ADVERT_LANDING_TEMPLATE.replace(
+    "    .copy { padding",
+    "    .ads-building { margin: -4px 0 20px; color: #8a5a00; font-weight: 700; }\n"
+    "    .copy { padding",
+).replace(
+    "      <h1>{{ad_heading}}</h1>",
+    "      <h1>{{ad_heading}}</h1>\n"
+    f'      <p class="ads-building">{ADVERT_BUILDING_MESSAGE}</p>',
+)
+
 
 _TOKEN_RE = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
 _AUTHOR_HEADER_RE = re.compile(
@@ -119,7 +133,12 @@ def advert_landing_slug(advert) -> str:
 
 def advert_landing_url(advert) -> str:
     from django.urls import reverse
+    from Partner.plans import advert_subdomain_url
 
+    #   An advert with its own subdomain is only ever opened there.
+    subdomain_url = advert_subdomain_url(advert)
+    if subdomain_url:
+        return subdomain_url
     return reverse(
         "partner:advert_landing",
         kwargs={"slug": advert_landing_slug(advert), "pk": advert.pk},
@@ -181,9 +200,17 @@ def render_advert_landing_document(
     #   Every link the landing page renders from {{ad_url}} leaves with our
     #   source marker, so the advertiser can separate Abureport traffic in
     #   their own analytics. An explicitly set utm_source is left alone.
+    from .models import AdvertEvent
     from .tracking import append_utm_source
 
-    ad_url = append_utm_source((getattr(advert, "url", "") or "").strip())
+    #   The ads desk "Public page URL" is the destination of record. The link
+    #   saved on the advert (rendered as {{ad_url}} by older templates) is the
+    #   fallback for advertisers who opened WhatsApp/shop links there.
+    reference = getattr(advert, "reference", None)
+    destination = (getattr(reference, "public_url", "") or "").strip()
+    if not destination:
+        destination = (getattr(advert, "url", "") or "").strip()
+    ad_url = append_utm_source(destination, AdvertEvent.SOURCE_ABUREPORT) if destination else ""
 
     title = (meta_title or heading).strip()
     description = (meta_description or body).strip()

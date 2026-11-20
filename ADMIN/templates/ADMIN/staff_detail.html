@@ -290,53 +290,43 @@
 
       <section class="profile-card profile-panel account-danger" id="staff-record-delete">
         <div class="panel-header">
-          <h3>Delete author account</h3>
-          {% if is_deleted %}<span class="panel-tag">Deleted</span>{% endif %}
+          <h3>Account deactivation</h3>
+          {% if is_deleted %}<span class="panel-tag">Deactivated</span>{% endif %}
         </div>
 
         {% if is_deleted %}
           <p>
-            This account is deleted and hidden everywhere.
-            {% if is_due %}
-            It is due for deletion {% if days_over %}{{ days_over }} day{{ days_over|pluralize }} ago{% else %}today{% endif %}.
-            {% else %}
-            You can restore it for {{ days_left }} more day{{ days_left|pluralize }}.
-            {% endif %}
+            This account is deactivated and anonymized on public surfaces.
+            It was deactivated {% if days_ago %}{{ days_ago }} day{{ days_ago|pluralize }} ago{% else %}today{% endif %}.
+            Only an admin can restore it.
           </p>
           <div class="acct-actions acct-block">
             <form method="post" action="{% url 'control:staff_restore' staff_account.pk %}">
               {% csrf_token %}
               <button type="submit" class="acct-btn">Restore account</button>
             </form>
-            {% if is_due %}
-            {% include "ADMIN/partials/purge_button.html" with purge_url=purge_url purge_name=staff_display_name purge_id=staff_account.pk stories_count=stories_count comments_count=comments_count %}
-            {% endif %}
           </div>
-          {% if not is_due %}
-          <p class="acct-note">Permanent deletion opens after the {{ restore_days }} days are over.</p>
-          {% endif %}
         {% elif delete_block_reason %}
           <p class="acct-note">{{ delete_block_reason }}</p>
         {% else %}
-          <p>Hide this account and everything they published. You have {{ restore_days }} days to undo it.</p>
+          <p>Deactivate this account now. Public content remains available but anonymized as <strong>Unknown</strong>. Only an admin can restore it later.</p>
           <div class="acct-block">
-            <button type="button" class="acct-btn acct-btn--danger" data-acct-open="delete-author">Delete author account</button>
+            <button type="button" class="acct-btn acct-btn--danger" data-acct-open="delete-author">Deactivate account</button>
           </div>
           <dialog class="acct-dialog" id="delete-author">
             <form method="post" action="{% url 'control:staff_delete' staff_account.pk %}">
               {% csrf_token %}
-              <h3>Delete {{ staff_display_name }}?</h3>
-              <p>This is what happens straight away:</p>
+              <h3>Deactivate {{ staff_display_name }}?</h3>
+              <p>This is what happens:</p>
               <ul>
                 <li>They are signed out everywhere and can no longer sign in.</li>
-                <li>Their {{ stories_count }} published stor{{ stories_count|pluralize:"y,ies" }} disappear from the site, search, author page and sitemap.</li>
-                <li>Their {{ comments_count }} comment{{ comments_count|pluralize }}, archive uploads and author profile are hidden too.</li>
-                <li>For {{ restore_days }} days you can press Restore and all of it comes back.</li>
-                <li>After {{ restore_days }} days an admin can delete the account for good. That removes everything and cannot be undone.</li>
+                <li>Their {{ stories_count }} published stor{{ stories_count|pluralize:"y,ies" }} and {{ comments_count }} comment{{ comments_count|pluralize }} remain public but shown as Unknown.</li>
+                <li>Drafts, announcements, and follows are removed according to hibernation rules.</li>
+                <li>Only an admin can restore the account. There is no automatic purge.</li>
               </ul>
               <div class="acct-actions">
                 <button type="button" class="acct-btn" data-acct-cancel>Cancel</button>
-                <button type="submit" class="acct-btn acct-btn--danger">Yes, delete this account</button>
+                <button type="submit" class="acct-btn acct-btn--danger">Yes, deactivate this account</button>
               </div>
             </form>
           </dialog>

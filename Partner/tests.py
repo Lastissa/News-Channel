@@ -223,7 +223,10 @@ class AdvertLandingViewTests(TestCase):
                     self.landing.save(update_fields=["author"])
                 with mock.patch("Partner.views.fetch_advert_landing_html") as fetch:
                     response = self.client.get(self.landing.get_absolute_url())
-                self.assertEqual(response.status_code, 404)
+                #   The untrusted document is never fetched, but the advert
+                #   still gets its built-in page with a 200.
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(b"Learn more", response.content)
                 fetch.assert_not_called()
 
     def test_cloudinary_failure_returns_plain_502_with_no_site_page(self):
@@ -344,23 +347,34 @@ class AdvertReferenceTests(TestCase):
         self.assertNotEqual(first.reference, second.reference)
         self.assertEqual(AdvertReference.objects.filter(user=self.owner).count(), 2)
 
-    def test_public_target_prefers_staff_url_then_landing_then_advert_link(self):
+    def test_public_target_opens_landing_first_and_paid_subdomain_wins(self):
         advert = self._advert()
         row = self._reference(advert=advert, public_url="https://advance.example.com/page")
-        self.assertEqual(row.public_target, "https://advance.example.com/page")
+        #   Regular clicks open the built-in /ads/ page. The "Learn more" link
+        #   on that page carries the public URL (tested in the renderer tests).
+        self.assertEqual(row.public_target, f"/ads/reference-advert-{advert.pk}/")
 
+        #   Paid advert: its own subdomain is the entry point.
+        row.plan = "advance"
+        row.subdomain = "graceads"
+        row.save(update_fields=["plan", "subdomain"])
+        self.assertTrue(row.public_target)
+        self.assertEqual(row.public_target, row.public_page_url)
+
+        #   A legacy paid advert with no subdomain may still open an external
+        #   link: the ads desk URL first, then the advert's saved link.
+        row.subdomain = ""
+        row.save(update_fields=["subdomain"])
+        self.assertEqual(row.public_target, "https://advance.example.com/page")
         row.public_url = ""
         row.save(update_fields=["public_url"])
         self.assertEqual(row.public_target, "https://example.com/reference")
 
-        AdvertLandingPage.objects.create(
-            advert=advert,
-            author=self.admin,
-            html_public_id="abureport/advert-landing/reference.html",
-            is_published=True,
-        )
-        row.advert = AdvertImage.objects.get(pk=advert.pk)
-        self.assertTrue(row.public_target.startswith("/ads/reference-advert-"))
+        #   Paid with neither subdomain nor destination is a setup error.
+        row.advert.url = ""
+        row.advert.save(update_fields=["url"])
+        row.refresh_from_db()
+        self.assertEqual(row.public_target, "")
 
     def test_is_live_respects_pause_and_expiry(self):
         row = self._reference()
@@ -690,11 +704,19 @@ class AdvertPlanServingTests(TestCase):
         self.reference.plan = plan
         self.reference.save()
 
-    def test_landing_page_shows_for_pro_and_not_for_regular(self):
+    def test_landing_page_shows_for_pro_and_built_in_page_for_regular(self):
         url = f"/ads/plan-shop-{self.advert.pk}/"
-        self.assertEqual(self._get(url).status_code, 200)
+        paid = self._get(url)
+        self.assertEqual(paid.status_code, 200)
+        self.assertIn(b"<!doctype html><title>Plan Shop</title>", paid.content)
+
+        #   Regular cannot run the custom document; it still gets the built-in
+        #   responsive page instead of a 404.
         self._set_plan(AdvertLead.PLAN_REGULAR)
-        self.assertEqual(self._get(url).status_code, 404)
+        regular = self._get(url)
+        self.assertEqual(regular.status_code, 200)
+        self.assertNotIn(b"<!doctype html><title>Plan Shop</title>", regular.content)
+        self.assertIn(b"Learn more", regular.content)
 
     def test_extra_pages_are_for_advance_only(self):
         url = f"/ads/plan-shop-{self.advert.pk}/about/"
@@ -723,3 +745,122 @@ class AdvertPlanServingTests(TestCase):
         self.reference.status = AdvertReference.STATUS_PAUSED
         self.reference.save()
         self.assertEqual(self._get(f"/ads/plan-shop-{self.advert.pk}/about/").status_code, 404)
+
+
+class DefaultAdvertLandingTests(TestCase):
+    """Every live advert has a page, even before a custom HTML file exists."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = Auth.objects.create_user(
+            email="default-landing-admin@example.com", is_staff=True, is_admin=True
+        )
+        self.owner = Auth.objects.create_user(email="default-landing-owner@example.com")
+        self.advert = AdvertImage.objects.create(
+            author=self.admin,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading="Sunday Deals",
+            body="Fresh deals every week.",
+            image_url="https://cdn.example.com/ads/sunday.jpg",
+            url="https://shop.example.com/whatsapp",
+        )
+
+    def _reference(self, plan="regular", **kwargs):
+        return AdvertReference.objects.create(
+            user=self.owner,
+            plan=plan,
+            business_name="Sunday Deals",
+            advert=self.advert,
+            **kwargs,
+        )
+
+    def test_regular_without_html_gets_built_in_page_and_public_url_wins_learn_more(self):
+        self._reference(public_url="https://shop.example.com/campaign")
+        url = f"/ads/sunday-deals-{self.advert.pk}/"
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("Sunday Deals", html)
+        self.assertIn("Fresh deals every week.", html)
+        self.assertIn("https://cdn.example.com/ads/sunday.jpg", html)
+        self.assertIn("Learn more", html)
+        #   Public page URL outranks the advert link, with our utm marker.
+        self.assertIn(
+            'href="https://shop.example.com/campaign?utm_source=abureport"', html
+        )
+        self.assertNotIn("being build", html)
+
+    def test_learn_more_falls_back_to_the_advert_link(self):
+        self._reference()
+        response = self.client.get(f"/ads/sunday-deals-{self.advert.pk}/")
+        self.assertIn(
+            'href="https://shop.example.com/whatsapp?utm_source=abureport"',
+            response.content.decode(),
+        )
+
+    def test_paid_subdomain_without_html_is_a_200_building_page(self):
+        self._reference(plan="advance", subdomain="graceads")
+        response = self.client.get("/", HTTP_HOST="graceads.localhost")
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("advertisement is being build, check back soon..", html)
+        self.assertIn("Learn more", html)
+        self.assertIn("Sunday Deals", html)
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow")
+
+    def test_paid_subdomain_with_custom_html_still_uses_the_document(self):
+        reference = self._reference(plan="pro", subdomain="graceads")
+        AdvertLandingPage.objects.create(
+            advert=self.advert,
+            author=self.admin,
+            html_public_id="abureport/advert-landing/sunday.html",
+            is_published=True,
+        )
+        document = "<!doctype html><title>{{page_title}}</title>"
+        with mock.patch("Partner.views.fetch_advert_landing_html", return_value=document):
+            response = self.client.get("/", HTTP_HOST="graceads.localhost")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"<title>Sunday Deals</title>", response.content)
+        self.assertNotIn(b"being build", response.content)
+        self.assertTrue(reference.is_live)
+
+    def test_generic_path_redirects_a_paid_advert_to_its_subdomain_even_without_html(self):
+        self._reference(plan="pro", subdomain="graceads")
+        response = self.client.get(f"/ads/sunday-deals-{self.advert.pk}/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("graceads.localhost", response["Location"])
+
+    def test_misconfigured_paid_click_returns_json_but_direct_pages_do_not(self):
+        #   No subdomain, no public URL and no advert link: a legacy setup error.
+        self.advert.url = ""
+        self.advert.save(update_fields=["url"])
+        self._reference(plan="pro")
+        row = AdvertReference.objects.get(business_name="Sunday Deals")
+        url = reverse("partner:advert_click", args=[row.reference])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "this ads was not set properly"})
+
+        check = self.client.get(url, {"check": "1"})
+        self.assertEqual(check.status_code, 400)
+        self.assertEqual(check.json(), {"detail": "this ads was not set properly"})
+
+        #   Direct opens are HTML, never JSON.
+        for direct in (f"/ads/sunday-deals-{self.advert.pk}/",):
+            direct_response = self.client.get(direct)
+            self.assertEqual(direct_response.status_code, 200)
+            self.assertEqual(direct_response["Content-Type"], "text/html; charset=utf-8")
+            self.assertIn("being build", direct_response.content.decode())
+
+    def test_check_endpoint_returns_the_landing_target_as_json(self):
+        self._reference()
+        url = reverse("partner:advert_click", args=[AdvertReference.objects.get().reference])
+        response = self.client.get(url, {"check": "1"})
+        self.assertEqual(response.status_code, 200)
+        #   A relative in-site landing URL needs no utm marker; external
+        #   "Learn more" links get it when they are rendered.
+        self.assertEqual(
+            response.json(),
+            {"ok": True, "target": f"/ads/sunday-deals-{self.advert.pk}/"},
+        )

@@ -73,10 +73,10 @@ def _prepare_portfolio_stories(stories):
 
 
 def _portfolio_author_or_404(author_id):
-    """Only an active staff level account has a portfolio; a member id or a
-    suspended account 404s exactly like a missing page."""
+    """Only a staff-level account has a portfolio. Hibernated accounts remain
+    reachable as anonymized/noindex pages."""
     author = (
-        Auth.objects.filter(pk=author_id, is_active=True)
+        Auth.everyone.filter(pk=author_id)
         .filter(Q(is_staff=True) | Q(is_admin=True) | Q(is_superuser=True))
         .first()
     )
@@ -86,11 +86,10 @@ def _portfolio_author_or_404(author_id):
 
 
 def _portfolio_profile_or_404(author_slug):
-    """Slug based lookup for the public portfolio URL. Only an active staff
-    level account with a profile slug has a portfolio; anything else 404s
-    exactly like a missing page."""
+    """Slug based lookup for the public portfolio URL. Hibernated accounts
+    remain reachable as anonymized/noindex pages."""
     profile = (
-        StaffProfile.objects.filter(slug=author_slug, auth__is_active=True)
+        StaffProfile.objects.filter(slug=author_slug)
         .filter(Q(auth__is_staff=True) | Q(auth__is_admin=True) | Q(auth__is_superuser=True))
         .select_related("auth")
         .first()
@@ -101,8 +100,9 @@ def _portfolio_profile_or_404(author_slug):
 
 
 def _display_name(profile, author):
-    """The portfolio username: the staff full name when set, otherwise the
-    email local part, mirroring blog.author_name."""
+    """The portfolio username. Hibernated accounts are rendered as Unknown."""
+    if getattr(author, "deleted_at", None):
+        return "Unknown"
     if profile and profile.full_name.strip():
         return profile.full_name.strip()
     return author.email.split("@")[0].title()
@@ -166,31 +166,37 @@ class PortfolioView(View):
     def get(self, request, author_slug):
         profile = _portfolio_profile_or_404(author_slug)
         author = profile.auth
+        is_anonymized = bool(getattr(author, "deleted_at", None))
 
         display_name = _display_name(profile, author)
-        bio = (profile.bio or "").strip() if profile else ""
-        tribute = (profile.tribute_bio or "").strip() if profile else ""
-        role_label = StaffConfig.role_label(profile.role) if profile else "Staff"
-        sex_label = profile.get_gender_display() if profile and profile.gender else ""
+        bio = "" if is_anonymized else ((profile.bio or "").strip() if profile else "")
+        tribute = "" if is_anonymized else ((profile.tribute_bio or "").strip() if profile else "")
+        role_label = "" if is_anonymized else (StaffConfig.role_label(profile.role) if profile else "Staff")
+        sex_label = "" if is_anonymized else (profile.get_gender_display() if profile and profile.gender else "")
 
         stats = _portfolio_stats(author)
         story_count = stats["story_count"]
 
         top_category = _top_category(author) if story_count else ""
 
-        follower_count = AuthorFollow.objects.filter(author=author).count()
-        following_count = AuthorFollow.objects.filter(follower=author).count()
+        follower_count = 0 if is_anonymized else AuthorFollow.objects.filter(author=author).count()
+        following_count = 0 if is_anonymized else AuthorFollow.objects.filter(follower=author).count()
         is_following = bool(
-            is_authenticated(request.user)
+            not is_anonymized
+            and is_authenticated(request.user)
             and AuthorFollow.objects.filter(follower=request.user, author=author).exists()
         )
 
-        socials = _portfolio_socials(profile, display_name)
+        socials = [] if is_anonymized else _portfolio_socials(profile, display_name)
         speciality = []
-        if profile and isinstance(profile.speciality, list):
+        if not is_anonymized and profile and isinstance(profile.speciality, list):
             speciality = [str(item).strip() for item in profile.speciality if str(item).strip()]
 
-        description_source = bio or f"{display_name}, {role_label} at {self._project_name()}."
+        description_source = (
+            "This author profile is currently unavailable."
+            if is_anonymized
+            else (bio or f"{display_name}, {role_label} at {self._project_name()}.")
+        )
 
         #   NUMBERED PAGES: ?page=N, six stories a page. A bad or out of range
         #   number falls back to the nearest real page (get_page), so the URL
@@ -210,7 +216,7 @@ class PortfolioView(View):
         context = {
             "author": author,
             "staff_profile": profile,
-            'staff_image': author.profile_img or None,
+            "staff_image": "/static/404.jpg" if is_anonymized else (author.profile_img or None),
             "display_name": display_name,
             "sex_label": sex_label,
             "bio": bio,
@@ -228,13 +234,15 @@ class PortfolioView(View):
             "follower_count": follower_count,
             "following_count": following_count,
             "is_following": is_following,
-            "follow_endpoint": reverse("staff:author_follow", args=[author.pk]),
+            "follow_endpoint": "" if is_anonymized else reverse("staff:author_follow", args=[author.pk]),
             "meta_description": description_source[:300],
-            "page_og_image": author.profile_img or None,
+            "page_og_image": "" if is_anonymized else (author.profile_img or None),
             "person_schema_json": self._person_schema(
-                request, author, display_name, bio or description_source, role_label, socials, speciality,
+                request, author, display_name, description_source, role_label, socials, speciality,
                 slug=profile.slug if profile else "",
+                is_anonymized=is_anonymized,
             ),
+            "is_anonymized": is_anonymized,
         }
         return render(request, "staff/portfolio.html", context)
 
@@ -245,22 +253,29 @@ class PortfolioView(View):
         return About.project_name
 
     @staticmethod
-    def _person_schema(request, author, display_name, description, role_label, socials, speciality, slug=""):
-        """JSON-LD for the portfolio: a ProfilePage whose mainEntity is the
-        author's Person node.
-
-        The Person is built by SERVICE_INTERNAL.schema.person_node -- the same
-        builder every one of the author's stories uses for its ``author`` -- so
-        the byline on a story and this portfolio resolve to ONE entity with one
-        ``@id`` (E-E-A-T), and ``worksFor`` attaches that entity to the shared
-        Organization node instead of repeating it.
-        """
+    def _person_schema(request, author, display_name, description, role_label, socials, speciality, slug="", is_anonymized=False):
+        """JSON-LD for the portfolio. Hibernated profiles emit a minimal
+        anonymized Person so no real identity leaks into structured data."""
         from SERVICE_INTERNAL.config import About
         from SERVICE_INTERNAL.schema import dumps, person_node, profile_page_node
 
-        #   REAL DOMAIN, NOT request.build_absolute_uri(): that reflects whatever
-        #   host/IP/tunnel served the request, which hurts SEO ranking signals.
         url = f"{About.domain}{request.path}"
+        if is_anonymized:
+            person = person_node(
+                name="Unknown",
+                slug=slug,
+                url=url,
+                image="",
+                description="",
+                job_title="",
+                same_as=[],
+                knows_about=[],
+                email="",
+                hire_date="",
+            )
+            page = profile_page_node(url=url, name="Unknown", person=person, description="")
+            return dumps({"@context": "https://schema.org", **page})
+
         person = person_node(
             name=display_name,
             slug=slug,
@@ -274,7 +289,6 @@ class PortfolioView(View):
             hire_date=author.date_joined.date().isoformat() if author.date_joined else "",
         )
         page = profile_page_node(url=url, name=display_name, person=person, description=description[:300])
-        #   dumps() escapes < so a bio can never close the script tag early.
         return dumps({"@context": "https://schema.org", **page})
 
 
@@ -433,7 +447,9 @@ class PortfolioStoriesView(View):
         if page_number < 2:
             return JsonResponse({"detail": "Invalid story page."}, status=400)
 
-        paginator = _portfolio_story_paginator(profile.auth)
+        author = profile.auth
+        is_anonymized = bool(getattr(author, "deleted_at", None))
+        paginator = _portfolio_story_paginator(author)
         try:
             page = paginator.page(page_number)
         except EmptyPage as exc:
@@ -445,8 +461,9 @@ class PortfolioStoriesView(View):
             {
                 "stories": _prepare_portfolio_stories(page.object_list),
                 "staff_profile": profile,
-                "staff_image": profile.auth.profile_img or None,
-                "display_name": _display_name(profile, profile.auth),
+                "staff_image": "/static/404.jpg" if is_anonymized else (author.profile_img or None),
+                "display_name": _display_name(profile, author),
+                "is_anonymized": is_anonymized,
             },
         )
         response["X-Portfolio-Has-Next"] = "true" if page.has_next() else "false"
@@ -470,6 +487,8 @@ class AuthorFollowToggleView(View):
             return JsonResponse({"detail": "You have to log in to follow this author."}, status=401)
 
         author = _portfolio_author_or_404(author_id)
+        if getattr(author, "deleted_at", None):
+            return JsonResponse({"detail": "This author is unavailable."}, status=404)
         if author.pk == request.user.pk:
             return JsonResponse({"detail": "You cannot follow your own account."}, status=400)
 
@@ -479,6 +498,8 @@ class AuthorFollowToggleView(View):
             following = False
             detail = f"Unfollowed {self._display_name_for(author)}."
         else:
+            if getattr(author, "deleted_at", None):
+                return JsonResponse({"detail": "This author is unavailable."}, status=404)
             AuthorFollow.objects.create(follower=request.user, author=author)
             following = True
             detail = f"Following {self._display_name_for(author)}."

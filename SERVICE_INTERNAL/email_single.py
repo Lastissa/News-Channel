@@ -168,6 +168,31 @@ def _try_send_login_email(user: object):
     _dispatch_email(user.email, subject, html_message)
 
 
+def _try_send_account_deactivation_code_email(user: object, code: str, expiry_minutes: int = 20):
+    """Send the one-time 5-digit code that authorizes self-service hibernation.
+
+    No unsubscribe link: this is a security/transactional message, not a
+    newsletter. The code itself never reaches a log or a third party.
+    """
+    subject = f"Your {About.project_name} account deactivation code"
+    main_content = (
+        "<p>Hi,</p>"
+        "<p>We received a request to deactivate (hibernate) your account. "
+        f"Use this one-time code to confirm it: <strong>{code}</strong></p>"
+        f"<p>The code expires in {expiry_minutes} minutes and can only be used once.</p>"
+        "<p>If you did not request this, you can ignore this email and your "
+        "account will stay active.</p>"
+    )
+    html_message = _build_email_html(
+        title="Account deactivation code",
+        main_content=main_content,
+        end_note=f"{About.project_name} Team",
+        unsubscribe_query=None,
+    )
+    _dispatch_email(user.email, subject, html_message)
+    info_logger(msg=f"DEACTIVATION CODE: sent to account {user.email}")
+
+
 def _try_send_password_reset_email(user: object, reset_link: str):
     """
     Receives the user and the freshly generated reset link and prepares the

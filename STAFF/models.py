@@ -14,11 +14,11 @@ STAFF_ROLE = [
 
 
 class LiveStaffProfileManager(models.Manager):
-    """A soft-deleted account has no public profile: no author page, no
-    editorial-team card, no directory row."""
+    """Public staff profiles remain addressable for hibernated accounts so the
+    portfolio can stay live and anonymized; rendering decides what to expose."""
 
     def get_queryset(self):
-        return super().get_queryset().filter(auth__deleted_at__isnull=True)
+        return super().get_queryset()
 
 
 class StaffProfile(models.Model):

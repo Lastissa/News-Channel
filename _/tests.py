@@ -230,3 +230,25 @@ class CSPReportTests(TestCase):
         self.assertIn("CSP violation", subject)
         self.assertIn("img-src", subject)
         self.assertIn("images.example.com", html_message)
+
+
+class FontReportNoiseTests(TestCase):
+    """Google Fonts reports are dropped: no log, no email."""
+
+    def test_gstatic_font_report_sends_no_email(self):
+        import json
+        from unittest import mock
+
+        body = {
+            "csp-report": {
+                "document-uri": "https://example.com/",
+                "violated-directive": "font-src",
+                "blocked-uri": "https://fonts.gstatic.com/s/ibmplexsans/v1/x.woff2",
+            }
+        }
+        with mock.patch("SERVICE_INTERNAL.email_single._try_send_csp_report_email") as send:
+            response = self.client.post(
+                reverse("csp_report"), data=json.dumps(body), content_type="application/csp-report"
+            )
+        self.assertEqual(response.status_code, 204)
+        send.assert_not_called()

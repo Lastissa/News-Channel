@@ -78,7 +78,7 @@
 
       var serverError = form.dataset.serverError;
       if (serverError) {
-        bottomtoast(serverError);
+        bottomtoast(serverError, 'error', 'bottom', 10000);
       }
 
       document.querySelectorAll('.password-toggle').forEach(function (toggle) {
@@ -175,7 +175,13 @@
               armRedirectWatchdog();
               return;
             }
-            bottomtoast(payload.detail || (result.ok ? 'Signed in. Redirecting...' : 'Could not sign in.'), result.ok ? 'success' : 'error');
+            var toastDuration = payload && payload.toast_duration_ms;
+            bottomtoast(
+              payload.detail || (result.ok ? 'Signed in. Redirecting...' : 'Could not sign in.'),
+              result.ok ? 'success' : 'error',
+              'bottom',
+              (typeof toastDuration === 'number' ? toastDuration : undefined)
+            );
             if (!result.ok) {
               setSubmitBusy(false);
               return;

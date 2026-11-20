@@ -37,9 +37,9 @@ class SecurityHeadersMiddleware:
         "https://pagead2.googlesyndication.com https://*.googlesyndication.com "
         "https://*.google.com https://*.gstatic.com https://*.googleusercontent.com "
         "https://*.doubleclick.net https://*.adtrafficquality.google; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.gstatic.com; "
         "img-src 'self' data: blob: https: "
-        "font-src 'self' data: https://fonts.gstatic.com; "
+        "font-src 'self' data: https://fonts.gstatic.com https://*.gstatic.com; "
         "connect-src 'self' https://*.google-analytics.com "
         "https://*.googlesyndication.com https://*.doubleclick.net "
         "https://*.google.com https://*.adtrafficquality.google; "
@@ -93,9 +93,10 @@ class AdsSubdomainMiddleware:
     site.
 
     A manager can also give one advert a subdomain such as
-    ``newads.<base>``. That host is a tracked short link: the root resolves the
-    reference and redirects to its public target, while unknown or non-advert
-    labels never resolve. Because ``ADS_HOST`` is also derived on localhost,
+    ``newads.<base>``. That host is the advert's own entry point: its root
+    serves the custom landing page when one is published, otherwise a built-in
+    responsive "being built" page (still a 200). Unknown or non-advert labels
+    never resolve. Because ``ADS_HOST`` is also derived on localhost,
     development uses ``ads.localhost`` and ``newads.localhost`` exactly the way
     production uses the real hosts.
     """
@@ -137,17 +138,18 @@ class AdsSubdomainMiddleware:
         """Resolve one manager-assigned advert subdomain as a tracked link.
 
         The custom host is a branded entry point, not a second copy of the
-        site. Its root records a click and redirects to the reference's public
-        target (the main-domain landing page or the advertiser's own URL).
+        site. Its root serves the advert's landing page -- custom HTML when
+        available, the built-in page while it is still being built.
         """
-        from Partner.models import AdvertEvent, AdvertReference
-        from Partner.tracking import append_utm_source, record_advert_click
+        from Partner.models import AdvertReference
 
         from Partner.plans import plan_allows
-        from Partner.views import serve_extra_page
+        from Partner.views import render_default_landing, serve_extra_page, serve_landing
 
         row = (
-            AdvertReference.objects.select_related("advert__landing_page")
+            AdvertReference.objects.select_related(
+                "advert", "advert__landing_page", "advert__landing_page__author"
+            )
             .filter(subdomain__iexact=label)
             .first()
         )
@@ -180,15 +182,21 @@ class AdsSubdomainMiddleware:
                 f"{origin}/" if origin else reverse("home:promote")
             )
 
-        target = row.public_target
-        if not target:
-            raise Http404("This advert has no destination yet.")
-        if target.startswith("/"):
-            origin = canonical_origin(request)
-            target = f"{origin}{target}" if origin else target
-        target = append_utm_source(target, AdvertEvent.SOURCE_ABUREPORT)
-        record_advert_click(row, request, target)
-        return HttpResponseRedirect(target)
+        #   The custom landing page wins when it is published and deliverable.
+        landing = getattr(row.advert, "landing_page", None) if row.advert_id else None
+        if landing and landing.is_deliverable and plan_allows(row.plan, "landing_page"):
+            return serve_landing(request, landing, canonical_url=request.build_absolute_uri("/"))
+
+        #   No custom HTML yet: answer here with the built-in responsive page
+        #   and a "being built" note. It stays on the branded host with a 200
+        #   instead of a 404 or a redirect away from the subdomain.
+        return render_default_landing(
+            request,
+            row.advert,
+            row,
+            canonical_url=request.build_absolute_uri("/"),
+            building=True,
+        )
 
     def __call__(self, request):
         host = request_host(request)

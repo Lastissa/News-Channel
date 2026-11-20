@@ -123,10 +123,12 @@ def get_category_choices():
 
 
 class LiveBlogManager(models.Manager):
-    """Stories of a soft-deleted author are hidden from readers and lists."""
+    """Public stories remain visible even for hibernated/deleted authors; public
+    surfaces anonymize identity. (Legacy soft-deleted accounts are treated as
+    hibernated.)"""
 
     def get_queryset(self):
-        return super().get_queryset().filter(author__deleted_at__isnull=True)
+        return super().get_queryset()
 
 
 class Blog(models.Model):
@@ -283,12 +285,32 @@ class Blog(models.Model):
     from functools import cached_property
     @cached_property
     def author_name(self):
-        from STAFF.models import StaffProfile
+        author = self.author
+        if getattr(author, "deleted_at", None):
+            return "Unknown"
+        try:
+            #   Use the reverse one-to-one so a page that prefetched or
+            #   select_related author__staffprofile answers from that cache
+            #   instead of running one profile query per story.
+            profile = author.staffprofile
+            if profile and profile.full_name:
+                return profile.full_name
+        except Exception:
+            pass
+        email = getattr(author, "email", "") or ""
+        local = email.split("@")[0] if "@" in email else email
+        return local.title() if local else "Unknown"
 
-        profile = StaffProfile.objects.filter(auth=self.author).first()
-        if profile and profile.full_name:
-            return profile.full_name
-        return self.author.email.split("@")[0].title()
+    @property
+    def author_avatar(self):
+        author = self.author
+        if getattr(author, "deleted_at", None):
+            return "/static/404.jpg"
+        return getattr(author, "profile_img", "") or "/static/404.jpg"
+
+    @property
+    def is_author_hibernated(self):
+        return bool(getattr(self.author, "deleted_at", None))
 
     def __str__(self):
         return f"{self.author.email.split("@")[0]}. {self.views} Views. {self.heading[:20]}"
@@ -358,10 +380,11 @@ class StoryView(models.Model):
 
 
 class LiveCommentManager(models.Manager):
-    """Comments written by a soft-deleted account are hidden."""
+    """Comments remain visible even when commenter or story author is
+    hibernated; identity is anonymized at render time."""
 
     def get_queryset(self):
-        return super().get_queryset().filter(author__deleted_at__isnull=True)
+        return super().get_queryset()
 
 
 class Comment(models.Model):
@@ -374,3 +397,31 @@ class Comment(models.Model):
 
     objects = LiveCommentManager()
     all_objects = models.Manager()
+
+    @property
+    def is_author_hibernated(self):
+        return bool(getattr(self.author, "deleted_at", None))
+
+    @property
+    def author_display_name(self):
+        author = self.author
+        if getattr(author, "deleted_at", None):
+            return "Unknown"
+        try:
+            #   Same as Blog.author_name: honour select_related/prefetch on a
+            #   comment list instead of querying the profile per comment.
+            profile = author.staffprofile
+            if profile and profile.full_name:
+                return profile.full_name
+        except Exception:
+            pass
+        email = getattr(author, "email", "") or ""
+        local = email.split("@")[0] if "@" in email else email
+        return local.title() if local else "Unknown"
+
+    @property
+    def author_avatar_url(self):
+        author = self.author
+        if getattr(author, "deleted_at", None):
+            return "/static/404.jpg"
+        return getattr(author, "profile_img", "") or "/static/404.jpg"

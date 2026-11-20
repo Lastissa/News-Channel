@@ -25,7 +25,7 @@
     <h3 class="story-card-title"><a href="{% url 'blog:story_detail' post.slug %}">{{ post.heading }}</a></h3>
     <p class="story-card-excerpt">{{ post.content|truncatewords:22 }}</p>
     <div class="story-card-footer">
-      <span class="story-card-byline">{{ post.author.staffprofile.full_name|slice:":20"|default:"UNKNOWN" }}</span>
+      <span class="story-card-byline">{{ post.author_name|slice:":20"|default:"Unknown" }}</span>
       <button type="button"
               class="bookmark-chip has-label"
               data-bookmark-btn

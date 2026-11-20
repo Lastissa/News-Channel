@@ -31,6 +31,8 @@ from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Category, Comment, get_category_choices
 from HOME.views import _resolve_page_number
 from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, invalidate_cache, is_rate_limited
+from SERVICE_INTERNAL.account_lifecycle import hibernate_account, restore_account
+from ADMIN.models import AccountActionLog
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
 from SERVICE_INTERNAL.hosts import RESERVED_SUBDOMAINS, ads_base_host, advert_host
@@ -348,79 +350,74 @@ class StaffDetailView(View):
         )
 
 
-#   DELETE AUTHOR (SOFT DELETE) ----------------------------------------------
-#   1. An admin presses Delete author. The account is hidden at once: it cannot
-#      sign in, its stories, comments, uploads and profile disappear.
-#   2. For 7 days an admin can press Restore and everything comes back.
-#   3. After 7 days the account is "due". Every admin sees a notice, and may
-#      delete it for good (after three confirmations). Nothing is deleted by
-#      a timer: only an admin pressing the button removes data.
-ACCOUNT_RESTORE_DAYS = 7
+#   ACCOUNT HIBERNATION ------------------------------------------------------
+#   Deactivated/hibernated accounts are hidden from login and anonymized on
+#   public surfaces, but their content stays restorable by an admin. There is no
+#   automatic or manual purge path here; true deletion is a separate superuser
+#   backdoor endpoint.
 
 
-def _deleted_account_info(account):
-    """The dates and words for one soft-deleted account."""
-    now = timezone.now()
-    due_at = account.deleted_at + timedelta(days=ACCOUNT_RESTORE_DAYS)
-    if now >= due_at:
-        return {"is_due": True, "days_over": (now - due_at).days, "days_left": 0, "due_at": due_at}
-    seconds_left = (due_at - now).total_seconds()
-    return {"is_due": False, "days_over": 0, "days_left": max(1, math.ceil(seconds_left / 86400)), "due_at": due_at}
+def _hibernated_days_ago(account):
+    if not getattr(account, "deleted_at", None):
+        return 0
+    delta = timezone.now() - account.deleted_at
+    return max(0, int(delta.total_seconds() // 86400))
 
 
 def _delete_block_reason(actor, account):
-    """Why this account may not be deleted by this admin, or "" when it may."""
+    """Why this account may not be hibernated by this admin, or "" when it may."""
     if account.pk == actor.pk:
-        return "You cannot delete your own account here."
+        return "You cannot deactivate your own account here."
     if account.is_superuser:
-        return "A superuser account cannot be deleted here."
+        return "A superuser account cannot be deactivated here."
     if account.is_admin and not actor.is_superuser:
-        return "Only a superuser can delete an admin account."
+        return "Only a superuser can deactivate an admin account."
     return ""
 
 
 def _deletion_context(actor, account):
-    """What the detail page needs to show the delete, restore and permanent
-    delete controls."""
+    """What the detail page needs to show hibernation and restore controls."""
     context = {
-        "is_deleted": account.deleted_at is not None,
+        "is_deleted": bool(getattr(account, "deleted_at", None)),
         "delete_block_reason": _delete_block_reason(actor, account),
         "stories_count": Blog.all_objects.filter(author=account).count(),
         "comments_count": Comment.all_objects.filter(author=account).count(),
-        "restore_days": ACCOUNT_RESTORE_DAYS,
-        "purge_url": reverse("control:staff_purge", args=[account.pk]),
+        "days_ago": _hibernated_days_ago(account),
     }
-    if account.deleted_at:
-        context.update(_deleted_account_info(account))
     return context
 
 
+def account_action_logs(limit=30):
+    return list(
+        AccountActionLog.objects.select_related("account", "actor").order_by("-created_at", "-pk")[:limit]
+    )
+
+
 def deleted_accounts_notice(user):
-    """The notice every admin sees when they come in: each soft-deleted
-    account, and how long it can still be restored, or how long it has been
-    due for permanent deletion."""
+    """Admin-visible list of hibernated accounts. No purge/due behavior."""
     if not admin_only(user):
         return []
     rows = []
-    for account in Auth.everyone.filter(deleted_at__isnull=False).order_by("deleted_at"):
+    for account in Auth.everyone.filter(deleted_at__isnull=False).order_by("-deleted_at"):
         profile = StaffProfile.all_objects.filter(auth=account).first()
         name = (profile.full_name.strip() if profile and profile.full_name else "") or account.email
         rows.append(
             {
                 "id": account.pk,
                 "name": name,
+                "email": account.email,
                 "url": reverse("control:staff_detail", args=[account.pk]),
-                "purge_url": reverse("control:staff_purge", args=[account.pk]),
                 "stories_count": Blog.all_objects.filter(author=account).count(),
                 "comments_count": Comment.all_objects.filter(author=account).count(),
-                **_deleted_account_info(account),
+                "days_ago": _hibernated_days_ago(account),
+                "deleted_at": account.deleted_at,
             }
         )
     return rows
 
 
 class StaffDeleteView(View):
-    """Soft delete: hide the account now, keep everything for 7 days."""
+    """Hibernate/deactivate a staff account. Restore remains admin-only."""
 
     def post(self, request, staff_id):
         if not admin_only(request.user):
@@ -431,13 +428,11 @@ class StaffDeleteView(View):
             messages.error(request, reason)
             return redirect("control:staff_detail", account.pk)
 
-        account.deleted_at = timezone.now()
-        account.save(update_fields=["deleted_at"])
-        ended = drop_sessions_for(account)
-        info_logger(msg=f"STAFF DELETED (soft): {account.email} by {request.user.email}, {ended} session(s) ended")
+        hibernate_account(account, actor=request.user)
+        info_logger(msg=f"STAFF HIBERNATED: {account.email} by {request.user.email}")
         messages.success(
             request,
-            f"{account.email} is deleted. You can restore it for {ACCOUNT_RESTORE_DAYS} days.",
+            f"{account.email} has been deactivated. Public content is anonymized and only an admin can restore it.",
         )
         return redirect("control:staff_detail", account.pk)
 
@@ -448,47 +443,11 @@ class StaffRestoreView(View):
             return admin_page_redirect(request)
         account = _staff_account_or_404(staff_id, include_deleted=True)
         if account.deleted_at is None:
-            messages.error(request, "That account is not deleted.")
+            messages.error(request, "That account is not deactivated.")
             return redirect("control:staff_detail", account.pk)
-        account.deleted_at = None
-        account.save(update_fields=["deleted_at"])
-        info_logger(msg=f"STAFF RESTORED: {account.email} by {request.user.email}")
-        messages.success(request, f"{account.email} is restored, with its stories and uploads.")
+        restore_account(account, actor=request.user)
+        messages.success(request, f"{account.email} has been restored.")
         return redirect("control:staff_detail", account.pk)
-
-
-class StaffPurgeView(View):
-    """Permanent delete. Only for an account that was soft-deleted and has
-    waited the full 7 days. This cannot be undone."""
-
-    def post(self, request, staff_id):
-        if not admin_only(request.user):
-            return admin_page_redirect(request)
-        account = _staff_account_or_404(staff_id, include_deleted=True)
-        if account.deleted_at is None:
-            messages.error(request, "Delete the account first. It can only be removed for good afterwards.")
-            return redirect("control:staff_detail", account.pk)
-        if not _deleted_account_info(account)["is_due"]:
-            messages.error(request, "This account can still be restored. It can be removed for good after 7 days.")
-            return redirect("control:staff_detail", account.pk)
-        reason = _delete_block_reason(request.user, account)
-        if reason:
-            messages.error(request, reason)
-            return redirect("control:staff_detail", account.pk)
-
-        #   Same clean-up as an account deleting itself: gather the Cloudinary
-        #   files first, delete the rows, then release the files.
-        from HOME.views import _collect_account_assets, _release_account_assets
-
-        email = account.email
-        assets = _collect_account_assets(account)
-        drop_sessions_for(account)
-        with transaction.atomic():
-            account.delete()
-        _release_account_assets(assets)
-        info_logger(msg=f"STAFF DELETED (permanent): {email} by {request.user.email}")
-        messages.success(request, f"{email} was deleted for good.")
-        return redirect("home:profile")
 
 
 class StaffPublishedView(View):
@@ -977,6 +936,7 @@ class PanelView(View):
             {
                 "is_superuser": bool(request.user.is_superuser),
                 "deleted_accounts": deleted_accounts_notice(request.user),
+                "account_action_logs": account_action_logs(),
                 "sender_full_name": own_profile.full_name.strip() if own_profile and own_profile.full_name else "",
                 "site_settings": SiteSettings.get_solo(),
                 "category_rows": _category_rows(),
@@ -2927,8 +2887,7 @@ def _reference_form_data(post=None, defaults=False):
         "starts_at": (post.get("starts_at", default_start) or "").strip(),
         "expires_at": (post.get("expires_at", default_end) or "").strip(),
         "public_url": (post.get("public_url") or "").strip(),
-        #   Django refuses host names with an underscore, so a typed _ becomes a hyphen.
-        "subdomain": (post.get("subdomain") or "").strip().lower().replace("_", "-"),
+        "subdomain": (post.get("subdomain") or "").strip().lower(),
         "advert_id": (post.get("advert_id") or "").strip(),
         "notes": (post.get("notes") or "").strip(),
     }
@@ -2985,6 +2944,16 @@ def _validate_reference_fields(form, existing=None):
             return None, "That subdomain is reserved for the site. Choose another."
         if "." in subdomain:
             return None, "Enter only the subdomain label, for example newads."
+        #   A standard host name label (RFC 1123): letters, digits and hyphens,
+        #   1 to 63 characters, no hyphen at either end.
+        if "_" in subdomain:
+            return None, "Underscores are not valid in a web address. Use a hyphen, like my-shop."
+        if len(subdomain) > 63:
+            return None, "A subdomain can have at most 63 characters."
+        if subdomain.startswith("-") or subdomain.endswith("-"):
+            return None, "A subdomain cannot start or end with a hyphen."
+        if not re.fullmatch(r"[a-z0-9-]+", subdomain):
+            return None, "Use only lowercase letters, numbers and hyphens, like my-shop."
         if not ads_base_host():
             return None, "Set ALLOWED_HOSTS or ADS_HOST before assigning a subdomain."
         if not advert_host(subdomain):
@@ -3014,6 +2983,17 @@ def _validate_reference_fields(form, existing=None):
             conflict = conflict.exclude(pk=existing.pk)
         if conflict.exists():
             return None, "That advert already has a reference. Each advert has exactly one."
+
+    #   Pro and Advance are subdomain plans. Staff can only leave it empty when
+    #   the advert opens an external link instead (Public page URL, or the link
+    #   saved on the advert image).
+    if plan_allows(plan, "subdomain") and not subdomain:
+        external = public_url or bool(advert and (advert.url or "").strip())
+        if not external:
+            return None, (
+                "Pro and Advance plans need a subdomain. Add one, or set a Public "
+                "page URL (or an advert link) to open an external link instead."
+            )
 
     notes = form["notes"]
     if len(notes) > 1000:
@@ -3109,6 +3089,7 @@ def _advert_choices(current_advert_id=None):
                 "label": advert.heading or f"Advert #{advert.pk}",
                 "taken_by": taken_by,
                 "allowed": not taken_by or advert.pk == current_advert_id,
+                "has_url": bool((advert.url or "").strip()),
             }
         )
     return choices
@@ -3117,6 +3098,8 @@ def _advert_choices(current_advert_id=None):
 def _advert_reference_row(reference, advert_choices):
     status_key, status_label = _reference_status(reference)
     advert = reference.advert
+    landing = getattr(advert, "landing_page", None)
+    has_landing = bool(landing and landing.is_deliverable)
     return {
         "id": reference.pk,
         "reference": reference.reference,
@@ -3151,6 +3134,7 @@ def _advert_reference_row(reference, advert_choices):
         "allows_pages": plan_allows(reference.plan, "extra_pages") and bool(advert),
         "allows_landing": plan_allows(reference.plan, "landing_page"),
         "allows_subdomain": plan_allows(reference.plan, "subdomain"),
+        "needs_landing_warning": plan_allows(reference.plan, "landing_page") and not has_landing,
         "allows_analytics": plan_allows(reference.plan, "analytics"),
         **time_left(reference),
         "advert_choices": [
@@ -3162,7 +3146,7 @@ def _advert_reference_row(reference, advert_choices):
 
 def _reference_queryset():
     return AdvertReference.objects.select_related(
-        "user", "issued_by", "advert__landing_page"
+        "user", "issued_by", "advert__landing_page", "advert__landing_page__author"
     ).annotate(
         view_total=Count("events", filter=Q(events__event_type=AdvertEvent.EVENT_VIEW)),
         click_total=Count("events", filter=Q(events__event_type=AdvertEvent.EVENT_CLICK)),

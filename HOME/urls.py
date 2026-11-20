@@ -40,6 +40,7 @@ urlpatterns = [
     path("profile/settings/image/", views.ProfileImageUpdateView.as_view(), name="profile_image_update"),
     path("profile/staff/update/", views.ProfileStaffUpdateView.as_view(), name="profile_staff_update"),
     path("profile/delete/placard/", views.ProfileDeletePlacardView.as_view(), name="profile_delete_placard"),
+    path("profile/delete/send-code/", views.ProfileDeleteSendCodeView.as_view(), name="profile_delete_send_code"),
     path("profile/delete/", views.ProfileDeleteAccountView.as_view(), name="profile_delete_account"),
     path("load-more/", views.LoadMoreView.as_view(), name="load_more"),
     path("continue-reading/", views.ContinueReadingFeedView.as_view(), name="continue_feed"),

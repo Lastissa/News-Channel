@@ -37,6 +37,10 @@ still work as normal form posts (see data-fallback forms in the edit block).{% e
     <li class="{% if ref.plan == 'advance' %}is-on{% endif %}">Extra pages</li>
   </ul>
 
+  {% if ref.needs_landing_warning %}
+  <p class="ads-desk-warning" role="status">This plan is on {{ ref.plan_label }} and no landing page was detected. The subdomain will show the 'advertisement is being built' page until a landing page is created.</p>
+  {% endif %}
+
   <p class="ads-desk-ref-meta">
     <span>Advert: {% if ref.advert_label %}{{ ref.advert_label }}{% else %}not linked yet{% endif %}</span>
     {% if ref.public_page_url %}<a href="{{ ref.public_page_url }}" target="_blank" rel="noopener noreferrer">{{ ref.public_host }}</a>
@@ -111,7 +115,7 @@ still work as normal form posts (see data-fallback forms in the edit block).{% e
         <span>Advert subdomain</span>
         <span class="ads-desk-subdomain">
           <input type="text" name="subdomain" maxlength="63" autocomplete="off" data-subdomain-input
-                 spellcheck="false" pattern="[a-z0-9](?:[a-z0-9_\-]{0,61}[a-z0-9])?"
+                 spellcheck="false" pattern="[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?" minlength="1" maxlength="63" autocapitalize="none"
                  value="{{ ref.edit.subdomain }}" placeholder="newads">
           <span class="ads-desk-subdomain-suffix">.{{ ads_base_host }}</span>
         </span>
@@ -120,7 +124,7 @@ still work as normal form posts (see data-fallback forms in the edit block).{% e
 
       <label class="ads-desk-field ads-desk-field--wide">
         <span>Public page URL</span>
-        <input type="url" name="public_url" maxlength="500" value="{{ ref.edit.public_url }}" placeholder="https://example.com/campaign">
+        <input type="url" name="public_url" maxlength="500" data-public-url-input value="{{ ref.edit.public_url }}" placeholder="https://example.com/campaign">
         <small>The advert opens this link. It is set only here.</small>
       </label>
 
@@ -129,7 +133,7 @@ still work as normal form posts (see data-fallback forms in the edit block).{% e
         <select name="advert_id">
           <option value="">No advert linked</option>
           {% for advert in ref.advert_choices %}
-          <option value="{{ advert.id }}" {% if ref.edit.advert_id == advert.id|stringformat:"s" %}selected{% endif %} {% if not advert.allowed %}disabled{% endif %}>
+          <option value="{{ advert.id }}" data-has-url="{{ advert.has_url|yesno:'true,false' }}" {% if ref.edit.advert_id == advert.id|stringformat:"s" %}selected{% endif %} {% if not advert.allowed %}disabled{% endif %}>
             {{ advert.label }}{% if advert.taken_by and advert.id != ref.advert_id %} - already used by {{ advert.taken_by }}{% endif %}
           </option>
           {% endfor %}

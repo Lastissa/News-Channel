@@ -42,10 +42,11 @@ class PortfolioFeedTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Posts by Portfolio Author")
-        # Numbered pages replaced the infinite scroll feed.
-        self.assertContains(response, "portfolio-pager")
-        self.assertContains(response, "?page=2#portfolio-feed")
-        self.assertNotContains(response, "portfolio-feed-skeleton")
+        # The feed keeps the skeleton loader and sentinel; numbered paging was
+        # dropped (see the portfolio_feed endpoint tests below).
+        self.assertContains(response, "portfolio-feed-skeleton")
+        self.assertContains(response, "data-feed-sentinel")
+        self.assertNotContains(response, "portfolio-pager")
         self.assertNotContains(response, "Recent story reach")
         self.assertEqual(len(response.context["stories"]), 6)
         self.assertEqual(
