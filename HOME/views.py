@@ -65,6 +65,7 @@ from SERVICE_INTERNAL.email_batch import (
 from SERVICE_INTERNAL.email_single import _try_send_newsletter_subscribe_email
 from SERVICE_INTERNAL.hosts import (
     ads_origin,
+    canonical_origin,
     is_ads_subdomain,
     promote_lead_path,
     promote_path,
@@ -455,31 +456,37 @@ class AtomFeedView(_FeedView):
 
 class ManifestView(View):
     """/site.webmanifest: lets a phone offer "Add to home screen" with the right
-    name, colours and icons. Values come from config so the name never drifts
-    from the rest of the site; only the icon files live in static."""
+    name, colours and icons. URLs are absolute on the canonical news host so
+    a manifest fetched from the ads host can never install ads as the app."""
 
     def get(self, request):
+        origin = canonical_origin(request)
+        root = f"{origin}/" if origin else "/"
+
+        def icon(path):
+            url = static(path)
+            return url if url.startswith(("http://", "https://")) else f"{origin}{url}"
+
         data = {
-            "id": "/",
+            "id": root,
             "name": About.project_name,
             "short_name": About.project_name,
             "description": About.project_cachphrase,
             "lang": "en-NG",
-            "start_url": "/",
-            "scope": "/",
+            "start_url": root,
+            "scope": root,
             "display": "standalone",
             "background_color": "#FFFFFF",
             "theme_color": "#0E1B2C",
             "icons": [
-                {"src": static("home/icons/icon-192.png"), "sizes": "192x192", "type": "image/png", "purpose": "any"},
-                {"src": static("home/icons/icon-512.png"), "sizes": "512x512", "type": "image/png", "purpose": "any"},
-                {"src": static("home/icons/icon-512-maskable.png"), "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+                {"src": icon("home/icons/icon-192.png"), "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                {"src": icon("home/icons/icon-512.png"), "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                {"src": icon("home/icons/icon-512-maskable.png"), "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
             ],
         }
         response = JsonResponse(data, content_type="application/manifest+json")
         response["Cache-Control"] = "public, max-age=86400"
         return response
-
 
 class FavicoView(View):
     def get(self, request):

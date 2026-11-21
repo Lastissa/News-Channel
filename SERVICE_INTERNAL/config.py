@@ -70,6 +70,7 @@ class StaffConfig:
 
 def custom_context_processors(request):
     from BLOG.models import get_category_choices
+    from SERVICE_INTERNAL.hosts import ads_host, advert_subdomain_from_host, request_host
     default_social = "https://www.abureport.com.ng/404/" # so to raise a friednly error if not set
     theme = "light"
     if request and request.COOKIES.get("abureport-theme") in {"dark", "light"}:
@@ -111,6 +112,10 @@ def custom_context_processors(request):
     if tweeter and tweeter != default_social:
         twitter_username = tweeter.rstrip("/").split("/")[-1].lstrip("@")
 
+    host = request_host(request)
+    on_ads_host = bool(ads_host() and host == ads_host())
+    on_advert_host = bool(advert_subdomain_from_host(host))
+
     context = {
         "project_name": About.project_name,
         "version": About.version,
@@ -135,6 +140,8 @@ def custom_context_processors(request):
         #   Exposed so templates can gate production-only third-party tags
         #   (e.g. Google AdSense in base.html) off localhost/dev entirely.
         'debug': settings.DEBUG,
+        # The ads/advert hosts are not installable copies of the news app.
+        'manifest_url': '' if on_ads_host or on_advert_host else '/site.webmanifest',
     }
 
     #   SITEWIDE JSON-LD ENTITY GRAPH (NewsMediaOrganization + WebSite with a

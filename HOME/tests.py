@@ -25,6 +25,7 @@ from Partner.models import AdvertEvent, AdvertImage, AdvertLandingPage, AdvertLe
 from SERVICE_INTERNAL import email_batch
 from SERVICE_INTERNAL.cache_keys import HOME_PAGE_HTML_CACHE_KEY
 from SERVICE_INTERNAL.config import About, custom_context_processors
+from SERVICE_INTERNAL.hosts import canonical_origin
 from SERVICE_INTERNAL.email_single import (
     _try_send_new_comment_email,
     _try_send_new_follower_email,
@@ -2541,7 +2542,7 @@ class HomeScreenHeadTests(QuietTestCase):
         self.assertTrue(response["Content-Type"].startswith("application/manifest+json"))
         data = response.json()
         self.assertEqual(data["name"], "AbuReport")
-        self.assertEqual(data["start_url"], "/")
+        self.assertEqual(data["start_url"], canonical_origin() + "/")
         self.assertEqual(data["display"], "standalone")
         sizes = {(icon["sizes"], icon["purpose"]) for icon in data["icons"]}
         self.assertIn(("192x192", "any"), sizes)
@@ -2553,6 +2554,15 @@ class HomeScreenHeadTests(QuietTestCase):
         self.assertIn('rel="manifest" href="/site.webmanifest"', body)
         self.assertIn('rel="apple-touch-icon"', body)
         self.assertIn('<meta name="theme-color" content="#0E1B2C">', body)
+
+    @override_settings(ADS_HOST="ads.localhost", ALLOWED_HOSTS=["localhost", "ads.localhost"])
+    def test_ads_host_does_not_advertise_the_news_manifest(self):
+        body = self.client.get("/", HTTP_HOST="ads.localhost").content.decode()
+
+        self.assertNotIn('rel="manifest"', body)
+        manifest = self.client.get("/site.webmanifest", HTTP_HOST="ads.localhost").json()
+        self.assertEqual(manifest["start_url"], canonical_origin() + "/")
+        self.assertEqual(manifest["scope"], canonical_origin() + "/")
 
     def test_twitter_site_meta_uses_the_normalised_handle(self):
         body = self.client.get("/").content.decode()
