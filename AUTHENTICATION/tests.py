@@ -1,8 +1,10 @@
+import json
 from unittest import mock
 
 from datetime import timedelta
 
 from django.contrib import admin
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.models import Session
 from django.contrib.sessions.backends.db import SessionStore
 from django.core.cache import cache
@@ -11,6 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from AUTHENTICATION.models import Auth, KnownDevice, UserSession
+from AUTHENTICATION.views import csrf_failure
 from BLOG.models import Blog
 from SERVICE_INTERNAL.sessions import drop_single_session, live_sessions_for
 
@@ -545,3 +548,41 @@ class SuperuserTrueDeleteBackdoorTests(TestCase):
         self.assertEqual(AccountActionLog.objects.count(), 0)
         logged = " ".join(str(call.kwargs.get("msg", "")) for call in info_log.call_args_list)
         self.assertIn("rootpass123", logged)
+
+
+class CsrfFailureResponseTests(TestCase):
+    """A rejected CSRF token must not masquerade as a generic client error."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.addCleanup(cache.clear)
+
+    def _request(self, **headers):
+        request = self.factory.post("/profile/settings/", **headers)
+        request.user = AnonymousUser()
+        return request
+
+    def _assert_json_detail(self, request):
+        response = csrf_failure(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response["Content-Type"], "application/json")
+        payload = json.loads(response.content)
+        self.assertIn("detail", payload)
+        self.assertIn("Refresh the page", payload["detail"])
+        self.assertNotIn(b"CSRF FAIL", response.content)
+
+    def test_fetch_request_gets_json_detail(self):
+        self._assert_json_detail(
+            self._request(HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        )
+
+    def test_htmx_request_gets_json_detail(self):
+        self._assert_json_detail(self._request(HTTP_HX_REQUEST="true"))
+
+    def test_json_accept_header_gets_json_detail(self):
+        self._assert_json_detail(self._request(HTTP_ACCEPT="application/json"))
+
+    def test_normal_navigation_still_gets_the_html_page(self):
+        response = csrf_failure(self._request())
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "CSRF FAIL", status_code=403)

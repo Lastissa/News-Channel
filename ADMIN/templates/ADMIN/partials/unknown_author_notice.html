@@ -1,0 +1,14 @@
+{% if unknown_author_total %}
+  <div class="acct-notice unknown-author-notice" data-unknown-notice>
+    <h2>Unknown Author</h2>
+    <p class="unknown-author-notice-sub" data-unknown-total-copy>
+      {{ unknown_author_total }} story{{ unknown_author_total|pluralize }} from deactivated author{{ unknown_author_total|pluralize }} are anonymized for readers.
+    </p>
+    <div class="acct-notice-actions">
+      <a class="acct-btn acct-btn--danger unknown-author-count" href="#panel-unknown-author" aria-label="Review {{ unknown_author_total }} unknown author stories">
+        <span>Review stories</span>
+        <span class="unknown-author-badge" aria-hidden="true" data-unknown-total-badge>{{ unknown_author_total }}</span>
+      </a>
+    </div>
+  </div>
+{% endif %}

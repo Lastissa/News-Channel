@@ -855,6 +855,59 @@
     });
   })();
 
+  /* ---------- Unknown Author: stories left behind by deactivated accounts ---------- */
+  (function () {
+    var list = document.querySelector("[data-unknown-author-list]");
+    if (!list) return;
+    var deleteTemplate = list.dataset.deleteEndpoint || "";
+    var badges = document.querySelectorAll("[data-unknown-total-badge]");
+    var labels = document.querySelectorAll("[data-unknown-total-label]");
+    var copies = document.querySelectorAll("[data-unknown-total-copy]");
+    var empties = document.querySelectorAll("[data-unknown-empty]");
+    var notices = document.querySelectorAll("[data-unknown-notice]");
+
+    function syncTotal(remaining) {
+      badges.forEach(function (node) { node.textContent = String(remaining); });
+      labels.forEach(function (node) {
+        node.textContent = remaining + " stor" + (remaining === 1 ? "y" : "ies");
+      });
+      copies.forEach(function (node) {
+        node.textContent = remaining + " stor" + (remaining === 1 ? "y" : "ies") +
+          " from deactivated author" + (remaining === 1 ? "" : "s") +
+          " are anonymized for readers.";
+      });
+      empties.forEach(function (node) { node.hidden = remaining !== 0; });
+      notices.forEach(function (node) { node.hidden = remaining === 0; });
+    }
+
+    list.addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-unknown-author-remove]");
+      if (!btn) return;
+      var row = btn.closest("[data-unknown-author-row]");
+      if (!row || btn.dataset.pending === "true") return;
+      var link = row.querySelector(".unknown-author-row-main a");
+      var heading = link ? link.textContent.trim() : "this story";
+      if (!window.confirm("Permanently delete " + heading + "? The story and its uploaded banner cannot be recovered.")) return;
+
+      var endpoint = deleteTemplate.replace(/0\/delete\/?$/, row.dataset.storyId + "/delete/");
+      btn.dataset.pending = "true";
+      btn.disabled = true;
+
+      postForm(endpoint, new FormData()).then(function (result) {
+        if (!result.ok) {
+          btn.dataset.pending = "false";
+          btn.disabled = false;
+          toast(extractDetail(result.text, "Could not delete the story."), "error");
+          return;
+        }
+        var remaining = 0;
+        try { remaining = Number(JSON.parse(result.text || "{}").remaining) || 0; } catch (e) {}
+        row.remove();
+        syncTotal(remaining);
+        toast(extractDetail(result.text, "Story deleted."));
+      });
+    });
+  })();
   /* ---------- announcements: scrolling home bar, add + edit + delete ---------- */
   (function () {
     var form = document.querySelector("[data-ann-form]");

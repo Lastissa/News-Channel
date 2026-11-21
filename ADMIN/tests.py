@@ -3531,3 +3531,91 @@ class DeleteAuthorTests(TestCase):
         member = Auth.objects.create_user(email="del-member@example.com")
         plain.force_login(member)
         self.assertNotContains(plain.get(reverse("home:profile")), "Deactivated accounts")
+
+
+class UnknownAuthorPanelTests(TestCase):
+    """The PANEL groups stories left behind by deactivated authors."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.admin = Auth.objects.create_user(
+            email="unknown-admin@example.com", is_staff=True, is_admin=True
+        )
+        self.live_author = Auth.objects.create_user(
+            email="live-author@example.com", is_staff=True
+        )
+        self.gone_author = Auth.objects.create_user(
+            email="gone-author@example.com", is_staff=True
+        )
+        self.orphan_story = Blog.objects.create(
+            heading="Orphan story", content="Body", author=self.gone_author,
+            category="GENERAL", image_1="",
+        )
+        Blog.objects.create(
+            heading="Live story", content="Body", author=self.live_author,
+            category="GENERAL", image_1="",
+        )
+        self.client.force_login(self.admin)
+
+    def test_panel_lists_anonymized_author_stories_with_red_count(self):
+        Auth.everyone.filter(pk=self.gone_author.pk).update(deleted_at=timezone.now())
+
+        response = self.client.get(reverse("control:panel"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["unknown_author_total"], 1)
+        self.assertEqual(
+            [row["id"] for row in response.context["unknown_author_stories"]],
+            [self.orphan_story.pk],
+        )
+        self.assertContains(response, "Unknown Author")
+        self.assertContains(response, "Orphan story")
+        self.assertContains(response, "unknown-author-badge")
+        self.assertContains(response, self.gone_author.email)
+
+    def test_no_unknown_section_when_no_author_is_anonymized(self):
+        response = self.client.get(reverse("control:panel"))
+
+        self.assertEqual(response.context["unknown_author_total"], 0)
+        self.assertNotContains(response, "unknown-author-badge")
+    @mock.patch("ADMIN.views._release_story_image")
+    def test_admin_can_delete_an_anonymized_author_story(self, release):
+        Auth.everyone.filter(pk=self.gone_author.pk).update(deleted_at=timezone.now())
+        self.orphan_story.image_public_id = "stories/orphan-banner"
+        self.orphan_story.save(update_fields=["image_public_id"])
+
+        response = self.client.post(
+            reverse("control:panel_unknown_author_delete", args=[self.orphan_story.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["detail"], "Story deleted.")
+        self.assertEqual(response.json()["remaining"], 0)
+        self.assertFalse(Blog.all_objects.filter(pk=self.orphan_story.pk).exists())
+        release.assert_called_once_with("stories/orphan-banner")
+
+    def test_non_admin_cannot_delete_an_anonymized_author_story(self):
+        Auth.everyone.filter(pk=self.gone_author.pk).update(deleted_at=timezone.now())
+        self.client.force_login(self.live_author)
+
+        response = self.client.post(
+            reverse("control:panel_unknown_author_delete", args=[self.orphan_story.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Admin access is required.")
+        self.assertTrue(Blog.all_objects.filter(pk=self.orphan_story.pk).exists())
+
+    @mock.patch("ADMIN.views._release_story_image")
+    def test_cannot_delete_a_live_authors_story(self, release):
+        live_story = Blog.all_objects.get(heading="Live story")
+
+        response = self.client.post(
+            reverse("control:panel_unknown_author_delete", args=[live_story.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Story not found.")
+        self.assertTrue(Blog.all_objects.filter(pk=live_story.pk).exists())
+        release.assert_not_called()

@@ -166,6 +166,19 @@
     releaseSkeleton();
   });
 
+  /*  An HTTP error may explain itself in the JSON `detail` key; a send or
+      timeout has no response, so those keep the fallback wording below. */
+  function responseDetail(event, fallback) {
+    var xhr = event && event.type === "htmx:responseError" && event.detail ? event.detail.xhr : null;
+    if (!xhr) return fallback;
+    try {
+      var data = JSON.parse(xhr.responseText || "{}");
+      return (data && data.detail) || fallback;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
   function recover(event) {
     if (!event.detail || event.detail.target !== membersBody) return;
     activeXhr = null;
@@ -182,7 +195,7 @@
       membersBody.style.overflow = "";
     }
     if (typeof window.AbuToast === "function") {
-      window.AbuToast("Could not load those members. Try again.", "error");
+      window.AbuToast(responseDetail(event, "Could not load those members. Try again."), "error");
     }
   }
   document.body.addEventListener("htmx:responseError", recover);

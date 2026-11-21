@@ -13,6 +13,7 @@
 
 {% block content %}
 <div class="panel-deleted-notice">{% include "ADMIN/partials/deleted_accounts_notice.html" %}</div>
+<div class="panel-unknown-notice">{% include "ADMIN/partials/unknown_author_notice.html" %}</div>
 {% comment %}
   Icon sprite. Every icon on this page (here and in panel.js) is
   <svg class="ic"><use href="#i-NAME"/></svg>. Buttons that only carry an icon
@@ -51,6 +52,7 @@
   <aside class="panel-aside">
     <nav class="panel-nav" aria-label="Panel sections" data-panel-nav>
       <a class="panel-nav-link" href="#panel-staff-gallery" aria-label="Staff" title="Staff"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="panel-nav-text">Staff</span></a>
+      <a class="panel-nav-link" href="#panel-unknown-author" aria-label="Unknown Author" title="Unknown Author"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg><span class="panel-nav-text">Unknown Author</span></a>
       <a class="panel-nav-link" href="#panel-announcements" aria-label="Announcements" title="Announcements"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg><span class="panel-nav-text">Announcements</span></a>
       <a class="panel-nav-link" href="#panel-image-adverts" aria-label="Image adverts" title="Image adverts"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg><span class="panel-nav-text">Image adverts</span></a>
       <a class="panel-nav-link" href="#panel-advert-leads" aria-label="Advert enquiries" title="Advert enquiries"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span class="panel-nav-text">Advert enquiries</span></a>
@@ -121,6 +123,36 @@
       </div></div>
     </section>
 
+    <section class="panel-card panel-card-wide is-collapsed" id="panel-unknown-author" aria-label="Unknown Author">
+      <header class="panel-card-header">
+        <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></span>
+        <h2>Unknown Author</h2>
+        <span class="panel-eyebrow" data-unknown-total-label>{{ unknown_author_total }} story{{ unknown_author_total|pluralize }}</span>
+        <div class="panel-card-header-actions">
+          <button type="button" class="panel-icon-btn panel-collapse-btn" data-collapse aria-expanded="false" aria-label="Collapse Unknown Author" title="Collapse"><svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+        </div>
+      </header>
+      <div class="panel-collapse"><div class="panel-collapse-inner">
+        <p class="panel-card-sub">Stories published by accounts that were later deactivated. Readers see these as anonymous.</p>
+        {% if unknown_author_stories %}
+        <ul class="unknown-author-list" data-unknown-author-list data-delete-endpoint="{% url 'control:panel_unknown_author_delete' 0 %}">
+          {% for item in unknown_author_stories %}
+          <li class="unknown-author-row" data-unknown-author-row data-story-id="{{ item.id }}">
+            <div class="unknown-author-row-main">
+              <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.heading }}</a>
+              <span class="unknown-author-row-meta">{{ item.category }} &middot; {{ item.detail }}</span>
+            </div>
+            <div class="unknown-author-row-actions">
+              {% if item.author_email %}<span class="unknown-author-row-from">{{ item.author_email }}</span>{% endif %}
+              <button type="button" class="panel-icon-btn panel-icon-danger" data-unknown-author-remove aria-label="Delete {{ item.heading }}" title="Delete story"><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg></button>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        <p class="panel-empty" data-unknown-empty{% if unknown_author_stories %} hidden{% endif %}>No stories from unknown authors.</p>
+      </div></div>
+    </section>
     <section class="panel-card panel-card-wide is-collapsed" id="panel-announcements" aria-label="Announcements">
       <header class="panel-card-header">
         <span class="panel-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg></span>

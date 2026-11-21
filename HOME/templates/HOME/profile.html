@@ -716,6 +716,20 @@
         shell.dataset.scrollAfter = "";
       });
 
+      /*  When the server answered, use its JSON `detail` (e.g. "Please sign in
+          to view bookmarks."); a send error or timeout has no response and
+          keeps the fallback wording below. */
+      function responseDetail(event, fallback) {
+        var xhr = event && event.type === "htmx:responseError" && event.detail ? event.detail.xhr : null;
+        if (!xhr) return fallback;
+        try {
+          var data = JSON.parse(xhr.responseText || "{}");
+          return (data && data.detail) || fallback;
+        } catch (err) {
+          return fallback;
+        }
+      }
+
       function recover(event) {
         var shell = event.detail && event.detail.target;
         if (!isShell(shell)) return;
@@ -730,7 +744,7 @@
           shell.style.height = "";
           shell.style.overflow = "";
         }
-        if (typeof window.AbuToast === "function") window.AbuToast("Could not load that page. Try again.", "error");
+        if (typeof window.AbuToast === "function") window.AbuToast(responseDetail(event, "Could not load that page. Try again."), "error");
       }
       document.body.addEventListener("htmx:responseError", recover);
       document.body.addEventListener("htmx:sendError", recover);

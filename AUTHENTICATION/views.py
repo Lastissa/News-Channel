@@ -494,5 +494,17 @@ class PasswordResetView(View):
 from SERVICE_INTERNAL.abstract import info_logger
 def csrf_failure(request, exception=None, **args):
     info_logger(msg=f"CSRF_ERROR: {request.user or 'Anonymous user'} tried to perform some action but experienced CSRF error")
-    # return JsonResponse({'detail': 'csrf error'}, status = 403)
+    #   fetch/htmx callers need a parseable reason: the HTML security page used
+    #   to be swallowed by their JSON parsers and became a generic "could not"
+    #   toast. Normal page navigation still gets the full CSRF explanation.
+    ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.headers.get("HX-Request") == "true"
+        or "application/json" in request.headers.get("Accept", "")
+    )
+    if ajax:
+        return JsonResponse(
+            {"detail": "Your session expired or the page is stale. Refresh the page and try again."},
+            status=403,
+        )
     return render(request, "csrf_fail.html", status=403)

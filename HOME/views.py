@@ -2982,7 +2982,7 @@ class ProfileStaffUpdateView(View):
     """
 
     def post(self, request):
-        remaining_time, is_limited = is_rate_limited(request, 10, 3)
+        remaining_time, is_limited = is_rate_limited(request, 10, 20)
         if is_limited:
             return _response({'detail': f'PERMISSION DENIED, wait {remaining_time} seconds before trying again'}, status=429)
         if not staff_only(request.user):

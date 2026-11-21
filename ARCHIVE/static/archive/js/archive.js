@@ -470,7 +470,11 @@
     loadMoreBtn.disabled = false;
     loadMoreBtn.classList.remove("is-loading");
     loadMoreBtn.textContent = loadMoreBtn.dataset.originalLabel || "Load more";
-    toast("Could not load more items.", "error");
+    /*  An HTTP error can carry the exact reason in its JSON `detail`; a lost
+        connection can't, so keep the same fallback for sendError/timeout. */
+    var responseText = event.type === "htmx:responseError" && event.detail && event.detail.xhr
+      ? event.detail.xhr.responseText : "";
+    toast(extractDetail(responseText, "Could not load more items."), "error");
   }
   document.body.addEventListener("htmx:responseError", recoverLoadMoreButton);
   document.body.addEventListener("htmx:sendError", recoverLoadMoreButton);

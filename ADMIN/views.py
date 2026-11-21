@@ -29,7 +29,7 @@ from django.views import View
 
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Category, Comment, get_category_choices
-from HOME.views import _resolve_page_number
+from HOME.views import _release_story_image, _resolve_page_number
 from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, invalidate_cache, is_rate_limited
 from SERVICE_INTERNAL.account_lifecycle import hibernate_account, restore_account
 from ADMIN.models import AccountActionLog
@@ -245,6 +245,31 @@ class StaffDirectoryView(View):
             status=200,
         )
 
+
+def _unknown_author_stories(limit=50):
+    """Stories left behind by deactivated authors, for the PANEL only.
+
+    The public managers hide these stories' anonymized authors, so the PANEL
+    uses ``all_objects`` here and links each row to the live public story.
+    """
+    stories = (
+        Blog.all_objects.filter(author__deleted_at__isnull=False)
+        .select_related("author")
+        .order_by("-date_created")[:limit]
+    )
+    rows = [
+        {
+            "id": story.pk,
+            "heading": story.heading,
+            "category": story.category,
+            "detail": f"{story.views} view{'' if story.views == 1 else 's'} `u2022 {story.date_created:%b %d, %Y}",
+            "url": reverse("blog:story_detail", args=[story.slug or str(story.pk)]),
+            "author_email": story.author.email if story.author else "",
+        }
+        for story in stories
+    ]
+    total = Blog.all_objects.filter(author__deleted_at__isnull=False).count()
+    return rows, total
 
 def _staff_account_or_404(staff_id, include_deleted=False):
     accounts = Auth.everyone if include_deleted else Auth.objects
@@ -499,7 +524,7 @@ class StaffTributeUpdateView(_SuperuserWriteView):
     staff member's own bio, which stays read only."""
 
     def post(self, request, staff_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited: return JsonResponse({'detail':f'Permission Denied, Wait {remaining_seconds} seconds'}, status = 403)
         resolved, error = self._guard(request, staff_id)
         if error:
@@ -520,7 +545,7 @@ class StaffSpecialityUpdateView(_SuperuserWriteView):
     sets it for someone else's account instead of their own."""
 
     def post(self, request, staff_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited: return JsonResponse({'detail':f'Permission Denied, Wait {remaining_seconds} seconds'}, status = 403)
         resolved, error = self._guard(request, staff_id)
         if error:
@@ -549,7 +574,7 @@ class StaffRoleUpdateView(_SuperuserWriteView):
     change stamps last_promotion with today."""
 
     def post(self, request, staff_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited: return JsonResponse({'detail':f'Permission Denied, Wait {remaining_seconds} seconds'}, status = 403)
         resolved, error = self._guard(request, staff_id)
         if error:
@@ -594,7 +619,7 @@ class StaffGenderUpdateView(_SuperuserWriteView):
     the admin record page where an admin can actually change it."""
 
     def post(self, request, staff_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited: return JsonResponse({'detail':f'Permission Denied, Wait {remaining_seconds} seconds'}, status = 403)
         resolved, error = self._guard(request, staff_id)
         if error:
@@ -631,7 +656,7 @@ class StaffBanToggleView(_SuperuserWriteView):
     deletes an account."""
 
     def post(self, request, staff_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited: return JsonResponse({'detail':f'Permission Denied, Wait {remaining_seconds} seconds'}, status = 403)
         
         resolved, error = self._guard(request, staff_id)
@@ -728,7 +753,7 @@ class OwnRoleUpdateView(View):
     change stamps last_promotion with today, exactly like the detail page."""
 
     def post(self, request):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited:
             return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
         if not admin_only(request.user):
@@ -785,7 +810,7 @@ class StaffCreateView(View):
         return self._render(request)
 
     def post(self, request):
-        remaining_seconds, limited = is_rate_limited(request, 30, 3)
+        remaining_seconds, limited = is_rate_limited(request, 30, 20)
         if limited:
             return self._fail(request, f"Permission Denied, Wait {remaining_seconds} seconds")
         if not admin_only(request.user):
@@ -924,6 +949,7 @@ class PanelView(View):
             return admin_page_redirect(request)
 
         own_profile = StaffProfile.objects.filter(auth=request.user).first()
+        unknown_rows, unknown_total = _unknown_author_stories()
 
         gallery_paginator = Paginator(staff_directory_queryset(), GALLERY_PAGE_SIZE)
         gallery_page = gallery_paginator.get_page(1)
@@ -936,6 +962,8 @@ class PanelView(View):
             {
                 "is_superuser": bool(request.user.is_superuser),
                 "deleted_accounts": deleted_accounts_notice(request.user),
+                "unknown_author_stories": unknown_rows,
+                "unknown_author_total": unknown_total,
                 "account_action_logs": account_action_logs(),
                 "sender_full_name": own_profile.full_name.strip() if own_profile and own_profile.full_name else "",
                 "site_settings": SiteSettings.get_solo(),
@@ -1685,7 +1713,7 @@ class AnalyticsAuthorCompareView(View):
             raw = (request.GET.get(name) or "").strip()
             return int(raw) if raw.isdigit() else None
         
-        remaining_seconds, limited = is_rate_limited(request, timeout_window=3, max_requests=2, reset_timeout = False, scope=f"{get_client_ip(request)}{3}")
+        remaining_seconds, limited = is_rate_limited(request, timeout_window=10, max_requests=10, reset_timeout = False, scope=f"{get_client_ip(request)}{3}")
         if limited: return JsonResponse({"detail": f"Rate limit exceeded. Please wait {remaining_seconds} seconds and try again."}, status=429)
         
 
@@ -1997,7 +2025,7 @@ class PanelSessionLogoutView(View):
     instantly. Reuses the exact same helper the suspend-account control uses."""
 
     def post(self, request, account_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited:
             return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
         if not admin_only(request.user):
@@ -2021,7 +2049,7 @@ class PanelSingleSessionLogoutView(View):
     reissued to someone else."""
 
     def post(self, request, account_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited:
             return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
         if not admin_only(request.user):
@@ -2048,7 +2076,7 @@ class PanelSiteSettingsUpdateView(View):
     About defaults everywhere it is used (see custom_context_processors)."""
 
     def post(self, request):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited:
             return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
         if not admin_only(request.user):
@@ -2092,7 +2120,7 @@ class PanelCategoryCreateView(View):
     category cache (BLOG/signals.py), so nothing here touches the cache."""
 
     def post(self, request):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited:
             return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
         if not admin_only(request.user):
@@ -2141,7 +2169,7 @@ class PanelCategoryDeleteView(View):
     cannot be removed, otherwise nobody could publish a story any more."""
 
     def post(self, request, category_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited:
             return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
         if not admin_only(request.user):
@@ -2164,6 +2192,42 @@ class PanelCategoryDeleteView(View):
             detail += f" {story_count} existing {'story stays' if story_count == 1 else 'stories stay'} published under it."
         return JsonResponse({"detail": detail, "story_count": story_count}, status=200)
 
+
+
+class PanelUnknownAuthorDeleteView(View):
+    """Permanently delete a story left behind by a deactivated author.
+
+    Restricted to admin/superuser and to stories whose author is anonymized;
+    a live author's story must be handled through their own profile tools.
+    The uploaded banner is released with the same helper the profile delete
+    uses, so no Cloudinary asset is orphaned.
+    """
+
+    def post(self, request, blog_id):
+        denied = _panel_write_guard(request)
+        if denied:
+            return denied
+
+        story = (
+            Blog.all_objects.select_related("author")
+            .filter(pk=blog_id, author__deleted_at__isnull=False)
+            .first()
+        )
+        if story is None:
+            return JsonResponse({"detail": "Story not found."}, status=404)
+
+        heading = story.heading
+        image_public_id = story.image_public_id
+        story.delete()
+        _release_story_image(image_public_id)
+
+        remaining = Blog.all_objects.filter(author__deleted_at__isnull=False).count()
+        info_logger(
+            msg=f"PANEL: unknown-author story {blog_id} ({heading}) deleted by {request.user.email}"
+        )
+        return JsonResponse(
+            {"detail": "Story deleted.", "remaining": remaining}, status=200
+        )
 
 class PanelStaffSearchView(View):
     """The "+" search in the mass-email composer. Matches StaffProfile
@@ -2389,7 +2453,7 @@ def _clean_announcement(post):
 
 def _panel_write_guard(request):
     """Rate limit + admin check shared by the panel write endpoints. Returns an error response or None."""
-    remaining_seconds, limited = is_rate_limited(request, 10, 6)
+    remaining_seconds, limited = is_rate_limited(request, 10, 30)
     if limited:
         return JsonResponse({"detail": f"Permission Denied, Wait {remaining_seconds} seconds"}, status=403)
     if not admin_only(request.user):
@@ -3433,7 +3497,7 @@ class StaffAdsAccessToggleView(_SuperuserWriteView):
     """
 
     def post(self, request, staff_id):
-        remaining_seconds, limited = is_rate_limited(request, 10, 3)
+        remaining_seconds, limited = is_rate_limited(request, 10, 20)
         if limited:
             return JsonResponse(
                 {"detail": f"Permission Denied, Wait {remaining_seconds} seconds"},
