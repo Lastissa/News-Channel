@@ -70,7 +70,7 @@
     <div class="portfolio-placard-aside">
       <div class="portfolio-placard-media">
         {% if is_anonymized %}
-          <img src="{% static '404.jpg' %}" alt="Unknown author">
+          <img src="/static/Profile_avatar_placeholder.png" alt="Unknown author">
         {% elif author.profile_img %}
           <img src="{{ author.profile_img }}" alt="{{ display_name }} profile picture"
                onerror="this.onerror=null;this.hidden=true;this.nextElementSibling.hidden=false;">

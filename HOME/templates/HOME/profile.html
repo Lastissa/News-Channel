@@ -59,7 +59,7 @@
       <div class="profile-summary">
       <div class="profile-identity-row">
         <div class="profile-avatar-wrap">
-          <img src="{{ user.profile_img}}" alt="{{ user.email }} avatar" class="profile-avatar" onerror="this.onerror=null;this.src='/static/404.jpg';">
+          <img src="{{ user.profile_img|default:'/static/Profile_avatar_placeholder.png' }}" alt="{{ user.email }} avatar" class="profile-avatar" onerror="this.onerror=null;this.src='/static/Profile_avatar_placeholder.png';">
           <button type="button" class="profile-avatar-edit" data-upload-profile-image aria-label="Change profile picture" title="Change profile picture">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M12 5v14M5 12h14" />
@@ -1042,4 +1042,17 @@
       });
     })();
   </script>
+
+  {% if is_staff_user and not user.profile_img %}
+  {#  AUTHORS WITHOUT A PICTURE: readers see their face next to every story,
+      so nudge them here, where the + badge can actually fix it. #}
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (typeof window.AbuToast !== "function") return;
+      window.setTimeout(function () {
+        window.AbuToast("Set a profile picture so readers can see who's behind your stories. Tap the + on your avatar to add one.", "info", "top");
+      }, 800);
+    });
+  </script>
+  {% endif %}
 {% endblock %}

@@ -115,8 +115,8 @@ class Auth(AbstractBaseUser):
     @property
     def public_avatar_url(self):
         if self.is_hibernated:
-            return "/static/404.jpg"
-        return self.profile_img or ""
+            return "/static/Profile_avatar_placeholder.png"
+        return self.profile_img or "/static/Profile_avatar_placeholder.png"
 
     def __str__(self):
         staff_type = "Member"

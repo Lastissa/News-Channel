@@ -305,8 +305,8 @@ class Blog(models.Model):
     def author_avatar(self):
         author = self.author
         if getattr(author, "deleted_at", None):
-            return "/static/404.jpg"
-        return getattr(author, "profile_img", "") or "/static/404.jpg"
+            return "/static/Profile_avatar_placeholder.png"
+        return getattr(author, "profile_img", "") or "/static/Profile_avatar_placeholder.png"
 
     @property
     def is_author_hibernated(self):
@@ -423,5 +423,5 @@ class Comment(models.Model):
     def author_avatar_url(self):
         author = self.author
         if getattr(author, "deleted_at", None):
-            return "/static/404.jpg"
-        return getattr(author, "profile_img", "") or "/static/404.jpg"
+            return "/static/Profile_avatar_placeholder.png"
+        return getattr(author, "profile_img", "") or "/static/Profile_avatar_placeholder.png"

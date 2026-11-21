@@ -936,7 +936,7 @@
           if (avatar && payload.image_url) {
             avatar.src = payload.image_url;
             avatar.onerror = function () {
-              this.src = "/static/404.jpg";
+              this.src = "/static/Profile_avatar_placeholder.png";
             };
           }
           closeCropper();

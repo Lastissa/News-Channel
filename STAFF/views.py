@@ -216,7 +216,7 @@ class PortfolioView(View):
         context = {
             "author": author,
             "staff_profile": profile,
-            "staff_image": "/static/404.jpg" if is_anonymized else (author.profile_img or None),
+            "staff_image": "/static/Profile_avatar_placeholder.png" if is_anonymized else (author.profile_img or None),
             "display_name": display_name,
             "sex_label": sex_label,
             "bio": bio,
@@ -461,7 +461,7 @@ class PortfolioStoriesView(View):
             {
                 "stories": _prepare_portfolio_stories(page.object_list),
                 "staff_profile": profile,
-                "staff_image": "/static/404.jpg" if is_anonymized else (author.profile_img or None),
+                "staff_image": "/static/Profile_avatar_placeholder.png" if is_anonymized else (author.profile_img or None),
                 "display_name": _display_name(profile, author),
                 "is_anonymized": is_anonymized,
             },
