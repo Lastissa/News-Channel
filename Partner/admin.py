@@ -7,6 +7,7 @@ from Partner.models import (
     AdvertLead,
     AdvertPage,
     AdvertReference,
+    AdvertReferenceFile,
     Announcement,
 )
 from SERVICE_INTERNAL.images import destroy_archive_asset
@@ -79,6 +80,44 @@ class AdvertReferenceAdmin(admin.ModelAdmin):
     readonly_fields = ("reference", "created_at", "updated_at")
 
 
+class AdvertReferenceFileAdmin(admin.ModelAdmin):
+    """Superuser inspection for the per-reference Ads desk shelf. Ads staff use
+    the reference card; this registration exists for recovery and to make sure
+    a direct admin delete cannot leave the Cloudinary asset behind."""
+
+    list_display = (
+        "reference",
+        "original_filename",
+        "resource_type",
+        "file_size",
+        "uploaded_by",
+        "date_uploaded",
+    )
+    list_filter = ("resource_type",)
+    search_fields = (
+        "original_filename",
+        "note",
+        "reference__reference",
+        "uploaded_by__email",
+    )
+    readonly_fields = ("public_id", "secure_url", "file_size", "date_uploaded")
+    raw_id_fields = ("reference", "uploaded_by")
+
+    def delete_model(self, request, obj):
+        public_id, resource_type = obj.public_id, obj.resource_type or "image"
+        super().delete_model(request, obj)
+        if public_id:
+            destroy_archive_asset(public_id, resource_type)
+
+    def delete_queryset(self, request, queryset):
+        assets = list(
+            queryset.exclude(public_id="").values_list("public_id", "resource_type")
+        )
+        super().delete_queryset(request, queryset)
+        for public_id, resource_type in assets:
+            destroy_archive_asset(public_id, resource_type or "image")
+
+
 class AdvertEventAdmin(admin.ModelAdmin):
     list_display = ("reference", "event_type", "source", "created_at")
     list_filter = ("event_type", "source")
@@ -102,6 +141,7 @@ admin.site.register(AdvertImage, AdvertImageAdmin)
 admin.site.register(AdvertLandingPage, AdvertLandingPageAdmin)
 admin.site.register(AdvertLead, AdvertLeadAdmin)
 admin.site.register(AdvertReference, AdvertReferenceAdmin)
+admin.site.register(AdvertReferenceFile, AdvertReferenceFileAdmin)
 admin.site.register(AdvertEvent, AdvertEventAdmin)
 
 

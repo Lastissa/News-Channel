@@ -110,3 +110,82 @@
 
   applyFilter();
 })();
+
+/* Reference storage drawer. Upload/delete forms are htmx and re-render the
+   drawer body; this only handles open/close, filter and search state. */
+(function () {
+  var storageModal = document.querySelector("[data-storage-modal]");
+  var deleteModal = document.querySelector("[data-ref-delete-modal]");
+  var storageBody = document.getElementById("advert-storage-body");
+  var storageFilter = "all";
+  var storageQuery = "";
+
+  function open(modal) {
+    if (!modal) return;
+    modal.hidden = false;
+    modal.classList.add("is-open");
+    document.body.classList.add("has-ads-modal");
+  }
+
+  function close(modal) {
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    modal.classList.remove("is-open");
+    if (!document.querySelector(".ads-modal.is-open")) document.body.classList.remove("has-ads-modal");
+  }
+
+  function applyStorageFilter() {
+    if (!storageBody) return;
+    storageBody.querySelectorAll(".ads-storage-item").forEach(function (item) {
+      var kind = item.getAttribute("data-storage-kind") || "file";
+      var haystack = (item.getAttribute("data-storage-search") || "").toLowerCase();
+      var kindOk = storageFilter === "all" || kind === storageFilter;
+      var queryOk = !storageQuery || haystack.indexOf(storageQuery) !== -1;
+      item.hidden = !(kindOk && queryOk);
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    if (event.target.closest("[data-open-storage]")) open(storageModal);
+    if (event.target.closest("[data-open-ref-delete]")) open(deleteModal);
+
+    var closeButton = event.target.closest("[data-modal-close]");
+    if (closeButton) {
+      close(closeButton.closest(".ads-modal"));
+      return;
+    }
+    var filterButton = event.target.closest("[data-storage-filter]");
+    if (filterButton) {
+      storageFilter = filterButton.getAttribute("data-storage-filter");
+      storageBody && storageBody.querySelectorAll("[data-storage-filter]").forEach(function (button) {
+        button.classList.toggle("is-active", button === filterButton);
+      });
+      applyStorageFilter();
+      return;
+    }
+    if (event.target === storageModal) close(storageModal);
+    if (event.target === deleteModal) close(deleteModal);
+  });
+
+  document.addEventListener("input", function (event) {
+    if (!event.target.matches || !event.target.matches("[data-storage-search]")) return;
+    storageQuery = (event.target.value || "").trim().toLowerCase();
+    applyStorageFilter();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    close(storageModal);
+    close(deleteModal);
+  });
+
+  document.body.addEventListener("htmx:afterSwap", function (event) {
+    if (event.target && event.target.id === "advert-storage-body") {
+      storageFilter = "all";
+      storageQuery = "";
+      open(storageModal);
+      applyStorageFilter();
+    }
+    if (event.target && event.target.id === "advert-ref-delete-body") open(deleteModal);
+  });
+})();

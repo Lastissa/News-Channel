@@ -2535,6 +2535,7 @@ class ArchiveUploadAlertToggleTests(QuietTestCase):
 class HomeScreenHeadTests(QuietTestCase):
     """Web manifest, iOS icon and address bar colour (HOME.views.ManifestView, base.html)."""
 
+    @override_settings(ALLOWED_HOSTS=["testserver"])
     def test_manifest_is_served_with_name_colours_and_icons(self):
         response = self.client.get("/site.webmanifest")
 
@@ -2543,11 +2544,13 @@ class HomeScreenHeadTests(QuietTestCase):
         data = response.json()
         self.assertEqual(data["name"], "AbuReport")
         self.assertEqual(data["start_url"], canonical_origin() + "/")
+        self.assertEqual(data["scope"], canonical_origin() + "/")
         self.assertEqual(data["display"], "standalone")
         sizes = {(icon["sizes"], icon["purpose"]) for icon in data["icons"]}
         self.assertIn(("192x192", "any"), sizes)
         self.assertIn(("512x512", "maskable"), sizes)
 
+    @override_settings(ALLOWED_HOSTS=["testserver"])
     def test_every_page_links_the_manifest_ios_icon_and_theme_colour(self):
         body = self.client.get("/").content.decode()
 
@@ -2556,13 +2559,24 @@ class HomeScreenHeadTests(QuietTestCase):
         self.assertIn('<meta name="theme-color" content="#0E1B2C">', body)
 
     @override_settings(ADS_HOST="ads.localhost", ALLOWED_HOSTS=["localhost", "ads.localhost"])
-    def test_ads_host_does_not_advertise_the_news_manifest(self):
+    def test_ads_host_does_not_advertise_or_serve_the_news_manifest(self):
         body = self.client.get("/", HTTP_HOST="ads.localhost").content.decode()
 
         self.assertNotIn('rel="manifest"', body)
-        manifest = self.client.get("/site.webmanifest", HTTP_HOST="ads.localhost").json()
-        self.assertEqual(manifest["start_url"], canonical_origin() + "/")
-        self.assertEqual(manifest["scope"], canonical_origin() + "/")
+        self.assertEqual(self.client.get("/site.webmanifest", HTTP_HOST="ads.localhost").status_code, 404)
+
+    @override_settings(ALLOWED_HOSTS=["localhost", "www.localhost"])
+    def test_other_subdomains_get_404_and_no_manifest_link(self):
+        body = self.client.get("/", HTTP_HOST="www.localhost").content.decode()
+
+        self.assertNotIn('rel="manifest"', body)
+        self.assertEqual(self.client.get("/site.webmanifest", HTTP_HOST="www.localhost").status_code, 404)
+
+    @override_settings(ALLOWED_HOSTS=["localhost", "localhost:8000"])
+    def test_local_port_alias_gets_404_too(self):
+        response = self.client.get("/site.webmanifest", HTTP_HOST="localhost:8000")
+
+        self.assertEqual(response.status_code, 404)
 
     def test_twitter_site_meta_uses_the_normalised_handle(self):
         body = self.client.get("/").content.decode()

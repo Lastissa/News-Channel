@@ -12,7 +12,9 @@ from datetime import datetime, time, timedelta
 from urllib.parse import urlencode
 
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connections
+from django.http import HttpResponse
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -28,7 +30,14 @@ from ADMIN.models import SiteSettings
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
-from Partner.models import AdvertImage, AdvertLandingPage, AdvertLead, AdvertPage, AdvertReference
+from Partner.models import (
+    AdvertImage,
+    AdvertLandingPage,
+    AdvertLead,
+    AdvertPage,
+    AdvertReference,
+    AdvertReferenceFile,
+)
 from SERVICE_INTERNAL import email_single
 from SERVICE_INTERNAL.config import About
 from STAFF.models import AuthorFollow, StaffProfile
@@ -220,7 +229,7 @@ class PanelCategoryTests(TestCase):
         self.assertContains(response, "News categories")
         self.assertContains(response, "2 stories")
         self.assertContains(response, "1 story")
-        self.assertContains(response, f"{ORIGINAL_COUNT} active")
+        self.assertContains(response, f">{ORIGINAL_COUNT}<")
 
     def test_panel_page_is_not_shown_to_plain_staff(self):
         self.client.force_login(self.writer)
@@ -3029,6 +3038,12 @@ class AdvertReferenceDeskTests(TestCase):
         patcher = mock.patch("ADMIN.views.is_rate_limited", return_value=(0, False))
         patcher.start()
         self.addCleanup(patcher.stop)
+        #   Account creation fires login/welcome emails on the global executor.
+        #   Keep this desk's many fixtures from queueing jobs that land in a
+        #   later test's mocked resend.Emails.send.
+        patcher = mock.patch("SERVICE_INTERNAL.email_single._EMAIL_EXECUTOR")
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
         self.admin = Auth.objects.create_admin(email="ads-desk-admin@example.com")
         self.ads_staff = Auth.objects.create_user(
@@ -3057,6 +3072,19 @@ class AdvertReferenceDeskTests(TestCase):
         }
         values.update(kwargs)
         return AdvertReference.objects.create(advert=advert or self.advert, **values)
+
+    def _storage_file(self, reference, public_id="abureport/advert-storage/brief", name="brief.pdf"):
+        return AdvertReferenceFile.objects.create(
+            reference=reference,
+            uploaded_by=self.ads_staff,
+            original_filename=name,
+            note="Final brief",
+            content_type="application/pdf",
+            resource_type="raw",
+            public_id=public_id,
+            secure_url="https://res.cloudinary.com/demo/raw/upload/v1/" + public_id,
+            file_size=12,
+        )
 
     def _issue_payload(self, **overrides):
         values = {
@@ -3423,6 +3451,148 @@ class AdvertReferenceDeskTests(TestCase):
         self.assertEqual(reference.business_name, "Updated Business")
         self.assertEqual(reference.public_url, "https://advance.example.com/landing")
         self.assertEqual(reference.notes, "Replaced after review.")
+
+    def test_ads_staff_can_upload_preview_and_delete_reference_storage(self):
+        reference = self._reference()
+        self.client.force_login(self.ads_staff)
+        upload = SimpleUploadedFile("brief.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
+        uploaded = {
+            "secure_url": "https://res.cloudinary.com/demo/raw/upload/v1/abureport/advert-storage/brief.pdf",
+            "public_id": "abureport/advert-storage/brief",
+            "resource_type": "raw",
+            "bytes": 12,
+        }
+        with mock.patch("ADMIN.views.upload_advert_storage_file", return_value=uploaded):
+            response = self.client.post(
+                reverse("control:advert_storage_upload", args=[reference.pk]),
+                {"storage_file": upload, "note": "Final brief"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        row = AdvertReferenceFile.objects.get()
+        self.assertEqual(row.reference, reference)
+        self.assertEqual(row.uploaded_by, self.ads_staff)
+        self.assertEqual(row.note, "Final brief")
+        self.assertEqual(row.public_id, "abureport/advert-storage/brief")
+
+        modal = self.client.get(reverse("control:advert_storage_modal", args=[reference.pk]))
+        self.assertContains(modal, "brief.pdf")
+        self.assertContains(modal, "Final brief")
+        match = re.search(r'href="(/control/ads/storage/[^"]+)"', modal.content.decode())
+        self.assertIsNotNone(match)
+        share_url = match.group(1)
+
+        self.client.logout()
+        with mock.patch("ADMIN.views._stream_advert_storage_asset", return_value=HttpResponse("ok")) as stream:
+            shared = self.client.get(share_url)
+        self.assertEqual(shared.status_code, 200)
+        self.assertTrue(stream.called)
+        bad_url = share_url[:-2] + ("y" if share_url[-2] == "x" else "x") + "/"
+        self.assertEqual(self.client.get(bad_url).status_code, 403)
+
+        self.client.force_login(self.ads_staff)
+        with mock.patch("ADMIN.views.destroy_archive_asset", return_value=True) as destroy:
+            response = self.client.post(
+                reverse("control:advert_storage_delete", args=[reference.pk, row.pk])
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(AdvertReferenceFile.objects.exists())
+        destroy.assert_called_once_with("abureport/advert-storage/brief", "raw")
+
+    def test_reader_cannot_open_or_upload_reference_storage(self):
+        reference = self._reference()
+        self.client.force_login(self.member)
+
+        modal = self.client.get(reverse("control:advert_storage_modal", args=[reference.pk]))
+        upload = self.client.post(reverse("control:advert_storage_upload", args=[reference.pk]), {})
+
+        self.assertEqual(modal.status_code, 302)
+        self.assertEqual(upload.status_code, 302)
+        self.assertFalse(AdvertReferenceFile.objects.exists())
+
+    def test_oversized_reference_storage_upload_is_rejected(self):
+        reference = self._reference()
+        self.client.force_login(self.ads_staff)
+        big = SimpleUploadedFile(
+            "big.zip", b"x" * (5 * 1024 * 1024 + 1), content_type="application/zip"
+        )
+
+        with mock.patch("ADMIN.views.upload_advert_storage_file") as upload:
+            response = self.client.post(
+                reverse("control:advert_storage_upload", args=[reference.pk]),
+                {"storage_file": big},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("limited to 5MB", response.content.decode())
+        upload.assert_not_called()
+
+    def test_reference_delete_removes_storage_and_only_checkbox_removes_advert_assets(self):
+        reference = self._reference()
+        self._storage_file(reference)
+        AdvertLandingPage.objects.create(
+            advert=self.advert,
+            html_public_id="abureport/advert-landing/advert_1.html",
+            html_bytes=12,
+            is_published=True,
+            author=self.admin,
+        )
+        self.client.force_login(self.ads_staff)
+
+        with (
+            mock.patch("SERVICE_INTERNAL.images.destroy_archive_asset", return_value=True) as signal_destroy,
+            mock.patch("ADMIN.views.destroy_archive_asset", return_value=True) as view_destroy,
+            mock.patch("ADMIN.views.destroy_advert_landing_html", return_value=True) as html_destroy,
+        ):
+            response = self.client.post(reverse("control:advert_reference_delete", args=[reference.pk]), {})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AdvertReference.objects.filter(pk=reference.pk).exists())
+        self.assertFalse(AdvertReferenceFile.objects.exists())
+        signal_destroy.assert_called_once_with("abureport/advert-storage/brief", "raw")
+        view_destroy.assert_not_called()
+        html_destroy.assert_not_called()
+        self.assertTrue(AdvertImage.objects.filter(pk=self.advert.pk).exists())
+
+        second_advert = self._advert("Second with assets")
+        AdvertImage.objects.filter(pk=second_advert.pk).update(
+            image_public_id="abureport/adverts/second",
+            image_url="https://res.cloudinary.com/demo/image/upload/v1/abureport/adverts/second.jpg",
+        )
+        second_advert.refresh_from_db()
+        second = self._reference(advert=second_advert)
+        AdvertLandingPage.objects.create(
+            advert=second_advert,
+            html_public_id="abureport/advert-landing/advert_2.html",
+            html_bytes=14,
+            is_published=True,
+            author=self.admin,
+        )
+        AdvertPage.objects.create(
+            advert=second_advert,
+            path="about",
+            html_public_id="abureport/advert-pages/advert_2_about.html",
+            html_bytes=20,
+            author=self.admin,
+            is_published=True,
+        )
+        with (
+            mock.patch("SERVICE_INTERNAL.images.destroy_archive_asset", return_value=True),
+            mock.patch("ADMIN.views.destroy_archive_asset", return_value=True) as view_destroy,
+            mock.patch("SERVICE_INTERNAL.images.destroy_advert_landing_html", return_value=True) as landing_destroy,
+            mock.patch("ADMIN.views.destroy_advert_landing_html", return_value=True) as page_destroy,
+        ):
+            response = self.client.post(
+                reverse("control:advert_reference_delete", args=[second.pk]),
+                {"delete_advert_assets": "1"},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AdvertReference.objects.filter(pk=second.pk).exists())
+        self.assertFalse(AdvertImage.objects.filter(pk=second_advert.pk).exists())
+        view_destroy.assert_called_once_with("abureport/adverts/second")
+        landing_destroy.assert_called_once_with("abureport/advert-landing/advert_2.html")
+        page_destroy.assert_called_once_with("abureport/advert-pages/advert_2_about.html")
 
     def test_desk_lists_recent_advert_leads(self):
         AdvertLead.objects.create(

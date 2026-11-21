@@ -132,6 +132,25 @@ def request_host(request):
     return clean_host(request.get_host())
 
 
+def is_canonical_request(request):
+    """True only when the raw request host is EXACTLY ALLOWED_HOSTS[0].
+
+    Unlike request_host() this does not strip a port, and unlike canonical_host()
+    it does not normalise the configured value. The web manifest is deliberately
+    strict: localhost:8000, www., tunnel aliases and every subdomain are all a
+    different host as far as the browser is concerned, so none of them serve it.
+    """
+    if request is None:
+        return False
+    configured = ""
+    for value in getattr(settings, "ALLOWED_HOSTS", []) or []:
+        if value and "*" not in value:
+            configured = str(value).strip().lower().rstrip(".")
+            break
+    incoming = str(request.get_host()).strip().lower().rstrip(".")
+    return bool(configured and incoming and incoming == configured)
+
+
 def is_ads_subdomain(request):
     host = ads_host()
     return bool(host and request is not None and request_host(request) == host)

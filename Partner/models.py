@@ -2,7 +2,7 @@ import re
 import secrets
 
 from django.db import models
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -427,6 +427,43 @@ class AdvertReference(models.Model):
         return self.public_page_url or self.public_target
 
 
+class AdvertReferenceFile(models.Model):
+    """A file kept in one reference's Ads desk storage.
+
+    This is deliberately NOT an ArchiveImage: it is private to the ads team,
+    belongs to one reference, and is never offered to story tokens or the
+    public /archive/ gallery. Cloudinary keeps the bytes; this row keeps the
+    public id needed to preview, share (signed link) and delete them again.
+    """
+
+    reference = models.ForeignKey(
+        AdvertReference,
+        on_delete=models.CASCADE,
+        related_name="storage_files",
+    )
+    uploaded_by = models.ForeignKey(
+        "AUTHENTICATION.Auth",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="advert_storage_files",
+    )
+    original_filename = models.CharField(max_length=255)
+    note = models.CharField(max_length=240, blank=True, default="")
+    content_type = models.CharField(max_length=100, blank=True, default="")
+    resource_type = models.CharField(max_length=10, default="image")
+    public_id = models.CharField(max_length=255)
+    secure_url = models.URLField(max_length=500)
+    file_size = models.PositiveIntegerField(default=0)
+    date_uploaded = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-date_uploaded",)
+
+    def __str__(self):
+        return f"{self.reference_id} - {self.original_filename}"
+
+
 class AdvertEvent(models.Model):
     """One tracked view or click for an advert reference.
 
@@ -495,3 +532,18 @@ def _release_landing_html(sender, instance, **kwargs):
     from SERVICE_INTERNAL.images import destroy_advert_landing_html
 
     destroy_advert_landing_html(instance.html_public_id)
+
+
+@receiver(pre_delete, sender=AdvertReference)
+def _release_reference_storage(sender, instance, **kwargs):
+    """A deleted reference takes its uploaded storage files with it.
+
+    Runs on pre_delete because Django's cascade removes the child rows before
+    this parent's post_delete fires. The linked advert picture/HTML is left
+    alone unless the Ads desk delete dialog explicitly asked for it.
+    """
+    from SERVICE_INTERNAL.images import destroy_archive_asset
+
+    for row in instance.storage_files.all():
+        if row.public_id:
+            destroy_archive_asset(row.public_id, row.resource_type or "image")

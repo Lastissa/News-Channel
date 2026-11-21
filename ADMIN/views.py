@@ -10,16 +10,20 @@ import math
 import logging
 import re
 from datetime import timedelta
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
+import cloudinary.utils
+import requests
 from django.contrib import messages
+from django.core import signing
 from django.core.exceptions import ValidationError
+from django.core.signing import BadSignature
 from django.core.validators import URLValidator, validate_email
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import title as title_case
 from django.urls import reverse
 from django.utils.text import slugify
@@ -40,12 +44,14 @@ from Partner.plans import advert_allows, plan_allows, plan_message, time_left
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.images import (
     ADVERT_LANDING_MAX_BYTES,
+    ADVERT_STORAGE_MAX_BYTES,
     ImageUploadError,
     destroy_advert_landing_html,
     destroy_archive_asset,
     fetch_advert_landing_html,
     upload_advert_image,
     upload_advert_landing_html,
+    upload_advert_storage_file,
 )
 from SERVICE_INTERNAL.permissions import admin_only, ads_staff_only
 from SERVICE_INTERNAL.passwords import first_password_error
@@ -74,6 +80,7 @@ from Partner.models import (
     AdvertLandingPage,
     AdvertLead,
     AdvertReference,
+    AdvertReferenceFile,
     Announcement,
 )
 from ADMIN.models import SiteSettings
@@ -3159,7 +3166,7 @@ def _advert_choices(current_advert_id=None):
     return choices
 
 
-def _advert_reference_row(reference, advert_choices):
+def _advert_reference_row(reference, advert_choices, storage_counts=None):
     status_key, status_label = _reference_status(reference)
     advert = reference.advert
     landing = getattr(advert, "landing_page", None)
@@ -3187,6 +3194,7 @@ def _advert_reference_row(reference, advert_choices):
         "advert_id": advert.pk if advert else None,
         "advert_label": (advert.heading or f"Advert #{advert.pk}") if advert else "",
         "notes": reference.notes,
+        "storage_count": (storage_counts or {}).get(reference.pk, 0),
         "view_total": getattr(reference, "view_total", 0),
         "click_total": getattr(reference, "click_total", 0),
         "ctr": round(getattr(reference, "click_total", 0) / getattr(reference, "view_total", 0) * 100, 1)
@@ -3217,15 +3225,25 @@ def _reference_queryset():
     )
 
 
+def _storage_counts_for(reference_ids=None):
+    """File counts by reference, without adding another join to the already
+    annotated view/click queryset."""
+    rows = AdvertReferenceFile.objects.all()
+    if reference_ids is not None:
+        rows = rows.filter(reference_id__in=reference_ids)
+    return dict(rows.values_list("reference_id").annotate(total=Count("id")))
+
+
 def _advert_reference_rows():
     advert_choices = _advert_choices()
-    rows = _reference_queryset().order_by("-created_at")[:ADVERT_REFERENCE_LIST_LIMIT]
-    return [_advert_reference_row(row, advert_choices) for row in rows]
+    rows = list(_reference_queryset().order_by("-created_at")[:ADVERT_REFERENCE_LIST_LIMIT])
+    counts = _storage_counts_for([row.pk for row in rows])
+    return [_advert_reference_row(row, advert_choices, counts) for row in rows]
 
 
 def _one_reference_row(reference_id):
     row = _reference_queryset().filter(pk=reference_id).first()
-    return _advert_reference_row(row, _advert_choices()) if row else None
+    return _advert_reference_row(row, _advert_choices(), _storage_counts_for([reference_id])) if row else None
 
 
 def _copy_link_to_advert(reference, old_advert=None):
@@ -3291,6 +3309,382 @@ def _ads_control_context(form_data=None, form_error=""):
         "form_data": form_data or _reference_form_data(defaults=True),
         "form_error": form_error,
     }
+
+
+"""
+------------------------------------------------------------
+#   ADVERT REFERENCE STORAGE
+------------------------------------------------------------
+Each Ads desk reference gets its own private file shelf. It is NOT the public
+/archive/ library: no story tokens, no public gallery, no advertiser access.
+Only ads staff can open it, upload, delete or hand out a one-hour signed link.
+The linked advert picture/HTML is listed as read-only system context.
+"""
+
+ADVERT_STORAGE_LINK_SALT = "advert-storage-share"
+ADVERT_STORAGE_LINK_AGE = 3600  #   one hour, as requested
+_ADVERT_ACTIVE_EXTENSIONS = {"html", "htm", "svg", "js", "mjs", "php", "py", "sh", "bat", "cmd", "exe"}
+
+
+def _ads_desk_denied(request):
+    if ads_staff_only(request.user):
+        return None
+    if request.headers.get("HX-Request") == "true":
+        return JsonResponse({"detail": "Ads access is required."}, status=403)
+    return admin_page_redirect(request)
+
+
+def _ads_file_size_label(num_bytes):
+    if not num_bytes:
+        return ""
+    if num_bytes < 1024:
+        return f"{num_bytes} B"
+    if num_bytes < 1024 * 1024:
+        return f"{num_bytes / 1024:.1f} KB"
+    return f"{num_bytes / (1024 * 1024):.2f} MB"
+
+
+def _advert_storage_kind(filename, content_type):
+    name_ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    mime = (content_type or "").lower()
+    if mime.startswith("image/") or name_ext in {"png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"}:
+        return "image"
+    if mime.startswith("video/") or name_ext in {"mp4", "mov", "webm"}:
+        return "video"
+    return "file"
+
+
+def _advert_storage_force_download(filename):
+    """Active content is stored, but never rendered on our own domain."""
+    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    return ext in _ADVERT_ACTIVE_EXTENSIONS
+
+
+def _advert_storage_share_urls(row):
+    token = signing.TimestampSigner(salt=ADVERT_STORAGE_LINK_SALT).sign(str(row.pk))
+    base = reverse("control:advert_storage_share", kwargs={"file_id": row.pk, "token": token})
+    return base, f"{base}?download=1"
+
+
+def _advert_storage_file_rows(reference):
+    rows = []
+    for item in reference.storage_files.select_related("uploaded_by").order_by("-date_uploaded"):
+        preview_url, download_url = _advert_storage_share_urls(item)
+        rows.append(
+            {
+                "id": item.pk,
+                "name": item.original_filename,
+                "note": item.note,
+                "kind": _advert_storage_kind(item.original_filename, item.content_type),
+                "secure_url": item.secure_url,
+                "size": _ads_file_size_label(item.file_size),
+                "uploaded_by": item.uploaded_by.email if item.uploaded_by_id else "",
+                "date": timezone.localtime(item.date_uploaded).strftime("%d %b %Y, %H:%M"),
+                "preview_url": preview_url,
+                "download_url": download_url,
+                "force_download": _advert_storage_force_download(item.original_filename),
+                "system": False,
+            }
+        )
+    return rows
+
+
+def _advert_storage_system_rows(reference):
+    """Read-only context already owned by the linked advert. These rows are
+    never edited or deleted from the storage shelf -- that stays in PANEL and
+    the landing-page editor."""
+    advert = reference.advert
+    if advert is None:
+        return []
+    rows = []
+    if advert.image_url:
+        rows.append(
+            {
+                "name": (advert.heading or "Advert banner") + " (banner)",
+                "note": "Linked advert banner",
+                "kind": "image",
+                "secure_url": advert.image_url,
+                "size": "",
+                "uploaded_by": "",
+                "date": timezone.localtime(advert.date_created).strftime("%d %b %Y, %H:%M"),
+                "system": True,
+            }
+        )
+    landing = getattr(advert, "landing_page", None)
+    if landing and landing.html_public_id:
+        rows.append(
+            {
+                "name": "Landing page HTML",
+                "note": f"{landing.html_bytes or 0} bytes · managed in PANEL",
+                "kind": "file",
+                "secure_url": "",
+                "size": _ads_file_size_label(landing.html_bytes),
+                "uploaded_by": landing.author_label,
+                "date": timezone.localtime(landing.date_updated).strftime("%d %b %Y, %H:%M"),
+                "system": True,
+            }
+        )
+    for page in advert.pages.all():
+        if page.html_public_id:
+            rows.append(
+                {
+                    "name": f"/{page.path}/ HTML",
+                    "note": "Extra advert page · managed in PANEL",
+                    "kind": "file",
+                    "secure_url": "",
+                    "size": _ads_file_size_label(page.html_bytes),
+                    "uploaded_by": "",
+                    "date": timezone.localtime(page.date_updated).strftime("%d %b %Y, %H:%M"),
+                    "system": True,
+                }
+            )
+    return rows
+
+
+def _advert_storage_context(reference, error="", notice=""):
+    return {
+        "ref": {
+            "id": reference.pk,
+            "reference": reference.reference,
+            "business_name": reference.business_name,
+        },
+        "storage_files": _advert_storage_file_rows(reference),
+        "system_files": _advert_storage_system_rows(reference),
+        "storage_max_mb": ADVERT_STORAGE_MAX_BYTES // (1024 * 1024),
+        "storage_error": error,
+        "storage_notice": notice,
+    }
+
+
+def _advert_storage_response(request, reference, error="", notice="", status=200):
+    response = render(
+        request,
+        "ADMIN/partials/advert_reference_storage.html",
+        _advert_storage_context(reference, error, notice),
+        status=status,
+    )
+    if notice or error:
+        response["HX-Trigger"] = json.dumps({"adsToast": {"text": notice or error, "ok": not bool(error)}})
+    return response
+
+
+class AdvertReferenceStorageModalView(View):
+    """htmx GET: the storage drawer for one reference."""
+
+    def get(self, request, reference_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        return _advert_storage_response(request, reference)
+
+
+class AdvertReferenceStorageUploadView(View):
+    def post(self, request, reference_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        remaining_seconds, limited = is_rate_limited(request, 20, 60, scope="advert-storage")
+        if limited:
+            return _advert_storage_response(
+                request,
+                get_object_or_404(AdvertReference, pk=reference_id),
+                error=f"Please wait {remaining_seconds} seconds before uploading again.",
+                status=429,
+            )
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        upload = request.FILES.get("storage_file")
+        if upload is None:
+            return _advert_storage_response(request, reference, error="Choose a file first.", status=400)
+        size = getattr(upload, "size", 0) or 0
+        if size > ADVERT_STORAGE_MAX_BYTES:
+            return _advert_storage_response(
+                request, reference, error=f"Files are limited to {ADVERT_STORAGE_MAX_BYTES // (1024 * 1024)}MB.", status=400
+            )
+        note = " ".join((request.POST.get("note") or "").split())[:240]
+        try:
+            uploaded = upload_advert_storage_file(upload)
+        except ImageUploadError as exc:
+            return _advert_storage_response(request, reference, error=str(exc), status=400)
+        try:
+            AdvertReferenceFile.objects.create(
+                reference=reference,
+                uploaded_by=request.user,
+                original_filename=(getattr(upload, "name", "") or "file")[:255],
+                note=note,
+                content_type=(getattr(upload, "content_type", "") or "")[:100],
+                resource_type=uploaded["resource_type"],
+                public_id=uploaded["public_id"],
+                secure_url=uploaded["secure_url"],
+                file_size=uploaded["bytes"],
+            )
+        except Exception:
+            destroy_archive_asset(uploaded["public_id"], uploaded["resource_type"])
+            raise
+        info_logger(msg=f"ADS STORAGE: file added to reference {reference.reference} by {request.user.email}")
+        return _advert_storage_response(request, reference, notice="File added to this reference.")
+
+
+class AdvertReferenceStorageDeleteView(View):
+    def post(self, request, reference_id, file_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        item = get_object_or_404(AdvertReferenceFile, pk=file_id, reference=reference)
+        public_id, resource_type = item.public_id, item.resource_type
+        item.delete()
+        if public_id:
+            destroy_archive_asset(public_id, resource_type or "image")
+        info_logger(msg=f"ADS STORAGE: file {file_id} removed from reference {reference.reference} by {request.user.email}")
+        return _advert_storage_response(request, reference, notice="File deleted.")
+
+
+def _stream_advert_storage_asset(request, item, force_download):
+    """Relay one small (<=5MB) Ads storage file from Cloudinary with a signed
+    link. Range is forwarded so video preview can seek."""
+    filename = item.original_filename or item.public_id.rsplit("/", 1)[-1] or "download"
+    delivery_url, _ = cloudinary.utils.cloudinary_url(
+        item.public_id, resource_type=item.resource_type or "image", secure=True
+    )
+    upstream_headers = {}
+    range_header = request.headers.get("Range")
+    if range_header:
+        upstream_headers["Range"] = range_header
+    try:
+        upstream = requests.get(delivery_url, headers=upstream_headers, stream=True, timeout=(8, 60))
+    except requests.RequestException as exc:
+        info_logger(msg=f"ADS STORAGE FETCH FAILED ({item.public_id}): {exc}")
+        raise Http404("File not found.")
+    if upstream.status_code == 404:
+        upstream.close()
+        raise Http404("File not found.")
+    if upstream.status_code >= 400:
+        upstream.close()
+        return HttpResponse(status=502)
+
+    def chunks():
+        try:
+            for chunk in upstream.iter_content(chunk_size=64 * 1024):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+
+    #   Active files must never be rendered as page/script on our domain, so
+    #   even a preview link hands them out as an opaque attachment.
+    content_type = (
+        "application/octet-stream"
+        if force_download
+        else (item.content_type or upstream.headers.get("Content-Type") or "application/octet-stream")
+    )
+    response = StreamingHttpResponse(
+        chunks(),
+        status=206 if upstream.status_code == 206 else 200,
+        content_type=content_type,
+    )
+    for header in ("Content-Length", "Content-Range", "ETag", "Last-Modified"):
+        if header in upstream.headers:
+            response[header] = upstream.headers[header]
+    response["Accept-Ranges"] = upstream.headers.get("Accept-Ranges", "bytes")
+    response["Cache-Control"] = "private, no-store"
+    safe_name = filename.replace('"', "").replace("\r", "").replace("\n", "")
+    disposition = "attachment" if force_download else "inline"
+    response["Content-Disposition"] = f"{disposition}; filename=\"{safe_name}\"; filename*=UTF-8''{quote(filename)}"
+    return response
+
+
+class AdvertReferenceShareView(View):
+    """Public one-hour signed link for one Ads storage file. No login needed:
+    possession of the token IS the permission. Active file types are forced
+    to download even when the link was opened as a preview."""
+
+    def get(self, request, file_id, token):
+        try:
+            signed_id = signing.TimestampSigner(salt=ADVERT_STORAGE_LINK_SALT).unsign(
+                token, max_age=ADVERT_STORAGE_LINK_AGE
+            )
+        except BadSignature:
+            return HttpResponse("This share link has expired or is invalid.", status=403)
+        if signed_id != str(file_id):
+            return HttpResponse("This share link has expired or is invalid.", status=403)
+        item = get_object_or_404(AdvertReferenceFile, pk=file_id)
+        force = request.GET.get("download") in {"1", "true", "yes"} or _advert_storage_force_download(
+            item.original_filename
+        )
+        return _stream_advert_storage_asset(request, item, force)
+
+
+class AdvertReferenceDeleteView(View):
+    """Delete one reference from the Ads desk. Storage files always go; the
+    linked advert picture/HTML only go when the confirm box is ticked."""
+
+    def get(self, request, reference_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        return render(
+            request,
+            "ADMIN/partials/advert_reference_delete.html",
+            {
+                "ref": {
+                    "id": reference.pk,
+                    "reference": reference.reference,
+                    "business_name": reference.business_name,
+                    "storage_count": reference.storage_files.count(),
+                    "has_advert": bool(reference.advert_id),
+                }
+            },
+        )
+
+    def post(self, request, reference_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        remaining_seconds, limited = is_rate_limited(request, 10, 60, scope="advert-reference-delete")
+        if limited:
+            return JsonResponse({"detail": f"Please wait {remaining_seconds} seconds before deleting again."}, status=429)
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        reference_code = reference.reference
+        advert = reference.advert
+        delete_assets = (
+            (request.POST.get("delete_advert_assets") or "").lower() in {"1", "true", "on", "yes"}
+            and advert is not None
+        )
+        html_public_ids = []
+        if delete_assets:
+            #   The landing page row's post_delete signal already removes its
+            #   Cloudinary HTML when advert.delete() cascades below. Extra
+            #   pages have no such signal, so their assets are collected here.
+            html_public_ids = list(
+                AdvertPage.objects.filter(advert=advert)
+                .exclude(html_public_id="")
+                .values_list("html_public_id", flat=True)
+            )
+        advert_image_public_id = advert.image_public_id if delete_assets else ""
+        reference.delete()  #   pre_delete signal removes storage files/assets
+        if delete_assets:
+            #   Ticking the box destroys the campaign itself, not just the
+            #   assignment. Deleting the AdvertImage row cascades its landing
+            #   and extra-page rows; the Cloudinary objects go below.
+            advert.delete()
+        if advert_image_public_id:
+            destroy_archive_asset(advert_image_public_id)
+        for public_id in html_public_ids:
+            destroy_advert_landing_html(public_id)
+        info_logger(
+            msg=(
+                f"ADS DESK: reference {reference_code} deleted by {request.user.email}; "
+                f"advert assets removed={delete_assets}"
+            )
+        )
+        if request.headers.get("HX-Request") == "true":
+            response = HttpResponse("")
+            response["HX-Redirect"] = reverse("control:advert_references")
+            return response
+        messages.success(request, f"Reference {reference_code} was deleted.")
+        return redirect("control:advert_references")
 
 
 class AdvertReferencesView(View):

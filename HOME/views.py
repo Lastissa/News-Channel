@@ -67,6 +67,7 @@ from SERVICE_INTERNAL.hosts import (
     ads_origin,
     canonical_origin,
     is_ads_subdomain,
+    is_canonical_request,
     promote_lead_path,
     promote_path,
     promote_public_url,
@@ -460,6 +461,8 @@ class ManifestView(View):
     a manifest fetched from the ads host can never install ads as the app."""
 
     def get(self, request):
+        if not is_canonical_request(request):
+            raise Http404("The web manifest is only served from the canonical domain.")
         origin = canonical_origin(request)
         root = f"{origin}/" if origin else "/"
 

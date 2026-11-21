@@ -209,13 +209,25 @@
     </aside>
   </div>
 
+  <div class="ads-modal" id="advert-storage-modal" data-storage-modal hidden>
+    <div class="ads-modal-panel" role="dialog" aria-modal="true" aria-label="Reference storage">
+      <div id="advert-storage-body"></div>
+    </div>
+  </div>
+
+  <div class="ads-modal" id="advert-ref-delete-modal" data-ref-delete-modal hidden>
+    <div class="ads-modal-panel ads-modal-panel--small" role="dialog" aria-modal="true" aria-label="Delete reference">
+      <div id="advert-ref-delete-body"></div>
+    </div>
+  </div>
+
   <div class="ads-desk-toast" id="ads-desk-toast" role="status" aria-live="polite" hidden></div>
 </section>
 {% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261120-1">
+<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261121-1">
 <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'control/js/advert_references.js' %}?v=20261120-1" defer></script>
+<script src="{% static 'control/js/advert_references.js' %}?v=20261121-1" defer></script>
 {% endblock %}

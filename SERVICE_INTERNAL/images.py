@@ -202,6 +202,12 @@ def upload_news_image(file, quality=ImageQuality.MEDIUM, public_id: str | None =
 #   goes down the wire.
 _ADVERT_IMAGE_PRESET = {"quality": "auto:good", "width": 1200, "crop": "limit"}
 
+#   Ads desk storage deliberately accepts ANY file type, but a hard 5MB cap
+#   keeps one upload from turning the desk into a free hosting bucket. Active
+#   types (HTML/SVG/JS/...) are still stored; the serving view forces them to
+#   download instead of rendering them on our domain.
+ADVERT_STORAGE_MAX_BYTES = 5 * 1024 * 1024
+
 
 def upload_advert_image(file, public_id: str | None = None) -> dict:
     """Panel "Image adverts" upload. `public_id` is the asset an advert
@@ -211,6 +217,50 @@ def upload_advert_image(file, public_id: str | None = None) -> dict:
     _validate_image_file(file)
     result = _run_upload(file, folder="abureport/adverts", preset=_ADVERT_IMAGE_PRESET, tag="advert", public_id=public_id)
     return {"secure_url": result.get("secure_url") or result.get("url"), "public_id": result.get("public_id", "")}
+
+
+def upload_advert_storage_file(file) -> dict:
+    """Upload one Ads desk reference file to Cloudinary.
+
+    Unlike the public archive this accepts every content type, but it is the
+    only ads upload path with a flat 5MB ceiling. The caller must save the
+    returned public_id/resource_type so the asset can later be previewed,
+    shared by a signed link and removed again.
+    """
+    original_name = getattr(file, "name", "") or "file"
+    size = getattr(file, "size", None)
+    if size is not None:
+        if size <= 0:
+            raise ImageUploadError("That file is empty.")
+        if size > ADVERT_STORAGE_MAX_BYTES:
+            raise ImageUploadError(
+                f"Ads storage files are limited to 5MB. This file is {_human_mb(size)}."
+            )
+
+    try:
+        result = cloudinary.uploader.upload(
+            file,
+            resource_type="auto",
+            folder="abureport/advert-storage",
+            use_filename=True,
+            unique_filename=True,
+            overwrite=False,
+            tags=["advert-storage"],
+        )
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY UPLOAD FAILED (advert-storage): {exc}")
+        raise ImageUploadError("Could not upload the file right now. Please try again.") from exc
+
+    secure_url = result.get("secure_url") or result.get("url")
+    if not secure_url or not result.get("public_id"):
+        error_logger(msg=f"CLOUDINARY UPLOAD (advert-storage) RETURNED NO ASSET: {result}")
+        raise ImageUploadError("Cloudinary did not return a file id. Please try again.")
+    return {
+        "secure_url": secure_url,
+        "public_id": result["public_id"],
+        "resource_type": result.get("resource_type") or "image",
+        "bytes": result.get("bytes") or size or 0,
+    }
 
 
 #   ADVERT LANDING PAGES

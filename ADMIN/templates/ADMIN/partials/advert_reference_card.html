@@ -65,6 +65,11 @@ still work as normal form posts (see data-fallback forms in the edit block).{% e
             hx-post="{% url 'control:advert_reference_shorten' ref.id %}" hx-vals='{"days": "7"}'
             hx-confirm="Remove 7 days from {{ ref.business_name }} ({{ ref.reference }})?{% if ref.expires_at %} It currently ends {{ ref.expires_at|date:'M d, Y H:i' }}.{% endif %}">&minus; 7 days</button>
 
+    <button type="button" class="ads-desk-button ads-desk-button--quiet"
+            data-open-storage
+            hx-get="{% url 'control:advert_storage_modal' ref.id %}"
+            hx-target="#advert-storage-body" hx-swap="innerHTML">Storage <b>{{ ref.storage_count }}</b></button>
+
     {% if ref.allows_pages and request.user.is_admin or ref.allows_pages and request.user.is_superuser %}
     <a class="ads-desk-button ads-desk-button--quiet" href="{% url 'control:advert_pages' ref.id %}">Pages</a>
     {% endif %}
@@ -74,6 +79,11 @@ still work as normal form posts (see data-fallback forms in the edit block).{% e
             hx-post="{% url 'control:advert_reference_status' ref.id %}" hx-vals='{"action": "expire"}'
             hx-confirm="End {{ ref.reference }} for {{ ref.business_name }}? It stops showing straight away.">End</button>
     {% endif %}
+
+    <button type="button" class="ads-desk-button ads-desk-button--danger"
+            data-open-ref-delete
+            hx-get="{% url 'control:advert_reference_delete' ref.id %}"
+            hx-target="#advert-ref-delete-body" hx-swap="innerHTML">Delete</button>
   </div>
 
   <details class="ads-desk-edit" {% if edit_error_id == ref.id %}open{% endif %}>

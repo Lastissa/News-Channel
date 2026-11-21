@@ -1,0 +1,31 @@
+<div class="ads-ref-delete">
+  <header class="ads-storage-head">
+    <div>
+      <p class="ads-storage-kicker">{{ ref.reference }}</p>
+      <h3>Delete this reference?</h3>
+      <p>{{ ref.business_name }} will be removed from the Ads desk.</p>
+    </div>
+    <button type="button" class="ads-desk-button ads-desk-button--quiet" data-modal-close>Close</button>
+  </header>
+
+  <p class="ads-ref-delete-copy">
+    The {{ ref.storage_count }} uploaded storage file{{ ref.storage_count|pluralize }} will be deleted permanently.
+  </p>
+
+  <form method="post" action="{% url 'control:advert_reference_delete' ref.id %}"
+        hx-post="{% url 'control:advert_reference_delete' ref.id %}"
+        class="ads-ref-delete-form">
+    {% csrf_token %}
+    {% if ref.has_advert %}
+    <label class="ads-ref-delete-check">
+      <input type="checkbox" name="delete_advert_assets" value="1">
+      <span>Also delete the linked advert banner, landing page and extra pages</span>
+    </label>
+    <small>Leave unchecked to keep the campaign files while removing only the reference and its storage.</small>
+    {% endif %}
+    <div class="ads-storage-actions-wide">
+      <button type="button" class="ads-desk-button ads-desk-button--quiet" data-modal-close>Cancel</button>
+      <button type="submit" class="ads-desk-button ads-desk-button--danger">Delete reference</button>
+    </div>
+  </form>
+</div>
