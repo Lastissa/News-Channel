@@ -329,7 +329,7 @@
           if (countNode) countNode.textContent = String(oldCount);
           if (result.status === 401) {
             openAuthGate("bookmark", extractDetail(result.text, "GGGGGGGGGGGGGG."));
-          } else if (result.status === 403) {
+          } else if (result.status === 403 || result.status === 419) {
             bottomtoast(extractDetail(result.text, "Security check failed. Please reload & try again."), "error");
           } else if (result.status >= 500) {
             bottomtoast(extractDetail(result.text, "Server error. Please try again."), "error");

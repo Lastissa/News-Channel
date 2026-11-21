@@ -564,7 +564,8 @@ class CsrfFailureResponseTests(TestCase):
 
     def _assert_json_detail(self, request):
         response = csrf_failure(request)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 419)
+        self.assertTrue(response["X-CSRF-Token"])
         self.assertEqual(response["Content-Type"], "application/json")
         payload = json.loads(response.content)
         self.assertIn("detail", payload)
@@ -584,5 +585,5 @@ class CsrfFailureResponseTests(TestCase):
 
     def test_normal_navigation_still_gets_the_html_page(self):
         response = csrf_failure(self._request())
-        self.assertEqual(response.status_code, 403)
-        self.assertContains(response, "CSRF FAIL", status_code=403)
+        self.assertEqual(response.status_code, 419)
+        self.assertContains(response, "CSRF FAIL", status_code=419)

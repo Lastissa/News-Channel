@@ -6,6 +6,7 @@ from urllib.parse import quote, urlsplit
 
 from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -493,7 +494,7 @@ class PasswordResetView(View):
 
 from SERVICE_INTERNAL.abstract import info_logger
 def csrf_failure(request, exception=None, **args):
-    info_logger(msg=f"CSRF_ERROR: {request.user or 'Anonymous user'} tried to perform some action but experienced CSRF error")
+    info_logger(msg=f"CSRF_ERROR: user={request.user or 'Anonymous user'} {request.method} {request.path} reason={exception} cookie={'csrftoken' in request.COOKIES} header={'HTTP_X_CSRFTOKEN' in request.META} referer={request.headers.get('Referer', '')}")
     #   fetch/htmx callers need a parseable reason: the HTML security page used
     #   to be swallowed by their JSON parsers and became a generic "could not"
     #   toast. Normal page navigation still gets the full CSRF explanation.
@@ -503,8 +504,10 @@ def csrf_failure(request, exception=None, **args):
         or "application/json" in request.headers.get("Accept", "")
     )
     if ajax:
-        return JsonResponse(
+        response = JsonResponse(
             {"detail": "Your session expired or the page is stale. Refresh the page and try again."},
-            status=403,
+            status=419,
         )
-    return render(request, "csrf_fail.html", status=403)
+        response["X-CSRF-Token"] = get_token(request)
+        return response
+    return render(request, "csrf_fail.html", status=419)

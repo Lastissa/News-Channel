@@ -2286,7 +2286,7 @@
 
            published story either. */
 
-        if (result.status === 401 || result.status === 403 || (result.ok && !result.isJson)) {
+        if (result.status === 401 || result.status === 403 || result.status === 419 || (result.ok && !result.isJson)) {
 
           toast(extractDetail(result.text, "Your session has expired. Refresh the page and sign in again to publish."), "error");
 

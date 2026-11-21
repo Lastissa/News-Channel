@@ -11,6 +11,7 @@ AUTH_USER_MODEL = "AUTHENTICATION.Auth"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
 CSRF_FAILURE_VIEW = "AUTHENTICATION.views.csrf_failure"
 
 SECRET_KEY = os.getenv('DJANGO_SECRET')
