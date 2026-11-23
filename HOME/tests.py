@@ -2725,6 +2725,79 @@ class AdvertiserReferenceDashboardTests(QuietTestCase):
             ],
         )
 
+    def test_dashboard_draws_a_views_line_and_a_two_slice_click_pie(self):
+        owner = Auth.objects.create_user(email="charts@example.com")
+        reference = self._reference(owner)
+        for source in (
+            AdvertEvent.SOURCE_ABUREPORT,
+            AdvertEvent.SOURCE_ABUREPORT,
+            AdvertEvent.SOURCE_EXTERNAL,
+        ):
+            AdvertEvent.objects.create(
+                reference=reference,
+                event_type=AdvertEvent.EVENT_CLICK,
+                source=source,
+            )
+        for _ in range(4):
+            AdvertEvent.objects.create(
+                reference=reference,
+                event_type=AdvertEvent.EVENT_VIEW,
+                source=AdvertEvent.SOURCE_ABUREPORT,
+            )
+        self.client.force_login(owner)
+
+        response = self.client.get(reverse("home:advertise_dashboard"))
+
+        self.assertEqual(response.context["analytics"]["click_chart"]["values"], [2, 1])
+        self.assertEqual(sum(response.context["analytics"]["view_chart"]["values"]), 4)
+        self.assertContains(response, "Views over time")
+        self.assertContains(response, "Where clicks come from")
+        self.assertContains(response, 'id="advertiser-all-views"')
+        self.assertContains(response, 'id="advertiser-all-clicks-data"')
+        self.assertNotContains(response, "ads-dash-bars")
+
+    def test_analytics_fragment_filters_by_reference_and_never_leaks_other_owners(self):
+        owner = Auth.objects.create_user(email="fragment-owner@example.com")
+        other_owner = Auth.objects.create_user(email="fragment-other@example.com")
+        first = self._reference(owner, business_name="First Ad")
+        second = self._reference(
+            owner, advert=self._advert("Second advert"), business_name="Second Ad"
+        )
+        other = self._reference(
+            other_owner,
+            advert=self._advert("Other advert"),
+            business_name="Other Shop",
+        )
+        AdvertEvent.objects.create(reference=first, event_type=AdvertEvent.EVENT_VIEW)
+        AdvertEvent.objects.create(
+            reference=first,
+            event_type=AdvertEvent.EVENT_CLICK,
+            source=AdvertEvent.SOURCE_ABUREPORT,
+        )
+        AdvertEvent.objects.create(reference=second, event_type=AdvertEvent.EVENT_VIEW)
+        AdvertEvent.objects.create(reference=other, event_type=AdvertEvent.EVENT_VIEW)
+        self.client.force_login(owner)
+
+        endpoint = reverse("home:advertise_dashboard_analytics")
+        scoped = self.client.get(
+            endpoint, {"range": "7", "reference": str(first.pk)}
+        )
+        self.assertEqual(scoped.status_code, 200)
+        self.assertEqual(scoped.context["selected_reference"], str(first.pk))
+        self.assertEqual(scoped.context["analytics"]["range"], "7")
+        self.assertEqual(scoped.context["analytics"]["totals"]["views"], 1)
+        self.assertEqual(scoped.context["analytics"]["click_chart"]["values"], [1, 0])
+        self.assertContains(scoped, "First Ad")
+        self.assertNotContains(scoped, "Other Shop")
+
+        combined = self.client.get(endpoint, {"reference": str(other.pk)})
+        self.assertEqual(combined.context["selected_reference"], "")
+        self.assertEqual(combined.context["analytics"]["totals"]["views"], 2)
+
+    def test_analytics_fragment_requires_a_signed_in_owner(self):
+        response = self.client.get(reverse("home:advertise_dashboard_analytics"))
+        self.assertEqual(response.status_code, 401)
+
     def test_home_rail_uses_tracked_click_and_view_urls(self):
         from HOME.views import _teaser_items
 
@@ -2786,6 +2859,15 @@ class AdvertiserDashboardPlanTests(TestCase):
         response = self.client.get(reverse("home:advertise_dashboard"))
         self.assertTrue(response.context["has_analytics"])
         self.assertEqual(response.context["view_total"], 1)
+
+    def test_regular_references_never_render_chart_data_or_a_chart_fragment(self):
+        self._make(AdvertLead.PLAN_REGULAR, "Regular Co")
+        dashboard = self.client.get(reverse("home:advertise_dashboard"))
+        self.assertNotContains(dashboard, "data-advert-chart")
+        self.assertNotContains(dashboard, "data-advert-analytics")
+
+        fragment = self.client.get(reverse("home:advertise_dashboard_analytics"))
+        self.assertNotContains(fragment, "data-advert-chart")
 
 
 class SearchPageAjaxTests(TestCase):

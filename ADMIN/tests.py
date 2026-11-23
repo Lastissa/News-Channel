@@ -31,6 +31,7 @@ from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
 from Partner.models import (
+    AdvertEvent,
     AdvertImage,
     AdvertLandingPage,
     AdvertLead,
@@ -3608,6 +3609,74 @@ class AdvertReferenceDeskTests(TestCase):
 
         self.assertContains(response, "Lead Shop")
         self.assertContains(response, "lead@example.com")
+
+
+    def test_analytics_modal_works_for_regular_references_and_folds_direct_clicks(self):
+        reference = self._reference(plan=AdvertLead.PLAN_REGULAR)
+        AdvertEvent.objects.create(
+            reference=reference, event_type=AdvertEvent.EVENT_VIEW
+        )
+        for source in (
+            AdvertEvent.SOURCE_ABUREPORT,
+            AdvertEvent.SOURCE_DIRECT,
+            AdvertEvent.SOURCE_EXTERNAL,
+        ):
+            AdvertEvent.objects.create(
+                reference=reference,
+                event_type=AdvertEvent.EVENT_CLICK,
+                source=source,
+            )
+        self.client.force_login(self.ads_staff)
+
+        response = self.client.get(
+            reverse("control:advert_analytics_modal", args=[reference.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["analytics"]["click_chart"]["values"], [1, 2]
+        )
+        self.assertEqual(
+            response.context["analytics"]["totals"]["views"], 1
+        )
+        self.assertContains(response, "Where clicks come from")
+        self.assertContains(response, f"ads-{reference.pk}-views")
+        self.assertNotContains(response, "Analytics come with Pro")
+
+    def test_analytics_modal_range_filters_older_events(self):
+        reference = self._reference()
+        now = timezone.now()
+        AdvertEvent.objects.create(reference=reference, event_type=AdvertEvent.EVENT_VIEW)
+        old = AdvertEvent.objects.create(
+            reference=reference, event_type=AdvertEvent.EVENT_VIEW
+        )
+        AdvertEvent.objects.filter(pk=old.pk).update(created_at=now - timedelta(days=20))
+        self.client.force_login(self.ads_staff)
+
+        endpoint = reverse("control:advert_analytics_modal", args=[reference.pk])
+        week = self.client.get(endpoint, {"range": "7"})
+        lifetime = self.client.get(endpoint, {"range": "all"})
+
+        self.assertEqual(week.context["analytics"]["totals"]["views"], 1)
+        self.assertEqual(lifetime.context["analytics"]["totals"]["views"], 2)
+
+    def test_non_ads_staff_cannot_open_the_analytics_modal(self):
+        reference = self._reference(plan=AdvertLead.PLAN_PRO)
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("control:advert_analytics_modal", args=[reference.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_reference_card_exposes_an_analytics_action(self):
+        reference = self._reference()
+        self.client.force_login(self.ads_staff)
+        response = self.client.get(reverse("control:advert_references"))
+        self.assertContains(response, "data-open-analytics")
+        self.assertContains(
+            response,
+            reverse("control:advert_analytics_modal", args=[reference.pk]),
+        )
 
 
 class DeleteAuthorTests(TestCase):

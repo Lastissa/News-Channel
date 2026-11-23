@@ -66,6 +66,11 @@ still work as normal form posts (see data-fallback forms in the edit block).{% e
             hx-confirm="Remove 7 days from {{ ref.business_name }} ({{ ref.reference }})?{% if ref.expires_at %} It currently ends {{ ref.expires_at|date:'M d, Y H:i' }}.{% endif %}">&minus; 7 days</button>
 
     <button type="button" class="ads-desk-button ads-desk-button--quiet"
+            data-open-analytics
+            hx-get="{% url 'control:advert_analytics_modal' ref.id %}"
+            hx-target="#advert-analytics-body" hx-swap="innerHTML">Analytics</button>
+
+    <button type="button" class="ads-desk-button ads-desk-button--quiet"
             data-open-storage
             hx-get="{% url 'control:advert_storage_modal' ref.id %}"
             hx-target="#advert-storage-body" hx-swap="innerHTML">Storage <b>{{ ref.storage_count }}</b></button>

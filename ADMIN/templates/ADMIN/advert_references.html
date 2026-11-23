@@ -215,6 +215,12 @@
     </div>
   </div>
 
+  <div class="ads-modal" id="advert-analytics-modal" data-analytics-modal hidden>
+    <div class="ads-modal-panel ads-modal-panel--wide" role="dialog" aria-modal="true" aria-label="Reference analytics">
+      <div id="advert-analytics-body"></div>
+    </div>
+  </div>
+
   <div class="ads-modal" id="advert-ref-delete-modal" data-ref-delete-modal hidden>
     <div class="ads-modal-panel ads-modal-panel--small" role="dialog" aria-modal="true" aria-label="Delete reference">
       <div id="advert-ref-delete-body"></div>
@@ -227,7 +233,8 @@
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261121-1">
+<link rel="stylesheet" href="{% static 'control/css/advert_references.css' %}?v=20261123-1">
 <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'control/js/advert_references.js' %}?v=20261121-1" defer></script>
+<script src="{% static 'control/js/vendor/apexcharts.min.js' %}" defer></script>
+<script src="{% static 'control/js/advert_references.js' %}?v=20261123-1" defer></script>
 {% endblock %}

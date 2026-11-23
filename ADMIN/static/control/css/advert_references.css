@@ -1052,3 +1052,45 @@ body.has-ads-modal { overflow: hidden; }
   .ads-modal { padding: 10px; }
   .ads-modal-panel { padding: 16px; max-height: 92vh; }
 }
+
+/* ---------- reference analytics modal ---------- */
+.ads-modal-panel--wide { width: min(1080px, 100%); }
+
+.ads-analytics { --ads-muted: var(--muted-text, #667085); }
+.ads-analytics .ads-dash-charts { min-width: 0; margin-top: 16px; }
+.ads-analytics .ads-dash-chart-controls {
+  display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px; margin-bottom: 10px;
+}
+.ads-analytics .ads-dash-chart-select { display: inline-flex; flex-direction: column; gap: 4px; color: var(--ads-muted); font-size: 0.68rem; font-weight: 700; }
+.ads-analytics .ads-dash-chart-select select { min-width: 190px; min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; }
+.ads-analytics .ads-dash-range { display: inline-flex; flex-wrap: wrap; gap: 5px; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: var(--ads-soft); }
+.ads-analytics .ads-dash-range-btn { min-height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ads-muted); cursor: pointer; font-size: 0.68rem; font-weight: 700; }
+.ads-analytics .ads-dash-range-btn:hover { color: var(--ink); }
+.ads-analytics .ads-dash-range-btn.is-active { background: var(--surface); color: var(--ads-gold-deep); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
+.ads-analytics .ads-dash-chart-caption { margin: 0 0 12px; color: var(--ads-muted); font-size: 0.7rem; line-height: 1.4; }
+.ads-analytics .ads-dash-chart-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.ads-analytics .ads-dash-chart-metrics > div { display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.ads-analytics .ads-dash-chart-metrics span { color: var(--ads-muted); font-size: 0.63rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.ads-analytics .ads-dash-chart-metrics strong { color: var(--ink); font-size: 1.05rem; line-height: 1.1; }
+.ads-analytics .ads-dash-chart-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr); gap: 12px; }
+.ads-analytics .ads-dash-chart-card { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ads-analytics .ads-dash-chart-card header { margin-bottom: 8px; }
+.ads-analytics .ads-dash-chart-card h3 { margin: 0; color: var(--ink); font-size: 0.92rem; font-weight: 700; }
+.ads-analytics .ads-dash-chart-card header p { margin: 3px 0 0; color: var(--ads-muted); font-size: 0.68rem; }
+.ads-analytics .ads-dash-chart-canvas,
+.ads-analytics .ads-dash-chart--pie .ads-dash-chart-canvas { min-height: 240px; }
+.ads-analytics .ads-dash-chart-empty { display: grid; place-items: center; min-height: 240px; margin: 0; border: 1px dashed var(--line); border-radius: 10px; color: var(--ads-muted); font-size: 0.78rem; text-align: center; }
+.ads-analytics .ads-dash-note { margin: 12px 0 0; color: var(--ads-muted); font-size: 0.72rem; line-height: 1.5; }
+@media (max-width: 900px) {
+  .ads-analytics .ads-dash-chart-grid { grid-template-columns: 1fr; }
+}
+.ads-analytics .ads-dash-chart-card h3,
+.ads-analytics .ads-dash-chart-metrics strong {
+  font-family: var(--font-display, var(--font-body, inherit));
+}
+.ads-analytics .ads-dash-chart-controls { margin-bottom: 10px; }
+.ads-analytics .ads-dash-chart-select select { min-height: 36px; }
+
+@media (max-width: 760px) {
+  .ads-analytics .ads-dash-chart-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

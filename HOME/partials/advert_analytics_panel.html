@@ -1,0 +1,64 @@
+{% load static %}
+<div class="ads-dash-charts" data-advert-analytics data-advert-analytics-url="{{ analytics_endpoint }}" data-advert-range="{{ analytics.range }}">
+  <div class="ads-dash-chart-controls">
+    {% if show_reference_filter %}
+    <label class="ads-dash-chart-select">
+      <span>Advert</span>
+      <select data-advert-reference aria-label="Choose advert">
+        <option value="" {% if not selected_reference %}selected{% endif %}>All adverts</option>
+        {% for choice in reference_choices %}
+        <option value="{{ choice.id }}" {% if selected_reference == choice.id|stringformat:"s" %}selected{% endif %}>{{ choice.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <div class="ads-dash-range" role="group" aria-label="Chart date range">
+      {% for choice in analytics_range_choices %}
+      <button type="button" class="ads-dash-range-btn{% if analytics.range == choice.key %} is-active{% endif %}" data-advert-range="{{ choice.key }}" aria-pressed="{% if analytics.range == choice.key %}true{% else %}false{% endif %}">{{ choice.label }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <p class="ads-dash-chart-caption">{{ analytics.range_label }} · dates use Africa/Lagos local time. Direct clicks are counted as other sources.</p>
+
+  <div class="ads-dash-chart-metrics" aria-label="Selected period totals">
+    <div><span>Views</span><strong>{{ analytics.totals.views }}</strong></div>
+    <div><span>Clicks</span><strong>{{ analytics.totals.clicks }}</strong></div>
+    <div><span>Click rate</span><strong>{{ analytics.totals.click_rate }}%</strong></div>
+    <div><span>From {{ project_name }}</span><strong>{{ analytics.totals.abureport_clicks }}</strong></div>
+  </div>
+
+  <div class="ads-dash-chart-grid">
+    <section class="ads-dash-chart-card">
+      <header>
+        <h3>Views over time</h3>
+        <p>One point per local calendar day.</p>
+      </header>
+      {% if analytics.view_chart.has_data %}
+      <div class="ads-dash-chart" data-advert-chart data-advert-chart-kind="line">
+        <div class="ads-dash-chart-canvas" id="{{ analytics.view_chart.element_id }}"></div>
+        {% with chart=analytics.view_chart %}{{ chart|json_script:chart.data_id }}{% endwith %}
+      </div>
+      {% else %}
+      <p class="ads-dash-chart-empty">No views in this period yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="ads-dash-chart-card">
+      <header>
+        <h3>Where clicks come from</h3>
+        <p>From {{ project_name }} versus other traffic.</p>
+      </header>
+      {% if analytics.click_chart.has_data %}
+      <div class="ads-dash-chart ads-dash-chart--pie" data-advert-chart data-advert-chart-kind="pie">
+        <div class="ads-dash-chart-canvas" id="{{ analytics.click_chart.element_id }}"></div>
+        {% with chart=analytics.click_chart %}{{ chart|json_script:chart.data_id }}{% endwith %}
+      </div>
+      {% else %}
+      <p class="ads-dash-chart-empty">No clicks in this period yet.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <p class="ads-dash-note">Views are counted when your advert becomes the focused slide or someone opens your landing page. Clicks from {{ project_name }} carry <code>utm_source=abureport</code>.</p>
+</div>

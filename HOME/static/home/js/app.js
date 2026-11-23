@@ -226,3 +226,153 @@
     });
   });
 })();
+
+/* Advert analytics charts.
+   The dashboard and the Ads desk reuse the same ApexCharts bundle and the same
+   JSON payloads, so this only draws what the server already calculated. It is
+   safe to load on every page: without a [data-advert-chart] mount it does
+   nothing. */
+(function () {
+  "use strict";
+
+  function reducedMotion() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function chartOptions(data, mount) {
+    var height = mount.clientWidth < 420 ? 220 : 260;
+    var common = {
+      chart: {
+        height: height,
+        width: "100%",
+        fontFamily: "inherit",
+        background: "transparent",
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        animations: { enabled: !reducedMotion(), speed: 220 },
+      },
+      stroke: { width: 0 },
+    };
+
+    if (data.kind === "pie") {
+      return {
+        chart: Object.assign({}, common.chart, { type: "pie" }),
+        series: data.values || [],
+        labels: data.labels || [],
+        colors: data.colors || [],
+        dataLabels: {
+          enabled: true,
+          formatter: function (value) { return Math.round(value) + "%"; },
+        },
+        legend: { show: true, position: "bottom", fontSize: "12px" },
+        tooltip: { y: { formatter: function (value) { return value + " clicks"; } } },
+        noData: { text: "No clicks yet" },
+      };
+    }
+
+    return {
+      chart: Object.assign({}, common.chart, { type: "line" }),
+      series: [{ name: data.name || "Views", data: data.values || [] }],
+      colors: ["#e8b84a"],
+      stroke: { curve: "straight", width: 2 },
+      markers: { size: 2.5, strokeWidth: 0 },
+      grid: { borderColor: "rgba(127, 140, 160, 0.2)", strokeDashArray: 3 },
+      xaxis: {
+        categories: data.labels || [],
+        tickAmount: Math.min(8, (data.labels || []).length),
+        labels: { hideOverlappingLabels: true, rotate: 0, trim: true },
+      },
+      yaxis: {
+        min: 0,
+        forceNiceScale: true,
+        labels: { formatter: function (value) { return Math.round(value); } },
+      },
+      legend: { show: false },
+      tooltip: { shared: true, intersect: false },
+      noData: { text: "No views yet" },
+    };
+  }
+
+  function paintChart(mount) {
+    var root = mount.closest("[data-advert-chart]");
+    var script = root && root.querySelector('script[type="application/json"]');
+    if (!script) return;
+    var data;
+    try {
+      data = JSON.parse(script.textContent);
+    } catch (error) {
+      return;
+    }
+    if (mount._advertChart) {
+      mount._advertChart.destroy();
+      mount._advertChart = null;
+    }
+    if (!window.ApexCharts) {
+      mount.textContent = "Charts are unavailable right now.";
+      return;
+    }
+    mount._advertChart = new window.ApexCharts(mount, chartOptions(data, mount));
+    mount._advertChart.render();
+  }
+
+  function paintAll() {
+    document.querySelectorAll("[data-advert-chart] .ads-dash-chart-canvas").forEach(function (mount) {
+      paintChart(mount);
+    });
+  }
+
+  function currentValue(panel, selector) {
+    var field = panel.querySelector(selector);
+    return field ? field.value : "";
+  }
+
+  function reload(panel, range, reference) {
+    var url = panel.getAttribute("data-advert-analytics-url");
+    if (!url) return;
+    var query = "range=" + encodeURIComponent(range || "30");
+    query += "&reference=" + encodeURIComponent(reference || "");
+    url += (url.indexOf("?") >= 0 ? "&" : "?") + query;
+    if (window.htmx) {
+      window.htmx.ajax("GET", url, { target: panel, swap: "innerHTML" });
+    } else {
+      window.location.href = url;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", paintAll);
+  document.addEventListener("htmx:afterSwap", paintAll);
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || !target.querySelectorAll) return;
+    target.querySelectorAll("[data-advert-chart] .ads-dash-chart-canvas").forEach(function (mount) {
+      if (mount._advertChart) {
+        mount._advertChart.destroy();
+        mount._advertChart = null;
+      }
+    });
+  });
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-advert-range]");
+    if (!button) return;
+    var panel = button.closest("[data-advert-analytics]");
+    if (!panel) return;
+    reload(
+      panel,
+      button.getAttribute("data-advert-range"),
+      currentValue(panel, "[data-advert-reference]")
+    );
+  });
+
+  document.addEventListener("change", function (event) {
+    var select = event.target.closest("[data-advert-reference]");
+    if (!select) return;
+    var panel = select.closest("[data-advert-analytics]");
+    if (!panel) return;
+    reload(
+      panel,
+      panel.getAttribute("data-advert-range") || "30",
+      select.value
+    );
+  });
+})();

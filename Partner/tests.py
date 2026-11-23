@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from unittest import mock
 
 from django.contrib import admin
@@ -6,6 +6,7 @@ from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from AUTHENTICATION.models import Auth
+from Partner.advert_analytics import build_advert_analytics
 from Partner.models import AdvertEvent, AdvertImage, AdvertLead, AdvertPage, AdvertReference
 
 
@@ -864,3 +865,70 @@ class DefaultAdvertLandingTests(TestCase):
             response.json(),
             {"ok": True, "target": f"/ads/sunday-deals-{self.advert.pk}/"},
         )
+
+
+class AdvertAnalyticsTests(TestCase):
+    """Chart payloads are derived from created_at, in the project timezone."""
+
+    def setUp(self):
+        self.owner = Auth.objects.create_user(email="analytics-owner@example.com")
+        self.advert = AdvertImage.objects.create(
+            author=self.owner,
+            expiry_date=timezone.now() + timedelta(days=7),
+            heading="Analytics advert",
+            image_url="https://cdn.example.com/ads/analytics.jpg",
+            url="https://example.com/analytics",
+        )
+        self.reference = AdvertReference.objects.create(
+            advert=self.advert,
+            user=self.owner,
+            plan="pro",
+            business_name="Analytics Shop",
+        )
+
+    def _event(self, event_type, source, moment=None):
+        event = AdvertEvent.objects.create(
+            reference=self.reference, event_type=event_type, source=source
+        )
+        if moment is not None:
+            AdvertEvent.objects.filter(pk=event.pk).update(created_at=moment)
+        return event
+
+    def test_clicks_are_two_slices_and_direct_counts_as_other(self):
+        self._event(AdvertEvent.EVENT_CLICK, AdvertEvent.SOURCE_ABUREPORT)
+        self._event(AdvertEvent.EVENT_CLICK, AdvertEvent.SOURCE_DIRECT)
+        self._event(AdvertEvent.EVENT_CLICK, AdvertEvent.SOURCE_EXTERNAL)
+        self._event(AdvertEvent.EVENT_VIEW, AdvertEvent.SOURCE_ABUREPORT)
+
+        payload = build_advert_analytics(self.reference.events.all(), "7")
+
+        self.assertEqual(payload["click_chart"]["values"], [1, 2])
+        self.assertEqual(
+            payload["click_chart"]["labels"], ["From Abureport", "Other sources"]
+        )
+        self.assertEqual(payload["totals"], {
+            "views": 1,
+            "clicks": 3,
+            "abureport_clicks": 1,
+            "other_clicks": 2,
+            "click_rate": 300.0,
+        })
+
+    def test_days_use_local_time_and_range_filters_old_events(self):
+        tz = timezone.get_current_timezone()
+        now = timezone.now()
+        today = timezone.localtime(now, tz).date()
+        midnight = timezone.make_aware(datetime.combine(today, time.min), tz)
+        old_day = timezone.make_aware(
+            datetime.combine(today - timedelta(days=10), time(12, 0)), tz
+        )
+        self._event(AdvertEvent.EVENT_VIEW, AdvertEvent.SOURCE_ABUREPORT, midnight + timedelta(minutes=1))
+        self._event(AdvertEvent.EVENT_VIEW, AdvertEvent.SOURCE_ABUREPORT, old_day)
+
+        week = build_advert_analytics(self.reference.events.all(), "7", now=now)
+        self.assertEqual(week["view_chart"]["labels"][-1], today.strftime("%d %b"))
+        self.assertEqual(week["view_chart"]["values"][-1], 1)
+        self.assertEqual(sum(week["view_chart"]["values"]), 1)
+
+        lifetime = build_advert_analytics(self.reference.events.all(), "all", now=now)
+        self.assertEqual(sum(lifetime["view_chart"]["values"]), 2)

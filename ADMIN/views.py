@@ -40,6 +40,7 @@ from ADMIN.models import AccountActionLog
 from SERVICE_INTERNAL.config import StaffConfig
 from SERVICE_INTERNAL.email_batch import _try_send_panel_mass_email, _try_send_staff_created_batch_email
 from SERVICE_INTERNAL.hosts import RESERVED_SUBDOMAINS, ads_base_host, advert_host
+from Partner.advert_analytics import RANGE_CHOICES, build_advert_analytics, normalize_range
 from Partner.plans import advert_allows, plan_allows, plan_message, time_left
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.images import (
@@ -3477,6 +3478,41 @@ class AdvertReferenceStorageModalView(View):
             return denied
         reference = get_object_or_404(AdvertReference, pk=reference_id)
         return _advert_storage_response(request, reference)
+
+
+class AdvertReferenceAnalyticsModalView(View):
+    """htmx GET: views + click-source charts for one Ads desk reference.
+
+    Staff are never plan-gated: they can inspect traffic on a Regular reference
+    just as they can open its storage. Only the advertiser dashboard applies the
+    Pro/Advance analytics gate.
+    """
+
+    def get(self, request, reference_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        range_key = normalize_range(request.GET.get("range"))
+        analytics = build_advert_analytics(
+            reference.events.all(),
+            range_key,
+            element_prefix=f"ads-{reference.pk}",
+        )
+        return render(
+            request,
+            "ADMIN/partials/advert_reference_analytics.html",
+            {
+                "reference": reference,
+                "analytics": analytics,
+                "analytics_range_choices": RANGE_CHOICES,
+                "analytics_endpoint": reverse(
+                    "control:advert_analytics_modal", args=[reference.pk]
+                ),
+                "show_reference_filter": False,
+                "selected_reference": str(reference.pk),
+            },
+        )
 
 
 class AdvertReferenceStorageUploadView(View):

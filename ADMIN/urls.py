@@ -77,6 +77,7 @@ urlpatterns = [
     path("ads/references/<int:reference_id>/shorten/", views.AdvertReferenceShortenView.as_view(), name="advert_reference_shorten"),
     path("ads/references/<int:reference_id>/update/", views.AdvertReferenceUpdateView.as_view(), name="advert_reference_update"),
     path("ads/references/<int:reference_id>/storage/", views.AdvertReferenceStorageModalView.as_view(), name="advert_storage_modal"),
+    path("ads/references/<int:reference_id>/analytics/", views.AdvertReferenceAnalyticsModalView.as_view(), name="advert_analytics_modal"),
     path("ads/references/<int:reference_id>/storage/upload/", views.AdvertReferenceStorageUploadView.as_view(), name="advert_storage_upload"),
     path("ads/references/<int:reference_id>/storage/<int:file_id>/delete/", views.AdvertReferenceStorageDeleteView.as_view(), name="advert_storage_delete"),
     path("ads/references/<int:reference_id>/delete/", views.AdvertReferenceDeleteView.as_view(), name="advert_reference_delete"),

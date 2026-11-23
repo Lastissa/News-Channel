@@ -28,6 +28,7 @@ from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Comment, get_category_choices
 from HOME.models import Bookmark, CategorySubscription
+from Partner.advert_analytics import RANGE_CHOICES, build_advert_analytics, normalize_range
 from Partner.models import AdvertEvent, AdvertImage, AdvertLead, AdvertReference
 from Partner.plans import plan_allows, time_left
 from SERVICE_INTERNAL.abstract import (
@@ -2035,6 +2036,54 @@ class PromoteLeadView(View):
         )
 
 
+def _advertiser_analytics_context(analytics_rows, requested_range, requested_reference, element_prefix="advertiser"):
+    """Build the shared chart payload for one advertiser's analytics rows.
+
+    An invalid reference id silently falls back to the combined view so a stale
+    bookmark or crafted query string can never expose somebody else's traffic.
+    """
+    range_key = normalize_range(requested_range)
+    reference_ids = [row.pk for row in analytics_rows]
+    allowed_ids = {str(pk) for pk in reference_ids}
+    selected = str(requested_reference or "")
+    if selected not in allowed_ids:
+        selected = ""
+
+    events = AdvertEvent.objects.filter(reference_id__in=reference_ids)
+    if selected:
+        events = events.filter(reference_id=selected)
+    analytics = build_advert_analytics(
+        events, range_key, element_prefix=f"{element_prefix}-{selected or 'all'}"
+    )
+    totals = analytics["totals"]
+    source_highest = max(totals["abureport_clicks"], totals["other_clicks"], 0) or 1
+    return {
+        "analytics": analytics,
+        "analytics_range": range_key,
+        "analytics_range_choices": RANGE_CHOICES,
+        "reference_choices": [
+            {"id": row.pk, "label": f"{row.business_name} — {row.reference}"}
+            for row in analytics_rows
+        ],
+        "selected_reference": selected,
+        "view_total": totals["views"],
+        "click_total": totals["clicks"],
+        "click_rate": totals["click_rate"],
+        "source_rows": [
+            {
+                "name": "From Abureport",
+                "count": totals["abureport_clicks"],
+                "width": round(totals["abureport_clicks"] / source_highest * 100),
+            },
+            {
+                "name": "Other sources",
+                "count": totals["other_clicks"],
+                "width": round(totals["other_clicks"] / source_highest * 100),
+            },
+        ],
+    }
+
+
 class AdvertiserDashboardView(View):
     """Advertiser home: enquiries, owned references, and real traffic.
 
@@ -2123,24 +2172,13 @@ class AdvertiserDashboardView(View):
             row.time_label = left["time_label"]
             row.time_percent = left["time_percent"]
         analytics_rows = [row for row in reference_rows if row.has_analytics]
-        view_total = sum(row.view_total for row in analytics_rows)
-        click_total = sum(row.click_total for row in analytics_rows)
-        abureport_clicks = sum(row.abureport_click_total for row in analytics_rows)
-        other_clicks = sum(row.other_click_total for row in analytics_rows)
-        click_rate = round(click_total / view_total * 100, 1) if view_total else 0
-        source_highest = max(abureport_clicks, other_clicks, 0) or 1
-        source_rows = [
-            {
-                "name": "From Abureport",
-                "count": abureport_clicks,
-                "width": round(abureport_clicks / source_highest * 100),
-            },
-            {
-                "name": "Other sources",
-                "count": other_clicks,
-                "width": round(other_clicks / source_highest * 100),
-            },
-        ]
+        analytics_context = _advertiser_analytics_context(
+            analytics_rows, request.GET.get("range"), request.GET.get("reference")
+        )
+        view_total = analytics_context["view_total"]
+        click_total = analytics_context["click_total"]
+        click_rate = analytics_context["click_rate"]
+        source_rows = analytics_context["source_rows"]
 
         reference_ids = [row.pk for row in analytics_rows]
         recent_events = (
@@ -2196,8 +2234,33 @@ class AdvertiserDashboardView(View):
                 "click_rate": click_rate,
                 "source_rows": source_rows,
                 "recent_events": recent_events,
+                **analytics_context,
+                "analytics_endpoint": reverse("home:advertise_dashboard_analytics"),
+                "show_reference_filter": True,
             },
         )
+
+
+class AdvertiserAnalyticsView(View):
+    """htmx fragment for the advertiser dashboard's range/reference drill-down."""
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Sign in to view analytics."}, status=401)
+
+        analytics_rows = [
+            row
+            for row in AdvertReference.objects.filter(user=request.user).only(
+                "id", "plan", "reference", "business_name"
+            )
+            if plan_allows(row.plan, "analytics")
+        ]
+        context = _advertiser_analytics_context(
+            analytics_rows, request.GET.get("range"), request.GET.get("reference")
+        )
+        context["analytics_endpoint"] = reverse("home:advertise_dashboard_analytics")
+        context["show_reference_filter"] = True
+        return render(request, "HOME/partials/advert_analytics_panel.html", context)
 
 
 class PromoteAdsView(View):

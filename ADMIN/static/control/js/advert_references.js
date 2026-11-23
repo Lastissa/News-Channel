@@ -116,6 +116,7 @@
 (function () {
   var storageModal = document.querySelector("[data-storage-modal]");
   var deleteModal = document.querySelector("[data-ref-delete-modal]");
+  var analyticsModal = document.querySelector("[data-analytics-modal]");
   var storageBody = document.getElementById("advert-storage-body");
   var storageFilter = "all";
   var storageQuery = "";
@@ -147,6 +148,7 @@
 
   document.addEventListener("click", function (event) {
     if (event.target.closest("[data-open-storage]")) open(storageModal);
+    if (event.target.closest("[data-open-analytics]")) open(analyticsModal);
     if (event.target.closest("[data-open-ref-delete]")) open(deleteModal);
 
     var closeButton = event.target.closest("[data-modal-close]");
@@ -164,6 +166,7 @@
       return;
     }
     if (event.target === storageModal) close(storageModal);
+    if (event.target === analyticsModal) close(analyticsModal);
     if (event.target === deleteModal) close(deleteModal);
   });
 
