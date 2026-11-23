@@ -252,6 +252,12 @@ class StaffMailTests(TestCase):
 
         for target, kwargs in [
             ("AUTHENTICATION.signals._try_send_login_email", {}),
+            #   Welcome emails from earlier tests run on this shared pool. Keeping
+            #   the pool mocked stops them from landing in this class's direct
+            #   resend.Emails.send mock and inflating its call count.
+            ("SERVICE_INTERNAL.email_single._EMAIL_EXECUTOR", {}),
+            #   Batch mail keeps its own imported reference to the same pool.
+            ("SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR", {}),
             ("ADMIN.views.is_rate_limited", {"return_value": (0, False)}),
         ]:
             patcher = mock.patch(target, **kwargs)
@@ -3042,9 +3048,13 @@ class AdvertReferenceDeskTests(TestCase):
         #   Account creation fires login/welcome emails on the global executor.
         #   Keep this desk's many fixtures from queueing jobs that land in a
         #   later test's mocked resend.Emails.send.
-        patcher = mock.patch("SERVICE_INTERNAL.email_single._EMAIL_EXECUTOR")
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        for target in (
+            "SERVICE_INTERNAL.email_single._EMAIL_EXECUTOR",
+            "SERVICE_INTERNAL.email_batch._EMAIL_EXECUTOR",
+        ):
+            patcher = mock.patch(target)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
         self.admin = Auth.objects.create_admin(email="ads-desk-admin@example.com")
         self.ads_staff = Auth.objects.create_user(
@@ -3664,7 +3674,8 @@ class AdvertReferenceDeskTests(TestCase):
         reference = self._reference(plan=AdvertLead.PLAN_PRO)
         self.client.force_login(self.member)
         response = self.client.get(
-            reverse("control:advert_analytics_modal", args=[reference.pk])
+            reverse("control:advert_analytics_modal", args=[reference.pk]),
+            HTTP_HX_REQUEST="true",
         )
         self.assertEqual(response.status_code, 403)
 

@@ -2754,7 +2754,7 @@ class AdvertiserReferenceDashboardTests(QuietTestCase):
         self.assertContains(response, "Where clicks come from")
         self.assertContains(response, 'id="advertiser-all-views"')
         self.assertContains(response, 'id="advertiser-all-clicks-data"')
-        self.assertNotContains(response, "ads-dash-bars")
+        self.assertNotContains(response, "ads-dash-performance-copy")
 
     def test_analytics_fragment_filters_by_reference_and_never_leaks_other_owners(self):
         owner = Auth.objects.create_user(email="fragment-owner@example.com")
