@@ -38,7 +38,7 @@ class SecurityHeadersMiddleware:
         "https://*.google.com https://*.gstatic.com https://*.googleusercontent.com "
         "https://*.doubleclick.net https://*.adtrafficquality.google; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.gstatic.com; "
-        "img-src 'self' data: blob: https: "
+        "img-src 'self' data: blob: https:; "
         "font-src 'self' data: https://fonts.gstatic.com https://*.gstatic.com; "
         "connect-src 'self' https://*.google-analytics.com "
         "https://*.googlesyndication.com https://*.doubleclick.net "

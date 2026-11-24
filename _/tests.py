@@ -62,6 +62,12 @@ class CSPReportTests(TestCase):
             f'csp-endpoint="http://testserver{reverse("csp_report")}"',
         )
 
+    def test_img_src_does_not_swallow_the_font_src_directive(self):
+        policy = self.client.get("/robots.txt")["Content-Security-Policy-Report-Only"]
+
+        self.assertIn("img-src 'self' data: blob: https:;", policy)
+        self.assertIn("font-src 'self' data:", policy)
+
     @patch("SERVICE_INTERNAL.email_single._try_send_csp_report_email")
     def test_legacy_csp_report_sends_one_email(self, send_email):
         response = self.client.post(

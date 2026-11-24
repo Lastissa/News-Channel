@@ -1039,6 +1039,7 @@ body.has-ads-modal { overflow: hidden; }
 .ads-storage-meta strong { overflow-wrap: anywhere; font-size: 0.9rem; }
 .ads-storage-meta span, .ads-storage-meta small { color: var(--muted-text, #667085); font-size: 0.78rem; }
 .ads-storage-badge { padding: 3px 8px; border-radius: 999px; background: var(--ads-soft-strong); font-size: 0.7rem; font-weight: 700; }
+.ads-storage-badge--type { background: var(--ads-soft); color: var(--muted-text, #667085); letter-spacing: 0.04em; }
 .ads-storage-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .ads-storage-empty { padding: 18px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted-text, #667085); text-align: center; }
 .ads-ref-delete-copy { margin: 18px 0; }

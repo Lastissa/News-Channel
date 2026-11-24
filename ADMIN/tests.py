@@ -28,6 +28,7 @@ from ADMIN.analytics import (
     member_overview,
 )
 from ADMIN.models import SiteSettings
+from ADMIN.views import _advert_storage_display_name, _advert_storage_share_urls
 from AUTHENTICATION.models import Auth
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
@@ -3514,7 +3515,11 @@ class AdvertReferenceDeskTests(TestCase):
             shared = self.client.get(share_url)
         self.assertEqual(shared.status_code, 200)
         self.assertTrue(stream.called)
-        bad_url = share_url[:-2] + ("y" if share_url[-2] == "x" else "x") + "/"
+        start = share_url.index("/share/") + len("/share/")
+        end = share_url.index("/", start)
+        token = share_url[start:end]
+        bad_token = token[:-1] + ("y" if token[-1] == "x" else "x")
+        bad_url = share_url[:start] + bad_token + share_url[end:]
         self.assertEqual(self.client.get(bad_url).status_code, 403)
 
         self.client.force_login(self.ads_staff)
@@ -3525,6 +3530,61 @@ class AdvertReferenceDeskTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(AdvertReferenceFile.objects.exists())
         destroy.assert_called_once_with("abureport/advert-storage/brief", "raw")
+
+    def test_reference_storage_serves_named_static_asset_with_real_mime(self):
+        reference = self._reference()
+        item = AdvertReferenceFile.objects.create(
+            reference=reference,
+            uploaded_by=self.ads_staff,
+            original_filename="2:1xVxKz:GQLIw-Gud1oBMuaSew",
+            note="Landing script",
+            content_type="application/octet-stream",
+            resource_type="raw",
+            public_id="abureport/advert-storage/landing_ab12cd",
+            secure_url="https://res.cloudinary.com/demo/raw/upload/v1/abureport/advert-storage/landing_ab12cd.js",
+            file_size=12,
+        )
+        self.client.force_login(self.ads_staff)
+        modal = self.client.get(reverse("control:advert_storage_modal", args=[reference.pk]))
+        self.assertContains(modal, "landing_ab12cd.js")
+        self.assertContains(modal, ">JS<")
+        share_url = re.search(r'href="(/control/ads/storage/[^"]+)"', modal.content.decode()).group(1)
+        self.assertTrue(share_url.endswith("/landing_ab12cd.js/"))
+
+        upstream = mock.Mock(status_code=200, headers={"Content-Length": "12"})
+        upstream.iter_content.return_value = [b"alert(1);"]
+        self.client.logout()
+        with mock.patch("ADMIN.views.requests.get", return_value=upstream):
+            response = self.client.get(share_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/javascript")
+        self.assertIn("inline", response["Content-Disposition"])
+        self.assertIn("landing_ab12cd.js", response["Content-Disposition"])
+
+    def test_reference_storage_keeps_html_as_an_opaque_download(self):
+        reference = self._reference()
+        item = AdvertReferenceFile.objects.create(
+            reference=reference,
+            uploaded_by=self.ads_staff,
+            original_filename="page.html",
+            content_type="text/html",
+            resource_type="raw",
+            public_id="abureport/advert-storage/page_html123",
+            secure_url="https://res.cloudinary.com/demo/raw/upload/v1/abureport/advert-storage/page_html123.html",
+            file_size=12,
+        )
+        share_url, _ = _advert_storage_share_urls(item, _advert_storage_display_name(item))
+
+        upstream = mock.Mock(status_code=200, headers={"Content-Length": "12"})
+        upstream.iter_content.return_value = [b"<p>hi</p>"]
+        with mock.patch("ADMIN.views.requests.get", return_value=upstream):
+            response = self.client.get(share_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/octet-stream")
+        self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
+        self.assertIn("page.html", response["Content-Disposition"])
 
     def test_reader_cannot_open_or_upload_reference_storage(self):
         reference = self._reference()

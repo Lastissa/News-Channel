@@ -86,6 +86,7 @@
           <span>{{ file.note|default:"No note" }}</span>
           <small>{{ file.date }}{% if file.uploaded_by %} · {{ file.uploaded_by }}{% endif %}{% if file.size %} · {{ file.size }}{% endif %}</small>
         </div>
+        {% if file.extension %}<span class="ads-storage-badge ads-storage-badge--type">{{ file.extension }}</span>{% endif %}
         <div class="ads-storage-actions">
           <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.preview_url }}" target="_blank" rel="noopener noreferrer">Preview</a>
           <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.download_url }}" target="_blank" rel="noopener noreferrer">Download</a>

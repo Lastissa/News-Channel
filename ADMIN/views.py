@@ -8,9 +8,10 @@ work stays in HOME.views; this module only holds the extra authority an admin
 import json
 import math
 import logging
+import mimetypes
 import re
 from datetime import timedelta
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlparse
 
 import cloudinary.utils
 import requests
@@ -3324,7 +3325,154 @@ The linked advert picture/HTML is listed as read-only system context.
 
 ADVERT_STORAGE_LINK_SALT = "advert-storage-share"
 ADVERT_STORAGE_LINK_AGE = 3600  #   one hour, as requested
-_ADVERT_ACTIVE_EXTENSIONS = {"html", "htm", "svg", "js", "mjs", "php", "py", "sh", "bat", "cmd", "exe"}
+
+#   The signed link ends with the real filename so a person (and the browser)
+#   can see what they are opening. The extension is resolved from the stored
+#   row -- never from that cosmetic URL segment.
+_ADVERT_MIME_BY_EXT = {
+    "js": "application/javascript",
+    "mjs": "application/javascript",
+    "css": "text/css",
+    "json": "application/json",
+    "map": "application/json",
+    "xml": "application/xml",
+    "txt": "text/plain",
+    "md": "text/plain",
+    "csv": "text/csv",
+    "html": "text/html",
+    "htm": "text/html",
+    "xhtml": "application/xhtml+xml",
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "gif": "image/gif",
+    "webp": "image/webp",
+    "avif": "image/avif",
+    "bmp": "image/bmp",
+    "ico": "image/x-icon",
+    "svg": "image/svg+xml",
+    "mp4": "video/mp4",
+    "m4v": "video/mp4",
+    "mov": "video/quicktime",
+    "webm": "video/webm",
+    "ogv": "video/ogg",
+    "mp3": "audio/mpeg",
+    "wav": "audio/wav",
+    "ogg": "audio/ogg",
+    "m4a": "audio/mp4",
+    "woff": "font/woff",
+    "woff2": "font/woff2",
+    "ttf": "font/ttf",
+    "otf": "font/otf",
+    "eot": "application/vnd.ms-fontobject",
+    "zip": "application/zip",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "ppt": "application/vnd.ms-powerpoint",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+#   Documents and scripts that must never render on our own domain. Static
+#   assets (js/css/images/fonts) are deliberately not in this set: a signed
+#   landing-page asset needs a real MIME type so the browser can use it.
+_ADVERT_ACTIVE_EXTENSIONS = {
+    "html",
+    "htm",
+    "xhtml",
+    "svg",
+    "php",
+    "phtml",
+    "py",
+    "sh",
+    "bat",
+    "cmd",
+    "exe",
+    "msi",
+}
+_ADVERT_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico", "svg"}
+_ADVERT_VIDEO_EXTENSIONS = {"mp4", "m4v", "mov", "webm", "ogv"}
+_ADVERT_AUDIO_EXTENSIONS = {"mp3", "wav", "ogg", "m4a"}
+
+
+def _advert_extension_from(value):
+    """The last dotted extension of a name/URL, only when it looks like one."""
+    if not value:
+        return ""
+    tail = str(value).split("?", 1)[0].split("#", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+    if "." not in tail:
+        return ""
+    ext = tail.rsplit(".", 1)[-1].lower()
+    return ext if ext and len(ext) <= 8 and ext.isalnum() else ""
+
+
+def _advert_storage_clean_name(value):
+    """A URL-safe basename with no control characters or quotes."""
+    name = str(value or "").strip().replace("\\", "/").rsplit("/", 1)[-1]
+    name = re.sub(r"[\x00-\x1f\x7f\"]", "", name)
+    return name[:200] or "file"
+
+
+def _advert_storage_extension(item, fallback_name=""):
+    for value in (
+        fallback_name,
+        getattr(item, "original_filename", ""),
+        getattr(item, "secure_url", ""),
+        getattr(item, "public_id", ""),
+    ):
+        ext = _advert_extension_from(value)
+        if ext in _ADVERT_MIME_BY_EXT:
+            return ext
+    mime = (getattr(item, "content_type", "") or "").split(";", 1)[0].strip().lower()
+    guessed = _advert_extension_from(mimetypes.guess_extension(mime) if mime else "")
+    return guessed if guessed in _ADVERT_MIME_BY_EXT else ""
+
+
+def _advert_storage_display_name(item):
+    """Prefer the real uploaded name; fall back to the asset URL's basename."""
+    name = _advert_storage_clean_name(getattr(item, "original_filename", ""))
+    if _advert_extension_from(name) not in _ADVERT_MIME_BY_EXT:
+        asset_name = _advert_storage_clean_name(
+            urlparse(getattr(item, "secure_url", "") or "").path
+        )
+        if _advert_extension_from(asset_name) in _ADVERT_MIME_BY_EXT:
+            name = asset_name
+    ext = _advert_storage_extension(item, name)
+    if ext and _advert_extension_from(name) not in _ADVERT_MIME_BY_EXT:
+        stem = name.rsplit(".", 1)[0] if "." in name else name
+        name = f"{stem}.{ext}"
+    return name
+
+
+def _advert_storage_kind(name, content_type, ext=""):
+    ext = ext or _advert_extension_from(name)
+    mime = (content_type or "").lower()
+    if ext in _ADVERT_IMAGE_EXTENSIONS or mime.startswith("image/"):
+        return "image"
+    if ext in _ADVERT_VIDEO_EXTENSIONS or mime.startswith("video/"):
+        return "video"
+    return "file"
+
+
+def _advert_storage_force_download(item, ext="", requested=False):
+    ext = ext or _advert_storage_extension(item)
+    return bool(requested or ext in _ADVERT_ACTIVE_EXTENSIONS or ext not in _ADVERT_MIME_BY_EXT)
+
+
+def _advert_storage_content_type(item, ext, force):
+    if force:
+        return "application/octet-stream"
+    return _ADVERT_MIME_BY_EXT.get(ext) or (getattr(item, "content_type", "") or "application/octet-stream")
+
+
+def _advert_storage_share_urls(row, filename=""):
+    token = signing.TimestampSigner(salt=ADVERT_STORAGE_LINK_SALT).sign(str(row.pk))
+    base = reverse(
+        "control:advert_storage_share_file",
+        kwargs={"file_id": row.pk, "token": token, "filename": _advert_storage_clean_name(filename)},
+    )
+    return base, f"{base}?download=1"
 
 
 def _ads_desk_denied(request):
@@ -3345,45 +3493,26 @@ def _ads_file_size_label(num_bytes):
     return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 
-def _advert_storage_kind(filename, content_type):
-    name_ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
-    mime = (content_type or "").lower()
-    if mime.startswith("image/") or name_ext in {"png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"}:
-        return "image"
-    if mime.startswith("video/") or name_ext in {"mp4", "mov", "webm"}:
-        return "video"
-    return "file"
-
-
-def _advert_storage_force_download(filename):
-    """Active content is stored, but never rendered on our own domain."""
-    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
-    return ext in _ADVERT_ACTIVE_EXTENSIONS
-
-
-def _advert_storage_share_urls(row):
-    token = signing.TimestampSigner(salt=ADVERT_STORAGE_LINK_SALT).sign(str(row.pk))
-    base = reverse("control:advert_storage_share", kwargs={"file_id": row.pk, "token": token})
-    return base, f"{base}?download=1"
-
-
 def _advert_storage_file_rows(reference):
     rows = []
     for item in reference.storage_files.select_related("uploaded_by").order_by("-date_uploaded"):
-        preview_url, download_url = _advert_storage_share_urls(item)
+        name = _advert_storage_display_name(item)
+        ext = _advert_storage_extension(item, name)
+        preview_url, download_url = _advert_storage_share_urls(item, name)
         rows.append(
             {
                 "id": item.pk,
-                "name": item.original_filename,
+                "name": name,
                 "note": item.note,
-                "kind": _advert_storage_kind(item.original_filename, item.content_type),
+                "kind": _advert_storage_kind(name, item.content_type, ext),
+                "extension": ext.upper(),
                 "secure_url": item.secure_url,
                 "size": _ads_file_size_label(item.file_size),
                 "uploaded_by": item.uploaded_by.email if item.uploaded_by_id else "",
                 "date": timezone.localtime(item.date_uploaded).strftime("%d %b %Y, %H:%M"),
                 "preview_url": preview_url,
                 "download_url": download_url,
-                "force_download": _advert_storage_force_download(item.original_filename),
+                "force_download": _advert_storage_force_download(item, ext),
                 "system": False,
             }
         )
@@ -3542,11 +3671,16 @@ class AdvertReferenceStorageUploadView(View):
             uploaded = upload_advert_storage_file(upload)
         except ImageUploadError as exc:
             return _advert_storage_response(request, reference, error=str(exc), status=400)
+        stored_name = _advert_storage_clean_name(getattr(upload, "name", "") or "file")
+        asset_ext = _advert_extension_from(uploaded.get("secure_url", ""))
+        if asset_ext in _ADVERT_MIME_BY_EXT and _advert_extension_from(stored_name) not in _ADVERT_MIME_BY_EXT:
+            stem = stored_name.rsplit(".", 1)[0] if "." in stored_name else stored_name
+            stored_name = f"{stem}.{asset_ext}"
         try:
             AdvertReferenceFile.objects.create(
                 reference=reference,
                 uploaded_by=request.user,
-                original_filename=(getattr(upload, "name", "") or "file")[:255],
+                original_filename=stored_name[:255],
                 note=note,
                 content_type=(getattr(upload, "content_type", "") or "")[:100],
                 resource_type=uploaded["resource_type"],
@@ -3579,7 +3713,8 @@ class AdvertReferenceStorageDeleteView(View):
 def _stream_advert_storage_asset(request, item, force_download):
     """Relay one small (<=5MB) Ads storage file from Cloudinary with a signed
     link. Range is forwarded so video preview can seek."""
-    filename = item.original_filename or item.public_id.rsplit("/", 1)[-1] or "download"
+    filename = _advert_storage_display_name(item)
+    ext = _advert_storage_extension(item, filename)
     delivery_url, _ = cloudinary.utils.cloudinary_url(
         item.public_id, resource_type=item.resource_type or "image", secure=True
     )
@@ -3607,13 +3742,10 @@ def _stream_advert_storage_asset(request, item, force_download):
         finally:
             upstream.close()
 
-    #   Active files must never be rendered as page/script on our domain, so
-    #   even a preview link hands them out as an opaque attachment.
-    content_type = (
-        "application/octet-stream"
-        if force_download
-        else (item.content_type or upstream.headers.get("Content-Type") or "application/octet-stream")
-    )
+    #   Static landing-page assets (js/css/images/fonts...) get a real MIME
+    #   type so the browser can actually use them. Documents and scripts that
+    #   could render a page stay opaque attachments on our own domain.
+    content_type = _advert_storage_content_type(item, ext, force_download)
     response = StreamingHttpResponse(
         chunks(),
         status=206 if upstream.status_code == 206 else 200,
@@ -3632,10 +3764,11 @@ def _stream_advert_storage_asset(request, item, force_download):
 
 class AdvertReferenceShareView(View):
     """Public one-hour signed link for one Ads storage file. No login needed:
-    possession of the token IS the permission. Active file types are forced
-    to download even when the link was opened as a preview."""
+    possession of the token IS the permission. The trailing filename is only
+    cosmetic -- the stored row decides the real type and MIME. Page/document
+    types are still forced to download; static assets get their proper MIME."""
 
-    def get(self, request, file_id, token):
+    def get(self, request, file_id, token, filename=""):
         try:
             signed_id = signing.TimestampSigner(salt=ADVERT_STORAGE_LINK_SALT).unsign(
                 token, max_age=ADVERT_STORAGE_LINK_AGE
@@ -3645,9 +3778,7 @@ class AdvertReferenceShareView(View):
         if signed_id != str(file_id):
             return HttpResponse("This share link has expired or is invalid.", status=403)
         item = get_object_or_404(AdvertReferenceFile, pk=file_id)
-        force = request.GET.get("download") in {"1", "true", "yes"} or _advert_storage_force_download(
-            item.original_filename
-        )
+        force = request.GET.get("download") in {"1", "true", "yes"} or _advert_storage_force_download(item)
         return _stream_advert_storage_asset(request, item, force)
 
 
