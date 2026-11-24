@@ -8,6 +8,7 @@ from unittest import mock
 
 import json
 import re
+import threading
 from datetime import datetime, time, timedelta
 from urllib.parse import urlencode
 
@@ -238,6 +239,20 @@ class PanelCategoryTests(TestCase):
         self.assertRedirects(response, reverse("home:profile"), fetch_redirect_response=False)
 
 
+class _MainThreadSendMock(mock.Mock):
+    """A resend mock that ignores work drained from the background mail pool.
+
+    Other tests queue welcome/batch emails on a module-level executor. Those
+    jobs can finish while a StaffMailTests assertion is running; counting them
+    would make an unrelated background send look like this class's direct mail.
+    """
+
+    def __call__(self, *args, **kwargs):
+        if threading.current_thread() is not threading.main_thread():
+            return None
+        return super().__call__(*args, **kwargs)
+
+
 @override_settings(CACHES=ISOLATED_CACHE)
 class StaffMailTests(TestCase):
     """The "Send mail" box on each staff detail page (ADMIN.views.StaffMailSendView).
@@ -264,8 +279,9 @@ class StaffMailTests(TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-        patcher = mock.patch("resend.Emails.send")
-        self.send = patcher.start()
+        self.send = _MainThreadSendMock()
+        patcher = mock.patch("resend.Emails.send", new=self.send)
+        patcher.start()
         self.addCleanup(patcher.stop)
 
         self.admin = self.make("admin@example.com", Auth.objects.create_admin, "Ada Admin")
