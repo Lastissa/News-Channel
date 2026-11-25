@@ -1,0 +1,83 @@
+{% load archive_extras %}
+<div class="ads-storage-list-pane" id="advert-storage-list">
+  <form class="ads-storage-tools"
+        hx-get="{{ storage_endpoint }}"
+        hx-target="#advert-storage-workspace"
+        hx-swap="innerHTML"
+        hx-trigger="input delay:350ms from:[data-storage-q], change from:[data-storage-kind], change from:[data-storage-date]">
+    <div class="ads-storage-filters" role="group" aria-label="Filter stored files">
+      <select name="kind" data-storage-kind aria-label="File kind">
+        <option value="all" {% if storage_kind == 'all' %}selected{% endif %}>All files</option>
+        <option value="image" {% if storage_kind == 'image' %}selected{% endif %}>Images</option>
+        <option value="video" {% if storage_kind == 'video' %}selected{% endif %}>Videos</option>
+        <option value="file" {% if storage_kind == 'file' %}selected{% endif %}>Files</option>
+      </select>
+      <select name="date" data-storage-date aria-label="Upload date">
+        <option value="" {% if not storage_date %}selected{% endif %}>Any date</option>
+        <option value="today" {% if storage_date == 'today' %}selected{% endif %}>Today</option>
+        <option value="7d" {% if storage_date == '7d' %}selected{% endif %}>Last 7 days</option>
+        <option value="30d" {% if storage_date == '30d' %}selected{% endif %}>Last 30 days</option>
+      </select>
+      <button type="button" class="ads-storage-clear" data-storage-clear>Clear filters</button>
+    </div>
+    <input type="search" name="q" value="{{ storage_query }}" data-storage-q placeholder="Search name, note or uploader" aria-label="Search stored files">
+    <span class="ads-storage-count">{{ storage_filtered_count }} shown</span>
+  </form>
+
+  {% if system_files %}
+  <section class="ads-storage-section" aria-label="Linked advert files">
+    <h4>Linked advert files <small>read only Â· managed in PANEL</small></h4>
+    <ul class="ads-storage-tiles">
+      {% for file in system_files %}
+      <li class="ads-storage-tile ads-storage-tile--system" data-storage-kind="{{ file.kind }}">
+        {% if file.kind == "image" and file.secure_url %}
+        <img class="ads-storage-thumb" src="{{ file.secure_url|cloudinary_proxy }}" alt="">
+        {% else %}
+        <span class="ads-storage-icon ads-storage-icon--{{ file.kind }}">{{ file.kind|first|upper }}</span>
+        {% endif %}
+        <div class="ads-storage-meta">
+          <strong>{{ file.name }}</strong>
+          <span>{{ file.note }}</span>
+          <small>{{ file.date }}{% if file.size %} Â· {{ file.size }}{% endif %}</small>
+        </div>
+        <span class="ads-storage-badge">System</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="ads-storage-section" aria-label="Uploaded reference files">
+    <h4>Uploaded files</h4>
+    <ul class="ads-storage-tiles" id="ads-storage-file-list">
+      {% for file in storage_files %}
+      <li class="ads-storage-tile" data-storage-kind="{{ file.kind }}"
+          data-storage-search="{{ file.name }} {{ file.note }} {{ file.uploaded_by }}">
+        {% if file.kind == "image" and not file.force_download %}
+        <img class="ads-storage-thumb" src="{{ file.secure_url|cloudinary_proxy }}" alt="">
+        {% else %}
+        <span class="ads-storage-icon ads-storage-icon--{{ file.kind }}">{{ file.kind|first|upper }}</span>
+        {% endif %}
+        <div class="ads-storage-meta">
+          <strong>{{ file.name }}</strong>
+          <span>{{ file.note|default:"No note" }}</span>
+          <small>{{ file.date }}{% if file.size %} Â· {{ file.size }}{% endif %}</small>
+        </div>
+        {% if file.extension %}<span class="ads-storage-badge ads-storage-badge--type">{{ file.extension }}</span>{% endif %}
+        <button type="button" class="ads-storage-open"
+                hx-get="{% url 'control:advert_storage_edit' ref.id file.id %}{{ storage_suffix }}"
+                hx-target="#advert-storage-workspace"
+                hx-swap="innerHTML">Open</button>
+      </li>
+      {% empty %}
+      <li class="ads-storage-empty">No files match this filter yet.</li>
+      {% endfor %}
+    </ul>
+    {% if storage_has_more %}
+    <button type="button" class="ads-desk-button ads-desk-button--quiet ads-storage-more"
+            hx-get="{{ storage_endpoint }}?kind={{ storage_kind }}&date={{ storage_date }}&q={{ storage_query }}&page={{ storage_next_page }}"
+            hx-target="#advert-storage-workspace"
+            hx-swap="innerHTML">Load more</button>
+    {% endif %}
+  </section>
+</div>

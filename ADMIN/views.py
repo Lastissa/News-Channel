@@ -3578,31 +3578,48 @@ def _advert_export_page_name(path, pk):
 def _advert_export_manifest(reference, included, failures):
     advert = reference.advert
     lines = [
-        "ABUREPORT ADS DESK EXPORT",
-        "=========================",
-        f"Reference: {reference.reference}",
-        f"Business: {reference.business_name}",
-        f"Advert: {advert.heading if advert else '(not linked)'}",
-        f"Plan: {reference.plan_name}",
-        f"Status: {reference.get_status_display()}",
-        f"Owner: {reference.user.email if reference.user_id else ''}",
-        f"Public page: {reference.public_link or '-'}",
-        f"Destination: {reference.public_target or '-'}",
-        f"Exported: {timezone.localtime().strftime('%d %b %Y, %H:%M %Z')}",
+        "# AbuReport Ads desk export",
         "",
-        "INCLUDED FILES",
-        "---------------",
+        f"- Reference: `{reference.reference}`",
+        f"- Business: {reference.business_name}",
+        f"- Advert: {advert.heading if advert else '(not linked)'}",
+        f"- Plan: {reference.plan_name}",
+        f"- Status: {reference.get_status_display()}",
+        f"- Owner: {reference.user.email if reference.user_id else '-'}",
+        f"- Public page: {reference.public_link or '-'}",
+        f"- Destination: {reference.public_target or '-'}",
+        f"- Exported: {timezone.localtime().strftime('%d %b %Y, %H:%M %Z')}",
+        "",
+        "## Folder map",
+        "",
+        "- `uploaded/` - files added by ads staff in this reference's storage shelf.",
+        "- `advert/` - the linked advert banner, owned by PANEL.",
+        "- `pages/` - the landing page and extra pages, owned by the landing-page editor.",
+        "- `README.md` - this file.",
+        "- `ERRORS.md` - only present if one or more assets could not be fetched.",
+        "",
+        "An agent rebuilding this advert should treat `pages/index.html` as the entry",
+        "point, keep `uploaded/` assets at their original names, and replace banner or",
+        "page content in PANEL rather than editing the generated files blindly.",
+        "",
+        "## Included files",
+        "",
+        "| Path in ZIP | Detail | Live link |",
+        "| --- | --- | --- |",
     ]
-    lines.extend(f"{name} - {detail}" if detail else name for name, detail in included)
-    if not included:
-        lines.append("(none)")
-    notes = (reference.notes or "").strip()
-    lines.extend(["", "REFERENCE NOTES", "---------------", notes or "(none)"])
-    if failures:
-        lines.extend(["", "EXPORT WARNINGS", "---------------"])
-        lines.extend(f"{name}: {reason}" for name, reason in failures)
-    return "\n".join(lines) + "\n"
+    if included:
+        for item in included:
+            path, detail, link = item if len(item) == 3 else (item[0], item[1] if len(item) > 1 else "", "-")
+            lines.append(f"| `{path}` | {detail} | {link} |")
+    else:
+        lines.append("| _none_ | - | - |")
 
+    notes = (reference.notes or "").strip()
+    lines.extend(["", "## Reference notes", "", notes or "_None._"])
+    if failures:
+        lines.extend(["", "## Warnings", ""])
+        lines.extend(f"- `{name}` - {reason}" for name, reason in failures)
+    return "\n".join(lines) + "\n"
 
 def _ads_desk_denied(request):
     if ads_staff_only(request.user):
@@ -3622,9 +3639,56 @@ def _ads_file_size_label(num_bytes):
     return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 
-def _advert_storage_file_rows(reference):
+def _advert_storage_file_rows(reference, query="", kind="all", date_filter="", page=1):
+    """Return filtered/paginated uploaded rows plus shelf totals."""
+    items = list(reference.storage_files.select_related("uploaded_by").order_by("-date_uploaded"))
+    today = timezone.localdate()
+    query = (query or "").strip().lower()
+    kind = kind or "all"
+    date_filter = date_filter or ""
+
+    def _keeps(item):
+        if kind != "all":
+            name = _advert_storage_display_name(item)
+            ext = _advert_storage_extension(item, name)
+            item_kind = _advert_storage_kind(name, item.content_type, ext)
+            if item_kind != kind:
+                return False
+        if date_filter:
+            made = timezone.localtime(item.date_uploaded).date()
+            if date_filter == "today" and made != today:
+                return False
+            if date_filter == "7d" and made < today - timedelta(days=7):
+                return False
+            if date_filter == "30d" and made < today - timedelta(days=30):
+                return False
+        if query:
+            haystack = " ".join(
+                str(value or "").lower()
+                for value in (
+                    _advert_storage_display_name(item),
+                    item.note,
+                    item.uploaded_by.email if item.uploaded_by_id else "",
+                )
+            )
+            if query not in haystack:
+                return False
+        return True
+
+    items = [item for item in items if _keeps(item)]
+    total = len(items)
+    used_count = reference.storage_files.count()
+    used_bytes = sum(value or 0 for value in reference.storage_files.values_list("file_size", flat=True))
+    page_size = 12
+    try:
+        page = max(1, int(page or 1))
+    except (TypeError, ValueError):
+        page = 1
+    start = (page - 1) * page_size
+    chosen = items[start:start + page_size]
+
     rows = []
-    for item in reference.storage_files.select_related("uploaded_by").order_by("-date_uploaded"):
+    for item in chosen:
         name = _advert_storage_display_name(item)
         ext = _advert_storage_extension(item, name)
         preview_url, download_url = _advert_storage_share_urls(item, name)
@@ -3650,8 +3714,15 @@ def _advert_storage_file_rows(reference):
                 "system": False,
             }
         )
-    return rows
-
+    return {
+        "rows": rows,
+        "total": total,
+        "page": page,
+        "has_more": start + page_size < total,
+        "next_page": page + 1,
+        "used_count": used_count,
+        "used_size": _ads_file_size_label(used_bytes),
+    }
 
 def _advert_storage_system_rows(reference):
     """Read-only context already owned by the linked advert. These rows are
@@ -3705,27 +3776,46 @@ def _advert_storage_system_rows(reference):
     return rows
 
 
-def _advert_storage_context(reference, error="", notice=""):
+def _advert_storage_context(reference, request=None, error="", notice=""):
+    query = request.GET.get("q", "") if request else ""
+    kind = request.GET.get("kind", "all") if request else "all"
+    date_filter = request.GET.get("date", "") if request else ""
+    page = request.GET.get("page", 1) if request else 1
+    result = _advert_storage_file_rows(reference, query, kind, date_filter, page)
+    query_string = request.META.get("QUERY_STRING", "") if request else ""
+    endpoint = reverse("control:advert_storage_modal", args=[reference.pk])
+    suffix = "?" + query_string if query_string else ""
     return {
         "ref": {
             "id": reference.pk,
             "reference": reference.reference,
             "business_name": reference.business_name,
         },
-        "storage_files": _advert_storage_file_rows(reference),
+        "storage_files": result["rows"],
         "system_files": _advert_storage_system_rows(reference),
         "storage_max_mb": ADVERT_STORAGE_MAX_BYTES // (1024 * 1024),
         "cache_choices": ADVERT_CACHE_CHOICES,
         "storage_error": error,
         "storage_notice": notice,
+        "storage_total_count": result["used_count"],
+        "storage_total_size": result["used_size"],
+        "storage_filtered_count": result["total"],
+        "storage_has_more": result["has_more"],
+        "storage_next_page": result["next_page"],
+        "storage_page": result["page"],
+        "storage_query": query,
+        "storage_kind": kind,
+        "storage_date": date_filter,
+        "storage_endpoint": endpoint,
+        "storage_suffix": suffix,
+        "storage_query_string": query_string,
     }
-
 
 def _advert_storage_response(request, reference, error="", notice="", status=200):
     response = render(
         request,
         "ADMIN/partials/advert_reference_storage.html",
-        _advert_storage_context(reference, error, notice),
+        _advert_storage_context(reference, request, error, notice),
         status=status,
     )
     if notice or error:
@@ -3745,13 +3835,7 @@ class AdvertReferenceStorageModalView(View):
 
 
 class AdvertReferenceStorageExportView(View):
-    """Download one reference's whole Ads desk shelf as a single ZIP.
-
-    Includes uploaded storage files, the linked advert banner, the landing
-    page HTML and every extra advert page. A failed Cloudinary fetch is noted
-    in the ZIP instead of aborting the whole export, so staff still get the
-    files that are available.
-    """
+    """Download one reference's Ads desk shelf as a ZIP with a Markdown map."""
 
     def get(self, request, reference_id):
         denied = _ads_desk_denied(request)
@@ -3777,9 +3861,9 @@ class AdvertReferenceStorageExportView(View):
 
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             for item in reference.storage_files.select_related("uploaded_by").order_by("date_uploaded"):
-                arcname = _advert_export_arcname(
-                    used, f"uploaded/{_advert_storage_display_name(item)}"
-                )
+                name = _advert_storage_display_name(item)
+                arcname = _advert_export_arcname(used, f"uploaded/{name}")
+                share_url, _ = _advert_storage_share_urls(item, name)
                 try:
                     data = _advert_export_fetch_bytes(
                         _advert_export_storage_url(item), ADVERT_STORAGE_MAX_BYTES
@@ -3794,7 +3878,7 @@ class AdvertReferenceStorageExportView(View):
                 if item.uploaded_by_id:
                     detail += f" - {item.uploaded_by.email}"
                 archive.writestr(arcname, data)
-                included.append((arcname, detail))
+                included.append((arcname, detail, share_url))
 
             advert = reference.advert
             if advert and advert.image_url:
@@ -3810,7 +3894,7 @@ class AdvertReferenceStorageExportView(View):
                     failures.append((arcname, str(exc)))
                 else:
                     archive.writestr(arcname, data)
-                    included.append((arcname, "Linked advert banner"))
+                    included.append((arcname, "Linked advert banner", advert.image_url))
 
             if advert:
                 landing = getattr(advert, "landing_page", None)
@@ -3822,7 +3906,9 @@ class AdvertReferenceStorageExportView(View):
                         failures.append((arcname, str(exc)))
                     else:
                         archive.writestr(arcname, html.encode("utf-8"))
-                        included.append((arcname, "Landing page HTML"))
+                        included.append(
+                            (arcname, "Landing page HTML", reference.public_link or "-")
+                        )
                 for page in advert.pages.all():
                     if not page.html_public_id:
                         continue
@@ -3834,15 +3920,20 @@ class AdvertReferenceStorageExportView(View):
                         failures.append((arcname, str(exc)))
                     else:
                         archive.writestr(arcname, html.encode("utf-8"))
-                        included.append((arcname, f"/{page.path}/ extra page HTML"))
+                        included.append(
+                            (arcname, f"/{page.path}/ extra page HTML", reference.public_link or "-")
+                        )
 
-            archive.writestr(
-                "README.txt", _advert_export_manifest(reference, included, failures)
-            )
+            archive.writestr("README.md", _advert_export_manifest(reference, included, failures))
             if failures:
-                error_lines = ["Files that could not be exported:", ""]
-                error_lines.extend(f"{name}: {reason}" for name, reason in failures)
-                archive.writestr("EXPORT_ERRORS.txt", "\n".join(error_lines) + "\n")
+                error_lines = [
+                    "# Export warnings",
+                    "",
+                    "These files could not be fetched. The rest of the export is usable.",
+                    "",
+                ]
+                error_lines.extend(f"- `{name}` - {reason}" for name, reason in failures)
+                archive.writestr("ERRORS.md", "\n".join(error_lines) + "\n")
 
         response = HttpResponse(buffer.getvalue(), content_type="application/zip")
         stamp = timezone.localtime().strftime("%Y%m%d-%H%M")
@@ -3850,7 +3941,6 @@ class AdvertReferenceStorageExportView(View):
         filename = f"{base}-{reference.reference}-export-{stamp}.zip"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
-
 
 class AdvertReferenceAnalyticsModalView(View):
     """htmx GET: views + click-source charts for one Ads desk reference.
@@ -3961,16 +4051,16 @@ def _advert_storage_edit_response(request, reference, item, content, note, error
 
 
 class AdvertReferenceStorageEditView(View):
-    """Edit a text storage file in place, keeping its Cloudinary public id."""
+    """Edit a text file, or replace image/video content in the same public id."""
 
-    def _target(self, request, reference_id, file_id):
+    def _target(self, request, reference_id, file_id, replacing=False):
         denied = _ads_desk_denied(request)
         if denied:
             return denied, None, None
         reference = get_object_or_404(AdvertReference, pk=reference_id)
         item = get_object_or_404(AdvertReferenceFile, pk=file_id, reference=reference)
         ext = _advert_storage_extension(item)
-        if ext not in _ADVERT_EDITABLE_EXTENSIONS:
+        if not replacing and ext not in _ADVERT_EDITABLE_EXTENSIONS:
             return (
                 _advert_storage_response(
                     request,
@@ -3987,6 +4077,11 @@ class AdvertReferenceStorageEditView(View):
         denied, reference, item = self._target(request, reference_id, file_id)
         if denied:
             return denied
+        ext = _advert_storage_extension(item)
+        if ext not in _ADVERT_EDITABLE_EXTENSIONS:
+            return _advert_storage_response(
+                request, reference, error="Use the media studio to replace this file.", status=400
+            )
         try:
             raw = _advert_export_fetch_bytes(
                 _advert_export_storage_url(item), ADVERT_STORAGE_MAX_BYTES
@@ -4002,7 +4097,9 @@ class AdvertReferenceStorageEditView(View):
         )
 
     def post(self, request, reference_id, file_id):
-        denied, reference, item = self._target(request, reference_id, file_id)
+        denied, reference, item = self._target(
+            request, reference_id, file_id, replacing=bool(request.FILES.get("replacement"))
+        )
         if denied:
             return denied
         remaining_seconds, limited = is_rate_limited(request, 20, 60, scope="advert-storage-edit")
@@ -4013,42 +4110,68 @@ class AdvertReferenceStorageEditView(View):
                 error=f"Please wait {remaining_seconds} seconds before saving again.",
                 status=429,
             )
-        content = request.POST.get("content", "")
+
         note = " ".join((request.POST.get("note") or "").split())[:240]
-        if len(content.encode("utf-8")) > ADVERT_STORAGE_MAX_BYTES:
-            return _advert_storage_edit_response(
-                request,
-                reference,
-                item,
-                content,
-                note,
-                error=f"Files are limited to {ADVERT_STORAGE_MAX_BYTES // (1024 * 1024)}MB.",
-                status=400,
-            )
-        ext = _advert_storage_extension(item)
-        try:
-            saved = replace_advert_storage_file(
-                content,
-                item.public_id,
-                item.resource_type,
-                ext,
-                _advert_storage_display_name(item),
-            )
-        except ImageUploadError as exc:
-            return _advert_storage_edit_response(
-                request, reference, item, content, note, error=str(exc), status=400
-            )
-        item.note = note
-        item.content_type = _ADVERT_MIME_BY_EXT.get(ext, item.content_type)
-        item.file_size = saved["bytes"]
-        item.save(update_fields=["note", "content_type", "file_size"])
+        replacement = request.FILES.get("replacement")
+
+        if replacement:
+            size = getattr(replacement, "size", 0) or 0
+            if size > ADVERT_STORAGE_MAX_BYTES:
+                return _advert_storage_response(
+                    request, reference, error="Files are limited to 5MB.", status=400
+                )
+            ext = _advert_storage_extension(item)
+            try:
+                saved = replace_advert_storage_binary(
+                    replacement,
+                    item.public_id,
+                    item.resource_type,
+                    ext,
+                    _advert_storage_display_name(item),
+                )
+            except ImageUploadError as exc:
+                return _advert_storage_response(request, reference, error=str(exc), status=400)
+            item.note = note
+            item.file_size = saved["bytes"]
+            if saved.get("secure_url"):
+                item.secure_url = saved["secure_url"]
+            item.save(update_fields=["note", "file_size", "secure_url"])
+            notice = "Media replaced. Its share link still points to the same address."
+        else:
+            content = request.POST.get("content", "")
+            if len(content.encode("utf-8")) > ADVERT_STORAGE_MAX_BYTES:
+                return _advert_storage_edit_response(
+                    request,
+                    reference,
+                    item,
+                    content,
+                    note,
+                    error=f"Files are limited to {ADVERT_STORAGE_MAX_BYTES // (1024 * 1024)}MB.",
+                    status=400,
+                )
+            ext = _advert_storage_extension(item)
+            try:
+                saved = replace_advert_storage_file(
+                    content,
+                    item.public_id,
+                    item.resource_type,
+                    ext,
+                    _advert_storage_display_name(item),
+                )
+            except ImageUploadError as exc:
+                return _advert_storage_edit_response(
+                    request, reference, item, content, note, error=str(exc), status=400
+                )
+            item.note = note
+            item.content_type = _ADVERT_MIME_BY_EXT.get(ext, item.content_type)
+            item.file_size = saved["bytes"]
+            item.save(update_fields=["note", "content_type", "file_size"])
+            notice = "File saved. Pages using its share URL keep the same address."
+
         info_logger(
             msg=f"ADS STORAGE: file {item.pk} edited in reference {reference.reference} by {request.user.email}"
         )
-        return _advert_storage_response(
-            request, reference, notice="File saved. Pages using its share URL keep the same address."
-        )
-
+        return _advert_storage_response(request, reference, notice=notice)
 
 class AdvertReferenceStorageCacheView(View):
     """Set how long one Ads storage file may be cached by browsers/CDNs."""

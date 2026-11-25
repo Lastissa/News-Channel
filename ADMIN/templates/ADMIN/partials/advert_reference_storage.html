@@ -1,10 +1,10 @@
 {% load archive_extras %}
-<div class="ads-storage">
+<div class="ads-storage" data-storage-root data-reference-id="{{ ref.id }}">
   <header class="ads-storage-head">
     <div>
       <p class="ads-storage-kicker">{{ ref.reference }}</p>
       <h3>{{ ref.business_name }}</h3>
-      <p>Files belong to this reference only. Only ads staff can open this shelf.</p>
+      <p class="ads-storage-total">{{ storage_total_count }} files Â· {{ storage_total_size }} used</p>
     </div>
     <div class="ads-storage-head-actions">
       <a class="ads-desk-button ads-desk-button--primary"
@@ -14,128 +14,53 @@
     </div>
   </header>
 
-  {% if storage_error %}
-  <p class="ads-desk-error" role="alert">{{ storage_error }}</p>
-  {% endif %}
-  {% if storage_notice %}
-  <p class="ads-storage-notice" role="status">{{ storage_notice }}</p>
-  {% endif %}
+  {% if storage_error %}<p class="ads-desk-error" role="alert">{{ storage_error }}</p>{% endif %}
+  {% if storage_notice %}<p class="ads-storage-notice" role="status">{{ storage_notice }}</p>{% endif %}
 
   <details class="ads-storage-upload" open>
-    <summary>Add a file</summary>
+    <summary>Add image or file</summary>
     <form class="ads-storage-form"
-          hx-post="{% url 'control:advert_storage_upload' ref.id %}"
-          hx-target="#advert-storage-body" hx-swap="innerHTML"
-          hx-encoding="multipart/form-data">
+          data-storage-upload-form
+          data-endpoint="{% url 'control:advert_storage_upload' ref.id %}{{ storage_suffix }}"
+          data-max-bytes="{{ storage_max_mb }}">
       {% csrf_token %}
-      <label>
-        <span>File</span>
-        <input type="file" name="storage_file" required>
-      </label>
-      <label>
+      <div class="ads-storage-drop" data-storage-drop>
+        <strong>Drop a file here or choose one</strong>
+        <small>Images, video, HTML, CSS, JS, text and any other file Â· max {{ storage_max_mb }}MB</small>
+        <input type="file" name="storage_file" data-storage-input required>
+      </div>
+      <div class="ads-storage-preview" data-storage-preview hidden>
+        <div class="ads-storage-preview-art" data-storage-preview-art></div>
+        <div class="ads-storage-preview-copy">
+          <strong data-storage-preview-name></strong>
+          <span data-storage-preview-meta></span>
+        </div>
+        <button type="button" class="ads-storage-preview-clear" data-storage-preview-clear>Clear</button>
+      </div>
+      <label class="ads-storage-note">
         <span>Note <small>optional</small></span>
         <input type="text" name="note" maxlength="240" placeholder="e.g. final banner artwork">
       </label>
-      <button type="submit" class="ads-desk-button ads-desk-button--primary">Upload</button>
-      <small>Any file type is allowed. Maximum {{ storage_max_mb }}MB per file.</small>
+      <div class="ads-storage-progress" data-storage-progress hidden>
+        <span data-storage-progress-fill></span>
+        <small data-storage-progress-text>Preparingâ€¦</small>
+      </div>
+      <div class="ads-storage-form-actions">
+        <button type="submit" class="ads-desk-button ads-desk-button--primary" data-storage-submit>Upload</button>
+        <button type="button" class="ads-desk-button ads-desk-button--quiet" data-storage-cancel hidden>Cancel</button>
+      </div>
+      <small class="ads-storage-hint">On a slow connection you will see progress; cancel stays available until the upload finishes.</small>
     </form>
   </details>
 
-  <div class="ads-storage-tools">
-    <div class="ads-storage-filters" role="group" aria-label="Filter stored files">
-      <button type="button" class="is-active" data-storage-filter="all">All</button>
-      <button type="button" data-storage-filter="image">Images</button>
-      <button type="button" data-storage-filter="video">Videos</button>
-      <button type="button" data-storage-filter="file">Files</button>
-    </div>
-    <input type="search" data-storage-search placeholder="Search name, note or uploader" aria-label="Search stored files">
+  <div class="ads-storage-workspace" id="advert-storage-workspace">
+    {% include "ADMIN/partials/advert_storage_list.html" %}
+    <section class="ads-storage-detail" aria-label="File details">
+      <div class="ads-storage-detail-empty">
+        <span aria-hidden="true">â—«</span>
+        <h4>Select a file</h4>
+        <p>Choose an uploaded file to preview it, edit its note, adjust cache, or open the media studio.</p>
+      </div>
+    </section>
   </div>
-
-  {% if system_files %}
-  <section class="ads-storage-section" aria-label="Linked advert files">
-    <h4>Linked advert files <small>read only · managed in PANEL</small></h4>
-    <ul class="ads-storage-list">
-      {% for file in system_files %}
-      <li class="ads-storage-item ads-storage-item--system" data-storage-kind="{{ file.kind }}"
-          data-storage-search="{{ file.name }} {{ file.note }} {{ file.uploaded_by }}">
-        {% if file.kind == "image" and file.secure_url %}
-        <img class="ads-storage-thumb" src="{{ file.secure_url|cloudinary_proxy }}" alt="">
-        {% else %}
-        <span class="ads-storage-icon ads-storage-icon--{{ file.kind }}">{{ file.kind|first|upper }}</span>
-        {% endif %}
-        <div class="ads-storage-meta">
-          <strong>{{ file.name }}</strong>
-          <span>{{ file.note }}</span>
-          <small>{{ file.date }}{% if file.uploaded_by %} · {{ file.uploaded_by }}{% endif %}{% if file.size %} · {{ file.size }}{% endif %}</small>
-        </div>
-        <span class="ads-storage-badge">System</span>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  <section class="ads-storage-section" aria-label="Uploaded reference files">
-    <h4>Uploaded files</h4>
-    <ul class="ads-storage-list" id="ads-storage-file-list">
-      {% for file in storage_files %}
-      <li class="ads-storage-item" data-storage-kind="{{ file.kind }}"
-          data-storage-search="{{ file.name }} {{ file.note }} {{ file.uploaded_by }}">
-        {% if file.kind == "image" and not file.force_download %}
-        <img class="ads-storage-thumb" src="{{ file.secure_url|cloudinary_proxy }}" alt="">
-        {% else %}
-        <span class="ads-storage-icon ads-storage-icon--{{ file.kind }}">{{ file.kind|first|upper }}</span>
-        {% endif %}
-        <div class="ads-storage-meta">
-          <strong>{{ file.name }}</strong>
-          <span>{{ file.note|default:"No note" }}</span>
-          <small>{{ file.date }}{% if file.uploaded_by %} · {{ file.uploaded_by }}{% endif %}{% if file.size %} · {{ file.size }}{% endif %}</small>
-          <div class="ads-storage-cache">
-            <form class="ads-storage-cache-form"
-                  hx-post="{% url 'control:advert_storage_cache' ref.id file.id %}"
-                  hx-trigger="change"
-                  hx-target="#advert-storage-body" hx-swap="innerHTML"
-                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-              {% csrf_token %}
-              <label>
-                <span>Cache</span>
-                <select name="cache_seconds" aria-label="Cache duration for {{ file.name }}">
-                  {% for seconds, label in cache_choices %}
-                  <option value="{{ seconds }}" {% if seconds == file.cache_seconds %}selected{% endif %}>{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-            </form>
-            {% if file.cache_seconds %}
-            <form class="ads-storage-cache-form"
-                  hx-post="{% url 'control:advert_storage_cache_clear' ref.id file.id %}"
-                  hx-target="#advert-storage-body" hx-swap="innerHTML"
-                  hx-confirm="Clear the cached copy of {{ file.name }}?"
-                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-              {% csrf_token %}
-              <button type="submit" class="ads-storage-cache-clear">Clear cache</button>
-            </form>
-            {% endif %}
-          </div>
-        </div>
-        {% if file.extension %}<span class="ads-storage-badge ads-storage-badge--type">{{ file.extension }}</span>{% endif %}
-        <div class="ads-storage-actions">
-          {% if file.editable %}
-          <button type="button" class="ads-desk-button ads-desk-button--quiet"
-                  hx-get="{% url 'control:advert_storage_edit' ref.id file.id %}"
-                  hx-target="#advert-storage-body" hx-swap="innerHTML">Edit</button>
-          {% endif %}
-          <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.preview_url }}" target="_blank" rel="noopener noreferrer">Preview</a>
-          <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.download_url }}" target="_blank" rel="noopener noreferrer">Download</a>
-          <button type="button" class="ads-desk-button ads-desk-button--danger"
-                  hx-post="{% url 'control:advert_storage_delete' ref.id file.id %}"
-                  hx-target="#advert-storage-body" hx-swap="innerHTML"
-                  hx-confirm="Delete {{ file.name }} from {{ ref.reference }}? This cannot be undone.">Delete</button>
-        </div>
-      </li>
-      {% empty %}
-      <li class="ads-storage-empty">No files uploaded for this reference yet.</li>
-      {% endfor %}
-    </ul>
-  </section>
 </div>

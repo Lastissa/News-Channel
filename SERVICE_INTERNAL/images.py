@@ -285,6 +285,41 @@ def clear_advert_storage_cache(public_id, resource_type="image") -> bool:
     return True
 
 
+def replace_advert_storage_binary(file, public_id, resource_type="image", ext="", filename="file") -> dict:
+    """Overwrite one Ads storage asset in place with new binary content.
+
+    The public id is kept, so signed share URLs continue to resolve to the
+    same stable address after a crop, resize, trim or replacement upload.
+    """
+    if not public_id:
+        raise ImageUploadError("This file has no Cloudinary id to edit.")
+    size = getattr(file, "size", None)
+    if size is not None and size > ADVERT_STORAGE_MAX_BYTES:
+        raise ImageUploadError(
+            f"Ads storage files are limited to {ADVERT_STORAGE_MAX_BYTES // (1024 * 1024)}MB."
+        )
+    file.seek(0)
+    placement = {
+        "public_id": public_id,
+        "unique_filename": False,
+        "overwrite": True,
+        "invalidate": True,
+        "resource_type": resource_type or "image",
+    }
+    if ext:
+        placement["format"] = ext
+    try:
+        result = cloudinary.uploader.upload(file, tags=["advert-storage"], **placement)
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY BINARY REPLACE FAILED (advert-storage): {exc}")
+        raise ImageUploadError("Could not save the media right now. Please try again.") from exc
+    info_logger(msg=f"CLOUDINARY BINARY REPLACE OK (advert-storage): {public_id}")
+    return {
+        "bytes": result.get("bytes") or size or 0,
+        "secure_url": result.get("secure_url") or result.get("url") or "",
+        "resource_type": result.get("resource_type") or resource_type or "image",
+    }
+
 def replace_advert_storage_file(text, public_id, resource_type="raw", ext="", filename="file") -> dict:
     """Overwrite one Ads desk storage asset in place, keeping its public id.
 

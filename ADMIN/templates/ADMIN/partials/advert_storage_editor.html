@@ -1,35 +1,134 @@
 {% load archive_extras %}
-<div class="ads-storage ads-storage-editor">
-  <header class="ads-storage-head">
-    <div>
-      <p class="ads-storage-kicker">{{ ref.reference }}</p>
-      <h3>Edit {{ file.name }}</h3>
-      <p>Saving overwrites this file at its existing Cloudinary address, so pages using its share URL keep working.</p>
-    </div>
-    <button type="button" class="ads-desk-button ads-desk-button--quiet"
-            hx-get="{{ storage_endpoint }}" hx-target="#advert-storage-body" hx-swap="innerHTML">Back</button>
-  </header>
+<div class="ads-storage-editor-shell" data-storage-editor data-kind="{{ file.kind }}" data-file-id="{{ file.id }}">
+  <div class="ads-storage-workspace">
+    {% include "ADMIN/partials/advert_storage_list.html" %}
+    <section class="ads-storage-detail" aria-label="Edit {{ file.name }}">
+      <header class="ads-storage-detail-head">
+        <div>
+          <p class="ads-storage-kicker">{{ ref.reference }}</p>
+          <h4>{{ file.name }}</h4>
+          <p>Saving keeps the existing share URL.</p>
+        </div>
+        <button type="button" class="ads-desk-button ads-desk-button--quiet"
+                hx-get="{{ storage_endpoint }}"
+                hx-target="#advert-storage-workspace"
+                hx-swap="innerHTML">Back to list</button>
+      </header>
 
-  {% if edit_error %}
-  <p class="ads-desk-error" role="alert">{{ edit_error }}</p>
-  {% endif %}
+      {% if edit_error %}<p class="ads-desk-error" role="alert">{{ edit_error }}</p>{% endif %}
 
-  <form class="ads-storage-editor-form"
-        hx-post="{% url 'control:advert_storage_edit' ref.id file.id %}"
-        hx-target="#advert-storage-body" hx-swap="innerHTML">
-    {% csrf_token %}
-    <label>
-      <span>Note <small>optional</small></span>
-      <input type="text" name="note" maxlength="240" value="{{ note }}" placeholder="e.g. landing page stylesheet">
-    </label>
-    <label>
-      <span>File content</span>
-      <textarea name="content" spellcheck="false" rows="18" required>{{ content }}</textarea>
-    </label>
-    <div class="ads-storage-actions-wide">
-      <button type="button" class="ads-desk-button ads-desk-button--quiet"
-              hx-get="{{ storage_endpoint }}" hx-target="#advert-storage-body" hx-swap="innerHTML">Cancel</button>
-      <button type="submit" class="ads-desk-button ads-desk-button--primary">Save changes</button>
-    </div>
-  </form>
+      <form class="ads-storage-editor-form"
+            data-storage-editor-form
+            hx-encoding="multipart/form-data"
+            hx-post="{% url 'control:advert_storage_edit' ref.id file.id %}{{ storage_suffix }}"
+            hx-target="#advert-storage-workspace"
+            hx-swap="innerHTML">
+        {% csrf_token %}
+
+        <div class="ads-storage-editor-preview">
+          {% if file.kind == "image" %}
+          <img src="{{ file.secure_url|cloudinary_proxy }}" alt="" data-studio-media>
+          {% elif file.kind == "video" %}
+          <video src="{{ file.preview_url }}" controls data-studio-media></video>
+          {% else %}
+          <span class="ads-storage-icon ads-storage-icon--file">{{ file.extension|first|default:"F" }}</span>
+          {% endif %}
+        </div>
+
+        <label>
+          <span>Note <small>optional</small></span>
+          <input type="text" name="note" maxlength="240" value="{{ note }}" placeholder="e.g. final banner artwork">
+        </label>
+
+        {% if file.kind == "image" %}
+        <fieldset class="ads-storage-studio" data-image-studio>
+          <legend>Image studio</legend>
+          <div class="ads-storage-studio-grid">
+            <label><span>Crop X</span><input type="number" min="0" value="0" data-crop-x></label>
+            <label><span>Crop Y</span><input type="number" min="0" value="0" data-crop-y></label>
+            <label><span>Crop width</span><input type="number" min="1" value="100" data-crop-w></label>
+            <label><span>Crop height</span><input type="number" min="1" value="100" data-crop-h></label>
+            <label><span>Output width</span><input type="number" min="1" value="1200" data-output-w></label>
+            <label>
+              <span>Quality</span>
+              <select data-quality>
+                <option value="0.92">High</option>
+                <option value="0.8" selected>Balanced</option>
+                <option value="0.65">Small</option>
+              </select>
+            </label>
+          </div>
+          <button type="button" class="ads-desk-button ads-desk-button--quiet" data-image-apply>Apply crop and resize</button>
+          <canvas data-studio-canvas hidden></canvas>
+        </fieldset>
+        {% elif file.kind == "video" %}
+        <fieldset class="ads-storage-studio" data-video-studio>
+          <legend>Video studio</legend>
+          <div class="ads-storage-studio-grid">
+            <label><span>Start (seconds)</span><input type="number" min="0" step="0.1" value="0" data-trim-start></label>
+            <label><span>End (seconds)</span><input type="number" min="0" step="0.1" value="0" data-trim-end></label>
+          </div>
+          <button type="button" class="ads-desk-button ads-desk-button--quiet" data-video-thumb>Use frame as thumbnail</button>
+          <button type="button" class="ads-desk-button ads-desk-button--quiet" data-video-apply>Apply trim</button>
+          <canvas data-studio-canvas hidden></canvas>
+        </fieldset>
+        {% else %}
+        <label>
+          <span>File content</span>
+          <textarea name="content" spellcheck="false" rows="18" required>{{ content }}</textarea>
+        </label>
+        {% endif %}
+
+        <label class="ads-storage-replace">
+          <span>Replace file <small>keeps this share URL</small></span>
+          <input type="file" name="replacement" data-replacement-input>
+        </label>
+
+        <div class="ads-storage-meta-row">
+          <span>{{ file.size }}</span>
+          <span>{{ file.date }}</span>
+          {% if file.uploaded_by %}<span>{{ file.uploaded_by }}</span>{% endif %}
+        </div>
+
+        <div class="ads-storage-cache-row">
+          <form class="ads-storage-cache-form"
+                hx-post="{% url 'control:advert_storage_cache' ref.id file.id %}{{ storage_suffix }}"
+                hx-target="#advert-storage-workspace"
+                hx-swap="innerHTML"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+            {% csrf_token %}
+            <label><span>Cache</span>
+              <select name="cache_seconds" hx-trigger="change">
+                {% for seconds, label in cache_choices %}
+                <option value="{{ seconds }}" {% if seconds == file.cache_seconds %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </form>
+          {% if file.cache_seconds %}
+          <form class="ads-storage-cache-form"
+                hx-post="{% url 'control:advert_storage_cache_clear' ref.id file.id %}{{ storage_suffix }}"
+                hx-target="#advert-storage-workspace"
+                hx-swap="innerHTML"
+                hx-confirm="Clear the cached copy of {{ file.name }}?"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+            {% csrf_token %}
+            <button type="submit" class="ads-storage-cache-clear">Clear cache</button>
+          </form>
+          {% endif %}
+        </div>
+
+        <div class="ads-storage-actions-wide">
+          <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.preview_url }}" target="_blank" rel="noopener noreferrer">Preview</a>
+          <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.download_url }}" target="_blank" rel="noopener noreferrer">Download</a>
+          <button type="submit" class="ads-desk-button ads-desk-button--primary" data-storage-save>Save changes</button>
+          <button type="button" class="ads-desk-button ads-desk-button--danger"
+                  hx-post="{% url 'control:advert_storage_delete' ref.id file.id %}{{ storage_suffix }}"
+                  hx-target="#advert-storage-workspace"
+                  hx-swap="innerHTML"
+                  hx-confirm="Delete {{ file.name }} from {{ ref.reference }}? This cannot be undone.">Delete</button>
+        </div>
+      </form>
+    </section>
+  </div>
 </div>
