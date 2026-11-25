@@ -6,8 +6,10 @@ seconds and these tests post far more than that.
 """
 from unittest import mock
 
+import io
 import json
 import re
+import zipfile
 import threading
 from datetime import datetime, time, timedelta
 from urllib.parse import urlencode
@@ -3613,6 +3615,84 @@ class AdvertReferenceDeskTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/octet-stream")
         self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
         self.assertIn("page.html", response["Content-Disposition"])
+
+    def test_ads_staff_can_export_whole_reference_as_one_zip(self):
+        reference = self._reference()
+        self._storage_file(reference, name="brief.pdf")
+        AdvertLandingPage.objects.create(
+            advert=self.advert,
+            author=self.admin,
+            html_public_id="abureport/advert-landing/advert_1",
+            html_bytes=11,
+            is_published=True,
+        )
+        AdvertPage.objects.create(
+            advert=self.advert,
+            path="about",
+            author=self.admin,
+            html_public_id="abureport/advert-pages/advert_1_about",
+            html_bytes=11,
+        )
+        self.client.force_login(self.ads_staff)
+
+        def fake_get(url, **kwargs):
+            response = mock.Mock(status_code=200)
+            response.iter_content.return_value = (
+                [b"BANNER"] if "desk.jpg" in url else [b"PDF"]
+            )
+            return response
+
+        def fake_html(public_id):
+            return "<html>landing</html>" if "landing" in public_id else "<html>about</html>"
+
+        with mock.patch("ADMIN.views.requests.get", side_effect=fake_get), mock.patch(
+            "ADMIN.views.fetch_advert_landing_html", side_effect=fake_html
+        ):
+            response = self.client.get(
+                reverse("control:advert_storage_export", args=[reference.pk])
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            names = archive.namelist()
+            self.assertIn("uploaded/brief.pdf", names)
+            self.assertIn("advert/banner.jpg", names)
+            self.assertIn("pages/index.html", names)
+            self.assertIn("pages/about.html", names)
+            self.assertIn("README.txt", names)
+            self.assertNotIn("EXPORT_ERRORS.txt", names)
+            self.assertEqual(archive.read("uploaded/brief.pdf"), b"PDF")
+            self.assertIn(b"Desk Business", archive.read("README.txt"))
+
+    def test_export_reports_a_failed_cloudinary_file_without_aborting(self):
+        reference = self._reference()
+        self._storage_file(reference, name="broken.pdf")
+        self.client.force_login(self.ads_staff)
+
+        failed = mock.Mock(status_code=404)
+        with mock.patch("ADMIN.views.requests.get", return_value=failed):
+            response = self.client.get(
+                reverse("control:advert_storage_export", args=[reference.pk])
+            )
+
+        self.assertEqual(response.status_code, 200)
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            self.assertIn("README.txt", archive.namelist())
+            self.assertIn("EXPORT_ERRORS.txt", archive.namelist())
+            self.assertIn(b"no longer exists", archive.read("EXPORT_ERRORS.txt"))
+            self.assertNotIn("uploaded/broken.pdf", archive.namelist())
+
+    def test_reader_cannot_export_reference_storage(self):
+        reference = self._reference()
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("control:advert_storage_export", args=[reference.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
 
     def test_reader_cannot_open_or_upload_reference_storage(self):
         reference = self._reference()

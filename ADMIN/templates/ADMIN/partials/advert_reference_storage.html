@@ -6,7 +6,12 @@
       <h3>{{ ref.business_name }}</h3>
       <p>Files belong to this reference only. Only ads staff can open this shelf.</p>
     </div>
-    <button type="button" class="ads-desk-button ads-desk-button--quiet" data-modal-close>Close</button>
+    <div class="ads-storage-head-actions">
+      <a class="ads-desk-button ads-desk-button--primary"
+         href="{% url 'control:advert_storage_export' ref.id %}"
+         download>Export ZIP</a>
+      <button type="button" class="ads-desk-button ads-desk-button--quiet" data-modal-close>Close</button>
+    </div>
   </header>
 
   {% if storage_error %}

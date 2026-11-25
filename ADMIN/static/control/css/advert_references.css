@@ -1009,6 +1009,7 @@ body.has-ads-modal { overflow: hidden; }
 .ads-storage-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .ads-storage-head h3, .ads-ref-delete h3 { margin: 0; font-size: 1.25rem; }
 .ads-storage-head p { margin: 4px 0 0; color: var(--muted-text, #667085); font-size: 0.86rem; }
+.ads-storage-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .ads-storage-kicker { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.04em; }
 .ads-storage-notice { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: rgba(47, 122, 77, 0.12); color: var(--ads-green); }
 .ads-storage-upload { margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: var(--ads-soft); }

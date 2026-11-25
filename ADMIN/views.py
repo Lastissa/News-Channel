@@ -5,11 +5,13 @@ work stays in HOME.views; this module only holds the extra authority an admin
 (or superuser) carries over the rest of the staff.
 """
 
+import io
 import json
 import math
 import logging
 import mimetypes
 import re
+import zipfile
 from datetime import timedelta
 from urllib.parse import quote, urlencode, urlparse
 
@@ -3475,6 +3477,97 @@ def _advert_storage_share_urls(row, filename=""):
     return base, f"{base}?download=1"
 
 
+def _advert_export_arcname(used, path):
+    """Keep the folder prefix but make every entry inside the ZIP unique."""
+    prefix, sep, name = path.rpartition("/")
+    clean = _advert_storage_clean_name(name)
+    base = f"{prefix}/{clean}" if sep else clean
+    if base not in used:
+        used.add(base)
+        return base
+    stem, dot, ext = clean.rpartition(".")
+    if not dot:
+        stem, ext = clean, ""
+    for index in range(2, 100):
+        candidate_name = f"{stem}_{index}" + (f".{ext}" if ext else "")
+        candidate = f"{prefix}/{candidate_name}" if sep else candidate_name
+        if candidate not in used:
+            used.add(candidate)
+            return candidate
+    raise ImageUploadError("Too many files with the same name to export.")
+
+
+def _advert_export_fetch_bytes(url, limit):
+    """Read one Cloudinary/public asset into memory with a hard size ceiling."""
+    try:
+        response = requests.get(url, stream=True, timeout=(8, 60))
+    except requests.RequestException as exc:
+        raise ImageUploadError("Could not reach the file.") from exc
+    try:
+        if response.status_code == 404:
+            raise ImageUploadError("The file no longer exists.")
+        if response.status_code >= 400:
+            raise ImageUploadError(f"Cloudinary returned HTTP {response.status_code}.")
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > limit:
+                raise ImageUploadError("The file is too large to export.")
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        response.close()
+
+
+def _advert_export_storage_url(item):
+    try:
+        delivery_url, _ = cloudinary.utils.cloudinary_url(
+            item.public_id,
+            resource_type=item.resource_type or "image",
+            secure=True,
+        )
+    except Exception as exc:
+        raise ImageUploadError("Could not resolve the stored file.") from exc
+    return delivery_url
+
+
+def _advert_export_page_name(path, pk):
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "-", (path or "").strip()).strip("-")
+    return cleaned or f"page-{pk}"
+
+
+def _advert_export_manifest(reference, included, failures):
+    advert = reference.advert
+    lines = [
+        "ABUREPORT ADS DESK EXPORT",
+        "=========================",
+        f"Reference: {reference.reference}",
+        f"Business: {reference.business_name}",
+        f"Advert: {advert.heading if advert else '(not linked)'}",
+        f"Plan: {reference.plan_name}",
+        f"Status: {reference.get_status_display()}",
+        f"Owner: {reference.user.email if reference.user_id else ''}",
+        f"Public page: {reference.public_link or '-'}",
+        f"Destination: {reference.public_target or '-'}",
+        f"Exported: {timezone.localtime().strftime('%d %b %Y, %H:%M %Z')}",
+        "",
+        "INCLUDED FILES",
+        "---------------",
+    ]
+    lines.extend(f"{name} - {detail}" if detail else name for name, detail in included)
+    if not included:
+        lines.append("(none)")
+    notes = (reference.notes or "").strip()
+    lines.extend(["", "REFERENCE NOTES", "---------------", notes or "(none)"])
+    if failures:
+        lines.extend(["", "EXPORT WARNINGS", "---------------"])
+        lines.extend(f"{name}: {reason}" for name, reason in failures)
+    return "\n".join(lines) + "\n"
+
+
 def _ads_desk_denied(request):
     if ads_staff_only(request.user):
         return None
@@ -3607,6 +3700,111 @@ class AdvertReferenceStorageModalView(View):
             return denied
         reference = get_object_or_404(AdvertReference, pk=reference_id)
         return _advert_storage_response(request, reference)
+
+
+class AdvertReferenceStorageExportView(View):
+    """Download one reference's whole Ads desk shelf as a single ZIP.
+
+    Includes uploaded storage files, the linked advert banner, the landing
+    page HTML and every extra advert page. A failed Cloudinary fetch is noted
+    in the ZIP instead of aborting the whole export, so staff still get the
+    files that are available.
+    """
+
+    def get(self, request, reference_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        remaining_seconds, limited = is_rate_limited(
+            request, 10, 60, scope="advert-storage-export"
+        )
+        if limited:
+            return HttpResponse(
+                f"Please wait {remaining_seconds} seconds before exporting again.",
+                status=429,
+            )
+        reference = get_object_or_404(
+            AdvertReference.objects.select_related("user", "advert", "advert__landing_page"),
+            pk=reference_id,
+        )
+
+        buffer = io.BytesIO()
+        used = set()
+        included = []
+        failures = []
+
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for item in reference.storage_files.select_related("uploaded_by").order_by("date_uploaded"):
+                arcname = _advert_export_arcname(
+                    used, f"uploaded/{_advert_storage_display_name(item)}"
+                )
+                try:
+                    data = _advert_export_fetch_bytes(
+                        _advert_export_storage_url(item), ADVERT_STORAGE_MAX_BYTES
+                    )
+                except ImageUploadError as exc:
+                    failures.append((arcname, str(exc)))
+                    continue
+                detail = item.note or "Uploaded Ads desk file"
+                if item.uploaded_by_id:
+                    detail += f" - {item.uploaded_by.email}"
+                archive.writestr(arcname, data)
+                included.append((arcname, detail))
+
+            advert = reference.advert
+            if advert and advert.image_url:
+                ext = _advert_extension_from(advert.image_url)
+                if ext not in _ADVERT_MIME_BY_EXT:
+                    ext = "jpg"
+                arcname = _advert_export_arcname(used, f"advert/banner.{ext}")
+                try:
+                    data = _advert_export_fetch_bytes(
+                        advert.image_url, ADVERT_STORAGE_MAX_BYTES
+                    )
+                except ImageUploadError as exc:
+                    failures.append((arcname, str(exc)))
+                else:
+                    archive.writestr(arcname, data)
+                    included.append((arcname, "Linked advert banner"))
+
+            if advert:
+                landing = getattr(advert, "landing_page", None)
+                if landing and landing.html_public_id:
+                    arcname = _advert_export_arcname(used, "pages/index.html")
+                    try:
+                        html = fetch_advert_landing_html(landing.html_public_id)
+                    except ImageUploadError as exc:
+                        failures.append((arcname, str(exc)))
+                    else:
+                        archive.writestr(arcname, html.encode("utf-8"))
+                        included.append((arcname, "Landing page HTML"))
+                for page in advert.pages.all():
+                    if not page.html_public_id:
+                        continue
+                    page_name = _advert_export_page_name(page.path, page.pk)
+                    arcname = _advert_export_arcname(used, f"pages/{page_name}.html")
+                    try:
+                        html = fetch_advert_landing_html(page.html_public_id)
+                    except ImageUploadError as exc:
+                        failures.append((arcname, str(exc)))
+                    else:
+                        archive.writestr(arcname, html.encode("utf-8"))
+                        included.append((arcname, f"/{page.path}/ extra page HTML"))
+
+            archive.writestr(
+                "README.txt", _advert_export_manifest(reference, included, failures)
+            )
+            if failures:
+                error_lines = ["Files that could not be exported:", ""]
+                error_lines.extend(f"{name}: {reason}" for name, reason in failures)
+                archive.writestr("EXPORT_ERRORS.txt", "\n".join(error_lines) + "\n")
+
+        response = HttpResponse(buffer.getvalue(), content_type="application/zip")
+        stamp = timezone.localtime().strftime("%Y%m%d-%H%M")
+        base = slugify(reference.business_name or reference.reference) or "ads"
+        filename = f"{base}-{reference.reference}-export-{stamp}.zip"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 class AdvertReferenceAnalyticsModalView(View):
