@@ -3319,12 +3319,12 @@ def _ads_control_context(form_data=None, form_error=""):
 ------------------------------------------------------------
 Each Ads desk reference gets its own private file shelf. It is NOT the public
 /archive/ library: no story tokens, no public gallery, no advertiser access.
-Only ads staff can open it, upload, delete or hand out a one-hour signed link.
+Only ads staff can open it, upload, delete or hand out a stable signed link.
 The linked advert picture/HTML is listed as read-only system context.
 """
 
 ADVERT_STORAGE_LINK_SALT = "advert-storage-share"
-ADVERT_STORAGE_LINK_AGE = 3600  #   one hour, as requested
+ADVERT_STORAGE_LINK_AGE = None  #   stable links: live pages can rely on them
 
 #   The signed link ends with the real filename so a person (and the browser)
 #   can see what they are opening. The extension is resolved from the stored
@@ -3763,10 +3763,12 @@ def _stream_advert_storage_asset(request, item, force_download):
 
 
 class AdvertReferenceShareView(View):
-    """Public one-hour signed link for one Ads storage file. No login needed:
-    possession of the token IS the permission. The trailing filename is only
-    cosmetic -- the stored row decides the real type and MIME. Page/document
-    types are still forced to download; static assets get their proper MIME."""
+    """Public stable signed link for one Ads storage file. No login needed:
+    possession of the token IS the permission. Links never expire because the
+    CSS/JS they point at is embedded in live landing pages. The trailing
+    filename is only cosmetic -- the stored row decides the real type and MIME.
+    Page/document types are still forced to download; static assets get their
+    proper MIME."""
 
     def get(self, request, file_id, token, filename=""):
         try:
@@ -3774,9 +3776,9 @@ class AdvertReferenceShareView(View):
                 token, max_age=ADVERT_STORAGE_LINK_AGE
             )
         except BadSignature:
-            return HttpResponse("This share link has expired or is invalid.", status=403)
+            return HttpResponse("This share link is invalid.", status=403)
         if signed_id != str(file_id):
-            return HttpResponse("This share link has expired or is invalid.", status=403)
+            return HttpResponse("This share link is invalid.", status=403)
         item = get_object_or_404(AdvertReferenceFile, pk=file_id)
         force = request.GET.get("download") in {"1", "true", "yes"} or _advert_storage_force_download(item)
         return _stream_advert_storage_asset(request, item, force)
