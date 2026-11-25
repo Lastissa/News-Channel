@@ -860,7 +860,9 @@ class PromotePageViewTests(QuietTestCase):
         self.assertContains(response, "Regular")
         self.assertContains(response, "Pro")
         self.assertContains(response, "Advance")
-        self.assertContains(response, "Launch offer")
+        self.assertContains(response, "1,000")
+        self.assertNotContains(response, "Launch offer")
+        self.assertNotContains(response, "current promotion")
         self.assertNotContains(response, "free for the first 2 weeks")
         self.assertNotContains(response, "PROD")
         #   The page's own email fallback (not the footer's generic links).

@@ -1764,11 +1764,11 @@ PROMOTE_PLANS = (
     {
         "slug": "advance",
         "name": "Advance",
-        "price": "500",
-        "original_price": "1,000",
-        "saving": "500",
-        "badge": "Launch offer",
-        "ribbon": "Most complete",
+        "price": "1,000",
+        # "original_price": "1,000",
+        # "saving": "500",
+        # "badge": "Launch offer",
+        # "ribbon": "Most complete",
         "featured": True,
         "summary": "A multipage business site with a premium finish.",
         "features": (
