@@ -2862,6 +2862,7 @@ class AdvertiserDashboardPlanTests(TestCase):
         self.assertTrue(response.context["has_analytics"])
         self.assertEqual(response.context["view_total"], 1)
 
+
     def test_regular_references_never_render_chart_data_or_a_chart_fragment(self):
         self._make(AdvertLead.PLAN_REGULAR, "Regular Co")
         dashboard = self.client.get(reverse("home:advertise_dashboard"))

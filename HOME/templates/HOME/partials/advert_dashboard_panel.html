@@ -1,0 +1,157 @@
+{% load static %}
+{% if active_section == "overview" or active_section == "adverts" %}
+<section class="ads-section" aria-labelledby="ads-portfolio-title">
+  <div class="ads-section-head">
+    <div>
+      <h2 id="ads-portfolio-title">Your adverts</h2>
+      <p class="ads-section-sub">Issued references, paid periods and the links you can share.</p>
+    </div>
+    <span class="ads-count">{{ reference_count }} issued</span>
+  </div>
+
+  {% if references %}
+  <div class="ads-ref-grid" role="list" aria-label="Your adverts">
+    {% for ref in references %}
+    <article class="ads-ref-card{% if not ref.is_live %} is-dimmed{% endif %}{% if ref.ending_soon %} is-ending{% endif %}" role="listitem">
+      <div class="ads-ref-top">
+        <code class="ads-ref-code">{{ ref.reference }}</code>
+        <span class="ads-ref-status{% if ref.is_live %} is-live{% endif %}">{% if ref.is_expired %}Expired{% else %}{{ ref.get_status_display }}{% endif %}</span>
+      </div>
+
+      <h3 class="ads-ref-name">{{ ref.business_name }}</h3>
+
+      <dl class="ads-ref-metrics">
+        <div><dt>Plan</dt><dd>{{ ref.plan_name }}</dd></div>
+        <div><dt>Period</dt><dd>{{ ref.time_label }}</dd></div>
+        <div><dt>Ends</dt><dd>{% if ref.expires_at %}{{ ref.expires_at|date:"M d, Y" }}{% else %}No end date{% endif %}</dd></div>
+        {% if ref.has_analytics %}
+        <div><dt>Views</dt><dd>{{ ref.view_total }}</dd></div>
+        <div><dt>Clicks</dt><dd>{{ ref.click_total }}</dd></div>
+        {% endif %}
+      </dl>
+
+      <div class="ads-ref-timebar" aria-hidden="true"><i style="width: {{ ref.time_percent }}%"></i></div>
+
+      <ul class="ads-includes" aria-label="Included in your plan">
+        <li class="is-on">Banner</li>
+        <li class="{% if ref.allows_landing %}is-on{% endif %}">Landing page</li>
+        <li class="{% if ref.has_analytics %}is-on{% endif %}">Analytics</li>
+        <li class="{% if ref.allows_pages %}is-on{% endif %}">Extra pages</li>
+      </ul>
+
+      {% if ref.public_link %}
+      <a class="ads-open-link" href="{{ ref.public_link }}" target="_blank" rel="noopener noreferrer">View your advert <span aria-hidden="true">â†—</span></a>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="ads-empty-state">
+    <div>
+      <h3>No adverts issued yet</h3>
+      <p>Send a brief and our ads desk will confirm your plan and period, then issue your advert reference.</p>
+      <a class="ads-text-action" href="{{ promote_url }}">Start an enquiry â†’</a>
+    </div>
+    <div class="ads-empty-figure" aria-hidden="true">
+      <span>00</span>
+      <small>References issued</small>
+      <i></i>
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if active_section == "analytics" %}
+<section class="ads-section" aria-labelledby="ads-analytics-title">
+  <div class="ads-section-head">
+    <div>
+      <p class="ads-eyebrow">Performance</p>
+      <h2 id="ads-analytics-title">Analytics</h2>
+      <p class="ads-section-sub">Views, clicks and where your traffic comes from.</p>
+    </div>
+    {% if has_analytics %}
+    <span class="ads-count">{{ live_reference_count }} live</span>
+    {% else %}
+    <span class="ads-count is-muted">Unlocks on Pro</span>
+    {% endif %}
+  </div>
+
+  {% if has_analytics %}
+  {% include "HOME/partials/advert_analytics_panel.html" %}
+  {% else %}
+  <div class="ads-empty-state">
+    <div>
+      <h3>Analytics come with Pro.</h3>
+      <p>Your Regular advert is live on {{ project_name }}. Pro adds a landing page and the numbers behind every view and click.</p>
+      {% if ads_whatsapp_url %}
+      <a class="ads-text-action" href="{{ ads_whatsapp_url }}" target="_blank" rel="noopener noreferrer">Ask about Pro â†’</a>
+      {% endif %}
+    </div>
+    <div class="ads-empty-figure" aria-hidden="true">
+      <span>0</span>
+      <small>Views tracked</small>
+      <i></i>
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if active_section == "activity" %}
+<section class="ads-section" aria-labelledby="ads-activity-title">
+  <div class="ads-section-head">
+    <div>
+      <p class="ads-eyebrow">Activity</p>
+      <h2 id="ads-activity-title">Enquiries and events</h2>
+      <p class="ads-section-sub">Briefs you sent and the latest views or clicks on your adverts.</p>
+    </div>
+    </div>
+
+  <div class="ads-activity-grid">
+    <section class="ads-activity-block" aria-labelledby="ads-enquiries-title">
+      <div class="ads-block-head">
+        <h3 id="ads-enquiries-title">Your enquiries</h3>
+        <span>{{ lead_count }} total</span>
+      </div>
+      {% if leads %}
+      <ul class="ads-list">
+        {% for lead in leads %}
+        <li>
+          <div>
+            <strong>{{ lead.business_name }}</strong>
+            <span>{{ lead.get_plan_display }} plan Â· {{ lead.created_at|date:"M d, Y" }}</span>
+          </div>
+          <span class="ads-list-meta">#{{ lead.pk }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="ads-list-empty">No briefs yet. <a href="{{ promote_url }}">Start an enquiry</a> and it will appear here.</p>
+      {% endif %}
+    </section>
+
+    <section class="ads-activity-block" aria-labelledby="ads-events-title">
+      <div class="ads-block-head">
+        <h3 id="ads-events-title">Latest activity</h3>
+        <span>Recent</span>
+      </div>
+      {% if recent_events %}
+      <ul class="ads-list">
+        {% for event in recent_events %}
+        <li>
+          <div>
+            <strong>{{ event.get_event_type_display }}</strong>
+            <span class="ads-list-code">{{ event.reference.reference }}</span>
+          </div>
+          <time class="ads-list-meta" datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"M d, H:i" }}</time>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="ads-list-empty">Quiet for now. Views and clicks will show up as soon as readers reach your advert.</p>
+      {% endif %}
+    </section>
+  </div>
+</section>
+{% endif %}

@@ -1,9 +1,17 @@
 {% load static %}
-<div class="ads-dash-charts" data-advert-analytics data-advert-analytics-url="{{ analytics_endpoint }}" data-advert-range="{{ analytics.range }}">
-  <div class="ads-dash-chart-controls">
+<div class="ads-analytics" data-advert-analytics data-advert-analytics-url="{{ analytics_endpoint }}" data-advert-range="{{ analytics.range }}">
+  <div id="ads-analytics-skeleton" class="ads-analytics-skeleton" aria-hidden="true">
+    <span class="ads-skeleton-line is-short"></span>
+    <span class="ads-skeleton-line"></span>
+    <span class="ads-skeleton-card"></span>
+    <span class="ads-skeleton-card is-small"></span>
+  </div>
+  <div class="ads-chart-controls">
     {% if show_reference_filter %}
-    <label class="ads-dash-chart-select">
-      <span>Advert</span>
+    <label class="ads-chart-select">
+      <span>Advert
+        <button type="button" class="ads-dash-help" data-tip="See one advert or all of them together. Every number and chart follows this choice." aria-label="About advert filter">?</button>
+      </span>
       <select data-advert-reference aria-label="Choose advert">
         <option value="" {% if not selected_reference %}selected{% endif %}>All adverts</option>
         {% for choice in reference_choices %}
@@ -12,53 +20,92 @@
       </select>
     </label>
     {% endif %}
-    <div class="ads-dash-range" role="group" aria-label="Chart date range">
-      {% for choice in analytics_range_choices %}
-      <button type="button" class="ads-dash-range-btn{% if analytics.range == choice.key %} is-active{% endif %}" data-advert-range="{{ choice.key }}" aria-pressed="{% if analytics.range == choice.key %}true{% else %}false{% endif %}">{{ choice.label }}</button>
-      {% endfor %}
+
+    <div class="ads-range-control">
+      <span class="ads-range-label">Period
+        <button type="button" class="ads-dash-help" data-tip="Choose how much history to look at. Dates follow Africa/Lagos local time." aria-label="About date range">?</button>
+      </span>
+      <div class="ads-range" role="group" aria-label="Chart date range">
+        {% for choice in analytics_range_choices %}
+        <button type="button" class="ads-range-btn{% if analytics.range == choice.key %} is-active{% endif %}" data-advert-range="{{ choice.key }}" aria-pressed="{% if analytics.range == choice.key %}true{% else %}false{% endif %}">{{ choice.label }}</button>
+        {% endfor %}
+      </div>
     </div>
   </div>
 
-  <p class="ads-dash-chart-caption">{{ analytics.range_label }} · dates use Africa/Lagos local time. Direct clicks are counted as other sources.</p>
+  <p class="ads-chart-caption">{{ analytics.range_label }} Â· Lagos time. Direct clicks are grouped with other sources.</p>
 
-  <div class="ads-dash-chart-metrics" aria-label="Selected period totals">
+  <div class="ads-chart-metrics" aria-label="Selected period totals">
     <div><span>Views</span><strong>{{ analytics.totals.views }}</strong></div>
     <div><span>Clicks</span><strong>{{ analytics.totals.clicks }}</strong></div>
     <div><span>Click rate</span><strong>{{ analytics.totals.click_rate }}%</strong></div>
     <div><span>From {{ project_name }}</span><strong>{{ analytics.totals.abureport_clicks }}</strong></div>
   </div>
 
-  <div class="ads-dash-chart-grid">
-    <section class="ads-dash-chart-card">
-      <header>
-        <h3>Views over time</h3>
-        <p>One point per local calendar day.</p>
-      </header>
-      {% if analytics.view_chart.has_data %}
-      <div class="ads-dash-chart" data-advert-chart data-advert-chart-kind="line">
-        <div class="ads-dash-chart-canvas" id="{{ analytics.view_chart.element_id }}"></div>
-        {% with chart=analytics.view_chart %}{{ chart|json_script:chart.data_id }}{% endwith %}
-      </div>
-      {% else %}
-      <p class="ads-dash-chart-empty">No views in this period yet.</p>
-      {% endif %}
-    </section>
+  <div class="ads-chart-grid">
+    <div class="ads-chart-column ads-chart-column--right">
+      <section class="ads-chart-card ads-chart-card--line" aria-labelledby="ads-chart-line-title">
+        <header>
+          <h3 id="ads-chart-line-title">Views over time</h3>
+          <p>One point per local calendar day.</p>
+        </header>
+        {% if analytics.view_chart.has_data %}
+        <div class="ads-chart" data-advert-chart data-advert-chart-kind="line">
+          <div class="ads-chart-canvas ads-dash-chart-canvas" id="{{ analytics.view_chart.element_id }}"></div>
+          {% with chart=analytics.view_chart %}{{ chart|json_script:chart.data_id }}{% endwith %}
+        </div>
+        {% else %}
+        <p class="ads-chart-empty">No views in this period yet. Try a longer period, or check back after your advert has been seen.</p>
+        {% endif %}
+      </section>
 
-    <section class="ads-dash-chart-card">
-      <header>
-        <h3>Where clicks come from</h3>
-        <p>From {{ project_name }} versus other traffic.</p>
-      </header>
-      {% if analytics.click_chart.has_data %}
-      <div class="ads-dash-chart ads-dash-chart--pie" data-advert-chart data-advert-chart-kind="pie">
-        <div class="ads-dash-chart-canvas" id="{{ analytics.click_chart.element_id }}"></div>
-        {% with chart=analytics.click_chart %}{{ chart|json_script:chart.data_id }}{% endwith %}
-      </div>
-      {% else %}
-      <p class="ads-dash-chart-empty">No clicks in this period yet.</p>
-      {% endif %}
-    </section>
+      <section class="ads-chart-card ads-chart-card--bar" aria-labelledby="ads-chart-bar-title">
+        <header>
+          <h3 id="ads-chart-bar-title">Views by day</h3>
+          <p>The same days, drawn as bars.</p>
+        </header>
+        {% if analytics.view_chart.has_data %}
+        <div class="ads-chart ads-chart--bar" data-advert-chart data-advert-chart-kind="bar">
+          <div class="ads-chart-canvas ads-dash-chart-canvas" id="{{ analytics.view_chart.element_id }}-bar"></div>
+          {% with chart=analytics.view_chart %}{{ chart|json_script:"advertiser-views-bar-data" }}{% endwith %}
+        </div>
+        {% else %}
+        <p class="ads-chart-empty">No bars to draw yet. Once views arrive, they will appear beside the line chart.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="ads-chart-column ads-chart-column--left">
+      <section class="ads-chart-card ads-chart-card--pie" aria-labelledby="ads-chart-pie-title">
+        <header>
+          <h3 id="ads-chart-pie-title">Where clicks come from</h3>
+          <p>From {{ project_name }} versus other traffic.</p>
+        </header>
+        {% if analytics.click_chart.has_data %}
+        <div class="ads-chart ads-chart--pie" data-advert-chart data-advert-chart-kind="pie">
+          <div class="ads-chart-canvas ads-dash-chart-canvas" id="{{ analytics.click_chart.element_id }}"></div>
+          {% with chart=analytics.click_chart %}{{ chart|json_script:chart.data_id }}{% endwith %}
+        </div>
+        {% else %}
+        <p class="ads-chart-empty">No clicks in this period yet. Views still count; clicks appear as soon as someone follows your advert.</p>
+        {% endif %}
+      </section>
+
+      <section class="ads-chart-card ads-chart-card--mix" aria-labelledby="ads-chart-mix-title">
+        <header>
+          <h3 id="ads-chart-mix-title">Traffic mix</h3>
+          <p>Horizontal comparison by source.</p>
+        </header>
+        <div class="ads-mix-bars">
+          {% for row in source_rows %}
+          <div class="ads-mix-row">
+            <span class="ads-mix-name">{{ row.name }}</span>
+            <span class="ads-mix-track" aria-hidden="true"><i style="width: {{ row.width }}%"></i></span>
+            <strong>{{ row.count }}</strong>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
   </div>
-
-  {% comment %} <p class="ads-dash-note">Views are counted when your advert becomes the focused slide or someone opens your landing page. Clicks from {{ project_name }} carry <code>utm_source=abureport</code>.</p> {% endcomment %}
 </div>

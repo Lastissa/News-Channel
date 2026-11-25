@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import random
@@ -1041,6 +1042,10 @@ class LoadMoreView(View):
         if page_number > paginator.num_pages and paginator.num_pages:
             raise Http404("Page not found.")
         page = paginator.get_page(page_number)
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/story_cards.html",
@@ -1293,6 +1298,10 @@ class AddNewsView(View):
         #   category would actually reach right now. Computed from the same
         #   query the sender uses (SERVICE_INTERNAL.email_batch), so the
         #   question and the send can never disagree.
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/add_news.html",
@@ -1475,6 +1484,10 @@ class EditNewsView(View):
         #   the story's real category and the browser would silently fall back to
         #   another one on save.
         current_categories = {value for value, _ in get_category_choices()}
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/edit_news.html",
@@ -1822,18 +1835,21 @@ def _ads_whatsapp_digits(value):
 
 
 def _ads_whatsapp_url():
-    """The ads WhatsApp link, using the panel field and falling back to the
-    project number when the field is blank or malformed."""
-    from ADMIN.models import SiteSettings
-
-    row = SiteSettings.get_solo()
-    configured = (row.ads_whatsapp_support or "").strip()
-    digits = _ads_whatsapp_digits(configured or About.whatsapp_dm)
-    if not digits and configured:
-        digits = _ads_whatsapp_digits(About.whatsapp_dm)
-    return f"https://wa.me/{digits}" if digits else ""
-
-
+    raw = (
+        os.environ.get("ads-whatsapp-support")
+        or os.environ.get("ADS_WHATSAPP_SUPPORT")
+        or "+2348113577875"
+    )
+    number = "".join(char for char in str(raw) if char.isdigit())
+    if number.startswith("234"):
+        pass
+    elif number.startswith("0") and len(number) >= 10:
+        number = "234" + number[1:]
+    elif len(number) == 10:
+        number = "234" + number
+    else:
+        number = "2348113577875"
+    return f"https://wa.me/{number}"
 def _promote_form_data(request, plan=None):
     user = getattr(request, "user", None)
     plan = (plan or "").strip()
@@ -2022,6 +2038,10 @@ class PromoteLeadView(View):
             response.status_code = 303
             return response
 
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/promote.html",
@@ -2146,20 +2166,6 @@ class AdvertiserDashboardView(View):
         lead_count = leads.count()
         latest_lead = leads.first()
 
-        counts = {
-            row["plan"]: row["total"]
-            for row in leads.values("plan").annotate(total=Count("id"))
-        }
-        highest = max(counts.values(), default=0) or 1
-        plan_rows = [
-            {
-                "slug": plan["slug"],
-                "name": plan["name"],
-                "count": counts.get(plan["slug"], 0),
-                "width": round(counts.get(plan["slug"], 0) / highest * 100),
-            }
-            for plan in PROMOTE_PLANS
-        ]
 
         #   Analytics are part of Pro and Advance. A Regular reference is left
         #   out of every total and of the activity list, so its numbers never
@@ -2171,6 +2177,8 @@ class AdvertiserDashboardView(View):
             left = time_left(row)
             row.time_label = left["time_label"]
             row.time_percent = left["time_percent"]
+            delta = (row.expires_at - timezone.now()).total_seconds() if row.expires_at else None
+            row.ending_soon = delta is not None and 0 <= delta <= 172800
         analytics_rows = [row for row in reference_rows if row.has_analytics]
         analytics_context = _advertiser_analytics_context(
             analytics_rows, request.GET.get("range"), request.GET.get("reference")
@@ -2196,6 +2204,8 @@ class AdvertiserDashboardView(View):
             else (latest_reference.business_name if latest_reference else "")
         )
 
+        whatsapp_url = _ads_whatsapp_url()
+
         #   The dashboard avatar follows the same name the header shows: the
         #   advertiser's business name first, then their staff profile name,
         #   then the email local part as a last resort.
@@ -2206,21 +2216,21 @@ class AdvertiserDashboardView(View):
         account_name = (business_name or profile_name or request.user.email.split("@", 1)[0]).strip()
         account_initial = next((char.upper() for char in account_name if char.isalnum()), "?")
 
-        return render(
-            request,
-            "HOME/advertiser_dashboard.html",
-            {
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
+        context = {
                 "account_email": request.user.email,
                 "account_avatar": request.user.profile_img or "",
                 "account_initial": account_initial,
                 "account_name": account_name,
                 "account_since": request.user.date_joined,
-                "ads_whatsapp_url": _ads_whatsapp_url(),
+                "ads_whatsapp_url": whatsapp_url,
                 "business_name": business_name,
                 "latest_lead": latest_lead,
                 "lead_count": lead_count,
                 "leads": list(leads[:6]),
-                "plan_rows": plan_rows,
                 "profile_url": f"{reverse('home:profile')}?view=profile",
                 "promote_url": reverse("home:promote"),
                 "references": reference_rows,
@@ -2237,9 +2247,11 @@ class AdvertiserDashboardView(View):
                 **analytics_context,
                 "analytics_endpoint": reverse("home:advertise_dashboard_analytics"),
                 "show_reference_filter": True,
-            },
-        )
-
+                "active_section": section,
+        }
+        if request.META.get("HTTP_HX_REQUEST"):
+            return render(request, "HOME/partials/advert_dashboard_panel.html", context)
+        return render(request, "HOME/advertiser_dashboard.html", context)
 
 class AdvertiserAnalyticsView(View):
     """htmx fragment for the advertiser dashboard's range/reference drill-down."""
@@ -2404,6 +2416,10 @@ class ProfileCategoryPreferencesView(View):
             return JsonResponse({"detail": "Please sign in to update settings."}, status=401)
 
         subscribed, available = _category_subscription_state(request.user)
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/category_preferences.html",
@@ -2725,6 +2741,10 @@ class ProfileSessionsPlacardView(View):
         if not request.user.is_authenticated:
             return redirect(reverse("auth:login") + "?" + urlencode({"to": reverse("home:profile")}))
 
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/sessions_placard.html",
@@ -2906,6 +2926,10 @@ class ProfileBookmarksView(View):
         paginator = Paginator(bookmarks_qs, 5)
         page = paginator.get_page(page_number)
 
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/profile_bookmarks_list.html",
@@ -2938,6 +2962,10 @@ class ProfileHistoryView(View):
         paginator = Paginator(history_qs, 5)
         page = paginator.get_page(page_number)
 
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/profile_history_list.html",
@@ -2958,6 +2986,10 @@ class ProfileFollowingView(View):
             return JsonResponse({"detail": "Please sign in to view who you follow."}, status=401)
         search_query = (request.GET.get("q") or "").strip()[:100]
         page, paginator, items = _following_page(request.user, search_query, _resolve_page_number(request.GET.get("page"), default=1))
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/profile_following_list.html",
@@ -2993,6 +3025,10 @@ class ProfileFollowersView(View):
         if not staff_only(request.user):
             return JsonResponse({"detail": "Only authors have followers."}, status=403)
         page, paginator, items = _followers_page(request.user, _resolve_page_number(request.GET.get("page"), default=1))
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/profile_followers_list.html",
@@ -3138,6 +3174,10 @@ class ProfilePublishedView(View):
 
         paginator = Paginator(published_qs, 5)
         page = paginator.get_page(page_number)
+
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
 
         return render(
             request,
@@ -3468,6 +3508,10 @@ class ProfileDeletePlacardView(View):
         else:
             _set_delete_step_progress(request, max(_delete_step_progress(request), step))
 
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
+
         return render(
             request,
             "HOME/partials/delete_account_placard.html",
@@ -3548,6 +3592,10 @@ class ProfileDeleteSendCodeView(View):
                 _delete_placard_context(request, error="Could not send the verification code. Please try again."),
                 status=500,
             )
+
+        section = request.GET.get("section", "overview")
+        if section not in {"overview", "adverts", "analytics", "activity"}:
+            section = "overview"
 
         return render(
             request,

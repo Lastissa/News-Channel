@@ -270,6 +270,29 @@
       };
     }
 
+    if (mount.getAttribute("data-advert-chart-kind") === "bar") {
+      return {
+        chart: Object.assign({}, common.chart, { type: "bar" }),
+        series: [{ name: data.name || "Views", data: data.values || [] }],
+        colors: ["#e8b84a"],
+        plotOptions: { bar: { borderRadius: 4, columnWidth: "58%" } },
+        grid: { borderColor: "rgba(127, 140, 160, 0.2)", strokeDashArray: 3 },
+        xaxis: {
+          categories: data.labels || [],
+          tickAmount: Math.min(8, (data.labels || []).length),
+          labels: { hideOverlappingLabels: true, rotate: 0, trim: true },
+        },
+        yaxis: {
+          min: 0,
+          forceNiceScale: true,
+          labels: { formatter: function (value) { return Math.round(value); } },
+        },
+        legend: { show: false },
+        tooltip: { shared: true, intersect: false },
+        noData: { text: "No views yet" },
+      };
+    }
+
     return {
       chart: Object.assign({}, common.chart, { type: "line" }),
       series: [{ name: data.name || "Views", data: data.values || [] }],
@@ -332,6 +355,8 @@
     var query = "range=" + encodeURIComponent(range || "30");
     query += "&reference=" + encodeURIComponent(reference || "");
     url += (url.indexOf("?") >= 0 ? "&" : "?") + query;
+    var skeleton = panel.querySelector("#ads-analytics-skeleton");
+    if (skeleton) skeleton.classList.add("htmx-request");
     if (window.htmx) {
       window.htmx.ajax("GET", url, { target: panel, swap: "innerHTML" });
     } else {
@@ -341,7 +366,11 @@
 
   document.addEventListener("DOMContentLoaded", paintAll);
   document.addEventListener("htmx:afterSwap", paintAll);
-  document.addEventListener("htmx:beforeSwap", function (event) {
+  document.addEventListener("htmx:afterRequest", function () {
+    document.querySelectorAll("#ads-analytics-skeleton.htmx-request").forEach(function (skeleton) {
+      skeleton.classList.remove("htmx-request");
+    });
+  });  document.addEventListener("htmx:beforeSwap", function (event) {
     var target = event.detail && event.detail.target;
     if (!target || !target.querySelectorAll) return;
     target.querySelectorAll("[data-advert-chart] .ads-dash-chart-canvas").forEach(function (mount) {
