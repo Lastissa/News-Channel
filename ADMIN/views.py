@@ -53,6 +53,7 @@ from SERVICE_INTERNAL.images import (
     destroy_advert_landing_html,
     destroy_archive_asset,
     fetch_advert_landing_html,
+    replace_advert_storage_file,
     upload_advert_image,
     upload_advert_landing_html,
     upload_advert_storage_file,
@@ -3396,6 +3397,23 @@ _ADVERT_ACTIVE_EXTENSIONS = {
 _ADVERT_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico", "svg"}
 _ADVERT_VIDEO_EXTENSIONS = {"mp4", "m4v", "mov", "webm", "ogv"}
 _ADVERT_AUDIO_EXTENSIONS = {"mp3", "wav", "ogg", "m4a"}
+#   Only text files can be edited in place. Overwriting a binary file through
+#   the editor would corrupt it, so those rows stay download/replace only.
+_ADVERT_EDITABLE_EXTENSIONS = {
+    "html",
+    "htm",
+    "xhtml",
+    "css",
+    "js",
+    "mjs",
+    "json",
+    "map",
+    "xml",
+    "txt",
+    "md",
+    "csv",
+    "svg",
+}
 
 
 def _advert_extension_from(value):
@@ -3606,6 +3624,7 @@ def _advert_storage_file_rows(reference):
                 "preview_url": preview_url,
                 "download_url": download_url,
                 "force_download": _advert_storage_force_download(item, ext),
+                "editable": ext in _ADVERT_EDITABLE_EXTENSIONS,
                 "system": False,
             }
         )
@@ -3891,6 +3910,118 @@ class AdvertReferenceStorageUploadView(View):
             raise
         info_logger(msg=f"ADS STORAGE: file added to reference {reference.reference} by {request.user.email}")
         return _advert_storage_response(request, reference, notice="File added to this reference.")
+
+
+def _advert_storage_edit_response(request, reference, item, content, note, error="", status=200):
+    return render(
+        request,
+        "ADMIN/partials/advert_storage_editor.html",
+        {
+            "ref": {
+                "id": reference.pk,
+                "reference": reference.reference,
+                "business_name": reference.business_name,
+            },
+            "file": {"id": item.pk, "name": _advert_storage_display_name(item)},
+            "note": note,
+            "content": content,
+            "edit_error": error,
+            "storage_endpoint": reverse(
+                "control:advert_storage_modal", args=[reference.pk]
+            ),
+        },
+        status=status,
+    )
+
+
+class AdvertReferenceStorageEditView(View):
+    """Edit a text storage file in place, keeping its Cloudinary public id."""
+
+    def _target(self, request, reference_id, file_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied, None, None
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        item = get_object_or_404(AdvertReferenceFile, pk=file_id, reference=reference)
+        ext = _advert_storage_extension(item)
+        if ext not in _ADVERT_EDITABLE_EXTENSIONS:
+            return (
+                _advert_storage_response(
+                    request,
+                    reference,
+                    error="This file type cannot be edited here. Upload a replacement instead.",
+                    status=400,
+                ),
+                None,
+                None,
+            )
+        return None, reference, item
+
+    def get(self, request, reference_id, file_id):
+        denied, reference, item = self._target(request, reference_id, file_id)
+        if denied:
+            return denied
+        try:
+            raw = _advert_export_fetch_bytes(
+                _advert_export_storage_url(item), ADVERT_STORAGE_MAX_BYTES
+            )
+        except ImageUploadError as exc:
+            return _advert_storage_response(request, reference, error=str(exc), status=400)
+        return _advert_storage_edit_response(
+            request,
+            reference,
+            item,
+            raw.decode("utf-8", errors="replace"),
+            item.note,
+        )
+
+    def post(self, request, reference_id, file_id):
+        denied, reference, item = self._target(request, reference_id, file_id)
+        if denied:
+            return denied
+        remaining_seconds, limited = is_rate_limited(request, 20, 60, scope="advert-storage-edit")
+        if limited:
+            return _advert_storage_response(
+                request,
+                reference,
+                error=f"Please wait {remaining_seconds} seconds before saving again.",
+                status=429,
+            )
+        content = request.POST.get("content", "")
+        note = " ".join((request.POST.get("note") or "").split())[:240]
+        if len(content.encode("utf-8")) > ADVERT_STORAGE_MAX_BYTES:
+            return _advert_storage_edit_response(
+                request,
+                reference,
+                item,
+                content,
+                note,
+                error=f"Files are limited to {ADVERT_STORAGE_MAX_BYTES // (1024 * 1024)}MB.",
+                status=400,
+            )
+        ext = _advert_storage_extension(item)
+        try:
+            saved = replace_advert_storage_file(
+                content,
+                item.public_id,
+                item.resource_type,
+                ext,
+                _advert_storage_display_name(item),
+            )
+        except ImageUploadError as exc:
+            return _advert_storage_edit_response(
+                request, reference, item, content, note, error=str(exc), status=400
+            )
+        item.note = note
+        item.content_type = _ADVERT_MIME_BY_EXT.get(ext, item.content_type)
+        item.file_size = saved["bytes"]
+        item.save(update_fields=["note", "content_type", "file_size"])
+        info_logger(
+            msg=f"ADS STORAGE: file {item.pk} edited in reference {reference.reference} by {request.user.email}"
+        )
+        return _advert_storage_response(
+            request, reference, notice="File saved. Pages using its share URL keep the same address."
+        )
 
 
 class AdvertReferenceStorageDeleteView(View):

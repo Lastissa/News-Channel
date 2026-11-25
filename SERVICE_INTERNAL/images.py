@@ -263,6 +263,46 @@ def upload_advert_storage_file(file) -> dict:
     }
 
 
+def replace_advert_storage_file(text, public_id, resource_type="raw", ext="", filename="file") -> dict:
+    """Overwrite one Ads desk storage asset in place, keeping its public id.
+
+    This is the text-editor counterpart to `upload_advert_storage_file`: the
+    signed share URL is built from the unchanged public id, so editing CSS/JS
+    never breaks a live landing page that already points at that URL.
+    """
+    if not public_id:
+        raise ImageUploadError("This file has no Cloudinary id to edit.")
+    payload = text.encode("utf-8") if isinstance(text, str) else bytes(text)
+    if not payload:
+        raise ImageUploadError("The file cannot be empty.")
+    if len(payload) > ADVERT_STORAGE_MAX_BYTES:
+        raise ImageUploadError(
+            f"Ads storage files are limited to {ADVERT_STORAGE_MAX_BYTES // (1024 * 1024)}MB."
+        )
+    stream = io.BytesIO(payload)
+    stream.name = filename or "file"
+    placement = {
+        "public_id": public_id,
+        "unique_filename": False,
+        "overwrite": True,
+        "invalidate": True,
+    }
+    if ext:
+        placement["format"] = ext
+    try:
+        result = cloudinary.uploader.upload(
+            stream,
+            resource_type=resource_type or "raw",
+            tags=["advert-storage"],
+            **placement,
+        )
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY REPLACE FAILED (advert-storage): {exc}")
+        raise ImageUploadError("Could not save the file right now. Please try again.") from exc
+    info_logger(msg=f"CLOUDINARY REPLACE OK (advert-storage): {public_id}")
+    return {"bytes": result.get("bytes") or len(payload)}
+
+
 #   ADVERT LANDING PAGES
 #   ------------------------------------------------------------
 #   The full HTML document for an advert's off-grid landing page. Unlike the

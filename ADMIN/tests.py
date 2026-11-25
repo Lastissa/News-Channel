@@ -3694,6 +3694,64 @@ class AdvertReferenceDeskTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
 
+    def test_ads_staff_can_edit_a_text_storage_file_in_place(self):
+        reference = self._reference()
+        item = self._storage_file(reference, public_id="abureport/advert-storage/styles", name="styles.css")
+        self.client.force_login(self.ads_staff)
+
+        upstream = mock.Mock(status_code=200)
+        upstream.iter_content.return_value = [b"body { color: red; }"]
+        with mock.patch("ADMIN.views.requests.get", return_value=upstream):
+            editor = self.client.get(
+                reverse("control:advert_storage_edit", args=[reference.pk, item.pk])
+            )
+        self.assertEqual(editor.status_code, 200)
+        self.assertContains(editor, "body { color: red; }")
+        self.assertContains(editor, "Save changes")
+
+        with mock.patch(
+            "ADMIN.views.replace_advert_storage_file",
+            return_value={"bytes": 20},
+        ) as replace:
+            response = self.client.post(
+                reverse("control:advert_storage_edit", args=[reference.pk, item.pk]),
+                {"content": "body { color: blue; }", "note": "Updated stylesheet"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pages using its share URL keep the same address.")
+        args = replace.call_args.args
+        self.assertEqual(args[0], "body { color: blue; }")
+        self.assertEqual(args[1], item.public_id)
+        self.assertEqual(args[3], "css")
+        item.refresh_from_db()
+        self.assertEqual(item.note, "Updated stylesheet")
+        self.assertEqual(item.file_size, 20)
+        self.assertEqual(item.content_type, "text/css")
+
+    def test_binary_storage_file_cannot_be_text_edited(self):
+        reference = self._reference()
+        item = self._storage_file(reference, public_id="abureport/advert-storage/pic", name="pic.png")
+        self.client.force_login(self.ads_staff)
+
+        response = self.client.get(
+            reverse("control:advert_storage_edit", args=[reference.pk, item.pk])
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "cannot be edited", status_code=400)
+
+    def test_reader_cannot_edit_reference_storage(self):
+        reference = self._reference()
+        item = self._storage_file(reference, public_id="abureport/advert-storage/styles", name="styles.css")
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("control:advert_storage_edit", args=[reference.pk, item.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+
     def test_reader_cannot_open_or_upload_reference_storage(self):
         reference = self._reference()
         self.client.force_login(self.member)

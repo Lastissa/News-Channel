@@ -1,0 +1,35 @@
+{% load archive_extras %}
+<div class="ads-storage ads-storage-editor">
+  <header class="ads-storage-head">
+    <div>
+      <p class="ads-storage-kicker">{{ ref.reference }}</p>
+      <h3>Edit {{ file.name }}</h3>
+      <p>Saving overwrites this file at its existing Cloudinary address, so pages using its share URL keep working.</p>
+    </div>
+    <button type="button" class="ads-desk-button ads-desk-button--quiet"
+            hx-get="{{ storage_endpoint }}" hx-target="#advert-storage-body" hx-swap="innerHTML">Back</button>
+  </header>
+
+  {% if edit_error %}
+  <p class="ads-desk-error" role="alert">{{ edit_error }}</p>
+  {% endif %}
+
+  <form class="ads-storage-editor-form"
+        hx-post="{% url 'control:advert_storage_edit' ref.id file.id %}"
+        hx-target="#advert-storage-body" hx-swap="innerHTML">
+    {% csrf_token %}
+    <label>
+      <span>Note <small>optional</small></span>
+      <input type="text" name="note" maxlength="240" value="{{ note }}" placeholder="e.g. landing page stylesheet">
+    </label>
+    <label>
+      <span>File content</span>
+      <textarea name="content" spellcheck="false" rows="18" required>{{ content }}</textarea>
+    </label>
+    <div class="ads-storage-actions-wide">
+      <button type="button" class="ads-desk-button ads-desk-button--quiet"
+              hx-get="{{ storage_endpoint }}" hx-target="#advert-storage-body" hx-swap="innerHTML">Cancel</button>
+      <button type="submit" class="ads-desk-button ads-desk-button--primary">Save changes</button>
+    </div>
+  </form>
+</div>

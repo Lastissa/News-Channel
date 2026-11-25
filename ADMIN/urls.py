@@ -80,6 +80,7 @@ urlpatterns = [
     path("ads/references/<int:reference_id>/storage/export/", views.AdvertReferenceStorageExportView.as_view(), name="advert_storage_export"),
     path("ads/references/<int:reference_id>/analytics/", views.AdvertReferenceAnalyticsModalView.as_view(), name="advert_analytics_modal"),
     path("ads/references/<int:reference_id>/storage/upload/", views.AdvertReferenceStorageUploadView.as_view(), name="advert_storage_upload"),
+    path("ads/references/<int:reference_id>/storage/<int:file_id>/edit/", views.AdvertReferenceStorageEditView.as_view(), name="advert_storage_edit"),
     path("ads/references/<int:reference_id>/storage/<int:file_id>/delete/", views.AdvertReferenceStorageDeleteView.as_view(), name="advert_storage_delete"),
     path("ads/references/<int:reference_id>/delete/", views.AdvertReferenceDeleteView.as_view(), name="advert_reference_delete"),
     path("ads/storage/<int:file_id>/share/<str:token>/<str:filename>/", views.AdvertReferenceShareView.as_view(), name="advert_storage_share_file"),

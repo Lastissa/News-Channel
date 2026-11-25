@@ -93,6 +93,11 @@
         </div>
         {% if file.extension %}<span class="ads-storage-badge ads-storage-badge--type">{{ file.extension }}</span>{% endif %}
         <div class="ads-storage-actions">
+          {% if file.editable %}
+          <button type="button" class="ads-desk-button ads-desk-button--quiet"
+                  hx-get="{% url 'control:advert_storage_edit' ref.id file.id %}"
+                  hx-target="#advert-storage-body" hx-swap="innerHTML">Edit</button>
+          {% endif %}
           <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.preview_url }}" target="_blank" rel="noopener noreferrer">Preview</a>
           <a class="ads-desk-button ads-desk-button--quiet" href="{{ file.download_url }}" target="_blank" rel="noopener noreferrer">Download</a>
           <button type="button" class="ads-desk-button ads-desk-button--danger"

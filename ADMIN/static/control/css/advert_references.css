@@ -1042,6 +1042,12 @@ body.has-ads-modal { overflow: hidden; }
 .ads-storage-badge { padding: 3px 8px; border-radius: 999px; background: var(--ads-soft-strong); font-size: 0.7rem; font-weight: 700; }
 .ads-storage-badge--type { background: var(--ads-soft); color: var(--muted-text, #667085); letter-spacing: 0.04em; }
 .ads-storage-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.ads-storage-editor-form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.ads-storage-editor-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; font-weight: 700; }
+.ads-storage-editor-form label small { font-weight: 400; color: var(--muted-text, #667085); }
+.ads-storage-editor-form input,
+.ads-storage-editor-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.ads-storage-editor-form textarea { min-height: 320px; resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.84rem; line-height: 1.5; }
 .ads-storage-empty { padding: 18px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted-text, #667085); text-align: center; }
 .ads-ref-delete-copy { margin: 18px 0; }
 .ads-ref-delete-check { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; }
