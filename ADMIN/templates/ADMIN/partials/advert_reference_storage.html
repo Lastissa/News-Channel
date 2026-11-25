@@ -90,6 +90,33 @@
           <strong>{{ file.name }}</strong>
           <span>{{ file.note|default:"No note" }}</span>
           <small>{{ file.date }}{% if file.uploaded_by %} · {{ file.uploaded_by }}{% endif %}{% if file.size %} · {{ file.size }}{% endif %}</small>
+          <div class="ads-storage-cache">
+            <form class="ads-storage-cache-form"
+                  hx-post="{% url 'control:advert_storage_cache' ref.id file.id %}"
+                  hx-trigger="change"
+                  hx-target="#advert-storage-body" hx-swap="innerHTML"
+                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+              {% csrf_token %}
+              <label>
+                <span>Cache</span>
+                <select name="cache_seconds" aria-label="Cache duration for {{ file.name }}">
+                  {% for seconds, label in cache_choices %}
+                  <option value="{{ seconds }}" {% if seconds == file.cache_seconds %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </form>
+            {% if file.cache_seconds %}
+            <form class="ads-storage-cache-form"
+                  hx-post="{% url 'control:advert_storage_cache_clear' ref.id file.id %}"
+                  hx-target="#advert-storage-body" hx-swap="innerHTML"
+                  hx-confirm="Clear the cached copy of {{ file.name }}?"
+                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+              {% csrf_token %}
+              <button type="submit" class="ads-storage-cache-clear">Clear cache</button>
+            </form>
+            {% endif %}
+          </div>
         </div>
         {% if file.extension %}<span class="ads-storage-badge ads-storage-badge--type">{{ file.extension }}</span>{% endif %}
         <div class="ads-storage-actions">

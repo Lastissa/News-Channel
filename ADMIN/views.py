@@ -48,6 +48,7 @@ from Partner.plans import advert_allows, plan_allows, plan_message, time_left
 from SERVICE_INTERNAL.email_single import _try_send_staff_direct_email, _try_send_staff_welcome_email
 from SERVICE_INTERNAL.images import (
     ADVERT_LANDING_MAX_BYTES,
+    clear_advert_storage_cache,
     ADVERT_STORAGE_MAX_BYTES,
     ImageUploadError,
     destroy_advert_landing_html,
@@ -3329,6 +3330,19 @@ The linked advert picture/HTML is listed as read-only system context.
 ADVERT_STORAGE_LINK_SALT = "advert-storage-share"
 ADVERT_STORAGE_LINK_AGE = None  #   stable links: live pages can rely on them
 
+#   Shared by the Ads desk control and the signed-file response. 0 is always
+#   the default: a file is only cached when ads staff explicitly opt in.
+ADVERT_CACHE_CHOICES = (
+    (0, "No cache (default)"),
+    (900, "15 minutes"),
+    (3600, "1 hour"),
+    (21600, "6 hours"),
+    (86400, "1 day"),
+    (604800, "7 days"),
+    (2592000, "30 days"),
+)
+_ADVERT_CACHE_LABELS = dict(ADVERT_CACHE_CHOICES)
+
 #   The signed link ends with the real filename so a person (and the browser)
 #   can see what they are opening. The extension is resolved from the stored
 #   row -- never from that cosmetic URL segment.
@@ -3625,6 +3639,10 @@ def _advert_storage_file_rows(reference):
                 "download_url": download_url,
                 "force_download": _advert_storage_force_download(item, ext),
                 "editable": ext in _ADVERT_EDITABLE_EXTENSIONS,
+                "cache_seconds": item.cache_seconds,
+                "cache_label": _ADVERT_CACHE_LABELS.get(
+                    item.cache_seconds, f"{item.cache_seconds} seconds"
+                ),
                 "system": False,
             }
         )
@@ -3693,6 +3711,7 @@ def _advert_storage_context(reference, error="", notice=""):
         "storage_files": _advert_storage_file_rows(reference),
         "system_files": _advert_storage_system_rows(reference),
         "storage_max_mb": ADVERT_STORAGE_MAX_BYTES // (1024 * 1024),
+        "cache_choices": ADVERT_CACHE_CHOICES,
         "storage_error": error,
         "storage_notice": notice,
     }
@@ -3764,7 +3783,10 @@ class AdvertReferenceStorageExportView(View):
                 except ImageUploadError as exc:
                     failures.append((arcname, str(exc)))
                     continue
-                detail = item.note or "Uploaded Ads desk file"
+                cache_label = _ADVERT_CACHE_LABELS.get(
+                    item.cache_seconds, f"{item.cache_seconds} seconds"
+                )
+                detail = f"{item.note or 'Uploaded Ads desk file'} - cache: {cache_label}"
                 if item.uploaded_by_id:
                     detail += f" - {item.uploaded_by.email}"
                 archive.writestr(arcname, data)
@@ -4024,6 +4046,83 @@ class AdvertReferenceStorageEditView(View):
         )
 
 
+class AdvertReferenceStorageCacheView(View):
+    """Set how long one Ads storage file may be cached by browsers/CDNs."""
+
+    def post(self, request, reference_id, file_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        item = get_object_or_404(AdvertReferenceFile, pk=file_id, reference=reference)
+        remaining_seconds, limited = is_rate_limited(request, 30, 60, scope="advert-storage-cache")
+        if limited:
+            return _advert_storage_response(
+                request,
+                reference,
+                error=f"Please wait {remaining_seconds} seconds before changing cache again.",
+                status=429,
+            )
+        try:
+            seconds = int(request.POST.get("cache_seconds", 0))
+        except (TypeError, ValueError):
+            seconds = -1
+        if seconds not in _ADVERT_CACHE_LABELS:
+            return _advert_storage_response(
+                request, reference, error="Choose one of the listed cache durations.", status=400
+            )
+        item.cache_seconds = seconds
+        item.save(update_fields=["cache_seconds"])
+        label = _ADVERT_CACHE_LABELS[seconds]
+        info_logger(
+            msg=f"ADS STORAGE: cache for file {item.pk} set to {label} by {request.user.email}"
+        )
+        notice = (
+            f"{label} is now the cache duration for {_advert_storage_display_name(item)}."
+        )
+        return _advert_storage_response(request, reference, notice=notice)
+
+
+class AdvertReferenceStorageCacheClearView(View):
+    """Purge Cloudinary's cached copy without deleting the stored asset."""
+
+    def post(self, request, reference_id, file_id):
+        denied = _ads_desk_denied(request)
+        if denied:
+            return denied
+        reference = get_object_or_404(AdvertReference, pk=reference_id)
+        item = get_object_or_404(AdvertReferenceFile, pk=file_id, reference=reference)
+        if item.cache_seconds == 0:
+            return _advert_storage_response(
+                request, reference, notice="This file already uses No cache, so there is nothing to clear."
+            )
+        remaining_seconds, limited = is_rate_limited(
+            request, 20, 60, scope="advert-storage-cache-clear"
+        )
+        if limited:
+            return _advert_storage_response(
+                request,
+                reference,
+                error=f"Please wait {remaining_seconds} seconds before clearing cache again.",
+                status=429,
+            )
+        if not clear_advert_storage_cache(item.public_id, item.resource_type):
+            return _advert_storage_response(
+                request,
+                reference,
+                error="Cloudinary could not clear the cached copy. Please try again.",
+                status=502,
+            )
+        info_logger(
+            msg=f"ADS STORAGE: cache cleared for file {item.pk} by {request.user.email}"
+        )
+        return _advert_storage_response(
+            request,
+            reference,
+            notice="Cloudinary cache cleared. Browsers may keep their copy until the chosen duration ends.",
+        )
+
+
 class AdvertReferenceStorageDeleteView(View):
     def post(self, request, reference_id, file_id):
         denied = _ads_desk_denied(request)
@@ -4084,7 +4183,10 @@ def _stream_advert_storage_asset(request, item, force_download):
         if header in upstream.headers:
             response[header] = upstream.headers[header]
     response["Accept-Ranges"] = upstream.headers.get("Accept-Ranges", "bytes")
-    response["Cache-Control"] = "private, no-store"
+    if item.cache_seconds > 0:
+        response["Cache-Control"] = f"public, max-age={item.cache_seconds}, must-revalidate"
+    else:
+        response["Cache-Control"] = "private, no-store"
     safe_name = filename.replace('"', "").replace("\r", "").replace("\n", "")
     disposition = "attachment" if force_download else "inline"
     response["Content-Disposition"] = f"{disposition}; filename=\"{safe_name}\"; filename*=UTF-8''{quote(filename)}"
@@ -4105,7 +4207,7 @@ class AdvertReferenceShareView(View):
                 token, max_age=ADVERT_STORAGE_LINK_AGE
             )
         except BadSignature:
-            return HttpResponse("This share link is invalid.", status=403)
+            return HttpResponse("This share link is malformed and have been tampered with.", status=403)
         if signed_id != str(file_id):
             return HttpResponse("This share link is invalid.", status=403)
         item = get_object_or_404(AdvertReferenceFile, pk=file_id)

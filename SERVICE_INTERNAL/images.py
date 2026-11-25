@@ -263,6 +263,28 @@ def upload_advert_storage_file(file) -> dict:
     }
 
 
+def clear_advert_storage_cache(public_id, resource_type="image") -> bool:
+    """Invalidate the CDN copy of one Ads storage asset without deleting it.
+
+    Browsers that already cached the file keep their copy until its max-age
+    ends; choosing "No cache" in Ads desk is the way to stop that immediately.
+    """
+    if not public_id:
+        return False
+    try:
+        cloudinary.uploader.explicit(
+            public_id,
+            type="upload",
+            resource_type=resource_type or "image",
+            invalidate=True,
+        )
+    except CloudinaryError as exc:
+        error_logger(msg=f"CLOUDINARY CACHE CLEAR FAILED (advert-storage): {exc}")
+        return False
+    info_logger(msg=f"CLOUDINARY CACHE CLEARED (advert-storage): {public_id}")
+    return True
+
+
 def replace_advert_storage_file(text, public_id, resource_type="raw", ext="", filename="file") -> dict:
     """Overwrite one Ads desk storage asset in place, keeping its public id.
 

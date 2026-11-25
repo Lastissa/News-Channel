@@ -3568,6 +3568,7 @@ class AdvertReferenceDeskTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/javascript")
         self.assertIn("inline", response["Content-Disposition"])
         self.assertIn("landing_ab12cd.js", response["Content-Disposition"])
+        self.assertEqual(response["Cache-Control"], "private, no-store")
 
     def test_reference_storage_share_links_do_not_expire(self):
         reference = self._reference()
@@ -3615,6 +3616,83 @@ class AdvertReferenceDeskTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/octet-stream")
         self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
         self.assertIn("page.html", response["Content-Disposition"])
+
+    def test_cached_storage_file_advertises_its_cache_duration(self):
+        reference = self._reference()
+        item = self._storage_file(reference, name="styles.css")
+        item.cache_seconds = 3600
+        item.save(update_fields=["cache_seconds"])
+        share_url, _ = _advert_storage_share_urls(
+            item, _advert_storage_display_name(item)
+        )
+
+        upstream = mock.Mock(status_code=200, headers={"Content-Length": "12"})
+        upstream.iter_content.return_value = [b"body{}"]
+        with mock.patch("ADMIN.views.requests.get", return_value=upstream):
+            response = self.client.get(share_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "public, max-age=3600, must-revalidate")
+
+    def test_ads_staff_can_set_a_cache_duration_for_a_storage_file(self):
+        reference = self._reference()
+        item = self._storage_file(reference, name="styles.css")
+        self.client.force_login(self.ads_staff)
+
+        response = self.client.post(
+            reverse("control:advert_storage_cache", args=[reference.pk, item.pk]),
+            {"cache_seconds": "86400"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "1 day is now the cache duration")
+        item.refresh_from_db()
+        self.assertEqual(item.cache_seconds, 86400)
+        modal = self.client.get(reverse("control:advert_storage_modal", args=[reference.pk]))
+        self.assertContains(modal, "No cache (default)")
+        self.assertContains(modal, "Clear cache")
+
+    def test_ads_staff_can_clear_a_storage_file_cache(self):
+        reference = self._reference()
+        item = self._storage_file(reference, name="styles.css")
+        item.cache_seconds = 604800
+        item.save(update_fields=["cache_seconds"])
+        self.client.force_login(self.ads_staff)
+
+        with mock.patch(
+            "ADMIN.views.clear_advert_storage_cache", return_value=True
+        ) as clear:
+            response = self.client.post(
+                reverse("control:advert_storage_cache_clear", args=[reference.pk, item.pk])
+            )
+
+        self.assertEqual(response.status_code, 200)
+        clear.assert_called_once_with(item.public_id, item.resource_type)
+        self.assertContains(response, "Cloudinary cache cleared")
+
+        with mock.patch(
+            "ADMIN.views.clear_advert_storage_cache", return_value=True
+        ) as clear:
+            item.cache_seconds = 0
+            item.save(update_fields=["cache_seconds"])
+            no_cache = self.client.post(
+                reverse("control:advert_storage_cache_clear", args=[reference.pk, item.pk])
+            )
+        self.assertEqual(no_cache.status_code, 200)
+        clear.assert_not_called()
+        self.assertContains(no_cache, "already uses No cache")
+
+    def test_reader_cannot_change_a_storage_file_cache(self):
+        reference = self._reference()
+        item = self._storage_file(reference, name="styles.css")
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("control:advert_storage_cache", args=[reference.pk, item.pk]),
+            {"cache_seconds": "86400"},
+        )
+
+        self.assertEqual(response.status_code, 302)
 
     def test_ads_staff_can_export_whole_reference_as_one_zip(self):
         reference = self._reference()

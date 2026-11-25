@@ -1039,6 +1039,11 @@ body.has-ads-modal { overflow: hidden; }
 .ads-storage-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .ads-storage-meta strong { overflow-wrap: anywhere; font-size: 0.9rem; }
 .ads-storage-meta span, .ads-storage-meta small { color: var(--muted-text, #667085); font-size: 0.78rem; }
+.ads-storage-cache { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.ads-storage-cache-form { display: flex; align-items: center; gap: 6px; }
+.ads-storage-cache label { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; }
+.ads-storage-cache select { min-height: 28px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 0.75rem; }
+.ads-storage-cache-clear { padding: 2px 4px; border: 0; background: transparent; color: var(--ads-gold-deep, #9a6b00); font-size: 0.72rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .ads-storage-badge { padding: 3px 8px; border-radius: 999px; background: var(--ads-soft-strong); font-size: 0.7rem; font-weight: 700; }
 .ads-storage-badge--type { background: var(--ads-soft); color: var(--muted-text, #667085); letter-spacing: 0.04em; }
 .ads-storage-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }

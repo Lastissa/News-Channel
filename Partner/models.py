@@ -455,6 +455,10 @@ class AdvertReferenceFile(models.Model):
     public_id = models.CharField(max_length=255)
     secure_url = models.URLField(max_length=500)
     file_size = models.PositiveIntegerField(default=0)
+    #   0 means "no cache": every share response is sent with no-store. A
+    #   positive value is the max-age, in seconds, advertised to browsers and
+    #   to the CDN for this asset's stable signed URL.
+    cache_seconds = models.PositiveIntegerField(default=0)
     date_uploaded = models.DateTimeField(auto_now_add=True)
 
     class Meta:
