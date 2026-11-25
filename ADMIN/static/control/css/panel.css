@@ -656,6 +656,7 @@ body.ad-landing-open { overflow: hidden; }
 
 .panel-badge-staff { color: var(--ink); border: 1px solid var(--ink); background: transparent; font-weight: 700; }
 .panel-badge-user { color: inherit; border: 1px dashed var(--line); background: transparent; opacity: 0.75; }
+.panel-badge-advertiser { color: var(--brand-deep, #9a6b00); border: 1px solid var(--brand-deep, #9a6b00); background: rgba(246, 139, 30, 0.12); font-weight: 700; }
 
 /* Unknown Author card: stories left behind by deactivated accounts. */
 .panel-card-sub { margin: 0 0 12px; font-size: 0.85rem; color: var(--slate, #5B6B7C); }

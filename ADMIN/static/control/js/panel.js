@@ -578,9 +578,12 @@
         email.className = "panel-session-email";
         email.textContent = row.email_masked + " ";
         var kind = document.createElement("span");
-        kind.className = "panel-badge " + (row.is_staff ? "panel-badge-staff" : "panel-badge-user");
-        kind.title = row.is_staff ? "Staff account" : "Regular reader account";
-        kind.textContent = row.is_staff ? "Staff" : "User";
+        /*  Advertiser access is a tag on a normal reader account, so it wins
+            over the plain "User" badge but never over a real staff role. */
+        var isAdvertiser = !row.is_staff && !!row.is_advertiser;
+        kind.className = "panel-badge " + (row.is_staff ? "panel-badge-staff" : isAdvertiser ? "panel-badge-advertiser" : "panel-badge-user");
+        kind.title = row.is_staff ? "Staff account" : isAdvertiser ? "Advertiser account (adv-user)" : "Regular reader account";
+        kind.textContent = row.is_staff ? "Staff" : isAdvertiser ? "Advertiser" : "User";
         email.appendChild(kind);
         if (row.suspicious_count) {
           var badge = document.createElement("span");

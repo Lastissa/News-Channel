@@ -19,7 +19,7 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connections
 from django.http import HttpResponse
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -36,7 +36,7 @@ from ADMIN.views import (
     _advert_storage_display_name,
     _advert_storage_share_urls,
 )
-from AUTHENTICATION.models import Auth
+from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, BlogLike, Category, Comment, StoryView, get_category_choices
 from HOME.models import CategorySubscription, ReadingHistory
 from Partner.models import (
@@ -245,6 +245,29 @@ class PanelCategoryTests(TestCase):
         self.client.force_login(self.writer)
         response = self.client.get(reverse("control:panel"))
         self.assertRedirects(response, reverse("home:profile"), fetch_redirect_response=False)
+
+    def test_active_sessions_show_the_advertiser_tag_on_regular_accounts(self):
+        advertiser = Auth.objects.create_user(
+            email="adv-user@example.com", is_advertiser=True
+        )
+        advertiser_client = Client()
+        advertiser_client.force_login(advertiser)
+        self.assertTrue(UserSession.objects.filter(user=advertiser).exists())
+
+        member_client = Client()
+        member_client.force_login(self.member)
+
+        self.client.force_login(self.admin)
+        feed = self.client.get(reverse("control:panel_sessions"))
+        self.assertEqual(feed.status_code, 200)
+        rows = {row["id"]: row for row in feed.json()["items"]}
+        self.assertTrue(rows[advertiser.pk]["is_advertiser"])
+        self.assertFalse(rows[self.member.pk]["is_advertiser"])
+
+        panel = self.client.get(reverse("control:panel"))
+        self.assertContains(panel, "Advertiser account (adv-user)")
+        self.assertContains(panel, ">Advertiser</span>")
+        self.assertContains(panel, "Regular reader account")
 
 
 class _MainThreadSendMock(mock.Mock):
@@ -3569,6 +3592,32 @@ class AdvertReferenceDeskTests(TestCase):
         self.assertIn("inline", response["Content-Disposition"])
         self.assertIn("landing_ab12cd.js", response["Content-Disposition"])
         self.assertEqual(response["Cache-Control"], "private, no-store")
+
+    def test_reference_storage_preview_is_not_cut_by_a_compressed_length_header(self):
+        reference = self._reference()
+        item = self._storage_file(reference, name="bundle.js")
+        share_url, _ = _advert_storage_share_urls(
+            item, _advert_storage_display_name(item)
+        )
+        body = b"window.start=1;" * 500  # far larger than the compressed length
+        upstream = mock.Mock(
+            status_code=200,
+            headers={
+                "Content-Length": "128",
+                "Content-Encoding": "gzip",
+                "ETag": "bundle-123",
+            },
+        )
+        upstream.iter_content.return_value = [body]
+
+        with mock.patch("ADMIN.views.requests.get", return_value=upstream) as get:
+            response = self.client.get(share_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Content-Length", response)
+        self.assertEqual(b"".join(response.streaming_content), body)
+        self.assertEqual(get.call_args.kwargs["headers"]["Accept-Encoding"], "identity")
+        self.assertEqual(response["ETag"], "bundle-123")
 
     def test_reference_storage_share_links_do_not_expire(self):
         reference = self._reference()

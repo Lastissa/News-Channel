@@ -1989,6 +1989,10 @@ def _active_sessions_page(page_number):
         {
             "id": account.pk,
             "is_staff": bool(account.is_staff),
+            #   Advertiser access is a tag on a normal reader account, not a
+            #   staff role. The PANEL session row has to surface it so an admin
+            #   can tell an advertiser's live login from an ordinary member's.
+            "is_advertiser": bool(account.is_advertiser),
             "email_masked": _mask_email(account.email),
             "session_count": session_counts.get(account.pk, 0),
             #   MOST RECENT LOGIN AMONG THIS ACCOUNT'S ACTIVE SESSIONS, SHOWN ON
@@ -4146,7 +4150,7 @@ def _stream_advert_storage_asset(request, item, force_download):
     delivery_url, _ = cloudinary.utils.cloudinary_url(
         item.public_id, resource_type=item.resource_type or "image", secure=True
     )
-    upstream_headers = {}
+    upstream_headers = {"Accept-Encoding": "identity"}
     range_header = request.headers.get("Range")
     if range_header:
         upstream_headers["Range"] = range_header
@@ -4179,7 +4183,12 @@ def _stream_advert_storage_asset(request, item, force_download):
         status=206 if upstream.status_code == 206 else 200,
         content_type=content_type,
     )
-    for header in ("Content-Length", "Content-Range", "ETag", "Last-Modified"):
+    #   `requests` decodes gzip/br before we stream it, so Cloudinary's
+    #   Content-Length no longer describes the bytes we send. Forwarding it
+    #   makes the browser stop early and show a half file. Let Django use
+    #   chunked transfer instead; Content-Range still tells video players
+    #   which part of the asset a 206 response carries.
+    for header in ("Content-Range", "ETag", "Last-Modified"):
         if header in upstream.headers:
             response[header] = upstream.headers[header]
     response["Accept-Ranges"] = upstream.headers.get("Accept-Ranges", "bytes")
