@@ -1731,7 +1731,7 @@
     var hiddenIds = form.querySelector("[data-extra-account-ids]");
     var sendBtn = form.querySelector("[data-mass-email-send]");
 
-    var active = { member: false, staff: false, admin: false };
+    var active = { member: false, staff: false, admin: false, advertiser: false };
     var extras = {}; // account_id -> { full_name, profile_img }
 
     function syncHidden() {
@@ -1761,12 +1761,9 @@
     }
 
     function updateAddAvailability() {
-      var blocked = active.staff && active.admin;
-      addToggle.disabled = blocked;
-      addToggle.title = blocked ? "Staff and admin together already cover everyone with a staff profile." : "";
-      if (blocked) {
-        searchBox.hidden = true;
-      }
+      /* the search also finds members and advertisers, so it is never blocked */
+      addToggle.disabled = false;
+      addToggle.title = "";
     }
 
     toggles.forEach(function (btn) {
@@ -1808,7 +1805,7 @@
             }
 
             var name = document.createElement("span");
-            name.textContent = item.full_name + " \u00b7 " + item.authority;
+            name.textContent = item.full_name + " \u00b7 " + item.authority + (item.email_masked && item.email_masked !== item.full_name ? " \u00b7 " + item.email_masked : "");
 
             var addBtn = document.createElement("button");
             addBtn.type = "button";
@@ -1847,7 +1844,7 @@
       var body = form.querySelector("[name='body']").value.trim();
       if (!subject) { toast("Enter an email heading.", "error"); return; }
       if (!body) { toast("Enter the email body.", "error"); return; }
-      if (!active.member && !active.staff && !active.admin && !Object.keys(extras).length) {
+      if (!active.member && !active.staff && !active.admin && !active.advertiser && !Object.keys(extras).length) {
         toast("Choose at least one recipient group.", "error");
         return;
       }
@@ -1856,6 +1853,7 @@
       if (active.member) data.set("include_member", "on");
       if (active.staff) data.set("include_staff", "on");
       if (active.admin) data.set("include_admin", "on");
+      if (active.advertiser) data.set("include_advertiser", "on");
 
       sendBtn.dataset.pending = "true";
       sendBtn.disabled = true;
@@ -1874,7 +1872,7 @@
         toggles.forEach(function (btn) {
           if (!btn.hasAttribute("data-toggle-add")) btn.classList.remove("is-active");
         });
-        active = { member: false, staff: false, admin: false };
+        active = { member: false, staff: false, admin: false, advertiser: false };
         extras = {};
         renderPills();
         syncHidden();

@@ -398,10 +398,11 @@
               <button type="button" class="panel-toggle-chip" data-toggle="member">Member</button>
               <button type="button" class="panel-toggle-chip" data-toggle="staff">Staff</button>
               <button type="button" class="panel-toggle-chip" data-toggle="admin">Admin</button>
+              <button type="button" class="panel-toggle-chip" data-toggle="advertiser">Advertiser</button>
               <button type="button" class="panel-toggle-chip panel-toggle-add" data-toggle-add aria-label="Search for a person" title="Search for a person"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></button>
             </div>
             <div class="panel-recipient-search" data-recipient-search hidden>
-              <input type="text" placeholder="Full name..." aria-label="Search staff by full name" data-recipient-search-input>
+              <input type="text" placeholder="Name or email..." aria-label="Search people by name or email" data-recipient-search-input>
               <div class="panel-recipient-results" data-recipient-results></div>
             </div>
             <div class="panel-recipient-pills" data-recipient-pills></div>
@@ -573,7 +574,7 @@
 {% block extra_scripts %}
   {{ block.super }}
   <script src="{% static 'home/js/htmx.min.js' %}" defer></script>
-  <script src="{% static 'control/js/panel.js' %}?v=20261125-1" defer></script>
+  <script src="{% static 'control/js/panel.js' %}?v=20261125-2" defer></script>
 {% endblock %}
 
 {% block footer %}{% endblock %}

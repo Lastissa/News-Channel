@@ -15,8 +15,10 @@
   var root = document.getElementById('splash');
   if (!root) return;
   var css = document.getElementById('base-css');
-  var MIN = 2.8;          /* seconds the intro is guaranteed to play */
-  var FAILSAFE = 12;      /* seconds before the splash lets go even if base.css never arrives */
+  var MIN = 2.4;          /* seconds the intro is guaranteed to play */
+  var FAILSAFE = 5;       /* real seconds before the splash lets go even if base.css never arrives */
+  var born = Date.now();
+  function overdue() { return (Date.now() - born) / 1000 > FAILSAFE; }   /* wall clock: frame and timer counters run slow on weak phones */
   var G = 2600;           /* gravity, px/s^2 */
   var BOUNCE = 0.36;      /* energy kept on each landing */
   var HOP = 340;          /* upward speed of a ripple hop, px/s */
@@ -29,10 +31,8 @@
   /* later pages in the session: no show, just wait for base.css */
   if (seen) {
     root.classList.add('sp-quiet');
-    var waited = 0;
     var poll = setInterval(function () {
-      waited += 0.03;
-      if (ready() || waited > FAILSAFE) { clearInterval(poll); finish(); }
+      if (ready() || overdue()) { clearInterval(poll); finish(); }
     }, 30);
     return;
   }
@@ -40,10 +40,8 @@
   var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (still) {            /* letters stay at rest, the cover simply fades */
     root.classList.add('sp-said');
-    var t0 = 0;
     var p2 = setInterval(function () {
-      t0 += 0.03;
-      if ((ready() && t0 > 0.7) || t0 > FAILSAFE) {
+      if ((ready() && (Date.now() - born) > 700) || overdue()) {
         clearInterval(p2);
         root.classList.add('sp-leaving');
         setTimeout(finish, 520);
@@ -139,8 +137,8 @@
     if (!exiting) {
       if (!said && allLanded()) { said = true; root.classList.add('sp-said'); }
       if (T > nextWave && allSettled() && said) { startWave(); nextWave = T + 1.7; }
-      if ((T >= MIN && ready()) || T > FAILSAFE) beginExit();
-    } else if (gone || T - exitT > 1.6) { done = true; finish(); }
+      if ((T >= MIN && ready()) || overdue()) beginExit();
+    } else if (gone || T - exitT > 1.2 || (Date.now() - born) / 1000 > FAILSAFE + 1.2) { done = true; finish(); }
     if (!done) requestAnimationFrame(frame);
   }
 

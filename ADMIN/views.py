@@ -2247,40 +2247,55 @@ class PanelUnknownAuthorDeleteView(View):
         )
 
 class PanelStaffSearchView(View):
-    """The "+" search in the mass-email composer. Matches StaffProfile
-    full_name, case-insensitive. Only ever used to add an individual on top
-    of the Member/Staff/Admin toggles -- it never returns raw emails, only
-    enough to render a confirmation row (name + avatar)."""
+    """The "+" search in the mass-email composer. Matches a StaffProfile
+    full_name OR the account email, case-insensitive, so advertisers and
+    plain members (who have no StaffProfile) can be found too. Only ever used
+    to add an individual on top of the Member/Staff/Admin/Advertiser toggles.
+    The email is never returned in full: a person with no profile name is
+    labelled by the masked address, and a typed email only ever matches
+    server side."""
 
     def get(self, request):
         if not admin_only(request.user):
             return JsonResponse({"detail": "Admin access is required to view This Page."}, status=403)
 
-        query = (request.GET.get("q") or "").strip()
+        query = (request.GET.get("q") or "").strip()[:100]
         if not query:
             return JsonResponse({"items": []}, status=200)
 
-        profiles = (
-            StaffProfile.objects.select_related("auth")
-            .filter(full_name__icontains=query, auth__is_active=True)
-            .order_by("full_name")[:8]
+        accounts = (
+            Auth.objects.select_related("staffprofile")
+            .filter(Q(email__icontains=query) | Q(staffprofile__full_name__icontains=query), is_active=True)
+            .order_by("email")[:8]
         )
 
-        items = [
-            {
-                "account_id": profile.auth_id,
-                "full_name": profile.full_name,
-                "profile_img": profile.auth.profile_img or "",
-                "authority": (
-                    "SAdmin" if profile.auth.is_superuser else "Admin" if profile.auth.is_admin else "Staff"
-                ),
-            }
-            for profile in profiles
-        ]
+        items = []
+        for account in accounts:
+            profile = getattr(account, "staffprofile", None)
+            full_name = (profile.full_name.strip() if profile and profile.full_name else "")
+            if account.is_superuser:
+                authority = "SAdmin"
+            elif account.is_admin:
+                authority = "Admin"
+            elif account.is_staff:
+                authority = "Staff"
+            elif account.is_advertiser:
+                authority = "Advertiser"
+            else:
+                authority = "Member"
+            items.append(
+                {
+                    "account_id": account.pk,
+                    "full_name": full_name or _mask_email(account.email),
+                    "email_masked": _mask_email(account.email),
+                    "profile_img": account.profile_img or "",
+                    "authority": authority + (" · Advertiser" if account.is_advertiser and authority != "Advertiser" else ""),
+                }
+            )
         return JsonResponse({"items": items}, status=200)
 
 
-def _mass_email_recipients(include_member, include_staff, include_admin, extra_account_ids):
+def _mass_email_recipients(include_member, include_staff, include_admin, extra_account_ids, include_advertiser=False):
     """Resolves the toggle state + explicit "+" adds into a final, deduped
     email address list. Never sent to the client -- this stays server side
     end to end."""
@@ -2291,6 +2306,8 @@ def _mass_email_recipients(include_member, include_staff, include_admin, extra_a
         query |= Q(is_staff=True, is_admin=False, is_superuser=False)
     if include_admin:
         query |= Q(is_admin=True) | Q(is_superuser=True)
+    if include_advertiser:
+        query |= Q(is_advertiser=True)
     if extra_account_ids:
         query |= Q(pk__in=extra_account_ids)
 
@@ -2328,13 +2345,16 @@ class PanelMassEmailView(View):
         include_member = request.POST.get("include_member") == "on"
         include_staff = request.POST.get("include_staff") == "on"
         include_admin = request.POST.get("include_admin") == "on"
+        include_advertiser = request.POST.get("include_advertiser") == "on"
         extra_raw = request.POST.get("extra_account_ids") or ""
         try:
             extra_account_ids = [int(v) for v in extra_raw.split(",") if v.strip().isdigit()]
         except ValueError:
             extra_account_ids = []
 
-        recipients = _mass_email_recipients(include_member, include_staff, include_admin, extra_account_ids)
+        recipients = _mass_email_recipients(
+            include_member, include_staff, include_admin, extra_account_ids, include_advertiser
+        )
         if not recipients:
             return JsonResponse({"detail": "No recipients selected."}, status=400)
 
@@ -2343,7 +2363,7 @@ class PanelMassEmailView(View):
 
         info_logger(
             msg=f"PANEL MASS EMAIL: {request.user.email} sent '{subject}' to {sent_total} recipients "
-            f"(member={include_member}, staff={include_staff}, admin={include_admin}, extra={len(extra_account_ids)})"
+            f"(member={include_member}, staff={include_staff}, admin={include_admin}, advertiser={include_advertiser}, extra={len(extra_account_ids)})"
         )
 
         return JsonResponse({"detail": f"Email queued for {sent_total} recipient(s)."}, status=200)
