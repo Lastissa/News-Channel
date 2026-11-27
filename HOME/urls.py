@@ -10,6 +10,7 @@ urlpatterns = [
     path("search/", views.SearchView.as_view(), name="search"),
     path("category/<slug:slug>/", views.CategoryView.as_view(), name="category"),
     path("profile/", views.ProfileView.as_view(), name="profile"),
+    path("profile/analytics/", views.ProfileAnalyticsView.as_view(), name="profile_analytics"),
     path("add-news/", views.AddNewsView.as_view(), name="add_news"),
     path("author-handbook/", views.AuthorHandbookView.as_view(), name="author_handbook"),
     path("profile/bookmarks/", views.ProfileBookmarksView.as_view(), name="profile_bookmarks"),

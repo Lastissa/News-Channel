@@ -28,6 +28,12 @@ from django.views import View
 from ARCHIVE.models import ArchiveImage
 from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Comment, get_category_choices
+from HOME.author_analytics import (
+    author_name,
+    author_pool,
+    build_author_analytics,
+    normalize_range as normalize_author_range,
+)
 from HOME.models import Bookmark, CategorySubscription
 from Partner.advert_analytics import RANGE_CHOICES, build_advert_analytics, normalize_range
 from Partner.models import AdvertEvent, AdvertImage, AdvertLead, AdvertReference
@@ -82,10 +88,12 @@ from SERVICE_INTERNAL.images import (
     upload_news_image,
     upload_profile_image,
 )
+from SERVICE_INTERNAL.analytics_buffer import pending_advert_event_rows
 from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for, drop_single_session, describe_device, live_sessions_for
 from SERVICE_INTERNAL.story_validation import first_error_message, forbidden_phrase_error, validate_story
+from SERVICE_INTERNAL.traffic import tag_internal_url
 from STAFF.models import GENDER_CHOICES, AuthorFollow, FollowRelationship, StaffProfile
 
 logger = logging.getLogger(__name__)
@@ -2072,8 +2080,14 @@ def _advertiser_analytics_context(analytics_rows, requested_range, requested_ref
     events = AdvertEvent.objects.filter(reference_id__in=reference_ids)
     if selected:
         events = events.filter(reference_id=selected)
+    pending = pending_advert_event_rows(
+        [selected] if selected else reference_ids
+    )
     analytics = build_advert_analytics(
-        events, range_key, element_prefix=f"{element_prefix}-{selected or 'all'}"
+        events,
+        range_key,
+        element_prefix=f"{element_prefix}-{selected or 'all'}",
+        pending_rows=pending,
     )
     totals = analytics["totals"]
     source_highest = max(totals["abureport_clicks"], totals["other_clicks"], 0) or 1
@@ -3061,7 +3075,7 @@ class ProfileCommentsView(View):
                 "blog_id": comment.blog_id,
                 "heading": comment.blog.heading,
                 "excerpt": Truncator(comment.content).chars(85),
-                "url": reverse("blog:story_detail", args=[comment.blog.slug]),
+                "url": tag_internal_url(reverse("blog:story_detail", args=[comment.blog.slug])),
             }
             for comment in page.object_list
         ]
@@ -3308,6 +3322,64 @@ class ProfilePublishedDeleteView(View):
         blog.delete()
         _release_story_image(image_public_id)
         return JsonResponse({"detail": "Story deleted.", "id": blog_id}, status=200)
+
+
+class ProfileAnalyticsView(View):
+    """The author's own analytics tab inside the profile.
+
+    HTMX swaps the whole profile content area with this view's partial, so the
+    toolbar and jump links stay put and the page never jumps. An admin may use
+    the picker in the panel to see exactly what another author sees; that
+    choice is kept in the session, never in the URL.
+    """
+
+    SESSION_AUTHOR_KEY = "profile_analytics_author"
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            messages.info(request, "sign in to open your profile.")
+            return redirect(reverse("auth:login") + "?" + urlencode({"to": request.get_full_path()}))
+
+        is_admin = admin_only(request.user)
+        target = request.user
+        choices = []
+
+        if is_admin:
+            pool = author_pool()
+            allowed_ids = {str(row.pk) for row in pool}
+            requested = (request.GET.get("author") or "").strip()
+            if requested in allowed_ids:
+                request.session[self.SESSION_AUTHOR_KEY] = int(requested)
+            selected = request.session.get(self.SESSION_AUTHOR_KEY)
+            if selected:
+                candidate = Auth.objects.filter(
+                    pk=selected, is_active=True, deleted_at__isnull=True
+                ).first()
+                if candidate and str(candidate.pk) in allowed_ids:
+                    target = candidate
+                else:
+                    request.session.pop(self.SESSION_AUTHOR_KEY, None)
+            choices = [
+                {"id": row.pk, "name": author_name(row)} for row in pool
+            ]
+        else:
+            request.session.pop(self.SESSION_AUTHOR_KEY, None)
+
+        range_key = normalize_author_range(request.GET.get("range"))
+        context = build_author_analytics(target, range_key)
+        context.update(
+            {
+                "is_admin_user": is_admin,
+                "author_choices": choices,
+                "selected_author_id": target.pk,
+                "analytics_url": reverse("home:profile_analytics"),
+                "profile_url": reverse("home:profile"),
+            }
+        )
+
+        if request.headers.get("HX-Request", "").lower() == "true":
+            return render(request, "HOME/partials/profile_analytics_panel.html", context)
+        return render(request, "HOME/profile_analytics.html", context)
 
 
 class ProfileView(View):
@@ -3802,7 +3874,7 @@ class MostViewedView(View):
         results = [
             {
                 "heading": post.heading,
-                "url": reverse("blog:story_detail", args=[post.slug]),
+                "url": tag_internal_url(reverse("blog:story_detail", args=[post.slug])),
                 "image": cloudinary_image(post.image_1, "f_auto/q_auto/w_320") if post.image_1 else "",
                 "views": post.views,
                 "category": post.get_category_display(),

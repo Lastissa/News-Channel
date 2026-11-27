@@ -31,6 +31,17 @@
     return isFinite(number) && number > 0 ? number : fallback;
   }
 
+  /* A view is only sent once the popup is in the document. The pixel endpoint
+     ignores bots and duplicate taps; the timestamp keeps the browser from
+     reusing a cached GIF on the next appearance. */
+  function recordView(viewUrl) {
+    if (!viewUrl) return;
+    var url = new URL(viewUrl, window.location.href);
+    url.searchParams.set("t", String(Date.now()));
+    var pixel = new Image();
+    pixel.src = url.toString();
+  }
+
   function init() {
     var host = document.querySelector("[data-story-ad]");
     if (!host) return;
@@ -100,9 +111,10 @@
       popup.setAttribute("aria-label", "Ads");
       popup.style.setProperty("--story-ad-show", showMs + "ms");
 
-      /* one link around picture + label + heading + text. A landing page takes
-         priority; the advertiser link is the fallback. */
-      var target = ad.landing_url || ad.url;
+      /* one link around picture + label + heading + text. A tracked reference
+         takes priority so the click is recorded and redirected; otherwise the
+         landing page is used, with the advertiser link as the fallback. */
+      var target = ad.click_url || ad.landing_url || ad.url;
       var link = document.createElement(target ? "a" : "div");
       link.className = "story-ad-link";
       if (target) {
@@ -189,6 +201,10 @@
         }
 
         document.body.appendChild(built.popup);
+
+        window.requestAnimationFrame(function () {
+          recordView(ready.ad.view_url);
+        });
 
         built.close.addEventListener("click", leave);
 

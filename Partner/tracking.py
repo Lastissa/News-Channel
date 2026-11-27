@@ -10,14 +10,15 @@ collapsed so an accidental double tap is counted once.
 from __future__ import annotations
 
 import hashlib
-from datetime import timedelta
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpResponse
-from django.utils import timezone
 
 from SERVICE_INTERNAL.abstract import get_client_ip, is_bot_request
+from SERVICE_INTERNAL.analytics_buffer import buffer_advert_event
+from SERVICE_INTERNAL.traffic import classify_request_source
 
 from .models import AdvertEvent, AdvertReference
 
@@ -93,21 +94,17 @@ def _request_session_key(request) -> str:
         return ""
 
 
-def _recent_event_exists(reference, event_type, ip_hash, dedupe_seconds):
-    """True when the same IP already recorded this event a moment ago.
+def _is_recent_duplicate(reference, event_type, ip_hash, dedupe_seconds):
+    """True when the same IP already sent this event a moment ago.
 
     The IP comes from get_client_ip (CF-Connecting-IP first), so visitors
-    behind Cloudflare are told apart by their real address. Sessions are not
-    used: another visitor on another IP never suppresses this one.
+    behind Cloudflare are told apart by their real address. The short window
+    lives in the cache, which also keeps the dedupe off the database.
     """
     if dedupe_seconds <= 0 or not ip_hash:
         return False
-    return AdvertEvent.objects.filter(
-        reference=reference,
-        event_type=event_type,
-        ip_hash=ip_hash,
-        created_at__gte=timezone.now() - timedelta(seconds=dedupe_seconds),
-    ).exists()
+    key = f"advert-dedupe:{reference.pk}:{event_type}:{ip_hash}"
+    return not cache.add(key, "1", timeout=dedupe_seconds)
 
 
 def record_advert_event(
@@ -119,27 +116,32 @@ def record_advert_event(
     source=None,
     dedupe_seconds=0,
 ):
-    """Write one event, or return ``None`` when it is a bot/duplicate."""
+    """Queue one event, or return ``False`` when it is a bot/duplicate.
+
+    The event is buffered in the cache and written by the /health flush; the
+    advertiser dashboard reads cache and database together, so nothing is
+    missing while a batch is still pending.
+    """
     if not isinstance(reference, AdvertReference) or not reference.pk:
         return None
     if is_bot_request(request):
         return None
 
     ip_hash = hash_ip(request)
-    session_key = _request_session_key(request)
-    if _recent_event_exists(reference, event_type, ip_hash, dedupe_seconds):
+    if _is_recent_duplicate(reference, event_type, ip_hash, dedupe_seconds):
         return None
 
-    return AdvertEvent.objects.create(
-        reference=reference,
+    referrer = (request.META.get("HTTP_REFERER") or "")[:1000]
+    return buffer_advert_event(
+        reference_id=reference.pk,
         event_type=event_type,
-        source=source or classify_traffic(request),
-        target_url=(target_url or "")[:1000],
-        path=(request.path or "")[:500],
-        referrer=(request.META.get("HTTP_REFERER") or "")[:1000],
+        source=source or classify_request_source(request),
+        target_url=target_url,
+        path=request.path or "",
+        referrer=referrer,
         ip_hash=ip_hash,
         user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
-        session_key=session_key,
+        session_key=_request_session_key(request),
     )
 
 

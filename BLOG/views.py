@@ -32,8 +32,9 @@ from SERVICE_INTERNAL.email_single import (
     _try_send_story_like_email,
     _try_send_story_views_alert_email,
 )
+from SERVICE_INTERNAL.traffic import tag_internal_url
 from STAFF.models import AuthorFollow, StaffProfile
-from .models import Blog, BlogLike, Comment, StoryView
+from .models import Blog, BlogLike, Comment
 
 logger = logging.getLogger(__name__)
 
@@ -1289,21 +1290,22 @@ class StoryDetailView(View):
                 Blog.objects.filter(pk=blog.pk).update(views=F("views") + 1)
                 blog.refresh_from_db(fields=["views"])
 
-                #   TIMESTAMPED HISTORY behind Blog.views, so ANALYTICS can
-                #   chart views per period instead of just the running total.
-                #   Written in the SAME dedupe branch as the counter bump, so
-                #   the two can never disagree. The inner atomic() is a
-                #   savepoint: if the write fails -- the table is not migrated
-                #   yet, say -- only the savepoint rolls back, the story page
-                #   still renders and the request is never 500'd.
-                try:
-                    with transaction.atomic():
-                        StoryView.objects.create(
-                            blog=blog,
-                            user=request.user if request.user.is_authenticated else None,
-                        )
-                except Exception as exc:
-                    error_logger(msg=f"STORY VIEW LOG FAILED: blog={blog.pk} error={exc}")
+                #   TIMESTAMPED HISTORY behind Blog.views. The row is queued
+                #   in the analytics cache in the SAME dedupe branch as the
+                #   counter bump, then written by the /health flush. Analytics
+                #   reads the database plus the still-pending cache rows, so
+                #   the numbers agree even before the flush runs.
+                from SERVICE_INTERNAL.analytics_buffer import buffer_story_view
+                from SERVICE_INTERNAL.traffic import classify_request_source
+
+                source = classify_request_source(
+                    request, getattr(author_profile, "full_name", "") or ""
+                )
+                buffer_story_view(
+                    blog_id=blog.pk,
+                    user_id=request.user.pk if request.user.is_authenticated else None,
+                    source=source,
+                )
 
                 alert_interval = getattr(settings, "STORY_VIEWS_ALERT_INTERVAL", 10)
                 if (
@@ -1485,7 +1487,7 @@ class StoryDetailView(View):
 #   database being hit on every popup of every reader.
 STORY_ADS_POOL_SIZE = 3
 STORY_ADS_CACHE_TTL = 120  # seconds
-STORY_ADS_CACHE_KEY = "story_ads_pool_v2"
+STORY_ADS_CACHE_KEY = "story_ads_pool_v3"
 
 
 def _load_story_ads_pool():
@@ -1499,7 +1501,7 @@ def _load_story_ads_pool():
     from Partner.models import AdvertImage
 
     live = (
-        AdvertImage.objects.select_related("landing_page__author")
+        AdvertImage.objects.select_related("landing_page__author", "reference")
         .filter(
             is_active=True,
             expiry_date__gte=timezone.now(),
@@ -1510,6 +1512,8 @@ def _load_story_ads_pool():
     ads = []
     for row in live:
         landing = getattr(row, "landing_page", None)
+        reference = getattr(row, "reference", None)
+        reference_code = (reference.reference if reference else "").strip().upper()
         ads.append(
             {
                 "id": row.pk,
@@ -1518,6 +1522,13 @@ def _load_story_ads_pool():
                 "body": row.body or "",
                 "url": row.url or "",
                 "landing_url": advert_landing_url(row) if landing and landing.is_deliverable else "",
+                "reference": reference_code,
+                "view_url": (
+                    reverse("partner:advert_view", args=[reference_code]) if reference_code else ""
+                ),
+                "click_url": (
+                    reverse("partner:advert_click", args=[reference_code]) if reference_code else ""
+                ),
             }
         )
     return {"ads": ads}
@@ -1571,7 +1582,7 @@ class CategoryRecommendationsView(View):
             recommendations.append(
                 {
                     "slug": story.slug,
-                    "url": reverse("blog:story_detail", args=[story.slug]),
+                    "url": tag_internal_url(reverse("blog:story_detail", args=[story.slug])),
                     "heading": story.heading,
                     "image": story.image_1 or "",
                     "category": story.get_category_display(),

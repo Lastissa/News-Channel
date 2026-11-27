@@ -356,6 +356,11 @@ class StoryView(models.Model):
     `user` is set for a signed-in reader and left null for an anonymous one.
     On account deletion the row survives (SET_NULL) so a historical view count
     never shrinks.
+
+    `source` is the traffic source resolved from the incoming Referer header
+    (UTM is only a fallback). Rows are queued in the analytics cache while the
+    reader is on the page and written here by the ``/health`` flush; analytics
+    adds the still-pending rows on top so the count never lags.
     """
 
     blog = models.ForeignKey(
@@ -371,6 +376,7 @@ class StoryView(models.Model):
         related_name="story_views",
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    source = models.CharField(max_length=32, blank=True, default="direct", db_index=True)
 
     class Meta:
         ordering = ["-created_at"]

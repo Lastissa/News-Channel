@@ -54,6 +54,7 @@ from Partner.landing import (
 )
 from Partner.models import AdvertLandingPage
 from Partner.tracking import append_utm_source
+from SERVICE_INTERNAL.analytics_buffer import pending_advert_events
 from SERVICE_INTERNAL.images import ImageUploadError
 
 
@@ -407,6 +408,8 @@ class AdvertTrackingTests(TestCase):
     """Public tracking stays honest: no raw IPs, no bot hits, deduped views."""
 
     def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.owner = Auth.objects.create_user(email="tracker@example.com")
         self.admin = Auth.objects.create_user(
             email="tracking-admin@example.com", is_staff=True, is_admin=True
@@ -427,6 +430,10 @@ class AdvertTrackingTests(TestCase):
         self.client.defaults["HTTP_USER_AGENT"] = "Mozilla/5.0 (TestBrowser)"
         self.client.defaults["HTTP_REFERER"] = "http://testserver/"
 
+    def flush(self):
+        #   Public requests only queue events. /health is the flush point.
+        self.client.get("/health")
+
     def test_view_pixel_records_one_view_and_returns_a_gif(self):
         response = self.client.get(
             reverse("partner:advert_view", args=[self.reference.reference])
@@ -434,6 +441,10 @@ class AdvertTrackingTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/gif")
+        self.assertEqual(len(pending_advert_events()), 1)
+        self.assertEqual(AdvertEvent.objects.count(), 0)
+
+        self.flush()
         event = AdvertEvent.objects.get()
         self.assertEqual(event.event_type, AdvertEvent.EVENT_VIEW)
         self.assertEqual(event.source, AdvertEvent.SOURCE_ABUREPORT)
@@ -444,6 +455,7 @@ class AdvertTrackingTests(TestCase):
         url = reverse("partner:advert_view", args=[self.reference.reference])
         self.client.get(url)
         self.client.get(url)
+        self.flush()
 
         self.assertEqual(AdvertEvent.objects.filter(event_type=AdvertEvent.EVENT_VIEW).count(), 1)
 
@@ -453,16 +465,19 @@ class AdvertTrackingTests(TestCase):
 
         self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.1.1")
         self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.1.1")
+        self.flush()
         self.assertEqual(count(), 1)
 
         #   Another device on another IP is never suppressed, even with the
         #   same proxy address in REMOTE_ADDR.
         self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.2.2")
+        self.flush()
         self.assertEqual(count(), 2)
 
         #   After the window the same IP counts again.
-        AdvertEvent.objects.update(created_at=timezone.now() - timedelta(seconds=4))
-        self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.1.1")
+        with mock.patch("Partner.tracking.VIEW_DEDUPE_SECONDS", 0):
+            self.client.get(url, HTTP_CF_CONNECTING_IP="102.89.1.1")
+        self.flush()
         self.assertEqual(count(), 3)
 
     def test_click_redirects_with_utm_source_and_records_the_click(self):
@@ -475,6 +490,8 @@ class AdvertTrackingTests(TestCase):
             response.url,
             "https://example.com/tracked?utm_source=abureport",
         )
+        self.assertEqual(len(pending_advert_events()), 1)
+        self.flush()
         event = AdvertEvent.objects.get()
         self.assertEqual(event.event_type, AdvertEvent.EVENT_CLICK)
         self.assertEqual(event.source, AdvertEvent.SOURCE_ABUREPORT)
@@ -486,14 +503,30 @@ class AdvertTrackingTests(TestCase):
             reverse("partner:advert_click", args=[self.reference.reference])
         )
         self.assertEqual(again.status_code, 302)
+        self.flush()
         self.assertEqual(AdvertEvent.objects.filter(event_type=AdvertEvent.EVENT_CLICK).count(), 1)
 
-    def test_external_referrer_is_classified_as_external(self):
+    def test_external_referrer_is_classified_by_source(self):
         self.client.defaults["HTTP_REFERER"] = "https://news.example.net/story"
 
         self.client.get(reverse("partner:advert_click", args=[self.reference.reference]))
+        self.flush()
 
-        self.assertEqual(AdvertEvent.objects.get().source, AdvertEvent.SOURCE_EXTERNAL)
+        self.assertEqual(AdvertEvent.objects.get().source, "other")
+
+    def test_search_and_social_referrers_are_recorded_as_sources(self):
+        url = reverse("partner:advert_click", args=[self.reference.reference])
+        cases = (
+            ("https://www.google.com/search?q=Tracked+Advert", "google"),
+            ("https://m.facebook.com/story.php", "facebook"),
+            ("https://wa.me/", "whatsapp"),
+        )
+        for referrer, expected in cases:
+            with self.subTest(source=expected):
+                cache.clear()
+                self.client.get(url, HTTP_REFERER=referrer)
+                self.flush()
+                self.assertEqual(AdvertEvent.objects.get().source, expected)
 
     def test_paused_reference_stops_clicks_and_landing_pages(self):
         self.reference.status = AdvertReference.STATUS_PAUSED
@@ -503,6 +536,8 @@ class AdvertTrackingTests(TestCase):
             reverse("partner:advert_click", args=[self.reference.reference])
         )
         self.assertRedirects(click, reverse("home:promote"), fetch_redirect_response=False)
+        self.assertEqual(pending_advert_events(), [])
+        self.flush()
         self.assertEqual(AdvertEvent.objects.count(), 0)
 
         AdvertLandingPage.objects.create(
@@ -522,6 +557,8 @@ class AdvertTrackingTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(pending_advert_events(), [])
+        self.flush()
         self.assertEqual(AdvertEvent.objects.count(), 0)
 
 

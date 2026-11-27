@@ -41,12 +41,15 @@
     <ol class="doc-toc-list">
       <li><a href="#workflow">The publishing workflow</a></li>
       <li><a href="#drafts-transfer">Saving drafts and transferring stories</a></li>
+      <li><a href="#preview">Previewing your story</a></li>
+      <li><a href="#clearing">Clearing or reverting a write-up</a></li>
       <li><a href="#dos-donts">Do's and don'ts</a></li>
       <li><a href="#formatting">Formatting codes</a></li>
       <li><a href="#review">What the review checks</a></li>
       <li><a href="#pictures">Pictures and captions</a></li>
       <li><a href="#editing">Editing a published story</a></li>
       <li><a href="#deleting">Deleting a story</a></li>
+      <li><a href="#analytics">Reading your analytics</a></li>
       <li><a href="#archive">Reusing pictures from the archive</a></li>
       <li><a href="#ai">Using AI</a></li>
       <li><a href="#author-of-the-week">Getting featured: author of the week</a></li>
@@ -79,6 +82,26 @@
         <li><strong>Share/transfer a draft:</strong> In <strong>Your drafts</strong>, use the <strong>Share</strong> button on a saved draft to export it as a JSON file. On supported devices this can use the system share sheet; otherwise the file is downloaded. You can send that file to yourself (for example, phone to laptop) or to another author to continue the same story.</li>
         <li><strong>Load a transferred draft:</strong> In the editor, use the icon-only <strong>Load news</strong> button right after <strong>Browse archive</strong> to pick a shared draft JSON file. The file’s content is loaded into the current editor. If you already have work on screen, the editor asks before replacing it— <strong>save your current work as a draft first if you still need it.</strong></li>
         <li><strong>Important:</strong> A loaded or saved draft is still a draft. It only counts as published once you publish it from the editor.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="preview">
+      <h2>Previewing your story</h2>
+      <p class="doc-lead">The Preview tab shows the article as readers will see it. It uses the same published-story stylesheet and the same parser as the live page, so headings, links, pictures and section order match.</p>
+      <ul class="doc-list">
+        <li>Empty headlines, categories and banners are shown as honest placeholder labels. They are never filled with sample news.</li>
+        <li>The only number in the preview is the live word count. Views, likes, shares, bookmarks and follower counts are left out because they do not exist until the story is published.</li>
+        <li>Reading controls, story rails, adverts and comments are also left out. They belong to the published page and are not part of your draft.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="clearing">
+      <h2>Clearing or reverting a write-up</h2>
+      <p class="doc-lead">Both editors have a small bin button beside the image actions. It asks twice before it changes anything, so a tap cannot wipe a story by accident.</p>
+      <ul class="doc-list">
+        <li><strong>On the add page:</strong> the first Yes asks you to read the warning. The second window repeats it, displays "CALM DOWN AND READ IT PROPERLY", and keeps its Yes disabled for one and a half seconds while the bar fills. The second Yes clears the headline, picture, caption, body, category, contents choice and image quality, removes the uploaded file, and deletes the draft saved in this browser.</li>
+        <li><strong>On the edit page:</strong> the same two steps revert every editable field and any newly chosen file to the values on the published story, then delete the local draft. Nothing is saved to the server until you publish again.</li>
+        <li><strong>No</strong> at either step, Escape, or a click outside the window leaves the editor exactly as it was.</li>
       </ul>
     </section>
 
@@ -245,6 +268,19 @@
         <li>A <strong>pasted external link is never touched.</strong> The file was never ours to delete.</li>
         <li>If <strong>another story still shares</strong> the same uploaded picture, the picture is kept so the surviving story does not lose its banner.</li>
         <li>Deleting your whole account cleans up every story banner the same way.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="analytics">
+      <h2>Reading your analytics</h2>
+      <p class="doc-lead">Open your profile and choose the green <strong>View analytics</strong> button. It loads only when you first open it, and swaps the profile panel without leaving the page. The same sections are available on a direct analytics page for Bookmarks and the browser Back button.</p>
+      <ul class="doc-list">
+        <li><strong>Period:</strong> 7, 30 or 90 days changes every number on the panel, including your ranks and the source breakdown.</li>
+        <li><strong>Numbers:</strong> stories, views, likes, comments, bookmarks and stories read come from real engagement records. Nothing is estimated or invented.</li>
+        <li><strong>Ranks:</strong> you are placed among active authors with a staff profile for stories written, views received and stories read. Overall is the rounded average of those three positions, with views and then stories used to break ties.</li>
+        <li><strong>Sources:</strong> the Referer header decides where a reader came from. UTM values are used only when there is no referrer. Google visits that include your full name, and those that also include "abureport", get their own rows.</li>
+        <li><strong>Admins:</strong> an admin can pick another active author from the dropdown inside the panel. The choice stays in that browser session and is not part of the link.</li>
+        <li>Page requests never write analytics rows. Events are queued in cache and written by the site health probe. The panel adds still-pending events to the database totals, so an open is counted immediately even before that write happens.</li>
       </ul>
     </section>
 

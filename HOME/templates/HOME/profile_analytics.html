@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block adsense %}{% endblock %}
+{% block title %}Author analytics | {{ project_name }}{% endblock %}
+{% block meta_robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block content %}
+<section class="profile-shell">
+  {% include "HOME/partials/profile_analytics_panel.html" %}
+</section>
+{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'home/css/profile.css' %}?v=20261115-03">
+<link rel="stylesheet" href="{% static 'home/css/profile-analytics.css' %}?v=20261127-01">
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'home/js/htmx.min.js' %}?v=20261106-1" defer></script>
+<script src="{% static 'home/js/profile-analytics.js' %}?v=20261127-01" defer></script>
+{% endblock %}

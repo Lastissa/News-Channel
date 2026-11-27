@@ -16,6 +16,7 @@
 
   var supportEmail = (shell.getAttribute("data-support-email") || "").trim();
   var customerSupportMobile = (shell.getAttribute("data-customer-support-mobile") || "").trim();
+  var authorName = (shell.getAttribute("data-author-name") || "").trim() || "You";
 
   var form = shell.querySelector("[data-editor-form]");
   var headingInput = shell.querySelector("[data-editor-heading]");
@@ -44,8 +45,23 @@
   var archiveRefreshBtn = archiveModal ? archiveModal.querySelector("[data-archive-refresh]") : null;
 
   var PREVIEW_KEY = "abu-editor-preview";
+  var DRAFT_KEY = shell.dataset.draftKey || "";
   var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   var MODAL_CLOSE_MS = 240;
+
+  /* The published values are read from the server-rendered form before the
+     author changes anything, so "revert" does not depend on stale form state. */
+  var PUBLISHED_VALUES = {
+    heading: headingInput ? headingInput.value : "",
+    image: imageInput ? imageInput.value : "",
+    imageInfo: imageInfoInput ? imageInfoInput.value : "",
+    category: categorySelect ? categorySelect.value : "",
+    tocMode: tocModeSelect ? tocModeSelect.value : "0",
+    imageQuality: imageQualityField
+      ? ((imageQualityField.querySelector("select") || {}).value || "")
+      : "",
+    content: contentInput ? contentInput.value : ""
+  };
   var MOBILE_QUERY = window.matchMedia ? window.matchMedia("(max-width: 899.98px)") : { matches: false };
   var pendingPublish = false;
 
@@ -699,32 +715,78 @@
     return shell.dataset.published || "";
   }
 
+  function wordCount(text) {
+    var words = String(text || "").match(/\b\S+\b/g);
+    return words ? words.length : 0;
+  }
+
   function renderPreview() {
     var heading = headingInput.value.trim();
     var imageUrl = selectedImageObjectUrl || imageInput.value.trim();
-    var imageInfo = imageInfoInput.value.trim() || "The image is self explanatory.";
+    var imageInfo = imageInfoInput.value.trim();
     var categoryLabel = currentCategoryLabel();
     var tocMode = tocModeSelect ? parseInt(tocModeSelect.value, 10) || 0 : 0;
     var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode);
+    var kicker = categoryLabel
+      ? '<span class="story-kicker">' + escapeHtml(categoryLabel) + "</span>"
+      : '<span class="story-kicker editor-preview-placeholder">Category</span>';
 
-    var html = '<div class="editor-preview-frame"><article class="story-article no-inner-shell">';
+    /* The preview omits views, likes, share buttons, bookmarks, follow buttons,
+       rails, adverts and comments. The only metric shown is the word count,
+       which is counted from the text currently in the editor. */
+    var html = '<div class="editor-preview-frame">' +
+      '<section class="story-article-shell">' +
+      '<article class="story-article no-inner-shell">' +
+      '<div class="story-reading-layout">' +
+      '<div class="story-reading-column">';
+
     html += '<header class="story-header">';
-    html += '<div class="story-kicker-row"><span class="story-kicker">' + escapeHtml(categoryLabel || "Category") + '</span>';
-    html += '<span class="story-separator">&bull;</span><time>' + escapeHtml(publishedLabel()) + "</time></div>";
-    html += "<h1>" + escapeHtml(heading || "Untitled story") + "</h1>";
-    html += "</header>";
+    html += '<div class="story-kicker-row">' + kicker +
+      '<span class="story-separator">&bull;</span><time>' + escapeHtml(publishedLabel()) + "</time></div>";
+    html += "<h1" + (heading ? "" : ' class="editor-preview-placeholder"') + ">" +
+      escapeHtml(heading || "Untitled story") + "</h1>";
+
+    html += '<div class="story-meta-row">';
+    html += '<div class="author-pill">' +
+      '<span class="author-avatar" aria-hidden="true">' +
+      '<img src="/static/Profile_avatar_placeholder.png" alt="">' +
+      "</span><div><p class=\"meta-label\">By</p>" +
+      '<div class="meta-author-row"><span class="meta-author">' + escapeHtml(authorName) + "</span></div>" +
+      "</div></div>";
+    html += '<div class="story-metrics-group"><div class="story-metrics" aria-label="Story metrics">' +
+      "<span><strong>Word count</strong> " + wordCount(contentInput.value) + "</span>" +
+      "</div></div>";
+    html += "</div></header>";
 
     if (imageUrl) {
       html += '<figure class="story-hero-figure">';
-      html += '<img src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(heading || "Story image") + '" loading="eager" onerror="this.onerror=null;this.src=\'/static/404.jpg\';">';
-      html += "<figcaption>" + escapeHtml(imageInfo) + "</figcaption>";
+      html += '<img src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(heading || "Story image") +
+        '" loading="eager" onerror="this.onerror=null;this.src=\'/static/404.jpg\';">';
+      html += "<figcaption>" + escapeHtml(imageInfo || "No caption added.") + "</figcaption>";
       html += "</figure>";
+    } else {
+      html += '<figure class="story-hero-figure editor-preview-hero-empty">' +
+        '<span class="editor-preview-hero-note">No main image selected yet.</span>' +
+        "</figure>";
     }
 
-    html += '<div class="story-body">';
-    html += bodyHtml || '<p class="editor-preview-empty">Live Preview Plcaeholder Text</p>';
+    html += '<hr class="editor-preview-divider">';
+
+    html += '<div class="story-body" data-story-body>';
+    html += bodyHtml || '<p class="editor-preview-empty">This story has no text yet.</p>';
     html += "</div>";
-    html += "</article></div>";
+
+    html += '<aside class="author-card editor-preview-author-card" aria-label="Author profile preview">';
+    html += '<div class="author-card-main"><div class="author-card-inner">';
+    html += '<div class="author-card-image-wrap">' +
+      '<img src="/static/Profile_avatar_placeholder.png" class="author-card-image" alt="">' +
+      "</div>";
+    html += '<div class="author-card-copy"><p class="author-card-label">Author profile</p>' +
+      "<h3>" + escapeHtml(authorName) + "</h3>" +
+      "<p>Your profile details appear here on the published story.</p></div>";
+    html += "</div></div></aside>";
+
+    html += "</div></div></article></section></div>";
 
     /* The preview pane IS the scroll container, so replacing its html would
        otherwise snap it back to the top on every keystroke. Keep the reader's
@@ -836,6 +898,35 @@
     if (imageFilenameEl) { imageFilenameEl.hidden = true; imageFilenameEl.textContent = ""; }
     if (imageClearBtn) imageClearBtn.hidden = true;
     if (imageQualityField) imageQualityField.hidden = true;
+  }
+
+  /* Returns every editable field, any newly chosen image file, and the local
+     draft to the values the server published. No save request is made here. */
+  function revertToPublished() {
+    clearSelectedImageFile();
+
+    if (headingInput) {
+      headingInput.value = PUBLISHED_VALUES.heading;
+      headingInput.classList.remove("is-error");
+    }
+    imageInput.value = PUBLISHED_VALUES.image;
+    imageInfoInput.value = PUBLISHED_VALUES.imageInfo;
+    contentInput.value = PUBLISHED_VALUES.content;
+    if (categorySelect) categorySelect.value = PUBLISHED_VALUES.category;
+    if (tocModeSelect) tocModeSelect.value = PUBLISHED_VALUES.tocMode;
+
+    if (imageQualityField) {
+      var qualitySelect = imageQualityField.querySelector("select");
+      if (qualitySelect) qualitySelect.value = PUBLISHED_VALUES.imageQuality;
+    }
+
+    if (DRAFT_KEY) {
+      try { window.localStorage.removeItem(DRAFT_KEY); } catch (e) { /* storage unavailable */ }
+    }
+
+    autosizeContent();
+    renderPreview();
+    toast("Reverted to the published story.");
   }
 
   if (uploadBtn && imageFileInput) {
@@ -1037,6 +1128,24 @@
       there is no separate state word to keep in sync. */
   if (tocModeSelect) {
     tocModeSelect.addEventListener("change", schedulePreview);
+  }
+
+  var clearWriteupBtn = shell.querySelector("[data-clear-writeup-btn]");
+  if (clearWriteupBtn) {
+    clearWriteupBtn.addEventListener("click", function () {
+      if (typeof window.AbuEditorClearConfirm !== "function") {
+        toast("The revert confirmation is still loading. Try again in a moment.", "error");
+        return;
+      }
+
+      window.AbuEditorClearConfirm({
+        onConfirm: revertToPublished,
+        title: "Revert to the published story?",
+        message: "Every change and the draft saved in this browser will be replaced with the published values.",
+        secondTitle: "This cannot be undone",
+        secondMessage: "Unsaved edits will be discarded and any newly chosen image file will be removed."
+      });
+    });
   }
 
   renderPreview();

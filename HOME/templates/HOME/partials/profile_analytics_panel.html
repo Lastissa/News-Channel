@@ -1,0 +1,118 @@
+{% comment %}
+  AUTHOR ANALYTICS PANEL. Loaded by HTMX into #profile-content from the green
+  "View analytics" button on the profile, and also rendered directly by the
+  full-page template. Every number belongs to the selected author only.
+{% endcomment %}
+<div class="profile-analytics" data-profile-analytics>
+  <div class="profile-analytics-head">
+    <div>
+      <span class="profile-toolbar-eyebrow">Your account</span>
+      <h2>Author analytics</h2>
+      <p class="profile-analytics-sub">Viewing {{ author_name }}</p>
+    </div>
+    <div class="profile-analytics-actions">
+      {% if is_admin_user %}
+      <label class="profile-analytics-picker">
+        View author
+        <select name="author" hx-get="{{ analytics_url }}" hx-target="#profile-content" hx-swap="innerHTML" hx-trigger="change" hx-indicator="#profile-analytics-loading" hx-vals='{"range": "{{ range_key }}"}' hx-push-url="true">
+          {% for choice in author_choices %}
+          <option value="{{ choice.id }}"{% if choice.id == selected_author_id %} selected{% endif %}>{{ choice.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <button type="button" class="profile-tool" hx-get="{{ profile_url }}" hx-select="#profile-content" hx-target="#profile-content" hx-swap="innerHTML" hx-push-url="true">Back to profile</button>
+    </div>
+  </div>
+
+  <div class="profile-analytics-ranges" role="group" aria-label="Analytics period">
+    <a href="{{ analytics_url }}?range=7" hx-get="{{ analytics_url }}" hx-vals='{"range": "7"}' hx-target="#profile-content" hx-swap="innerHTML" hx-indicator="#profile-analytics-loading" hx-push-url="true"{% if range_key == "7" %} class="is-active" aria-current="true"{% endif %}>7 days</a>
+    <a href="{{ analytics_url }}?range=30" hx-get="{{ analytics_url }}" hx-vals='{"range": "30"}' hx-target="#profile-content" hx-swap="innerHTML" hx-indicator="#profile-analytics-loading" hx-push-url="true"{% if range_key == "30" %} class="is-active" aria-current="true"{% endif %}>30 days</a>
+    <a href="{{ analytics_url }}?range=90" hx-get="{{ analytics_url }}" hx-vals='{"range": "90"}' hx-target="#profile-content" hx-swap="innerHTML" hx-indicator="#profile-analytics-loading" hx-push-url="true"{% if range_key == "90" %} class="is-active" aria-current="true"{% endif %}>90 days</a>
+  </div>
+
+  {% if not has_author_profile %}
+  <p class="profile-analytics-note">This account does not have an author profile yet. Analytics become available once a staff profile is created.</p>
+  {% endif %}
+
+  <div class="profile-analytics-kpis">
+    <div class="profile-analytics-kpi"><span>Stories</span><strong>{{ kpis.stories }}</strong></div>
+    <div class="profile-analytics-kpi"><span>Views</span><strong>{{ kpis.views }}</strong></div>
+    <div class="profile-analytics-kpi"><span>Likes</span><strong>{{ kpis.likes }}</strong></div>
+    <div class="profile-analytics-kpi"><span>Comments</span><strong>{{ kpis.comments }}</strong></div>
+    <div class="profile-analytics-kpi"><span>Bookmarks</span><strong>{{ kpis.bookmarks }}</strong></div>
+    <div class="profile-analytics-kpi"><span>Stories read</span><strong>{{ kpis.reads }}</strong></div>
+  </div>
+
+  <section class="profile-analytics-block" aria-labelledby="analytics-ranks">
+    <h3 id="analytics-ranks">Your rank among authors</h3>
+    <div class="profile-analytics-ranks">
+      {% for rank in ranks %}
+      <article class="profile-analytics-rank">
+        <span class="profile-analytics-rank-label">{{ rank.label }}</span>
+        <strong>#{{ rank.position }}</strong>
+        <span class="profile-analytics-rank-meta">of {{ rank.total }} authors, {{ rank.value }} {{ rank.label|lower }}</span>
+      </article>
+      {% endfor %}
+      <article class="profile-analytics-rank is-overall">
+        <span class="profile-analytics-rank-label">Overall</span>
+        <strong>#{{ overall.position }}</strong>
+        <span class="profile-analytics-rank-meta">of {{ overall.total }} authors, average position {{ overall.average }}</span>
+      </article>
+    </div>
+  </section>
+
+  <section class="profile-analytics-block" aria-labelledby="analytics-sources">
+    <h3 id="analytics-sources">Where your readers came from</h3>
+    <p class="profile-analytics-note">From the Referer header on each story view. UTM values are used only when there is no referrer.</p>
+    <div class="profile-analytics-sources">
+      {% for row in source_rows %}
+      <div class="profile-analytics-source">
+        <span class="profile-analytics-source-name">{{ row.label }}</span>
+        <span class="profile-analytics-source-bar"><i style="width:{{ row.width }}%"></i></span>
+        <span class="profile-analytics-source-count">{{ row.count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="profile-analytics-google">
+      {% for row in google_rows %}
+      <div class="profile-analytics-google-row">
+        <span>{{ row.label }}</span>
+        <strong>{{ row.count }}</strong>
+      </div>
+      {% empty %}
+      <p class="profile-analytics-note">No Google search visits recorded for this period.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="profile-analytics-block" aria-labelledby="analytics-stories">
+    <h3 id="analytics-stories">Your stories</h3>
+    <div class="profile-analytics-table-wrap">
+      <table class="profile-analytics-table" data-sort-table>
+        <thead>
+          <tr>
+            <th><button type="button" data-sort-key="heading">Story</button></th>
+            <th><button type="button" data-sort-key="date">Published</button></th>
+            <th><button type="button" data-sort-key="views">Views</button></th>
+            <th><button type="button" data-sort-key="likes">Likes</button></th>
+            <th><button type="button" data-sort-key="comments">Comments</button></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for story in story_table %}
+          <tr data-heading="{{ story.heading }}" data-date="{{ story.date|date:'U' }}" data-views="{{ story.views }}" data-likes="{{ story.likes }}" data-comments="{{ story.comments }}">
+            <td><a href="{{ story.url }}">{{ story.heading }}</a></td>
+            <td>{{ story.date|date:"j M Y" }}</td>
+            <td>{{ story.views }}</td>
+            <td>{{ story.likes }}</td>
+            <td>{{ story.comments }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">No stories published in this period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

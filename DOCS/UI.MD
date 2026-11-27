@@ -81,3 +81,23 @@ Template `HOME/templates/HOME/profile.html`, styles `HOME/static/home/css/profil
 - Picking a file never uploads it. It opens the Adjust photo window: drag to reposition, slider, mouse wheel or pinch to resize, live circular preview. Nothing is sent until Confirm upload is pressed. Cancel or Escape throws the choice away.
 - What is sent is the framed square, cut in the browser to a 512 x 512 JPEG, so the file is small and is exactly what the preview showed.
 - Each account owns one avatar asset in Cloudinary (`abureport/avatars/user_<id>`). A new upload overwrites it and never adds another image (see `SERVICE_INTERNAL/images.py`).
+
+### AUTHOR ANALYTICS TAB (`/profile/analytics/`)
+Templates `HOME/templates/HOME/profile.html`, `HOME/templates/HOME/profile_analytics.html` and `HOME/templates/HOME/partials/profile_analytics_panel.html`, styles `HOME/static/home/css/profile-analytics.css`, script `HOME/static/home/js/profile-analytics.js`, data builder `HOME/author_analytics.py`.
+- The green **View analytics** button sits first in the profile jump links. It uses `--brand` for its border and glow, keeps the toolbar and jump links in place, and fetches the panel only on the first open. Later clicks jump to the panel already on the page. Returning to the profile restores the lazy fetch for the next visit.
+- HTMX swaps `#profile-content` when the header says `HX-Request: true`; a direct URL renders a complete page. `hx-push-url` keeps the browser Back button working across the panel, ranges and the profile.
+- The panel shows six KPI tiles, a sortable own-story table, three rank cards, an overall position, a source breakdown and two Google name rows. 7, 30 and 90 days filter all of them. Admin users get an author dropdown whose value is kept only in the session.
+- Source labels come from `SERVICE_INTERNAL/traffic.py`. The screen states that Referer is the primary signal and UTM is the fallback. Every displayed count comes from real engagement rows plus pending cache rows. There is no chart and no invented sample data.
+
+### EDITOR PREVIEW AND CLEAR CONTROLS (`/add-news/`, `/profile/stories/<id>/edit/`)
+Templates `HOME/templates/HOME/add_news.html` and `HOME/templates/HOME/edit_news.html`; scripts `HOME/static/home/js/add-news-editor.js`, `HOME/static/home/js/edit-news-editor.js` and `HOME/static/home/js/editor-clear-writeup.js`; styles `HOME/static/home/css/add-news.css` and `blog/css/story-detail.css`.
+- The preview reuses the published story layout and stylesheet. Empty values become plain placeholder labels and the word count is the only metric. Views, likes, share controls, bookmarks, follows, rails, adverts and comments are omitted because they are live page features, not draft content.
+- The add page image row now carries the clear button in the place once used by the duplicate image row load button. The toolbar keeps its own **Load news** button and file input.
+- Clear and revert both use the shared two-step dialog. Step one is Yes or No. Step two repeats the warning, shows "CALM DOWN AND READ IT PROPERLY", drains a bar for 1.5 seconds, and disables Yes until it finishes. No, Escape or a backdrop click changes nothing.
+- Add clears every editor field, the selected upload and the local draft. Edit reverts every editable field, the selected upload and the local draft to the values rendered from the published story. Neither action sends a save request.
+
+### IN-STORY ADVERT POPUP
+JSON endpoint `blog:story_ads`, script `BLOG/static/blog/js/story-ads.js`, pool loader and cache key in `BLOG/views.py`.
+- The popup is built with DOM nodes and textContent only. An advert with a real `AdvertReference` receives `view_url` and `click_url` pointing at the existing public tracking endpoints.
+- The view pixel is fired only after the popup has been appended to the page. A `t` query value stops the browser reusing a cached GIF.
+- A click uses the tracked `click_url` when it exists. Adverts without a reference keep their old landing or external link and are not counted in the database.

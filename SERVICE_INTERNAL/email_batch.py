@@ -23,6 +23,7 @@ from HOME.models import CategorySubscription
 from SERVICE_INTERNAL.abstract import info_logger, error_logger
 from SERVICE_INTERNAL.config import About
 from SERVICE_INTERNAL.email_single import _EMAIL_EXECUTOR, _build_email_html
+from SERVICE_INTERNAL.traffic import tag_internal_url
 from STAFF.models import AuthorFollow
 
 BATCH_CHUNK_SIZE = 100  # Resend's hard limit per batch API call
@@ -183,7 +184,7 @@ def _try_send_new_story_batch_email(blog: object):
 
     safe_heading = " ".join(blog.heading.splitlines())
     subject = f"New from {blog.author_name}: {safe_heading}"
-    story_url = f"{About.domain}/story/{blog.slug}/"
+    story_url = tag_internal_url(f"{About.domain.rstrip('/')}/story/{blog.slug}/")
 
     def build_html_for(email):
         main_content = (

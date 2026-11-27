@@ -24,6 +24,8 @@
 
   var customerSupportMobile = (shell.getAttribute("data-customer-support-mobile") || "").trim();
 
+  var authorName = (shell.getAttribute("data-author-name") || "").trim() || "You";
+
 
 
   var form = shell.querySelector("[data-editor-form]");
@@ -135,6 +137,14 @@
   var DRAFT_KEY = shell.dataset.draftKey;
 
   var DRAFT_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+
+  /* Captured before any local draft is restored: "clear write-up" returns the
+     form to its empty publishing state, not to whatever was autosaved. */
+  var DEFAULT_CATEGORY = categorySelect ? categorySelect.value : "";
+  var DEFAULT_TOC_MODE = tocModeSelect ? tocModeSelect.value : "0";
+  var DEFAULT_IMAGE_QUALITY = imageQualityField
+    ? (imageQualityField.querySelector("select") || {}).value || ""
+    : "";
 
   var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -351,6 +361,36 @@
       setDraftStatus("Story published, but its local draft could not be cleared.", true);
 
     }
+
+  }
+
+
+  /* Clears the whole write-up without going through saveDraft(), otherwise the
+     empty state would immediately be autosaved back into localStorage. */
+  function clearWriteup() {
+
+    if (headingInput) {
+      headingInput.value = "";
+      headingInput.classList.remove("is-error");
+    }
+
+    imageInput.value = "";
+    imageInfoInput.value = "";
+    contentInput.value = "";
+
+    if (categorySelect) categorySelect.value = DEFAULT_CATEGORY;
+    if (tocModeSelect) tocModeSelect.value = DEFAULT_TOC_MODE;
+
+    if (imageQualityField) {
+      var qualitySelect = imageQualityField.querySelector("select");
+      if (qualitySelect) qualitySelect.value = DEFAULT_IMAGE_QUALITY;
+    }
+
+    clearSelectedImageFile();
+    clearDraft();
+    autosizeContent();
+    renderPreview();
+    toast("Write-up cleared.");
 
   }
 
@@ -1746,10 +1786,9 @@
 
 
 
-  function todayLabel() {
-
-    return new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-
+  function wordCount(text) {
+    var words = String(text || "").match(/\b\S+\b/g);
+    return words ? words.length : 0;
   }
 
 
@@ -1760,7 +1799,7 @@
 
     var imageUrl = selectedImageObjectUrl || imageInput.value.trim();
 
-    var imageInfo = imageInfoInput.value.trim() || "The image is self explanatory.";
+    var imageInfo = imageInfoInput.value.trim();
 
     var categoryLabel = currentCategoryLabel();
 
@@ -1768,43 +1807,66 @@
 
     var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode);
 
+    var kicker = categoryLabel
+      ? '<span class="story-kicker">' + escapeHtml(categoryLabel) + "</span>"
+      : '<span class="story-kicker editor-preview-placeholder">Category</span>';
 
-
-    var html = '<div class="editor-preview-frame"><article class="story-article no-inner-shell">';
+    /* The preview deliberately omits views, likes, share buttons, bookmarks,
+       follow buttons, rails, adverts and comments. The only metric shown is the
+       one that can be counted honestly from the draft. */
+    var html = '<div class="editor-preview-frame">' +
+      '<section class="story-article-shell">' +
+      '<article class="story-article no-inner-shell">' +
+      '<div class="story-reading-layout">' +
+      '<div class="story-reading-column">';
 
     html += '<header class="story-header">';
+    html += '<div class="story-kicker-row">' + kicker +
+      '<span class="story-separator">&bull;</span><time>Not published yet</time></div>';
+    html += "<h1" + (heading ? "" : ' class="editor-preview-placeholder"') + ">" +
+      escapeHtml(heading || "Untitled story") + "</h1>";
 
-    html += '<div class="story-kicker-row"><span class="story-kicker">' + escapeHtml(categoryLabel || "Category") + '</span>';
-
-    html += '<span class="story-separator">&bull;</span><time>' + escapeHtml(todayLabel()) + "</time></div>";
-
-    html += "<h1>" + escapeHtml(heading || "Untitled story") + "</h1>";
-
-    html += "</header>";
-
-
+    html += '<div class="story-meta-row">';
+    html += '<div class="author-pill">' +
+      '<span class="author-avatar" aria-hidden="true">' +
+      '<img src="/static/Profile_avatar_placeholder.png" alt="">' +
+      "</span><div><p class=\"meta-label\">By</p>" +
+      '<div class="meta-author-row"><span class="meta-author">' + escapeHtml(authorName) + "</span></div>" +
+      "</div></div>";
+    html += '<div class="story-metrics-group"><div class="story-metrics" aria-label="Story metrics">' +
+      "<span><strong>Word count</strong> " + wordCount(contentInput.value) + "</span>" +
+      "</div></div>";
+    html += "</div></header>";
 
     if (imageUrl) {
-
       html += '<figure class="story-hero-figure">';
-
-      html += '<img src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(heading || "Story image") + '" loading="eager" onerror="this.onerror=null;this.src=\'/static/404.jpg\';">';
-
-      html += "<figcaption>" + escapeHtml(imageInfo) + "</figcaption>";
-
+      html += '<img src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(heading || "Story image") +
+        '" loading="eager" onerror="this.onerror=null;this.src=\'/static/404.jpg\';">';
+      html += "<figcaption>" + escapeHtml(imageInfo || "No caption added yet.") + "</figcaption>";
       html += "</figure>";
-
+    } else {
+      html += '<figure class="story-hero-figure editor-preview-hero-empty">' +
+        '<span class="editor-preview-hero-note">No main image selected yet.</span>' +
+        "</figure>";
     }
 
+    html += '<hr class="editor-preview-divider">';
 
-
-    html += '<div class="story-body">';
-
-    html += bodyHtml || '<p class="editor-preview-empty">Live Preview Plcaeholder Text</p>';
-
+    html += '<div class="story-body" data-story-body>';
+    html += bodyHtml || '<p class="editor-preview-empty">Nothing written yet. Start typing in the editor to see the story here.</p>';
     html += "</div>";
 
-    html += "</article></div>";
+    html += '<aside class="author-card editor-preview-author-card" aria-label="Author profile preview">';
+    html += '<div class="author-card-main"><div class="author-card-inner">';
+    html += '<div class="author-card-image-wrap">' +
+      '<img src="/static/Profile_avatar_placeholder.png" class="author-card-image" alt="">' +
+      "</div>";
+    html += '<div class="author-card-copy"><p class="author-card-label">Author profile</p>' +
+      "<h3>" + escapeHtml(authorName) + "</h3>" +
+      "<p>Your profile details appear here on the published story.</p></div>";
+    html += "</div></div></aside>";
+
+    html += "</div></div></article></section></div>";
 
 
 
@@ -2951,6 +3013,34 @@
     var imageQualitySelect = imageQualityField.querySelector("select");
 
     if (imageQualitySelect) imageQualitySelect.addEventListener("change", saveDraft);
+
+  }
+
+
+
+  var clearWriteupBtn = shell.querySelector("[data-clear-writeup-btn]");
+
+  if (clearWriteupBtn) {
+
+    clearWriteupBtn.addEventListener("click", function () {
+
+      if (typeof window.AbuEditorClearConfirm !== "function") {
+
+        toast("The clear confirmation is still loading. Try again in a moment.", "error");
+
+        return;
+
+      }
+
+      window.AbuEditorClearConfirm({
+        onConfirm: clearWriteup,
+        title: "Clear this write-up?",
+        message: "Every editor field and the draft saved in this browser will be cleared.",
+        secondTitle: "This cannot be undone",
+        secondMessage: "The editor will be empty. Already published stories are not affected."
+      });
+
+    });
 
   }
 

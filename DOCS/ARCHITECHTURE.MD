@@ -5,6 +5,9 @@ Project blueprint and decisions are documented here and on every update made to 
 
   * [Main scope](#main-scope)
   * [Sepration of concern](#sepration-of-concern)
+  * [Analytics write path](#analytics-write-path)
+  * [Traffic source keys](#traffic-source-keys)
+  * [Generated internal links](#generated-internal-links)
 
   
 ## MAIN SCOPE
@@ -42,6 +45,21 @@ api-v1/
 
 ## USER INTERFACE STRUCTURE
 The ui target and response perfectly to both mobile and desktop, with mobile first css and all templates extending the base template [structure in ui.md](UI.MD)
+
+## ANALYTICS WRITE PATH
+Page requests do not write analytics rows. They append a small event to a Redis-backed cache list under `analytics:pending:story_views:v1` or `analytics:pending:advert_events:v1`. Appends take a short lock (`analytics:append:lock`); the site health probe takes the flush lock (`analytics:flush:lock`) and writes the batch. `NoName/urls.py::health` stays public and always answers `{"message": "success", "ip": ...}`. A flush failure is logged and the failed rows stay in cache for the next probe, so the health response never changes and a row is never written twice.
+
+`SERVICE_INTERNAL/analytics_buffer.py` owns the queues, the timestamp-preserving flush and the read helpers. `SERVICE_INTERNAL/abstract.py` still supplies the client IP and bot check. Only one schema field was added for this work: `BLOG.StoryView.source` in migration `0023_storyview_source.py` (default `direct`, indexed). No new story advert table was introduced.
+
+Both read paths combine cache and database:
+- `BLOG.views.StoryDetailView` keeps the immediate `Blog.views` counter and queues a timestamped `StoryView` in the same dedupe branch. `HOME/author_analytics.py` adds pending rows to DB rows before it counts KPIs, ranks, sources and the own-story table.
+- `Partner.tracking.record_advert_event` buffers a view or click under a real `AdvertReference`. `Partner/advert_analytics.py` accepts pending rows alongside `AdvertEvent` rows, so the advertiser dashboard and the Ads desk modal show the same totals before and after the flush. A story advert with no reference is cache-only and is discarded at flush time because there is no generic event table for it.
+
+## TRAFFIC SOURCE KEYS
+`SERVICE_INTERNAL/traffic.py` is the single source of truth for source keys and labels. The Referer header is checked first, so a share that strips UTM values is still classified. `utm_source` is a fallback only when there is no usable referrer. Keys are short because `AdvertEvent.source` is a 16 character column: `google`, `google_name`, `google_abu`, `facebook`, `whatsapp`, `x_twitter`, `instagram`, `linkedin`, `bing`, `abureport`, `direct` and `other`. A Google query that contains the author's full name gets `google_name`; adding "abureport" gets `google_abu`. Anything unknown is folded into `other` in the breakdown so totals stay honest.
+
+## GENERATED INTERNAL LINKS
+`tag_internal_url()` adds `utm_source=abureport` to links this site generates and returns: author analytics story rows, profile comment links, profile most-viewed links, category recommendations and new-story emails. It leaves an existing `utm_source` alone and preserves fragments. Ordinary template story cards are not rewritten, so navigation inside the site stays a normal internal visit and is still labelled Abureport by the Referer check.
 
 ## FOOTER
 

@@ -38,6 +38,7 @@ from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Category, Comment, get_category_choices
 from HOME.views import _release_story_image, _resolve_page_number
 from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, invalidate_cache, is_rate_limited
+from SERVICE_INTERNAL.analytics_buffer import pending_advert_event_rows
 from SERVICE_INTERNAL.account_lifecycle import hibernate_account, restore_account
 from ADMIN.models import AccountActionLog
 from SERVICE_INTERNAL.config import StaffConfig
@@ -3980,6 +3981,7 @@ class AdvertReferenceAnalyticsModalView(View):
             reference.events.all(),
             range_key,
             element_prefix=f"ads-{reference.pk}",
+            pending_rows=pending_advert_event_rows([reference.pk]),
         )
         return render(
             request,

@@ -29,6 +29,19 @@ handler500 = "HOME.views.handler500"
 
 
 def health(request):
+    #   Analytics events are buffered in the cache while readers browse. A
+    #   health probe is the flush point: one bounded batch is written to the
+    #   database here so page requests never pay for analytics writes. A
+    #   failure is logged and the batch stays queued for the next probe; the
+    #   health response itself is unchanged.
+    try:
+        from SERVICE_INTERNAL.analytics_buffer import flush_pending_events
+
+        flush_pending_events()
+    except Exception as exc:
+        from SERVICE_INTERNAL.abstract import error_logger
+
+        error_logger(msg=f"HEALTH ANALYTICS FLUSH FAILED: {exc}")
     try:
         ip = get_client_ip(request) or ""
     except Exception:

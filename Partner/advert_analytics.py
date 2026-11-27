@@ -40,18 +40,39 @@ def _window(range_key, now=None):
     return timezone.make_aware(datetime.combine(start_date, time.min), tz), local_now.date()
 
 
-def build_advert_analytics(events, range_key=DEFAULT_RANGE, now=None, element_prefix="advert"):
-    """Turn an AdvertEvent queryset into two ready-to-draw chart payloads.
+def build_advert_analytics(events, range_key=DEFAULT_RANGE, now=None, element_prefix="advert", pending_rows=None):
+    """Turn advert events into two ready-to-draw chart payloads.
 
     ``events`` must already be scoped to the advertiser/staff being served.
-    Direct traffic is folded into "Other sources" so the click pie has exactly
-    the two slices requested: From Abureport and everything else.
+    ``pending_rows`` are the still-cached events from
+    :func:`SERVICE_INTERNAL.analytics_buffer.pending_advert_event_rows`; they use
+    the same shape and carry their original timestamp, so a dashboard drawn
+    before the /health flush agrees with one drawn after it. Direct traffic is
+    folded into "Other sources" so the click pie has exactly the two slices
+    requested: From Abureport and everything else.
     """
     range_key = normalize_range(range_key)
     start_dt, end_date = _window(range_key, now)
     tz = timezone.get_current_timezone()
 
-    rows = list(events.values_list("created_at", "event_type", "source"))
+    if hasattr(events, "values_list"):
+        rows = list(events.values_list("created_at", "event_type", "source"))
+    else:
+        rows = [
+            (row.get("created_at"), row.get("event_type"), row.get("source") or AdvertEvent.SOURCE_DIRECT)
+            for row in events
+            if isinstance(row, dict)
+        ]
+    for row in pending_rows or []:
+        if not isinstance(row, dict):
+            continue
+        rows.append(
+            (
+                row.get("created_at"),
+                row.get("event_type"),
+                row.get("source") or AdvertEvent.SOURCE_DIRECT,
+            )
+        )
     if start_dt is not None:
         rows = [row for row in rows if row[0] is None or row[0] >= start_dt]
 
