@@ -1632,6 +1632,17 @@
 
 
 
+  /* The published story adds this final TOC row; mirror its capitalisation. */
+  function tocAuthorName(value) {
+
+    var name = String(value || "").trim();
+
+    return name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : "";
+
+  }
+
+
+
   function tocTree(headings) {
 
     var roots = [];
@@ -1692,7 +1703,7 @@
 
 
 
-  function enhanceStoryBody(htmlBody, tocMode) {
+  function enhanceStoryBody(htmlBody, tocMode, authorName) {
 
     var mode = parseInt(tocMode, 10) || 0;
 
@@ -1733,6 +1744,16 @@
 
 
     if (!headings.length) return withIds;
+
+
+
+    var authorLabel = tocAuthorName(authorName);
+
+    if (authorLabel) {
+
+      headings.push({ level: 2, slug: "about-author", text: "About Author - " + authorLabel });
+
+    }
 
 
 
@@ -1805,7 +1826,7 @@
 
     var tocMode = tocModeSelect ? parseInt(tocModeSelect.value, 10) || 0 : 0;
 
-    var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode);
+    var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode, authorName);
 
     var kicker = categoryLabel
       ? '<span class="story-kicker">' + escapeHtml(categoryLabel) + "</span>"
@@ -1821,8 +1842,8 @@
       '<div class="story-reading-column">';
 
     html += '<header class="story-header">';
-    html += '<div class="story-kicker-row">' + kicker +
-      '<span class="story-separator">&bull;</span><time>Not published yet</time></div>';
+    html += '<div class="story-kicker-row"><time>Not published yet</time>' +
+      '<span class="story-separator">&bull;</span>' + kicker + "</div>";
     html += "<h1" + (heading ? "" : ' class="editor-preview-placeholder"') + ">" +
       escapeHtml(heading || "Untitled story") + "</h1>";
 
@@ -1856,7 +1877,7 @@
     html += bodyHtml || '<p class="editor-preview-empty">Nothing written yet. Start typing in the editor to see the story here.</p>';
     html += "</div>";
 
-    html += '<aside class="author-card editor-preview-author-card" aria-label="Author profile preview">';
+    html += '<aside class="author-card editor-preview-author-card" id="about-author" aria-label="Author profile preview">';
     html += '<div class="author-card-main"><div class="author-card-inner">';
     html += '<div class="author-card-image-wrap">' +
       '<img src="/static/Profile_avatar_placeholder.png" class="author-card-image" alt="">' +

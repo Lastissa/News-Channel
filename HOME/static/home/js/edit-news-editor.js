@@ -322,9 +322,9 @@
   var fileTokenRe = /^filel\s+(\S+)(?:\s+(.*))?$/;
 
   var IMG_SIDE_CLASSES = {
-    imgl: "story-inline-img-left",
-    imgr: "story-inline-img-right",
-    imgc: "story-inline-img-center"
+    imgl: "story-inline-fig-left",
+    imgr: "story-inline-fig-right",
+    imgc: "story-inline-fig-center"
   };
 
   /* INLINE VIDEO TOKEN: "vidl URL caption" / "vidr URL caption" (floated,
@@ -353,9 +353,13 @@
   }
 
   function renderInlineImage(direction, url, altText) {
-    var alt = (altText || "").trim() || imageFilenameFromUrl(url);
-    var sideClass = IMG_SIDE_CLASSES[direction] || "story-inline-img-left";
-    return '<img class="story-inline-img ' + sideClass + '" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">';
+    var caption = (altText || "").trim();
+    var alt = caption || imageFilenameFromUrl(url);
+    var figClass = IMG_SIDE_CLASSES[direction] || "story-inline-fig-left";
+    return '<figure class="story-inline-fig ' + figClass + '">' +
+      '<img class="story-inline-img" src="' + escapeAttr(url) + '" alt="' + escapeAttr(alt) + '" loading="lazy">' +
+      (caption ? "<figcaption>" + escapeHtml(caption) + "</figcaption>" : "") +
+      "</figure>";
   }
 
   function fileExtensionFromUrl(url) {
@@ -632,6 +636,12 @@
     return value.replace(/^[-_]+|[-_]+$/g, "");
   }
 
+  /* The published story adds this final TOC row; mirror its capitalisation. */
+  function tocAuthorName(value) {
+    var name = String(value || "").trim();
+    return name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : "";
+  }
+
   function tocTree(headings) {
     var roots = [];
     var stack = [];
@@ -662,7 +672,7 @@
     }).join("");
   }
 
-  function enhanceStoryBody(htmlBody, tocMode) {
+  function enhanceStoryBody(htmlBody, tocMode, authorName) {
     var mode = parseInt(tocMode, 10) || 0;
     if (!htmlBody || !mode) return htmlBody;
 
@@ -683,6 +693,11 @@
     });
 
     if (!headings.length) return withIds;
+
+    var authorLabel = tocAuthorName(authorName);
+    if (authorLabel) {
+      headings.push({ level: 2, slug: "about-author", text: "About Author - " + authorLabel });
+    }
 
     var branchesOpen = mode === 3;
     var shellOpen = (mode === 2 || mode === 3) ? " open" : "";
@@ -726,7 +741,7 @@
     var imageInfo = imageInfoInput.value.trim();
     var categoryLabel = currentCategoryLabel();
     var tocMode = tocModeSelect ? parseInt(tocModeSelect.value, 10) || 0 : 0;
-    var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode);
+    var bodyHtml = enhanceStoryBody(parseStoryContent(contentInput.value), tocMode, authorName);
     var kicker = categoryLabel
       ? '<span class="story-kicker">' + escapeHtml(categoryLabel) + "</span>"
       : '<span class="story-kicker editor-preview-placeholder">Category</span>';
@@ -741,8 +756,8 @@
       '<div class="story-reading-column">';
 
     html += '<header class="story-header">';
-    html += '<div class="story-kicker-row">' + kicker +
-      '<span class="story-separator">&bull;</span><time>' + escapeHtml(publishedLabel()) + "</time></div>";
+    html += '<div class="story-kicker-row"><time>' + escapeHtml(publishedLabel()) + "</time>" +
+      '<span class="story-separator">&bull;</span>' + kicker + "</div>";
     html += "<h1" + (heading ? "" : ' class="editor-preview-placeholder"') + ">" +
       escapeHtml(heading || "Untitled story") + "</h1>";
 
@@ -776,7 +791,7 @@
     html += bodyHtml || '<p class="editor-preview-empty">This story has no text yet.</p>';
     html += "</div>";
 
-    html += '<aside class="author-card editor-preview-author-card" aria-label="Author profile preview">';
+    html += '<aside class="author-card editor-preview-author-card" id="about-author" aria-label="Author profile preview">';
     html += '<div class="author-card-main"><div class="author-card-inner">';
     html += '<div class="author-card-image-wrap">' +
       '<img src="/static/Profile_avatar_placeholder.png" class="author-card-image" alt="">' +

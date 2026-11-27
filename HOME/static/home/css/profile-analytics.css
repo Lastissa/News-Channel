@@ -3,6 +3,8 @@
    themes without hard-coded hex values. */
 
 .profile-jump-analytics {
+  flex: none;
+  white-space: nowrap;
   border: 1px solid var(--brand);
   border-radius: var(--radius-s);
   background: var(--brand-wash);

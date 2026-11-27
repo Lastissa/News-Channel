@@ -202,8 +202,11 @@
 
         document.body.appendChild(built.popup);
 
+        /* Two frames: append paints the popup first, then the view is sent. */
         window.requestAnimationFrame(function () {
-          recordView(ready.ad.view_url);
+          window.requestAnimationFrame(function () {
+            recordView(ready.ad.view_url);
+          });
         });
 
         built.close.addEventListener("click", leave);

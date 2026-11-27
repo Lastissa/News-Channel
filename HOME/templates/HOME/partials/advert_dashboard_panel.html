@@ -141,8 +141,8 @@
         {% for event in recent_events %}
         <li>
           <div>
-            <strong>{{ event.get_event_type_display }}</strong>
-            <span class="ads-list-code">{{ event.reference.reference }}</span>
+            <strong>{{ event.label }}</strong>
+            <span class="ads-list-code">{{ event.reference_code }}</span>
           </div>
           <time class="ads-list-meta" datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"M d, H:i" }}</time>
         </li>

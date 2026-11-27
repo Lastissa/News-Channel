@@ -22,6 +22,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from SERVICE_INTERNAL.abstract import error_logger, info_logger
+from SERVICE_INTERNAL.traffic import SOURCE_ABUREPORT
 
 STORY_VIEW_KEY = "analytics:pending:story_views:v1"
 ADVERT_EVENT_KEY = "analytics:pending:advert_events:v1"
@@ -151,6 +152,31 @@ def pending_advert_event_rows(reference_ids=None):
             }
         )
     return rows
+
+
+def pending_advert_event_counts(reference_ids=None):
+    """Pending counts by reference id, shaped like the dashboard annotations.
+
+    This lets reference cards show the same numbers as the chart before
+    ``/health`` has written the queued rows to the database.
+    """
+    counts = {}
+    for row in pending_advert_event_rows(reference_ids):
+        reference_id = str(row.get("reference_id") or "")
+        bucket = counts.setdefault(
+            reference_id,
+            {"view": 0, "click": 0, "abureport_click": 0, "other_click": 0},
+        )
+        event_type = row.get("event_type")
+        if event_type == "view":
+            bucket["view"] += 1
+        elif event_type == "click":
+            bucket["click"] += 1
+            if row.get("source") == SOURCE_ABUREPORT:
+                bucket["abureport_click"] += 1
+            else:
+                bucket["other_click"] += 1
+    return counts
 
 
 def _drop_resolved(key, resolved_ids):

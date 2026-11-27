@@ -18,6 +18,7 @@ from SERVICE_INTERNAL.analytics_buffer import (
     buffer_advert_event,
     buffer_story_view,
     flush_pending_events,
+    pending_advert_event_counts,
     pending_advert_events,
     pending_story_views,
 )
@@ -112,6 +113,20 @@ class TrafficSourceTests(TestCase):
         )
         self.assertEqual(classify_request_source(factory.get("/")), "direct")
 
+    def test_unknown_referrer_falls_back_to_utm(self):
+        request = RequestFactory().get(
+            "/",
+            {"utm_source": "whatsapp"},
+            HTTP_REFERER="https://news.example.net/story",
+        )
+
+        self.assertEqual(classify_request_source(request), SOURCE_WHATSAPP)
+
+    def test_whatsapp_short_link_referrer_is_whatsapp(self):
+        request = RequestFactory().get("/", HTTP_REFERER="https://wa.me/2348012345678")
+
+        self.assertEqual(classify_request_source(request), SOURCE_WHATSAPP)
+
     def test_tagging_generated_links_preserves_other_query_parts(self):
         self.assertEqual(
             tag_internal_url("/story/one/?utm_medium=email#top"),
@@ -155,6 +170,28 @@ class AnalyticsBufferTests(TestCase):
         self.assertEqual(row.user_id, self.author.pk)
         self.assertLess(abs((row.created_at - moment).total_seconds()), 2)
         self.assertEqual(pending_story_views(), [])
+
+    def test_health_keeps_its_response_with_a_non_form_post_body(self):
+        response = self.client.post(
+            "/health", data="not-a-form-body", content_type="text/plain"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(set(payload), {"message", "ip"})
+        self.assertEqual(payload["message"], "success")
+
+    def test_pending_advert_counts_include_cache_only_events(self):
+        buffer_advert_event(11, "view", "google")
+        buffer_advert_event(11, "click", "abureport")
+        buffer_advert_event(12, "click", "facebook")
+
+        counts = pending_advert_event_counts([11, 12])
+
+        self.assertEqual(counts["11"]["view"], 1)
+        self.assertEqual(counts["11"]["click"], 1)
+        self.assertEqual(counts["11"]["abureport_click"], 1)
+        self.assertEqual(counts["12"]["other_click"], 1)
 
     def test_a_failed_write_keeps_the_event_for_the_next_probe(self):
         buffer_story_view(self.story.pk, None, SOURCE_FACEBOOK)

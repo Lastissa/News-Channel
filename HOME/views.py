@@ -88,7 +88,10 @@ from SERVICE_INTERNAL.images import (
     upload_news_image,
     upload_profile_image,
 )
-from SERVICE_INTERNAL.analytics_buffer import pending_advert_event_rows
+from SERVICE_INTERNAL.analytics_buffer import (
+    pending_advert_event_counts,
+    pending_advert_event_rows,
+)
 from SERVICE_INTERNAL.indexnow import ping_indexnow
 from SERVICE_INTERNAL.permissions import admin_only, staff_only
 from SERVICE_INTERNAL.sessions import drop_sessions_for, drop_single_session, describe_device, live_sessions_for
@@ -2203,13 +2206,46 @@ class AdvertiserDashboardView(View):
         source_rows = analytics_context["source_rows"]
 
         reference_ids = [row.pk for row in analytics_rows]
-        recent_events = (
-            AdvertEvent.objects.filter(reference_id__in=reference_ids)
-            .select_related("reference")
-            .order_by("-created_at")[:8]
-            if reference_ids
-            else []
-        )
+        pending_counts = pending_advert_event_counts(reference_ids)
+        for row in analytics_rows:
+            counts = pending_counts.get(str(row.pk), {})
+            row.view_total += counts.get("view", 0)
+            row.click_total += counts.get("click", 0)
+            row.abureport_click_total += counts.get("abureport_click", 0)
+            row.other_click_total += counts.get("other_click", 0)
+
+        recent_events = []
+        if reference_ids:
+            reference_codes = {str(row.pk): str(row.reference) for row in analytics_rows}
+            event_labels = dict(AdvertEvent.EVENT_CHOICES)
+            for event in (
+                AdvertEvent.objects.filter(reference_id__in=reference_ids)
+                .select_related("reference")
+                .order_by("-created_at")[:8]
+            ):
+                recent_events.append(
+                    {
+                        "label": event.get_event_type_display(),
+                        "reference_code": event.reference.reference,
+                        "created_at": event.created_at,
+                    }
+                )
+            for row in pending_advert_event_rows(reference_ids):
+                event_type = row.get("event_type") or AdvertEvent.EVENT_VIEW
+                recent_events.append(
+                    {
+                        "label": event_labels.get(event_type, str(event_type).title()),
+                        "reference_code": reference_codes.get(
+                            str(row.get("reference_id") or ""), ""
+                        ),
+                        "created_at": row.get("created_at"),
+                    }
+                )
+            recent_events.sort(
+                key=lambda item: item.get("created_at") or timezone.now(),
+                reverse=True,
+            )
+            recent_events = recent_events[:8]
 
         latest_reference = reference_rows[0] if reference_rows else None
         business_name = (

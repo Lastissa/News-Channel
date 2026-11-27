@@ -18,7 +18,7 @@ from django.http import HttpResponse
 
 from SERVICE_INTERNAL.abstract import get_client_ip, is_bot_request
 from SERVICE_INTERNAL.analytics_buffer import buffer_advert_event
-from SERVICE_INTERNAL.traffic import classify_request_source
+from SERVICE_INTERNAL.traffic import SOURCE_ABUREPORT, SOURCE_DIRECT, classify_request_source
 
 from .models import AdvertEvent, AdvertReference
 
@@ -46,30 +46,18 @@ def hash_ip(request) -> str:
 
 
 def classify_traffic(request) -> str:
-    """On-site, external, or direct.
+    """Legacy three-bucket view of the canonical source classifier.
 
-    ``utm_source=abureport`` is the marker our own links add. Any other UTM
-    source is external. With no UTM, a referrer from our own host is internal,
-    a different host is external, and no referrer at all is direct.
+    Kept for any older caller that still expects the AdvertEvent constants.
+    New analytics code should use classify_request_source() directly so the
+    same Referer-first keys are written everywhere.
     """
-    utm_source = (request.GET.get("utm_source") or "").strip().lower()
-    if utm_source == AdvertEvent.SOURCE_ABUREPORT:
+    source = classify_request_source(request)
+    if source == SOURCE_ABUREPORT:
         return AdvertEvent.SOURCE_ABUREPORT
-    if utm_source:
-        return AdvertEvent.SOURCE_EXTERNAL
-
-    referrer = (request.META.get("HTTP_REFERER") or "").strip()
-    if referrer:
-        try:
-            referrer_host = (urlsplit(referrer).netloc or "").lower()
-            own_host = (request.get_host() or "").lower()
-        except Exception:
-            referrer_host = own_host = ""
-        if referrer_host and referrer_host == own_host:
-            return AdvertEvent.SOURCE_ABUREPORT
-        if referrer_host:
-            return AdvertEvent.SOURCE_EXTERNAL
-    return AdvertEvent.SOURCE_DIRECT
+    if source == SOURCE_DIRECT:
+        return AdvertEvent.SOURCE_DIRECT
+    return AdvertEvent.SOURCE_EXTERNAL
 
 
 def append_utm_source(url: str, source: str = AdvertEvent.SOURCE_ABUREPORT) -> str:

@@ -81,12 +81,21 @@
       countdown: countdown,
       bar: bar,
       no: no,
-      yes: yes
+      yes: yes,
+      runId: 0,
+      countdownTimer: null
     };
   }
 
   function close() {
     if (!active) return;
+    /* Invalidate any countdown from this run so a stale timer cannot enable
+       the second Yes after the dialog has been reopened. */
+    active.runId += 1;
+    if (active.countdownTimer) {
+      window.clearTimeout(active.countdownTimer);
+      active.countdownTimer = null;
+    }
     active.layer.hidden = true;
     active.yes.disabled = false;
     active.yes.textContent = "Yes";
@@ -111,6 +120,7 @@
       document.addEventListener("keydown", onKey);
     }
 
+    active.runId += 1;
     active.onConfirm = config.onConfirm;
     active.title.textContent = config.title || "Clear this write-up?";
     active.message.textContent = config.message || "";
@@ -131,24 +141,34 @@
         return;
       }
 
+      var runId = active.runId;
       active.yes.dataset.step = "two";
-      active.title.textContent = config.secondTitle || "This cannot be undone";
-      active.message.textContent = config.secondMessage || "";
+      active.title.textContent = "CALM DOWN AND READ IT PROPERLY";
+      active.message.textContent =
+        (config.secondTitle ? config.secondTitle + " " : "") +
+        (config.secondMessage || "");
       active.countdown.hidden = false;
       active.yes.disabled = true;
       active.yes.textContent = "Yes, clear it";
 
-      /* Force a frame before the transition so the bar really starts at 0. */
+      /* Force a frame before the transition so the bar really starts at 0.
+         Every callback checks the run id so closing and reopening starts a
+         fresh 1.5 second wait. */
       active.bar.style.transition = "none";
       active.bar.style.width = "0%";
       window.requestAnimationFrame(function () {
+        if (!active || active.runId !== runId) return;
         window.requestAnimationFrame(function () {
+          if (!active || active.runId !== runId) return;
           active.bar.style.transition = "width " + COUNTDOWN_MS + "ms linear";
           active.bar.style.width = "100%";
         });
       });
-      window.setTimeout(function () {
-        if (active && active.yes.dataset.step === "two") active.yes.disabled = false;
+      active.countdownTimer = window.setTimeout(function () {
+        active.countdownTimer = null;
+        if (active && active.runId === runId && active.yes.dataset.step === "two") {
+          active.yes.disabled = false;
+        }
       }, COUNTDOWN_MS);
     };
   };

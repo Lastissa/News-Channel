@@ -188,13 +188,16 @@ def build_author_analytics(target, range_key=DEFAULT_RANGE):
         rank_card("Stories read", read_rank, "reads"),
     ]
     overall_position = overall_rank.get(target.pk, len(pool) or 1)
+    mean_position = (
+        story_rank.get(target.pk, len(pool))
+        + view_rank.get(target.pk, len(pool))
+        + read_rank.get(target.pk, len(pool))
+    ) / 3
     overall = {
         "position": overall_position,
         "total": len(pool),
-        "average": round(
-            (story_rank.get(target.pk, len(pool)) + view_rank.get(target.pk, len(pool)) + read_rank.get(target.pk, len(pool))) / 3,
-            1,
-        ),
+        #   Show the same rounded integer used to order the overall card.
+        "average": math.floor(mean_position + 0.5),
     }
 
     #   Source breakdown for the selected author only: database rows plus the

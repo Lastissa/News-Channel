@@ -10,7 +10,7 @@
   {{ block.super }}
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {% comment %} <meta name="viewport" content="initial-scale=0.5, width=1200"> {% endcomment %}
-  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261127-01">
+  <link rel="stylesheet" href="{% static 'blog/css/story-detail.css' %}?v=20261127-02">
   <style>
     /* Skeleton only: the polish lives in add-news.css (loaded by the light script below). Kept identical to add_news.html so both editors wear the same UI. */
     .prompt { border-bottom: 2px solid red; margin: 5px 0;text-align: center; letter-spacing: 0.05em; font-weight:700;}
@@ -66,13 +66,13 @@
 <section class="editor-shell is-loading"
          id="editor-shell"
          data-view="write"
-         data-published="{{ blog.date_created|date:'j M Y' }}"
+         data-published="{{ blog.date_created|date:'j M Y, g:i A' }}"
          data-draft-key="abureport-edit-news-draft-{{ blog.id }}-{{ request.user.pk }}"
          data-author-name="{{ request.user.get_full_name|default:request.user.email|escapejs }}"
          data-support-email="{{ support_email|default:'' }}"
          data-customer-support-mobile="{{ customer_support_mobile|default:'' }}"
-         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261127-01"
-         data-heavy-js="{% static 'home/js/edit-news-editor.js' %}?v=20261127-01">
+         data-heavy-css="{% static 'home/css/add-news.css' %}?v=20261127-02"
+         data-heavy-js="{% static 'home/js/edit-news-editor.js' %}?v=20261127-02">
   <div class="editor-toolbar" data-editor-toolbar>
     <div class="editor-toolbar-main">
       <h1>edit news</h1>
@@ -314,7 +314,7 @@
 </section>
 
 <script src="{% static 'blog/js/story-toc.js' %}?v=20261017-2" defer></script>
-<script src="{% static 'home/js/editor-clear-writeup.js' %}?v=20261127-01"></script>
+<script src="{% static 'home/js/editor-clear-writeup.js' %}?v=20261127-02"></script>
 <script>
   /* LIGHT PHASE: runs at parse time, before the heavy editor. It tells the
      user the page is still fetching its parts, then pulls them in. The heavy

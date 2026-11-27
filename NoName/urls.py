@@ -47,10 +47,18 @@ def health(request):
     except Exception:
         ip = request.META.get("REMOTE_ADDR", "") or ""
     payload = {"message": "success", "ip": ip}
-    get = dict(request.GET) or {}
-    post = dict(request.body) or {}
-    form_post = dict(request.POST) or {}
-    info_logger(msg =f"HEALTH: get=%{get} post={post} form_post={form_post} ip=%{ip}")
+    #   Logging must never decide whether the probe succeeds. request.body is
+    #   deliberately not parsed here: a non-form POST body would raise and the
+    #   health response still has to be the same small JSON payload.
+    try:
+        info_logger(
+            msg=(
+                f"HEALTH: get={dict(request.GET)} "
+                f"post={dict(request.POST)} ip={ip}"
+            )
+        )
+    except Exception:
+        pass
     return JsonResponse(payload, status=200)
 
 urlpatterns = [

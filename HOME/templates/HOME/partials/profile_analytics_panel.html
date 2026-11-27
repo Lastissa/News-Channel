@@ -14,14 +14,14 @@
       {% if is_admin_user %}
       <label class="profile-analytics-picker">
         View author
-        <select name="author" hx-get="{{ analytics_url }}" hx-target="#profile-content" hx-swap="innerHTML" hx-trigger="change" hx-indicator="#profile-analytics-loading" hx-vals='{"range": "{{ range_key }}"}' hx-push-url="true">
+        <select name="author" hx-get="{{ analytics_url }}" hx-target="#profile-content" hx-swap="innerHTML" hx-trigger="change" hx-indicator="#profile-analytics-loading" hx-vals='{"range": "{{ range_key }}"}' hx-push-url="false">
           {% for choice in author_choices %}
           <option value="{{ choice.id }}"{% if choice.id == selected_author_id %} selected{% endif %}>{{ choice.name }}</option>
           {% endfor %}
         </select>
       </label>
       {% endif %}
-      <button type="button" class="profile-tool" hx-get="{{ profile_url }}" hx-select="#profile-content" hx-target="#profile-content" hx-swap="innerHTML" hx-push-url="true">Back to profile</button>
+      <a class="profile-tool" href="{{ profile_url }}">Back to profile</a>
     </div>
   </div>
 
@@ -64,7 +64,7 @@
 
   <section class="profile-analytics-block" aria-labelledby="analytics-sources">
     <h3 id="analytics-sources">Where your readers came from</h3>
-    <p class="profile-analytics-note">From the Referer header on each story view. UTM values are used only when there is no referrer.</p>
+    <p class="profile-analytics-note">This is a new feature and the data from here start recording accurately from 27thNov, 2026. All earlier count is added to `Direct`.</p>
     <div class="profile-analytics-sources">
       {% for row in source_rows %}
       <div class="profile-analytics-source">

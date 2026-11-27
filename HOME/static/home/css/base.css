@@ -37,6 +37,8 @@
   --header-h: 64px;
   --brand: #22D3EE; 
   --brand-deep: #0B6E8A;
+  --brand-wash: rgba(34, 211, 238, 0.12);
+  --on-brand: #04202A;
   --red-linar-grad: linear-gradient(180deg, #ff6b8b 0%, #e02447 100%);
   /* Toast surfaces use the site's teal brand and danger-red accents. */
   --toast-bg: #ffffff;
@@ -107,6 +109,8 @@ html[data-theme="dark"] {
   --shadow-raised: 0 10px 28px rgba(0, 0, 0, 0.5);
   --brand: #0B6E8A;
   --brand-deep: #22D3EE;
+  --brand-wash: rgba(11, 110, 138, 0.28);
+  --on-brand: #F3EFE6;
   --red-linar-grad: linear-gradient(180deg, #d04664 0%, #9d243a 100%);
   /* Keep toast surfaces distinct from dark page backgrounds. */
   --toast-bg: #121F30;

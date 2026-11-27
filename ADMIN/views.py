@@ -38,7 +38,10 @@ from AUTHENTICATION.models import Auth, UserSession
 from BLOG.models import Blog, Category, Comment, get_category_choices
 from HOME.views import _release_story_image, _resolve_page_number
 from SERVICE_INTERNAL.abstract import get_client_ip, info_logger, invalidate_cache, is_rate_limited
-from SERVICE_INTERNAL.analytics_buffer import pending_advert_event_rows
+from SERVICE_INTERNAL.analytics_buffer import (
+    pending_advert_event_counts,
+    pending_advert_event_rows,
+)
 from SERVICE_INTERNAL.account_lifecycle import hibernate_account, restore_account
 from ADMIN.models import AccountActionLog
 from SERVICE_INTERNAL.config import StaffConfig
@@ -3197,11 +3200,14 @@ def _advert_choices(current_advert_id=None):
     return choices
 
 
-def _advert_reference_row(reference, advert_choices, storage_counts=None):
+def _advert_reference_row(reference, advert_choices, storage_counts=None, pending_counts=None):
     status_key, status_label = _reference_status(reference)
     advert = reference.advert
     landing = getattr(advert, "landing_page", None)
     has_landing = bool(landing and landing.is_deliverable)
+    counts = (pending_counts or {}).get(str(reference.pk), {})
+    view_total = getattr(reference, "view_total", 0) + counts.get("view", 0)
+    click_total = getattr(reference, "click_total", 0) + counts.get("click", 0)
     return {
         "id": reference.pk,
         "reference": reference.reference,
@@ -3226,11 +3232,9 @@ def _advert_reference_row(reference, advert_choices, storage_counts=None):
         "advert_label": (advert.heading or f"Advert #{advert.pk}") if advert else "",
         "notes": reference.notes,
         "storage_count": (storage_counts or {}).get(reference.pk, 0),
-        "view_total": getattr(reference, "view_total", 0),
-        "click_total": getattr(reference, "click_total", 0),
-        "ctr": round(getattr(reference, "click_total", 0) / getattr(reference, "view_total", 0) * 100, 1)
-        if getattr(reference, "view_total", 0)
-        else 0,
+        "view_total": view_total,
+        "click_total": click_total,
+        "ctr": round(click_total / view_total * 100, 1) if view_total else 0,
         "created_at": reference.created_at,
         "issued_by": reference.issued_by.email if reference.issued_by else "",
         "edit": _reference_edit_values(reference),
@@ -3269,12 +3273,23 @@ def _advert_reference_rows():
     advert_choices = _advert_choices()
     rows = list(_reference_queryset().order_by("-created_at")[:ADVERT_REFERENCE_LIST_LIMIT])
     counts = _storage_counts_for([row.pk for row in rows])
-    return [_advert_reference_row(row, advert_choices, counts) for row in rows]
+    pending_counts = pending_advert_event_counts([row.pk for row in rows])
+    return [
+        _advert_reference_row(row, advert_choices, counts, pending_counts)
+        for row in rows
+    ]
 
 
 def _one_reference_row(reference_id):
     row = _reference_queryset().filter(pk=reference_id).first()
-    return _advert_reference_row(row, _advert_choices(), _storage_counts_for([reference_id])) if row else None
+    if not row:
+        return None
+    return _advert_reference_row(
+        row,
+        _advert_choices(),
+        _storage_counts_for([reference_id]),
+        pending_advert_event_counts([reference_id]),
+    )
 
 
 def _copy_link_to_advert(reference, old_advert=None):

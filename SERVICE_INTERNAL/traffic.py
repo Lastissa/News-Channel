@@ -135,6 +135,30 @@ def _search_query(referrer):
     return ""
 
 
+def _classify_utm(request):
+    """Return the UTM source, or ``None`` when there is no usable marker."""
+    utm_source = (request.GET.get("utm_source") or "").strip().lower()
+    if not utm_source:
+        return None
+    if utm_source == SOURCE_ABUREPORT:
+        return SOURCE_ABUREPORT
+    if "google" in utm_source:
+        return SOURCE_GOOGLE
+    if "facebook" in utm_source or utm_source in {"fb", "messenger"}:
+        return SOURCE_FACEBOOK
+    if "whatsapp" in utm_source or utm_source == "wa":
+        return SOURCE_WHATSAPP
+    if utm_source in {"twitter", "x", "t.co"}:
+        return SOURCE_X
+    if "instagram" in utm_source:
+        return SOURCE_INSTAGRAM
+    if "linkedin" in utm_source:
+        return SOURCE_LINKEDIN
+    if "bing" in utm_source:
+        return SOURCE_BING
+    return SOURCE_OTHER
+
+
 def classify_request_source(request, author_name=None):
     """Classify an incoming page view as one of the keys in SOURCE_LABELS.
 
@@ -161,7 +185,7 @@ def classify_request_source(request, author_name=None):
             return SOURCE_GOOGLE
         if "facebook" in host or host in {"fb.com", "messenger.com"}:
             return SOURCE_FACEBOOK
-        if "whatsapp" in host:
+        if "whatsapp" in host or host == "wa.me" or host.endswith(".whatsapp.com"):
             return SOURCE_WHATSAPP
         if host in {"twitter.com", "x.com", "t.co"} or host.endswith(".twitter.com"):
             return SOURCE_X
@@ -173,25 +197,9 @@ def classify_request_source(request, author_name=None):
             return SOURCE_BING
         if host in _own_hosts(request) or host.endswith(".abureport.com"):
             return SOURCE_ABUREPORT
-        return SOURCE_OTHER
+        #   A referrer we do not recognise is still a real referrer. UTM is
+        #   the fallback here, and "other" wins only when neither signal is
+        #   useful.
+        return _classify_utm(request) or SOURCE_OTHER
 
-    utm_source = (request.GET.get("utm_source") or "").strip().lower()
-    if not utm_source:
-        return SOURCE_DIRECT
-    if utm_source == SOURCE_ABUREPORT:
-        return SOURCE_ABUREPORT
-    if "google" in utm_source:
-        return SOURCE_GOOGLE
-    if "facebook" in utm_source or utm_source in {"fb", "messenger"}:
-        return SOURCE_FACEBOOK
-    if "whatsapp" in utm_source or utm_source == "wa":
-        return SOURCE_WHATSAPP
-    if utm_source in {"twitter", "x", "t.co"}:
-        return SOURCE_X
-    if "instagram" in utm_source:
-        return SOURCE_INSTAGRAM
-    if "linkedin" in utm_source:
-        return SOURCE_LINKEDIN
-    if "bing" in utm_source:
-        return SOURCE_BING
-    return SOURCE_OTHER
+    return _classify_utm(request) or SOURCE_DIRECT
