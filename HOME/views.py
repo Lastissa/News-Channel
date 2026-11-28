@@ -1309,6 +1309,7 @@ class AddNewsView(View):
         #   category would actually reach right now. Computed from the same
         #   query the sender uses (SERVICE_INTERNAL.email_batch), so the
         #   question and the send can never disagree.
+        # Get the author staff name here
         section = request.GET.get("section", "overview")
         if section not in {"overview", "adverts", "analytics", "activity"}:
             section = "overview"
