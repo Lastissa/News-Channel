@@ -548,12 +548,14 @@ html.auth-gate-locked { overflow: hidden; }
    and the advert rail becomes its own swipeable strip underneath the hero. */
 .hero-row { display: flex; align-items: stretch; width: 100%; }
 
-.hero { position: relative; overflow: hidden; background: var(--nav-bg); border-bottom-left-radius: 25px; width: 70vw; height: 70vh; min-height: 400px; max-height: 640px; }
+.hero { position: relative; overflow: hidden; background: var(--nav-bg); border-bottom-left-radius: 25px; width: 70vw; height: 70vh; min-height: 460px; max-height: 640px; }
 .hero-track { position: relative; height: 100%; background: var(--nav-bg); }
 .hero-empty { height: 100%; display: flex; flex-direction: column; justify-content: center; }
 @media (max-width:899px) {
   .hero-row { flex-direction: column; }
   .hero { width: 100%; height: 45vh; min-height: 0; max-height: none; }
+  .hero-scrim { background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.56) 22%, rgba(0,0,0,0.22) 45%, rgba(0,0,0,0.04) 62%, rgba(0,0,0,0) 78%); }
+  .hero-content { padding: 36px 16px 58px; }
 }
 .hero-slide {
   position: absolute; inset: 0;
@@ -566,11 +568,11 @@ html.auth-gate-locked { overflow: hidden; }
   display: flex; align-items: flex-end;
 }
 .hero-slide.is-active { opacity: 1; visibility: visible; transition: opacity 0.9s ease, visibility 0s linear 0s; }
-.hero-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14,27,44,0.05) 0%, rgba(14,27,44,0.55) 55%, rgba(14,27,44,0.92) 100%); }
+.hero-scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.62) 28%, rgba(0,0,0,0.30) 55%, rgba(0,0,0,0.08) 75%, rgba(0,0,0,0) 100%); }
 /* Real lead image on top of the slide's fallback background-image; hidden by
    its own onerror handler if it fails, leaving the CSS background to show. */
 .hero-slide-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.hero-content { position: relative; z-index: 2; padding: 32px 20px 96px; max-width: 720px; }
+.hero-content { position: relative; z-index: 2; padding: 32px 20px 148px; max-width: 720px; }
 /* whole slide (image included) is a link to the story: the overlay sits under
    the text, the text lets clicks fall through to it, real links/buttons keep
    working on their own */
@@ -629,32 +631,87 @@ html.auth-gate-locked { overflow: hidden; }
 .hero-empty-copy { color: rgba(250,248,243,0.7); max-width: 420px; margin: 0 auto; }
 
 @media (max-width: 640px) {
-  .hero-headline { font-size: clamp(1.5rem, 7vw, 1.9rem); line-height: 1.16; }
+  .hero-label { font-size: 0.75rem; margin-bottom: 6px; gap: 6px; }
+  .hero-headline { font-size: clamp(1.15rem, 5.4vw, 1.45rem); line-height: 1.2; margin-bottom: 6px; }
+  .hero-byline { font-size: 0.78rem; margin-bottom: 12px; }
 }
 
-.hero-controls { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 3; display: flex; align-items: center; justify-content: center; gap: 18px; }
-.hero-arrow { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; }
-.hero-arrow:hover { background: var(--amber); color: #0E1B2C; border-color: var(--amber); }
-.hero-dots { display: flex; align-items: center; gap: 8px; }
-/* The button is the 24px hit target; the painted dot is a pseudo-element. */
-.hero-dot {
-  position: relative;
-  width: 24px; height: 24px;
-  padding: 0; border: none; border-radius: 999px; background: transparent;
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: width 0.25s ease;
+/* Featured-story selector: overlaid on the hero image bottom area. Replaces
+   arrows/dots with actual story previews. */
+.hero-selector {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  padding: 0 20px 18px;
 }
-.hero-dot::before {
-  content: ""; width: 8px; height: 8px; border-radius: 999px;
-  background: rgba(255,255,255,0.4);
-  transition: background 0.2s ease, width 0.25s ease;
+.hero-selector-track {
+  display: flex;
+  gap: 10px;
 }
-.hero-dot.is-active { width: 34px; }
-.hero-dot.is-active::before { background: var(--amber); width: 26px; }
-.hero-dot:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.hero-selector-track .hero-selector-card {
+  flex: 1 1 0;
+}
+.hero-selector-card {
+  appearance: none;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-bottom: 2px solid transparent;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(250,248,243,0.82);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.hero-selector-card:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.18);
+}
+.hero-selector-card:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.hero-selector-card.is-active {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.18);
+  border-bottom-color: var(--brand);
+  color: #FAF8F3;
+}
+.hero-selector-thumb {
+  flex: 0 0 56px;
+  width: 56px; height: 42px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+}
+.hero-selector-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+  opacity: 0.82;
+  transition: opacity 0.2s ease;
+}
+.hero-selector-card.is-active .hero-selector-thumb img,
+.hero-selector-card:hover .hero-selector-thumb img { opacity: 1; }
+.hero-selector-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: inherit;
+}
+.hero-selector-card.is-active .hero-selector-title { font-weight: 700; }
+
+@media (min-width: 900px) and (max-width: 1099.98px) {
+  .hero-selector-thumb { flex-basis: 44px; width: 44px; height: 34px; }
+  .hero-selector-card { gap: 8px; padding: 7px 8px; }
+  .hero-selector-title { font-size: 0.72rem; }
+}
 
 @media (min-width: 900px) {
-  .hero-content { padding: 40px 60px 110px; }
+  .hero-content { padding: 40px 60px 152px; }
 }
 
 /* ---------- Hero advert rail ---------- */
@@ -668,7 +725,7 @@ html.auth-gate-locked { overflow: hidden; }
 .hero-teaser {
   position: relative; width: 30vw; overflow: hidden;
   background: transparent; border-left: 2px solid var(--brand-deep);
-  height: 70vh; min-height: 400px; max-height: 640px;
+  height: 70vh; min-height: 460px; max-height: 640px;
 }
 .teaser-track {
   position: relative; height: 100%;
@@ -2993,15 +3050,35 @@ html.nav-locked { overflow: hidden; }
   .icon-btn { width: 44px; height: 44px; }
   .search-form input { padding: 12px 14px; }
 
-  .hero-arrow { width: 44px; height: 44px; }
-  .hero-controls { gap: 8px; }
-  .hero-dots { gap: 4px; }
-  .hero-dot { width: 36px; height: 44px; }
-  .hero-dot.is-active { width: 44px; }
-  .hero-dot::before { width: 12px; height: 12px; }
-  .hero-dot.is-active::before { width: 26px; }
-  .hero-bookmark { top: 14px; right: 14px; }
-  .hero-bookmark .bookmark-chip { width: 44px; height: 44px; }
+  .hero-selector { padding: 0 12px 10px; }
+  .hero-selector-track {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .hero-selector-track::-webkit-scrollbar { display: none; }
+  .hero-selector-card {
+    flex: 0 0 136px;
+    min-width: 136px;
+    scroll-snap-align: start;
+    padding: 6px 7px;
+    gap: 7px;
+    border-radius: 8px;
+  }
+  .hero-selector-thumb { flex-basis: 42px; width: 42px; height: 32px; border-radius: 5px; }
+  .hero-selector-title { font-size: 0.68rem; line-height: 1.3; -webkit-line-clamp: 2; }
+  .hero-actions { gap: 8px; }
+  .hero-actions .glass-btn { padding: 7px 12px; font-size: 0.78rem; }
+  .hero-actions .glass-btn-icon { width: 34px; height: 34px; }
+  .hero-actions .glass-btn-icon .share-icon { width: 16px; height: 16px; }
+  .hero-bookmark { top: 12px; right: 12px; }
+  .hero-bookmark .bookmark-chip { width: 34px; height: 34px; }
+  .hero-bookmark .bookmark-icon { width: 15px; height: 15px; }
 
   .password-toggle { width: 44px; height: 44px; }
   .auth-submit { min-height: 46px; }

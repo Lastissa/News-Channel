@@ -116,18 +116,22 @@
   </div>
 
   {% if featured_posts|length > 1 %}
-  <div class="hero-controls">
-    <button type="button" class="hero-arrow hero-prev" aria-label="Previous story">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4L7 10l5.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <div class="hero-dots" role="tablist" aria-label="Choose featured story">
+  <div class="hero-selector" aria-label="Featured stories selector">
+    <div class="hero-selector-track" role="tablist" aria-label="Choose featured story">
       {% for post in featured_posts %}
-      <button type="button" class="hero-dot {% if forloop.first %}is-active{% endif %}" data-index="{{ forloop.counter0 }}" role="tab" aria-label="Story {{ forloop.counter }}"></button>
+      <button type="button"
+              class="hero-selector-card {% if forloop.first %}is-active{% endif %}"
+              data-index="{{ forloop.counter0 }}"
+              role="tab"
+              aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+              aria-label="Show featured story: {{ post.heading|striptags }}">
+        <span class="hero-selector-thumb">
+          <img src="{{ post.image_1|cloudinary_image:"f_auto/q_auto/w_240"|default:placeholder }}" alt="" loading="lazy" decoding="async" onerror="this.remove();">
+        </span>
+        <span class="hero-selector-title">{{ post.heading|striptags|truncatechars:62 }}</span>
+      </button>
       {% endfor %}
     </div>
-    <button type="button" class="hero-arrow hero-next" aria-label="Next story">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4L13 10l-5.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
   </div>
   {% endif %}
 

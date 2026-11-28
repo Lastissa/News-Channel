@@ -7,9 +7,8 @@
   var slides = Array.prototype.slice.call(hero.querySelectorAll(".hero-slide"));
   if (slides.length < 2) return;
 
-  var dots = Array.prototype.slice.call(hero.querySelectorAll(".hero-dot"));
-  var prevBtn = hero.querySelector(".hero-prev");
-  var nextBtn = hero.querySelector(".hero-next");
+  var selectorCards = Array.prototype.slice.call(hero.querySelectorAll(".hero-selector-card"));
+  var selectorTrack = hero.querySelector(".hero-selector-track");
   var current = 0;
   var timer = null;
   var interval = parseInt(hero.getAttribute("data-autoplay"), 10) || 6000;
@@ -17,53 +16,81 @@
   var swipeStartX = null;
   var touchStartX = null;
   var suppressClick = false;
+  var progressBar = document.querySelector(".carousel-progress-fill");
+  var progressTimer = null;
+  var progressStart = Date.now();
+
+  function scrollActiveCardIntoView(card) {
+    if (!card || !selectorTrack) return;
+    if (selectorTrack.scrollWidth <= selectorTrack.clientWidth + 1) return;
+    var trackRect = selectorTrack.getBoundingClientRect();
+    var cardRect = card.getBoundingClientRect();
+    var offset = (cardRect.left - trackRect.left) - (trackRect.width / 2) + (cardRect.width / 2);
+    selectorTrack.scrollTo({ left: selectorTrack.scrollLeft + offset, behavior: reducedMotion ? "auto" : "smooth" });
+  }
+
+  function syncSelector() {
+    selectorCards.forEach(function (card, index) {
+      var active = index === current;
+      card.classList.toggle("is-active", active);
+      card.setAttribute("aria-selected", active ? "true" : "false");
+      card.setAttribute("tabindex", active ? "0" : "-1");
+      if (active) scrollActiveCardIntoView(card);
+    });
+  }
 
   function goTo(index) {
     slides[current].classList.remove("is-active");
-    if (dots[current]) dots[current].classList.remove("is-active");
     current = (index + slides.length) % slides.length;
     slides[current].classList.add("is-active");
-    if (dots[current]) dots[current].classList.add("is-active");
-    if (progressBar) { progressBar.style.width = '0%'; progressStart = Date.now(); }
+    syncSelector();
+    if (progressBar) { progressBar.style.width = "0%"; progressStart = Date.now(); }
   }
 
   function next() { goTo(current + 1); }
   function prev() { goTo(current - 1); }
 
-  var progressBar = document.querySelector('.carousel-progress-fill');
-  var progressTimer = null;
-  var progressStart = Date.now();
-
   function updateProgress() {
     if (reducedMotion || !progressBar) return;
     var elapsed = Date.now() - progressStart;
     var pct = Math.min((elapsed / interval) * 100, 100);
-    progressBar.style.width = pct + '%';
+    progressBar.style.width = pct + "%";
+  }
+
+  function stop() {
+    if (timer) { window.clearInterval(timer); timer = null; }
+    if (progressTimer) { window.clearInterval(progressTimer); progressTimer = null; }
   }
 
   function start() {
     if (reducedMotion) return;
     stop();
     progressStart = Date.now();
-    if (progressBar) progressBar.style.width = '0%';
-    if (progressTimer) window.clearInterval(progressTimer);
+    if (progressBar) progressBar.style.width = "0%";
     progressTimer = window.setInterval(updateProgress, 50);
     timer = window.setInterval(next, interval);
   }
-  function stop() {
-    if (timer) { window.clearInterval(timer); timer = null; }
-    if (progressTimer) { window.clearInterval(progressTimer); progressTimer = null; }
-    if (progressBar && !reducedMotion) progressBar.style.width = '0%';
-  }
 
-  if (nextBtn) nextBtn.addEventListener("click", function () { next(); start(); });
-  if (prevBtn) prevBtn.addEventListener("click", function () { prev(); start(); });
-  dots.forEach(function (dot, index) {
-    dot.addEventListener("click", function () { goTo(index); start(); });
+  selectorCards.forEach(function (card, index) {
+    card.addEventListener("click", function () { goTo(index); start(); });
+    card.addEventListener("keydown", function (event) {
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        event.preventDefault();
+        goTo(index + 1);
+        start();
+        if (selectorCards[current]) selectorCards[current].focus();
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        event.preventDefault();
+        goTo(index - 1);
+        start();
+        if (selectorCards[current]) selectorCards[current].focus();
+      }
+    });
   });
 
   hero.addEventListener("pointerdown", function (event) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (event.target.closest(".hero-selector")) return;
     swipeStartX = event.clientX;
   });
 
@@ -91,6 +118,7 @@
   });
 
   hero.addEventListener("touchstart", function (event) {
+    if (event.target.closest(".hero-selector")) return;
     if (event.touches && event.touches[0]) {
       touchStartX = event.touches[0].clientX;
     }
@@ -108,20 +136,17 @@
   }, { passive: true });
 
   hero.addEventListener("wheel", function (event) {
+    if (event.target.closest(".hero-selector")) return;
     if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
     event.preventDefault();
     if (event.deltaX < 0) next(); else prev();
     start();
   }, { passive: false });
 
-  hero.addEventListener("mouseenter", stop);
-  hero.addEventListener("mouseleave", start);
-  hero.addEventListener("focusin", stop);
-  hero.addEventListener("focusout", start);
-
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) stop(); else start();
   });
 
+  syncSelector();
   start();
 })();
