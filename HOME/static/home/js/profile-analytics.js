@@ -43,43 +43,50 @@
 
   /* The green button fetches the panel once. After the first successful swap
      it is a plain jump to the panel already on the page, so opening analytics
-     again never repeats the request. A capture listener stops HTMX before it
-     sees a later click. */
-  var openButton = document.querySelector("[data-profile-analytics-open]");
-  if (openButton) {
-    var lazyAttributes = ["hx-get", "hx-target", "hx-swap", "hx-indicator", "hx-disabled-elt", "hx-push-url"];
-    var originalAttributes = {};
+     again never repeats the request. A delegated capture listener survives
+     HTMX history restores, which replace body children with cached HTML. */
+  var lazyAttributes = ["hx-get", "hx-target", "hx-swap", "hx-indicator", "hx-disabled-elt", "hx-push-url"];
+  var originalAttributes = {};
+
+  function captureOriginalAttributes(button) {
+    if (!button) return;
     lazyAttributes.forEach(function (name) {
-      if (openButton.hasAttribute(name)) originalAttributes[name] = openButton.getAttribute(name);
+      if (button.hasAttribute(name)) originalAttributes[name] = button.getAttribute(name);
     });
-
-    openButton.addEventListener("click", function (event) {
-      if (openButton.dataset.loaded !== "1") return;
-      event.preventDefault();
-      event.stopPropagation();
-      var panel = document.querySelector("[data-profile-analytics]");
-      if (panel && panel.scrollIntoView) {
-        panel.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }, true);
-
-    function syncOpenButton(event) {
-      var target = event.detail && event.detail.target;
-      if (target && target.id && target.id !== "profile-content") return;
-      if (document.querySelector("[data-profile-analytics]")) {
-        openButton.dataset.loaded = "1";
-        lazyAttributes.forEach(function (name) { openButton.removeAttribute(name); });
-        return;
-      }
-      /* The profile came back through a jump link or the browser Back button,
-         so the next green-button click is allowed to fetch a fresh panel. */
-      delete openButton.dataset.loaded;
-      Object.keys(originalAttributes).forEach(function (name) {
-        openButton.setAttribute(name, originalAttributes[name]);
-      });
-    }
-
-    document.body.addEventListener("htmx:afterSwap", syncOpenButton);
-    document.body.addEventListener("htmx:historyRestore", syncOpenButton);
   }
+
+  captureOriginalAttributes(document.querySelector("[data-profile-analytics-open]"));
+
+  document.addEventListener("click", function (event) {
+    var button = event.target && event.target.closest && event.target.closest("[data-profile-analytics-open]");
+    if (!button || button.dataset.loaded !== "1") return;
+    event.preventDefault();
+    event.stopPropagation();
+    var panel = document.querySelector("[data-profile-analytics]");
+    if (panel && panel.scrollIntoView) {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, true);
+
+  function syncOpenButton(event) {
+    var target = event.detail && event.detail.target;
+    if (target && target.id && target.id !== "profile-content") return;
+    var button = document.querySelector("[data-profile-analytics-open]");
+    if (!button) return;
+    captureOriginalAttributes(button);
+    if (document.querySelector("[data-profile-analytics]")) {
+      button.dataset.loaded = "1";
+      lazyAttributes.forEach(function (name) { button.removeAttribute(name); });
+      return;
+    }
+    /* The profile came back through a jump link or the browser Back button,
+       so the next green-button click is allowed to fetch a fresh panel. */
+    delete button.dataset.loaded;
+    Object.keys(originalAttributes).forEach(function (name) {
+      button.setAttribute(name, originalAttributes[name]);
+    });
+  }
+
+  document.body.addEventListener("htmx:afterSwap", syncOpenButton);
+  document.body.addEventListener("htmx:historyRestore", syncOpenButton);
 })();

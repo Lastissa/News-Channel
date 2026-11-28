@@ -3410,7 +3410,7 @@ class ProfileAnalyticsView(View):
                 "author_choices": choices,
                 "selected_author_id": target.pk,
                 "analytics_url": reverse("home:profile_analytics"),
-                "profile_url": reverse("home:profile"),
+                "profile_url": f"{reverse('home:profile')}?view=profile",
             }
         )
 

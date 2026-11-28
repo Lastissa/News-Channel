@@ -7,7 +7,10 @@
 
 {% block content %}
 <section class="profile-shell">
-  {% include "HOME/partials/profile_analytics_panel.html" %}
+  <div id="profile-content">
+    <span id="profile-analytics-loading" class="htmx-indicator profile-analytics-loading" role="status">Loading analytics...</span>
+    {% include "HOME/partials/profile_analytics_panel.html" %}
+  </div>
 </section>
 {% endblock %}
 
